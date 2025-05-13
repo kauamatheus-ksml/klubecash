@@ -336,6 +336,30 @@ $dashboardData = $hasError ? [] : $result['data'];
             color: var(--danger-color);
             border: 1px solid var(--danger-color);
         }
+         /* Adicione ao seu CSS existente */
+        .notification a {
+            display: block;
+            transition: all 0.2s ease;
+        }
+        
+        .notification a:hover {
+            background-color: rgba(255, 122, 0, 0.1);
+            transform: translateY(-2px);
+        }
+        
+        .notification a:after {
+            content: "→";
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+        
+        .notification a:hover:after {
+            opacity: 1;
+        }
         
         /* Responsividade */
         @media (max-width: 768px) {
@@ -514,16 +538,20 @@ $dashboardData = $hasError ? [] : $result['data'];
                         <p style="text-align: center; padding: 20px;">Nenhuma notificação disponível</p>
                     <?php else: ?>
                         <?php foreach ($dashboardData['notificacoes'] as $notificacao): ?>
+                            <?php 
+                            // Verificar se tem link
+                            $hasLink = !empty($notificacao['link']);
+                            ?>
                             <div class="notification">
-                                <?php if (!empty($notificacao['link'])): ?>
-                                    <a href="<?php echo $notificacao['link']; ?>" style="text-decoration: none; color: inherit;">
+                                <?php if ($hasLink): ?>
+                                    <a href="<?php echo htmlspecialchars($notificacao['link']); ?>" style="text-decoration: none; color: inherit;">
                                 <?php endif; ?>
                                 
                                 <h4 class="notification-title"><?php echo htmlspecialchars($notificacao['titulo']); ?></h4>
                                 <p class="notification-text"><?php echo htmlspecialchars($notificacao['mensagem']); ?></p>
                                 <p class="notification-time"><?php echo date('d/m/Y H:i', strtotime($notificacao['data_criacao'])); ?></p>
                                 
-                                <?php if (!empty($notificacao['link'])): ?>
+                                <?php if ($hasLink): ?>
                                     </a>
                                 <?php endif; ?>
                             </div>

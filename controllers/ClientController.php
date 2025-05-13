@@ -1485,13 +1485,14 @@ class ClientController {
             $stmt->execute();
             
             if ($stmt->rowCount() == 0) {
-                // Criar a tabela
+                // Criar a tabela com a coluna 'link'
                 $createTable = "CREATE TABLE notificacoes (
                     id INT AUTO_INCREMENT PRIMARY KEY,
                     usuario_id INT NOT NULL,
                     titulo VARCHAR(100) NOT NULL,
                     mensagem TEXT NOT NULL,
                     tipo ENUM('info', 'success', 'warning', 'error') DEFAULT 'info',
+                    link VARCHAR(255) DEFAULT '',
                     data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     lida TINYINT(1) DEFAULT 0,
                     data_leitura TIMESTAMP NULL,
@@ -1499,9 +1500,18 @@ class ClientController {
                 )";
                 
                 $db->exec($createTable);
+            } else {
+                // Verificar se a coluna 'link' existe
+                $columnCheckStmt = $db->prepare("SHOW COLUMNS FROM notificacoes LIKE 'link'");
+                $columnCheckStmt->execute();
+                
+                // Se a coluna não existir, adicionar
+                if ($columnCheckStmt->rowCount() == 0) {
+                    $db->exec("ALTER TABLE notificacoes ADD COLUMN link VARCHAR(255) DEFAULT ''");
+                }
             }
         } catch (PDOException $e) {
-            error_log('Erro ao criar tabela de notificações: ' . $e->getMessage());
+            error_log('Erro ao criar/verificar tabela de notificações: ' . $e->getMessage());
         }
     }
 }
