@@ -1,4 +1,109 @@
+<?php
+// views/client/profile.php
+// Definir o menu ativo
+$activeMenu = 'perfil';
 
+// Incluir arquivos necessários
+require_once '../../config/database.php';
+require_once '../../config/constants.php';
+require_once '../../controllers/AuthController.php';
+require_once '../../controllers/ClientController.php';
+
+// Iniciar sessão
+session_start();
+
+// Verificar se o usuário está logado e é cliente
+if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION['user_type'] !== USER_TYPE_CLIENT) {
+    header("Location: " . LOGIN_URL . "?error=acesso_restrito");
+    exit;
+}
+
+// Obter dados do perfil
+$userId = $_SESSION['user_id'];
+$result = ClientController::getProfileData($userId);
+
+// Verificar se houve erro
+$hasError = !$result['status'];
+$errorMessage = $hasError ? $result['message'] : '';
+
+// Dados para exibição
+$profileData = $hasError ? [] : $result['data'];
+
+// Processar atualização de perfil
+$updateSuccess = false;
+$updateMessage = '';
+
+if (isset($_POST['update_profile'])) {
+    // Formulário de informações pessoais
+    $updateData = [
+        'nome' => $_POST['nome'] ?? '',
+        'contato' => [
+            'telefone' => $_POST['telefone'] ?? '',
+            'celular' => $_POST['celular'] ?? '',
+            'email_alternativo' => $_POST['email_alternativo'] ?? ''
+        ]
+    ];
+    
+    $updateResult = ClientController::updateProfile($userId, $updateData);
+    $updateSuccess = $updateResult['status'];
+    $updateMessage = $updateResult['message'];
+    
+    // Recarregar dados do perfil
+    if ($updateSuccess) {
+        $result = ClientController::getProfileData($userId);
+        $hasError = !$result['status'];
+        $profileData = $hasError ? [] : $result['data'];
+    }
+}
+
+// Processar atualização de senha
+$passwordSuccess = false;
+$passwordMessage = '';
+
+if (isset($_POST['update_password'])) {
+    $passwordData = [
+        'senha_atual' => $_POST['senha_atual'] ?? '',
+        'nova_senha' => $_POST['nova_senha'] ?? '',
+        'confirmar_senha' => $_POST['confirmar_senha'] ?? ''
+    ];
+    
+    // Validar senhas
+    if ($passwordData['nova_senha'] !== $passwordData['confirmar_senha']) {
+        $passwordSuccess = false;
+        $passwordMessage = 'As senhas não coincidem.';
+    } else {
+        $updateResult = ClientController::updateProfile($userId, ['senha_atual' => $passwordData['senha_atual'], 'nova_senha' => $passwordData['nova_senha']]);
+        $passwordSuccess = $updateResult['status'];
+        $passwordMessage = $updateResult['message'];
+    }
+}
+
+if (isset($_POST['update_address'])) {
+    // Formulário de endereço
+    $updateData = [
+        'endereco' => [
+            'cep' => $_POST['cep'] ?? '',
+            'logradouro' => $_POST['logradouro'] ?? '',
+            'numero' => $_POST['numero'] ?? '',
+            'complemento' => $_POST['complemento'] ?? '',
+            'bairro' => $_POST['bairro'] ?? '',
+            'cidade' => $_POST['cidade'] ?? '',
+            'estado' => $_POST['estado'] ?? ''
+        ]
+    ];
+    
+    $updateResult = ClientController::updateProfile($userId, $updateData);
+    $updateSuccess = $updateResult['status'];
+    $updateMessage = $updateResult['message'];
+    
+    // Recarregar dados do perfil
+    if ($updateSuccess) {
+        $result = ClientController::getProfileData($userId);
+        $hasError = !$result['status'];
+        $profileData = $hasError ? [] : $result['data'];
+    }
+}
+?>
 
 <!DOCTYPE html>
 <html lang="pt-BR">
