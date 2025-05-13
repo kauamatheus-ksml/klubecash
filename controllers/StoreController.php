@@ -218,9 +218,6 @@ class StoreController {
                 $addressStmt->execute();
             }
             
-            if (!Validator::validaCNPJ($data['cnpj'])) {
-                return ['status' => false, 'message' => 'CNPJ inválido.'];
-            }
             // Enviar email de notificação
             $subject = 'Solicitação de Loja Recebida - Klube Cash';
             $message = "
@@ -267,6 +264,59 @@ class StoreController {
             return ['status' => false, 'message' => 'Erro ao cadastrar loja. Por favor, tente novamente.'];
         }
     }
+    
+     /**
+     * Valida CNPJ
+     * @param string $cnpj CNPJ com ou sem máscara
+     * @return bool Verdadeiro se o CNPJ for válido
+     */
+   
+    public static function validaCNPJ($cnpj) {
+        // Remover caracteres especiais
+        $cnpj = preg_replace('/[^0-9]/', '', $cnpj);
+        
+        // Verificar se tem 14 dígitos
+        if (strlen($cnpj) != 14) {
+            return false;
+        }
+        
+        // Verificar se todos os dígitos são iguais
+        if (preg_match('/(\d)\1{13}/', $cnpj)) {
+            return false;
+        }
+        
+        // Validação do primeiro dígito verificador
+        $soma = 0;
+        $multiplicador = 5;
+        
+        for ($i = 0; $i < 12; $i++) {
+            $soma += $cnpj[$i] * $multiplicador;
+            $multiplicador = ($multiplicador == 2) ? 9 : $multiplicador - 1;
+        }
+        
+        $resto = $soma % 11;
+        $dv1 = ($resto < 2) ? 0 : 11 - $resto;
+        
+        // Validação do segundo dígito verificador
+        $soma = 0;
+        $multiplicador = 6;
+        
+        for ($i = 0; $i < 13; $i++) {
+            $soma += $cnpj[$i] * $multiplicador;
+            $multiplicador = ($multiplicador == 2) ? 9 : $multiplicador - 1;
+        }
+        
+        $resto = $soma % 11;
+        $dv2 = ($resto < 2) ? 0 : 11 - $resto;
+        
+        // Verificar se os dígitos verificadores são válidos
+        return ($cnpj[12] == $dv1 && $cnpj[13] == $dv2);
+        
+        if (empty($data['cnpj'])) {
+            $errors[] = 'CNPJ é obrigatório';
+        }
+    }
+    
     
     /**
      * Obtém lista de lojas
