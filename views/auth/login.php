@@ -445,7 +445,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
 
                     <div class="forgot-password">
-                        <a href="recover-password.php">Esqueci minha senha</a>
+                    <a href="<?php echo RECOVER_PASSWORD_URL; ?>">Esqueci minha senha</a>
                     </div>
 
                     <button type="submit" class="login-btn">Entrar</button>
@@ -467,7 +467,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
 
                 <div class="register-link">
-                    <p>Não tem conta? <a href="register.php">Registre-se</a></p>
+                    <p>Não tem conta? <a href="<?php echo REGISTER_URL; ?>">Registre-se</a></p>
                 </div>
             </div>
         </div>
