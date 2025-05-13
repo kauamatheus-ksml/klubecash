@@ -9,15 +9,15 @@ session_start();
 // Verificar se o usuário está logado
 $isLoggedIn = isset($_SESSION['user_id']);
 $userType = $isLoggedIn ? $_SESSION['user_type'] : '';
+$userName = $isLoggedIn ? $_SESSION['user_name'] : '';
 
-// Redirecionar para dashboard se já estiver logado
+// Determinar URL do dashboard (não redireciona automaticamente)
+$dashboardURL = '';
 if ($isLoggedIn) {
     if ($userType === 'admin') {
-        header('Location: ' . ADMIN_DASHBOARD_URL);
-        exit;
+        $dashboardURL = ADMIN_DASHBOARD_URL;
     } elseif ($userType === 'cliente') {
-        header('Location: ' . CLIENT_DASHBOARD_URL);
-        exit;
+        $dashboardURL = CLIENT_DASHBOARD_URL;
     }
 }
 ?>
@@ -636,7 +636,6 @@ if ($isLoggedIn) {
             <nav class="nav">
                 <a href="#" class="logo">
                     <img src="assets/images/logolaranja.png" alt="Klube Cash Logo">
-                    
                 </a>
                 
                 <div class="hamburger" id="hamburger">
@@ -652,8 +651,14 @@ if ($isLoggedIn) {
                     <li class="nav-item"><a href="#beneficios" class="nav-link">Benefícios</a></li>
                     <li class="nav-item"><a href="#parceiros" class="nav-link">Lojas Parceiras</a></li>
                     <li class="nav-item"><a href="#faq" class="nav-link">FAQ</a></li>
-                    <li class="nav-item"><a href="<?php echo LOGIN_URL; ?>" class="nav-link">Entrar</a></li>
-                    <li class="nav-item"><a href="<?php echo REGISTER_URL; ?>" class="nav-link btn">Cadastre-se</a></li>
+                    
+                    <?php if ($isLoggedIn): ?>
+                        <li class="nav-item"><a href="<?php echo $dashboardURL; ?>" class="nav-link">Meu Painel</a></li>
+                        <li class="nav-item"><a href="<?php echo SITE_URL; ?>/controllers/AuthController.php?action=logout" class="nav-link btn">Sair</a></li>
+                    <?php else: ?>
+                        <li class="nav-item"><a href="<?php echo LOGIN_URL; ?>" class="nav-link">Entrar</a></li>
+                        <li class="nav-item"><a href="<?php echo REGISTER_URL; ?>" class="nav-link btn">Cadastre-se</a></li>
+                    <?php endif; ?>
                 </ul>
             </nav>
         </div>
@@ -663,12 +668,21 @@ if ($isLoggedIn) {
     <section class="hero">
         <div class="container">
             <div class="hero-content">
-                <h1>Ganhe dinheiro de volta em cada compra</h1>
-                <p>Junte-se a milhares de pessoas que economizam com o Klube Cash. Receba cashback em todas as compras nas lojas parceiras.</p>
-                <div class="hero-buttons">
-                    <a href="<?php echo REGISTER_URL; ?>" class="btn btn-white">Começar Agora</a>
-                    <a href="#como-funciona" class="btn btn-outline-white">Saiba Mais</a>
-                </div>
+                <?php if ($isLoggedIn): ?>
+                    <h1>Bem-vindo de volta, <?php echo htmlspecialchars($userName); ?>!</h1>
+                    <p>Continue aproveitando o cashback em suas compras nas lojas parceiras.</p>
+                    <div class="hero-buttons">
+                        <a href="<?php echo $dashboardURL; ?>" class="btn btn-white">Acessar Meu Painel</a>
+                        <a href="#como-funciona" class="btn btn-outline-white">Saiba Mais</a>
+                    </div>
+                <?php else: ?>
+                    <h1>Ganhe dinheiro de volta em cada compra</h1>
+                    <p>Junte-se a milhares de pessoas que economizam com o Klube Cash. Receba cashback em todas as compras nas lojas parceiras.</p>
+                    <div class="hero-buttons">
+                        <a href="<?php echo REGISTER_URL; ?>" class="btn btn-white">Começar Agora</a>
+                        <a href="#como-funciona" class="btn btn-outline-white">Saiba Mais</a>
+                    </div>
+                <?php endif; ?>
             </div>
             <img src="assets/images/hero-image.png" alt="Pessoas economizando com cashback" class="hero-image">
         </div>
