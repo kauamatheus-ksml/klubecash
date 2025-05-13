@@ -34,22 +34,11 @@ $updateSuccess = false;
 $updateMessage = '';
 
 if (isset($_POST['update_profile'])) {
+    // Os dados já estarão na estrutura correta devido aos nomes dos campos do formulário
     $updateData = [
         'nome' => $_POST['nome'] ?? '',
-        'contato' => [
-            'telefone' => $_POST['telefone'] ?? '',
-            'celular' => $_POST['celular'] ?? '',
-            'email_alternativo' => $_POST['email_alternativo'] ?? ''
-        ],
-        'endereco' => [
-            'cep' => $_POST['cep'] ?? '',
-            'logradouro' => $_POST['logradouro'] ?? '',
-            'numero' => $_POST['numero'] ?? '',
-            'complemento' => $_POST['complemento'] ?? '',
-            'bairro' => $_POST['bairro'] ?? '',
-            'cidade' => $_POST['cidade'] ?? '',
-            'estado' => $_POST['estado'] ?? ''
-        ]
+        'contato' => $_POST['contato'] ?? [],
+        'endereco' => $_POST['endereco'] ?? []
     ];
     
     $updateResult = ClientController::updateProfile($userId, $updateData);
@@ -457,17 +446,17 @@ if (isset($_POST['update_password'])) {
                         <div class="form-row">
                             <div class="form-group">
                                 <label class="form-label" for="telefone">Telefone</label>
-                                <input type="tel" id="telefone" name="telefone" class="form-control" value="<?php echo htmlspecialchars($profileData['contato']['telefone'] ?? ''); ?>">
+                                <input type="tel" id="telefone" name="contato[telefone]" class="form-control" value="<?php echo htmlspecialchars($profileData['contato']['telefone'] ?? ''); ?>">
                             </div>
                             
                             <div class="form-group">
                                 <label class="form-label" for="celular">Celular</label>
-                                <input type="tel" id="celular" name="celular" class="form-control" value="<?php echo htmlspecialchars($profileData['contato']['celular'] ?? ''); ?>">
+                                <input type="tel" id="celular" name="contato[celular]" class="form-control" value="<?php echo htmlspecialchars($profileData['contato']['celular'] ?? ''); ?>">
                             </div>
                             
                             <div class="form-group">
                                 <label class="form-label" for="email_alternativo">E-mail Alternativo</label>
-                                <input type="email" id="email_alternativo" name="email_alternativo" class="form-control" value="<?php echo htmlspecialchars($profileData['contato']['email_alternativo'] ?? ''); ?>">
+                                <input type="email" id="email_alternativo" name="contato[email_alternativo]" class="form-control" value="<?php echo htmlspecialchars($profileData['contato']['email_alternativo'] ?? ''); ?>">
                             </div>
                         </div>
                         
@@ -485,41 +474,41 @@ if (isset($_POST['update_password'])) {
                         <div class="form-row">
                             <div class="form-group">
                                 <label class="form-label" for="cep">CEP</label>
-                                <input type="text" id="cep" name="cep" class="form-control" value="<?php echo htmlspecialchars($profileData['endereco']['cep'] ?? ''); ?>">
+                                <input type="text" id="cep" name="endereco[cep]" class="form-control" value="<?php echo htmlspecialchars($profileData['endereco']['cep'] ?? ''); ?>">
                             </div>
                         </div>
                         
                         <div class="form-row">
                             <div class="form-group" style="grid-column: span 2;">
                                 <label class="form-label" for="logradouro">Logradouro</label>
-                                <input type="text" id="logradouro" name="logradouro" class="form-control" value="<?php echo htmlspecialchars($profileData['endereco']['logradouro'] ?? ''); ?>">
+                                <input type="text" id="logradouro" name="endereco[logradouro]" class="form-control" value="<?php echo htmlspecialchars($profileData['endereco']['logradouro'] ?? ''); ?>">
                             </div>
                             
                             <div class="form-group">
                                 <label class="form-label" for="numero">Número</label>
-                                <input type="text" id="numero" name="numero" class="form-control" value="<?php echo htmlspecialchars($profileData['endereco']['numero'] ?? ''); ?>">
+                                <input type="text" id="numero" name="endereco[numero]" class="form-control" value="<?php echo htmlspecialchars($profileData['endereco']['numero'] ?? ''); ?>">
                             </div>
                         </div>
                         
                         <div class="form-group">
                             <label class="form-label" for="complemento">Complemento</label>
-                            <input type="text" id="complemento" name="complemento" class="form-control" value="<?php echo htmlspecialchars($profileData['endereco']['complemento'] ?? ''); ?>">
+                            <input type="text" id="complemento" name="endereco[complemento]" class="form-control" value="<?php echo htmlspecialchars($profileData['endereco']['complemento'] ?? ''); ?>">
                         </div>
                         
                         <div class="form-row">
                             <div class="form-group">
                                 <label class="form-label" for="bairro">Bairro</label>
-                                <input type="text" id="bairro" name="bairro" class="form-control" value="<?php echo htmlspecialchars($profileData['endereco']['bairro'] ?? ''); ?>">
+                                <input type="text" id="bairro" name="endereco[bairro]" class="form-control" value="<?php echo htmlspecialchars($profileData['endereco']['bairro'] ?? ''); ?>">
                             </div>
                             
                             <div class="form-group">
                                 <label class="form-label" for="cidade">Cidade</label>
-                                <input type="text" id="cidade" name="cidade" class="form-control" value="<?php echo htmlspecialchars($profileData['endereco']['cidade'] ?? ''); ?>">
+                                <input type="text" id="cidade" name="endereco[cidade]" class="form-control" value="<?php echo htmlspecialchars($profileData['endereco']['cidade'] ?? ''); ?>">
                             </div>
                             
                             <div class="form-group">
                                 <label class="form-label" for="estado">Estado</label>
-                                <input type="text" id="estado" name="estado" class="form-control" value="<?php echo htmlspecialchars($profileData['endereco']['estado'] ?? ''); ?>">
+                                <input type="text" id="estado" name="endereco[estado]" class="form-control" value="<?php echo htmlspecialchars($profileData['endereco']['estado'] ?? ''); ?>">
                             </div>
                         </div>
                         
