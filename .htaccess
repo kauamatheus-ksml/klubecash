@@ -1,0 +1,96 @@
+# Relatórios admin
+RewriteRule ^admin/relatorios/?$ views/admin/reports.php [L]
+
+# Habilitar o motor de reescrita
+RewriteEngine On
+
+# Definir diretório base
+RewriteBase /
+
+# Configurações de segurança
+<IfModule mod_headers.c>
+    # Proteção contra XSS e clickjacking
+    Header set X-XSS-Protection "1; mode=block"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set X-Content-Type-Options "nosniff"
+    
+    # Política de segurança de conteúdo (CSP)
+    Header set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;"
+</IfModule>
+
+# Bloquear acesso a arquivos sensíveis
+<FilesMatch "^(\.htaccess|\.htpasswd|\.git|\.env|config\.php)">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# Evitar navegação em diretórios
+Options -Indexes
+
+# Adicionar regra para detalhes de transação
+RewriteRule ^admin/transacao/([0-9]+)/?$ views/admin/transaction-details.php?id=$1 [L]
+
+# Redirecionar www para non-www
+RewriteCond %{HTTP_HOST} ^www\.(.*)$ [NC]
+RewriteRule ^(.*)$ https://%1/$1 [R=301,L]
+
+# Forçar HTTPS
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# Regras de reescrita de URL para rotas amigáveis
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_FILENAME}\.php -f
+RewriteRule ^(.*)$ $1.php [L]
+
+# Reescrever URLs amigáveis para autenticação
+RewriteRule ^login/?$ views/auth/login.php [L]
+RewriteRule ^registro/?$ views/auth/register.php [L]
+RewriteRule ^recuperar-senha/?$ views/auth/recover-password.php [L]
+
+# Reescrever URLs amigáveis para cliente
+RewriteRule ^cliente/dashboard/?$ views/client/dashboard.php [L]
+RewriteRule ^cliente/extrato/?$ views/client/statement.php [L]
+RewriteRule ^cliente/lojas-parceiras/?$ views/client/partner-stores.php [L]
+RewriteRule ^cliente/perfil/?$ views/client/profile.php [L]
+
+# Reescrever URLs amigáveis para admin
+RewriteRule ^admin/dashboard/?$ views/admin/dashboard.php [L]
+RewriteRule ^admin/usuarios/?$ views/admin/users.php [L]
+RewriteRule ^admin/lojas/?$ views/admin/stores.php [L]
+RewriteRule ^admin/transacoes/?$ views/admin/purchases.php [L]
+RewriteRule ^admin/configuracoes/?$ views/admin/settings.php [L]
+
+# Reescrever URLs amigáveis para lojas
+RewriteRule ^lojas/cadastro/?$ views/stores/register.php [L]
+RewriteRule ^lojas/detalhes/([0-9]+)/?$ views/stores/details.php?id=$1 [L]
+
+# Definir página de erro personalizada
+ErrorDocument 404 /views/errors/404.php
+ErrorDocument 500 /views/errors/500.php
+
+# Configurações de performance
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType image/jpg "access plus 1 year"
+    ExpiresByType image/jpeg "access plus 1 year"
+    ExpiresByType image/gif "access plus 1 year"
+    ExpiresByType image/png "access plus 1 year"
+    ExpiresByType text/css "access plus 1 month"
+    ExpiresByType application/javascript "access plus 1 month"
+</IfModule>
+
+# Comprimir arquivos
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css application/javascript application/json
+</IfModule>
+
+# Configurar PHP
+<IfModule mod_php7.c>
+    php_value upload_max_filesize 10M
+    php_value post_max_size 10M
+    php_value max_execution_time 300
+    php_value max_input_time 300
+    php_flag display_errors off
+    php_value error_reporting E_ALL & ~E_NOTICE & ~E_DEPRECATED
+</IfModule>
