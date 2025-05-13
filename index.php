@@ -910,7 +910,7 @@ if ($isLoggedIn) {
             <div class="footer-grid">
                 <div class="footer-column">
                     <h3>Klube Cash</h3>
-                    <p> O melhor programa de cashback para suas compras. Ganhe dinheiro de volta em cada compra nas lojas parceiras.</p>
+                    <p> melhor programa de cashback para suas compras. Ganhe dinheiro de volta em cada compra nas lojas parceiras.</p>
                     <div class="social-icons">
                         <a href="#" class="social-icon">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
