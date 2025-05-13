@@ -144,6 +144,7 @@ class StoreController {
      */
     public static function registerStore($data) {
         try {
+            
             // Validar dados obrigatórios
             $requiredFields = ['nome_fantasia', 'razao_social', 'cnpj', 'email', 'telefone'];
             foreach ($requiredFields as $field) {
@@ -217,6 +218,9 @@ class StoreController {
                 $addressStmt->execute();
             }
             
+            if (!Validator::validaCNPJ($data['cnpj'])) {
+                return ['status' => false, 'message' => 'CNPJ inválido.'];
+            }
             // Enviar email de notificação
             $subject = 'Solicitação de Loja Recebida - Klube Cash';
             $message = "
