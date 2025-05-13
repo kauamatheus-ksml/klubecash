@@ -542,9 +542,9 @@ $dashboardData = $hasError ? [] : $result['data'];
                             // Verificar se tem link
                             $hasLink = !empty($notificacao['link']);
                             ?>
-                            <div class="notification">
+                            <div class="notification" style="position: relative;">
                                 <?php if ($hasLink): ?>
-                                    <a href="<?php echo htmlspecialchars($notificacao['link']); ?>" style="text-decoration: none; color: inherit;">
+                                    <a href="<?php echo htmlspecialchars($notificacao['link']); ?>" style="text-decoration: none; color: inherit; display: block;">
                                 <?php endif; ?>
                                 
                                 <h4 class="notification-title"><?php echo htmlspecialchars($notificacao['titulo']); ?></h4>

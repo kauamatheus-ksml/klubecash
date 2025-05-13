@@ -681,6 +681,69 @@ class ClientController {
                 }
             }
             
+            // Verificar se o perfil está completo após a atualização
+            $profileComplete = true;
+            
+            // Verificar se tem endereço
+            $checkAddrStmt = $db->prepare("SELECT id FROM usuarios_endereco WHERE usuario_id = :user_id LIMIT 1");
+            $checkAddrStmt->bindParam(':user_id', $userId);
+            $checkAddrStmt->execute();
+            if ($checkAddrStmt->rowCount() == 0) {
+                $profileComplete = false;
+                error_log('Perfil incompleto: Falta endereço');
+            }
+            
+            // Verificar se tem contato
+            $checkContactStmt = $db->prepare("SELECT id FROM usuarios_contato WHERE usuario_id = :user_id LIMIT 1");
+            $checkContactStmt->bindParam(':user_id', $userId);
+            $checkContactStmt->execute();
+            if ($checkContactStmt->rowCount() == 0) {
+                $profileComplete = false;
+                error_log('Perfil incompleto: Falta contato');
+            }
+            
+            // Verificar se tem telefone no cadastro principal
+            $phoneStmt = $db->prepare("
+                SELECT telefone FROM usuarios 
+                WHERE id = :user_id AND (telefone IS NOT NULL AND telefone != '')
+            ");
+            $phoneStmt->bindParam(':user_id', $userId);
+            $phoneStmt->execute();
+            if ($phoneStmt->rowCount() == 0) {
+                $profileComplete = false;
+                error_log('Perfil incompleto: Falta telefone principal');
+            }
+            
+            // Se o perfil estiver completo, marcar notificações relacionadas como lidas
+            if ($profileComplete) {
+                error_log('Perfil completo! Marcando notificações como lidas');
+                
+                // Verificar se a tabela de notificações tem a coluna 'lida'
+                $tableColumnsStmt = $db->prepare("SHOW COLUMNS FROM notificacoes LIKE 'lida'");
+                $tableColumnsStmt->execute();
+                
+                if ($tableColumnsStmt->rowCount() > 0) {
+                    $updateNotificationsStmt = $db->prepare("
+                        UPDATE notificacoes 
+                        SET lida = 1, data_leitura = NOW() 
+                        WHERE usuario_id = :user_id 
+                        AND (
+                            titulo LIKE '%perfil%' OR 
+                            mensagem LIKE '%perfil%' OR 
+                            mensagem LIKE '%dados cadastrais%'
+                        )
+                        AND lida = 0
+                    ");
+                    $updateNotificationsStmt->bindParam(':user_id', $userId);
+                    $updateNotificationsStmt->execute();
+                    
+                    $affectedRows = $updateNotificationsStmt->rowCount();
+                    error_log("$affectedRows notificações de perfil marcadas como lidas");
+                } else {
+                    error_log("Coluna 'lida' não encontrada na tabela notificacoes");
+                }
+            }
+            
             // Confirmar transação
             $db->commit();
             error_log('Transação concluída com sucesso - Perfil atualizado');
@@ -706,6 +769,7 @@ class ClientController {
             }
         }
     }
+    
     
     /**
      * Verifica e cria as tabelas necessárias se não existirem
@@ -1380,7 +1444,7 @@ class ClientController {
      * @param int $limit Limite de notificações
      * @return array Lista de notificações
      */
-    private static function getClientNotifications($userId, $limit = 5) {
+    private static function getClientNotifications($userId, $limit = 5, $onlyUnread = true) {
         try {
             $db = Database::getConnection();
             
@@ -1388,13 +1452,19 @@ class ClientController {
             self::createNotificationsTableIfNotExists($db);
             
             // Obter notificações
-            $stmt = $db->prepare("
+            $query = "
                 SELECT *
                 FROM notificacoes
                 WHERE usuario_id = :user_id
-                ORDER BY data_criacao DESC
-                LIMIT :limit
-            ");
+            ";
+            
+            if ($onlyUnread) {
+                $query .= " AND lida = 0";
+            }
+            
+            $query .= " ORDER BY data_criacao DESC LIMIT :limit";
+            
+            $stmt = $db->prepare($query);
             $stmt->bindParam(':user_id', $userId);
             $stmt->bindParam(':limit', $limit, PDO::PARAM_INT);
             $stmt->execute();
@@ -1500,6 +1570,7 @@ class ClientController {
                 )";
                 
                 $db->exec($createTable);
+                error_log('Tabela notificacoes criada com sucesso');
             } else {
                 // Verificar se a coluna 'link' existe
                 $columnCheckStmt = $db->prepare("SHOW COLUMNS FROM notificacoes LIKE 'link'");
@@ -1508,6 +1579,7 @@ class ClientController {
                 // Se a coluna não existir, adicionar
                 if ($columnCheckStmt->rowCount() == 0) {
                     $db->exec("ALTER TABLE notificacoes ADD COLUMN link VARCHAR(255) DEFAULT ''");
+                    error_log('Coluna link adicionada à tabela notificacoes');
                 }
             }
         } catch (PDOException $e) {
