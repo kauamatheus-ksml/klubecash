@@ -39,7 +39,8 @@ class ClientController {
                     $userId, 
                     'Complete seu perfil', 
                     'Complete seus dados cadastrais para aproveitar melhor sua experiência no Klube Cash. Clique aqui para atualizar seu perfil agora.',
-                    'warning'
+                    'warning',
+                    CLIENT_PROFILE_URL
                 );
             }
 
@@ -56,7 +57,55 @@ class ClientController {
             $balanceData = $balanceStmt->fetch(PDO::FETCH_ASSOC);
             $totalBalance = $balanceData['saldo_total'] ?? 0;
             
-            // ... resto do código original ...
+            // Obter transações recentes
+            $transactionsStmt = $db->prepare("
+                SELECT t.*, l.nome_fantasia as loja_nome
+                FROM transacoes_cashback t
+                JOIN lojas l ON t.loja_id = l.id
+                WHERE t.usuario_id = :user_id
+                ORDER BY t.data_transacao DESC
+                LIMIT 5
+            ");
+            $transactionsStmt->bindParam(':user_id', $userId);
+            $transactionsStmt->execute();
+            $recentTransactions = $transactionsStmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            // Obter estatísticas de cashback
+            $statisticsStmt = $db->prepare("
+                SELECT 
+                    COUNT(*) as total_transacoes,
+                    SUM(valor_total) as total_compras,
+                    SUM(valor_cashback) as total_cashback,
+                    MAX(data_transacao) as ultima_transacao
+                FROM transacoes_cashback
+                WHERE usuario_id = :user_id AND status = :status
+            ");
+            $statisticsStmt->bindParam(':user_id', $userId);
+            $statisticsStmt->bindParam(':status', $status);
+            $statisticsStmt->execute();
+            $statistics = $statisticsStmt->fetch(PDO::FETCH_ASSOC);
+            
+            // Obter lojas favoritas/mais utilizadas
+            $favoritesStmt = $db->prepare("
+                SELECT 
+                    l.id, l.nome_fantasia, 
+                    COUNT(t.id) as total_compras,
+                    SUM(t.valor_cashback) as total_cashback,
+                    l.porcentagem_cashback
+                FROM transacoes_cashback t
+                JOIN lojas l ON t.loja_id = l.id
+                WHERE t.usuario_id = :user_id AND t.status = :status
+                GROUP BY l.id
+                ORDER BY total_compras DESC
+                LIMIT 3
+            ");
+            $favoritesStmt->bindParam(':user_id', $userId);
+            $favoritesStmt->bindParam(':status', $status);
+            $favoritesStmt->execute();
+            $favoriteStores = $favoritesStmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            // Obter notificações do cliente
+            $notifications = self::getClientNotifications($userId);
             
             // Consolidar dados
             return [
