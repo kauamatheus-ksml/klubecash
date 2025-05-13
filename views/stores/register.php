@@ -50,8 +50,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = 'Razão social é obrigatória';
     }
     
-    if (empty($data['cnpj']) || !Validator::validaCNPJ($data['cnpj'])) {
-        $errors[] = 'CNPJ inválido';
+    if (empty($data['cnpj'])) {
+        $errors[] = 'CNPJ é obrigatório';
     }
     
     if (empty($data['email']) || !filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
@@ -90,6 +90,7 @@ $categorias = [
     'Alimentação', 'Vestuário', 'Eletrônicos', 'Casa e Decoração', 
     'Beleza e Saúde', 'Serviços', 'Educação', 'Entretenimento', 'Outros'
 ];
+
 ?>
 
 <!DOCTYPE html>

@@ -312,9 +312,6 @@ class StoreController {
         // Verificar se os dígitos verificadores são válidos
         return ($cnpj[12] == $dv1 && $cnpj[13] == $dv2);
         
-        if (empty($data['cnpj'])) {
-            $errors[] = 'CNPJ é obrigatório';
-        }
     }
     
     
