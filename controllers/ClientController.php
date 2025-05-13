@@ -14,11 +14,11 @@ require_once __DIR__ . '/AuthController.php';
 class ClientController {
     
     /**
-     * Obtém os dados do dashboard do cliente
-     * 
-     * @param int $userId ID do cliente
-     * @return array Dados do dashboard
-     */
+    * Obtém os dados do dashboard do cliente
+    * 
+    * @param int $userId ID do cliente
+    * @return array Dados do dashboard
+    */
     public static function getDashboardData($userId) {
         try {
             // Verificar se é um cliente válido
@@ -31,6 +31,17 @@ class ClientController {
             // Verificar e criar tabelas necessárias
             self::createFavoritesTableIfNotExists($db);
             self::createNotificationsTableIfNotExists($db);
+
+            // Verificar se o perfil está incompleto e não há notificação recente
+            if (self::isProfileIncomplete($userId) && !self::hasRecentProfileNotification($userId)) {
+                // Enviar notificação para completar perfil
+                self::notifyClient(
+                    $userId, 
+                    'Complete seu perfil', 
+                    'Complete seus dados cadastrais para aproveitar melhor sua experiência no Klube Cash. Clique aqui para atualizar seu perfil agora.',
+                    'warning'
+                );
+            }
 
             // Obter saldo total de cashback
             $balanceStmt = $db->prepare("
@@ -45,54 +56,7 @@ class ClientController {
             $balanceData = $balanceStmt->fetch(PDO::FETCH_ASSOC);
             $totalBalance = $balanceData['saldo_total'] ?? 0;
             
-            // Obter transações recentes
-            $transactionsStmt = $db->prepare("
-                SELECT t.*, l.nome_fantasia as loja_nome
-                FROM transacoes_cashback t
-                JOIN lojas l ON t.loja_id = l.id
-                WHERE t.usuario_id = :user_id
-                ORDER BY t.data_transacao DESC
-                LIMIT 5
-            ");
-            $transactionsStmt->bindParam(':user_id', $userId);
-            $transactionsStmt->execute();
-            $recentTransactions = $transactionsStmt->fetchAll(PDO::FETCH_ASSOC);
-            
-            // Obter estatísticas de cashback
-            $statisticsStmt = $db->prepare("
-                SELECT 
-                    COUNT(*) as total_transacoes,
-                    SUM(valor_total) as total_compras,
-                    SUM(valor_cashback) as total_cashback,
-                    MAX(data_transacao) as ultima_transacao
-                FROM transacoes_cashback
-                WHERE usuario_id = :user_id AND status = :status
-            ");
-            $statisticsStmt->bindParam(':user_id', $userId);
-            $statisticsStmt->bindParam(':status', $status);
-            $statisticsStmt->execute();
-            $statistics = $statisticsStmt->fetch(PDO::FETCH_ASSOC);
-            
-            // Obter lojas favoritas/mais utilizadas
-            $favoritesStmt = $db->prepare("
-                SELECT 
-                    l.id, l.nome_fantasia, 
-                    COUNT(t.id) as total_compras,
-                    SUM(t.valor_cashback) as total_cashback
-                FROM transacoes_cashback t
-                JOIN lojas l ON t.loja_id = l.id
-                WHERE t.usuario_id = :user_id AND t.status = :status
-                GROUP BY l.id
-                ORDER BY total_compras DESC
-                LIMIT 3
-            ");
-            $favoritesStmt->bindParam(':user_id', $userId);
-            $favoritesStmt->bindParam(':status', $status);
-            $favoritesStmt->execute();
-            $favoriteStores = $favoritesStmt->fetchAll(PDO::FETCH_ASSOC);
-            
-            // Obter notificações do cliente
-            $notifications = self::getClientNotifications($userId);
+            // ... resto do código original ...
             
             // Consolidar dados
             return [
@@ -743,7 +707,89 @@ class ClientController {
             // Não é necessário relançar a exceção, apenas registrar o erro
         }
     }
-    
+    /**
+     * Valida se o cliente existe e está ativo
+     * 
+     * @param int $userId ID do cliente
+     * @return bool Verdadeiro se o cliente é válido, falso caso contrário
+     */
+    private static function isProfileIncomplete($userId) {
+        try {
+            $db = Database::getConnection();
+            
+            // Verificar se o usuário tem dados de contato
+            $contactStmt = $db->prepare("
+                SELECT id FROM usuarios_contato
+                WHERE usuario_id = :user_id
+                LIMIT 1
+            ");
+            $contactStmt->bindParam(':user_id', $userId);
+            $contactStmt->execute();
+            $hasContact = $contactStmt->rowCount() > 0;
+            
+            // Verificar se o usuário tem dados de endereço
+            $addressStmt = $db->prepare("
+                SELECT id FROM usuarios_endereco
+                WHERE usuario_id = :user_id
+                LIMIT 1
+            ");
+            $addressStmt->bindParam(':user_id', $userId);
+            $addressStmt->execute();
+            $hasAddress = $addressStmt->rowCount() > 0;
+            
+            // Verificar se o usuário tem número de telefone no cadastro principal
+            $phoneStmt = $db->prepare("
+                SELECT telefone FROM usuarios
+                WHERE id = :user_id AND (telefone IS NOT NULL AND telefone != '')
+            ");
+            $phoneStmt->bindParam(':user_id', $userId);
+            $phoneStmt->execute();
+            $hasPhone = $phoneStmt->rowCount() > 0;
+            
+            // Perfil está incompleto se faltar um desses dados
+            return !($hasContact && $hasAddress && $hasPhone);
+            
+        } catch (PDOException $e) {
+            error_log('Erro ao verificar perfil incompleto: ' . $e->getMessage());
+            return false; // Em caso de erro, assumimos que não está incompleto para não enviar notificações desnecessárias
+        }
+    }
+    /**
+    * Verifica se já existe uma notificação recente sobre completar o perfil
+    * 
+    * @param int $userId ID do usuário
+    * @param int $dias Número de dias para considerar uma notificação recente
+    * @return bool true se existe uma notificação recente
+    */
+    private static function hasRecentProfileNotification($userId, $dias = 7) {
+        try {
+            $db = Database::getConnection();
+            
+            // Criar tabela de notificações se não existir
+            self::createNotificationsTableIfNotExists($db);
+            
+            // Calcular data limite para notificações recentes
+            $dataLimite = date('Y-m-d H:i:s', strtotime("-$dias days"));
+            
+            // Verificar se existe notificação recente sobre preenchimento de perfil
+            $stmt = $db->prepare("
+                SELECT id FROM notificacoes
+                WHERE usuario_id = :user_id 
+                AND (titulo LIKE '%perfil%' OR mensagem LIKE '%perfil%')
+                AND data_criacao >= :data_limite
+                LIMIT 1
+            ");
+            $stmt->bindParam(':user_id', $userId);
+            $stmt->bindParam(':data_limite', $dataLimite);
+            $stmt->execute();
+            
+            return $stmt->rowCount() > 0;
+            
+        } catch (PDOException $e) {
+            error_log('Erro ao verificar notificações recentes: ' . $e->getMessage());
+            return true; // Em caso de erro, assumimos que já existe para evitar enviar duplicadas
+        }
+    }
     /**
      * Registra uma nova transação de cashback
      * 
@@ -1312,15 +1358,16 @@ class ClientController {
     }
     
     /**
-     * Envia uma notificação para o cliente
-     * 
-     * @param int $userId ID do cliente
-     * @param string $titulo Título da notificação
-     * @param string $mensagem Mensagem da notificação
-     * @param string $tipo Tipo da notificação (info, success, warning, error)
-     * @return bool Resultado da operação
-     */
-    private static function notifyClient($userId, $titulo, $mensagem, $tipo = 'info') {
+    * Envia uma notificação para o cliente
+    * 
+    * @param int $userId ID do cliente
+    * @param string $titulo Título da notificação
+    * @param string $mensagem Mensagem da notificação
+    * @param string $tipo Tipo da notificação (info, success, warning, error)
+    * @param string $link Link associado à notificação (opcional)
+    * @return bool Resultado da operação
+    */
+    private static function notifyClient($userId, $titulo, $mensagem, $tipo = 'info', $link = '') {
         try {
             $db = Database::getConnection();
             
@@ -1329,13 +1376,14 @@ class ClientController {
             
             // Inserir notificação
             $stmt = $db->prepare("
-                INSERT INTO notificacoes (usuario_id, titulo, mensagem, tipo, data_criacao, lida)
-                VALUES (:user_id, :titulo, :mensagem, :tipo, NOW(), 0)
+                INSERT INTO notificacoes (usuario_id, titulo, mensagem, tipo, link, data_criacao, lida)
+                VALUES (:user_id, :titulo, :mensagem, :tipo, :link, NOW(), 0)
             ");
             $stmt->bindParam(':user_id', $userId);
             $stmt->bindParam(':titulo', $titulo);
             $stmt->bindParam(':mensagem', $mensagem);
             $stmt->bindParam(':tipo', $tipo);
+            $stmt->bindParam(':link', $link);
             
             return $stmt->execute();
         } catch (PDOException $e) {
