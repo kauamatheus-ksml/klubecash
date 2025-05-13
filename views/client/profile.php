@@ -3,25 +3,13 @@
 // Definir o menu ativo
 $activeMenu = 'perfil';
 
-// Iniciar o buffer de saída para capturar erros
-ob_start();
-
 // Incluir arquivos necessários
 require_once '../../config/database.php';
 require_once '../../config/constants.php';
 require_once '../../controllers/AuthController.php';
 require_once '../../controllers/ClientController.php';
 
-// Função para debugar
-function debug_to_console($data) {
-    $output = $data;
-    if (is_array($output))
-        $output = implode(',', $output);
-    
-    echo "<script>console.log('Debug: " . $output . "');</script>";
-}
-
-// Iniciar sessão
+// Iniciar sessão se não estiver iniciada
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -34,109 +22,140 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION[
 
 $userId = $_SESSION['user_id'];
 
-// Inicializar mensagens
-$successMessage = '';
-$errorMessage = '';
+// Inicializar variáveis para mensagens de feedback
+$personalInfoMessage = '';
+$personalInfoSuccess = false;
+$addressMessage = '';
+$addressSuccess = false;
+$passwordMessage = '';
+$passwordSuccess = false;
 
-// Processar formulários
+// Função para registrar erros em log e exibir mensagem amigável
+function logError($message, $error) {
+    error_log($message . ': ' . $error);
+    return "Ocorreu um erro ao processar sua solicitação. Por favor, tente novamente.";
+}
+
+// Processamento de formulários
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
-    // Processar dados pessoais
-    if (isset($_POST['action']) && $_POST['action'] === 'update_personal') {
-        $personalData = [
-            'nome' => $_POST['nome'] ?? '',
-            'contato' => [
-                'telefone' => $_POST['telefone'] ?? '',
-                'celular' => $_POST['celular'] ?? '',
-                'email_alternativo' => $_POST['email_alternativo'] ?? ''
-            ]
-        ];
-        
-        debug_to_console("Enviando dados pessoais: " . json_encode($personalData));
-        
-        $result = ClientController::updateProfile($userId, $personalData);
-        
-        if ($result['status']) {
-            $successMessage = $result['message'];
-        } else {
-            $errorMessage = $result['message'];
-        }
-    }
-    
-    // Processar endereço
-    if (isset($_POST['action']) && $_POST['action'] === 'update_address') {
-        $addressData = [
-            'endereco' => [
-                'cep' => $_POST['cep'] ?? '',
-                'logradouro' => $_POST['logradouro'] ?? '',
-                'numero' => $_POST['numero'] ?? '',
-                'complemento' => $_POST['complemento'] ?? '',
-                'bairro' => $_POST['bairro'] ?? '',
-                'cidade' => $_POST['cidade'] ?? '',
-                'estado' => $_POST['estado'] ?? '',
-                'principal' => 1
-            ]
-        ];
-        
-        debug_to_console("Enviando dados de endereço: " . json_encode($addressData));
-        
-        $result = ClientController::updateProfile($userId, $addressData);
-        
-        if ($result['status']) {
-            $successMessage = $result['message'];
-        } else {
-            $errorMessage = $result['message'];
-        }
-    }
-    
-    // Processar alteração de senha
-    if (isset($_POST['action']) && $_POST['action'] === 'update_password') {
-        if ($_POST['nova_senha'] !== $_POST['confirmar_senha']) {
-            $errorMessage = 'As senhas não coincidem.';
-        } else {
-            $passwordData = [
-                'senha_atual' => $_POST['senha_atual'],
-                'nova_senha' => $_POST['nova_senha']
+    // Formulário de informações pessoais
+    if (isset($_POST['form_type']) && $_POST['form_type'] === 'personal_info') {
+        try {
+            $updateData = [
+                'nome' => $_POST['nome'] ?? '',
+                'contato' => [
+                    'telefone' => $_POST['telefone'] ?? '',
+                    'celular' => $_POST['celular'] ?? '',
+                    'email_alternativo' => $_POST['email_alternativo'] ?? ''
+                ]
             ];
             
-            debug_to_console("Enviando dados de senha: senha fornecida");
+            $result = ClientController::updateProfile($userId, $updateData);
+            $personalInfoSuccess = $result['status'];
+            $personalInfoMessage = $result['message'];
             
-            $result = ClientController::updateProfile($userId, $passwordData);
+        } catch (Exception $e) {
+            $personalInfoSuccess = false;
+            $personalInfoMessage = logError('Erro ao atualizar informações pessoais', $e->getMessage());
+        }
+    }
+    
+    // Formulário de endereço
+    if (isset($_POST['form_type']) && $_POST['form_type'] === 'address') {
+        try {
+            $updateData = [
+                'endereco' => [
+                    'cep' => $_POST['cep'] ?? '',
+                    'logradouro' => $_POST['logradouro'] ?? '',
+                    'numero' => $_POST['numero'] ?? '',
+                    'complemento' => $_POST['complemento'] ?? '',
+                    'bairro' => $_POST['bairro'] ?? '',
+                    'cidade' => $_POST['cidade'] ?? '',
+                    'estado' => $_POST['estado'] ?? '',
+                    'principal' => 1
+                ]
+            ];
             
-            if ($result['status']) {
-                $successMessage = $result['message'];
+            $result = ClientController::updateProfile($userId, $updateData);
+            $addressSuccess = $result['status'];
+            $addressMessage = $result['message'];
+            
+        } catch (Exception $e) {
+            $addressSuccess = false;
+            $addressMessage = logError('Erro ao atualizar endereço', $e->getMessage());
+        }
+    }
+    
+    // Formulário de alteração de senha
+    if (isset($_POST['form_type']) && $_POST['form_type'] === 'password') {
+        try {
+            $senhaAtual = $_POST['senha_atual'] ?? '';
+            $novaSenha = $_POST['nova_senha'] ?? '';
+            $confirmarSenha = $_POST['confirmar_senha'] ?? '';
+            
+            // Validação básica
+            if (empty($senhaAtual) || empty($novaSenha) || empty($confirmarSenha)) {
+                $passwordSuccess = false;
+                $passwordMessage = 'Todos os campos de senha são obrigatórios.';
+            } else if ($novaSenha !== $confirmarSenha) {
+                $passwordSuccess = false;
+                $passwordMessage = 'As senhas não coincidem.';
+            } else if (strlen($novaSenha) < PASSWORD_MIN_LENGTH) {
+                $passwordSuccess = false;
+                $passwordMessage = 'A nova senha deve ter pelo menos ' . PASSWORD_MIN_LENGTH . ' caracteres.';
             } else {
-                $errorMessage = $result['message'];
+                $updateData = [
+                    'senha_atual' => $senhaAtual,
+                    'nova_senha' => $novaSenha
+                ];
+                
+                $result = ClientController::updateProfile($userId, $updateData);
+                $passwordSuccess = $result['status'];
+                $passwordMessage = $result['message'];
             }
+            
+        } catch (Exception $e) {
+            $passwordSuccess = false;
+            $passwordMessage = logError('Erro ao atualizar senha', $e->getMessage());
         }
     }
 }
 
-// Carregar dados do perfil
-$result = ClientController::getProfileData($userId);
-$hasError = !$result['status'];
-$profileData = $hasError ? [] : $result['data'];
-
-// Verificar se estruturas existem
-if (!isset($profileData['contato']) || !is_array($profileData['contato'])) {
-    $profileData['contato'] = [];
-}
-if (!isset($profileData['endereco']) || !is_array($profileData['endereco'])) {
-    $profileData['endereco'] = [];
-}
-if (!isset($profileData['estatisticas']) || !is_array($profileData['estatisticas'])) {
-    $profileData['estatisticas'] = [
-        'total_cashback' => 0,
-        'total_transacoes' => 0,
-        'total_compras' => 0,
-        'total_lojas_utilizadas' => 0
-    ];
-}
-
-// Verificar erros PHP capturados
-$phpError = ob_get_clean();
-if (!empty($phpError)) {
-    error_log("Erro PHP na página de perfil: " . $phpError);
+// Carregar dados do perfil depois de qualquer atualização
+try {
+    $profileResult = ClientController::getProfileData($userId);
+    
+    if (!$profileResult['status']) {
+        $error = true;
+        $errorMessage = $profileResult['message'];
+        $profileData = [];
+    } else {
+        $error = false;
+        $profileData = $profileResult['data'];
+        
+        // Garantir que as chaves existam para evitar erros
+        if (!isset($profileData['contato']) || !is_array($profileData['contato'])) {
+            $profileData['contato'] = [];
+        }
+        
+        if (!isset($profileData['endereco']) || !is_array($profileData['endereco'])) {
+            $profileData['endereco'] = [];
+        }
+        
+        if (!isset($profileData['estatisticas']) || !is_array($profileData['estatisticas'])) {
+            $profileData['estatisticas'] = [
+                'total_cashback' => 0,
+                'total_transacoes' => 0,
+                'total_compras' => 0,
+                'total_lojas_utilizadas' => 0
+            ];
+        }
+    }
+} catch (Exception $e) {
+    $error = true;
+    $errorMessage = logError('Erro ao carregar dados do perfil', $e->getMessage());
+    $profileData = [];
 }
 ?>
 
@@ -397,22 +416,9 @@ if (!empty($phpError)) {
             <p class="page-subtitle">Gerencie suas informações pessoais e preferências</p>
         </div>
         
-        <!-- Mensagens de feedback -->
-        <?php if (!empty($successMessage)): ?>
-            <div class="alert alert-success">
-                <?php echo htmlspecialchars($successMessage); ?>
-            </div>
-        <?php endif; ?>
-        
-        <?php if (!empty($errorMessage)): ?>
+        <?php if (isset($error) && $error): ?>
             <div class="alert alert-danger">
                 <?php echo htmlspecialchars($errorMessage); ?>
-            </div>
-        <?php endif; ?>
-        
-        <?php if ($hasError): ?>
-            <div class="alert alert-danger">
-                Erro ao carregar dados do perfil. Por favor, tente novamente mais tarde.
             </div>
         <?php else: ?>
         
@@ -487,8 +493,14 @@ if (!empty($phpError)) {
                         <h3 class="card-title">Informações Pessoais</h3>
                     </div>
                     
+                    <?php if (!empty($personalInfoMessage)): ?>
+                        <div class="alert <?php echo $personalInfoSuccess ? 'alert-success' : 'alert-danger'; ?>">
+                            <?php echo htmlspecialchars($personalInfoMessage); ?>
+                        </div>
+                    <?php endif; ?>
+                    
                     <form action="" method="POST">
-                        <input type="hidden" name="action" value="update_personal">
+                        <input type="hidden" name="form_type" value="personal_info">
                         
                         <div class="form-group">
                             <label class="form-label" for="nome">Nome Completo</label>
@@ -528,8 +540,14 @@ if (!empty($phpError)) {
                         <h3 class="card-title">Endereço</h3>
                     </div>
                     
+                    <?php if (!empty($addressMessage)): ?>
+                        <div class="alert <?php echo $addressSuccess ? 'alert-success' : 'alert-danger'; ?>">
+                            <?php echo htmlspecialchars($addressMessage); ?>
+                        </div>
+                    <?php endif; ?>
+                    
                     <form action="" method="POST">
-                        <input type="hidden" name="action" value="update_address">
+                        <input type="hidden" name="form_type" value="address">
                         
                         <div class="form-row">
                             <div class="form-group">
@@ -582,8 +600,14 @@ if (!empty($phpError)) {
                         <h3 class="card-title">Alterar Senha</h3>
                     </div>
                     
+                    <?php if (!empty($passwordMessage)): ?>
+                        <div class="alert <?php echo $passwordSuccess ? 'alert-success' : 'alert-danger'; ?>">
+                            <?php echo htmlspecialchars($passwordMessage); ?>
+                        </div>
+                    <?php endif; ?>
+                    
                     <form action="" method="POST">
-                        <input type="hidden" name="action" value="update_password">
+                        <input type="hidden" name="form_type" value="password">
                         
                         <div class="form-group">
                             <label class="form-label" for="senha_atual">Senha Atual</label>
