@@ -29,10 +29,13 @@ $errorMessage = $hasError ? $result['message'] : '';
 // Dados para exibição
 $profileData = $hasError ? [] : $result['data'];
 
-// Processar atualização de perfil
+// Inicializar variáveis de status
 $updateSuccess = false;
 $updateMessage = '';
+$passwordSuccess = false;
+$passwordMessage = '';
 
+// Processar atualização de informações pessoais
 if (isset($_POST['update_profile'])) {
     // Formulário de informações pessoais
     $updateData = [
@@ -48,36 +51,13 @@ if (isset($_POST['update_profile'])) {
     $updateSuccess = $updateResult['status'];
     $updateMessage = $updateResult['message'];
     
-    // Recarregar dados do perfil
-    if ($updateSuccess) {
-        $result = ClientController::getProfileData($userId);
-        $hasError = !$result['status'];
-        $profileData = $hasError ? [] : $result['data'];
-    }
+    // Recarregar dados do perfil após atualização
+    $result = ClientController::getProfileData($userId);
+    $hasError = !$result['status'];
+    $profileData = $hasError ? [] : $result['data'];
 }
 
-// Processar atualização de senha
-$passwordSuccess = false;
-$passwordMessage = '';
-
-if (isset($_POST['update_password'])) {
-    $passwordData = [
-        'senha_atual' => $_POST['senha_atual'] ?? '',
-        'nova_senha' => $_POST['nova_senha'] ?? '',
-        'confirmar_senha' => $_POST['confirmar_senha'] ?? ''
-    ];
-    
-    // Validar senhas
-    if ($passwordData['nova_senha'] !== $passwordData['confirmar_senha']) {
-        $passwordSuccess = false;
-        $passwordMessage = 'As senhas não coincidem.';
-    } else {
-        $updateResult = ClientController::updateProfile($userId, ['senha_atual' => $passwordData['senha_atual'], 'nova_senha' => $passwordData['nova_senha']]);
-        $passwordSuccess = $updateResult['status'];
-        $passwordMessage = $updateResult['message'];
-    }
-}
-
+// Processar atualização de endereço
 if (isset($_POST['update_address'])) {
     // Formulário de endereço
     $updateData = [
@@ -96,12 +76,44 @@ if (isset($_POST['update_address'])) {
     $updateSuccess = $updateResult['status'];
     $updateMessage = $updateResult['message'];
     
-    // Recarregar dados do perfil
-    if ($updateSuccess) {
-        $result = ClientController::getProfileData($userId);
-        $hasError = !$result['status'];
-        $profileData = $hasError ? [] : $result['data'];
+    // Recarregar dados do perfil após atualização
+    $result = ClientController::getProfileData($userId);
+    $hasError = !$result['status'];
+    $profileData = $hasError ? [] : $result['data'];
+}
+
+// Processar atualização de senha
+if (isset($_POST['update_password'])) {
+    $senhaAtual = $_POST['senha_atual'] ?? '';
+    $novaSenha = $_POST['nova_senha'] ?? '';
+    $confirmarSenha = $_POST['confirmar_senha'] ?? '';
+    
+    // Validar senhas
+    if (empty($senhaAtual) || empty($novaSenha) || empty($confirmarSenha)) {
+        $passwordSuccess = false;
+        $passwordMessage = 'Todos os campos de senha são obrigatórios.';
+    } else if ($novaSenha !== $confirmarSenha) {
+        $passwordSuccess = false;
+        $passwordMessage = 'As senhas não coincidem.';
+    } else if (strlen($novaSenha) < PASSWORD_MIN_LENGTH) {
+        $passwordSuccess = false;
+        $passwordMessage = 'A nova senha deve ter pelo menos ' . PASSWORD_MIN_LENGTH . ' caracteres.';
+    } else {
+        $updateResult = ClientController::updateProfile($userId, [
+            'senha_atual' => $senhaAtual,
+            'nova_senha' => $novaSenha
+        ]);
+        $passwordSuccess = $updateResult['status'];
+        $passwordMessage = $updateResult['message'];
     }
+}
+
+// Garantir que temos arrays para endereço e contato, mesmo que vazios
+if (!isset($profileData['endereco']) || !is_array($profileData['endereco'])) {
+    $profileData['endereco'] = [];
+}
+if (!isset($profileData['contato']) || !is_array($profileData['contato'])) {
+    $profileData['contato'] = [];
 }
 ?>
 
@@ -541,7 +553,8 @@ if (isset($_POST['update_address'])) {
                             </div>
                         </div>
                         
-                        <button type="submit" name="update_profile" class="btn btn-primary">Salvar Alterações</button>
+                        <!-- Aqui está a correção principal - alteração do name do botão -->
+                        <button type="submit" name="update_address" class="btn btn-primary">Salvar Alterações</button>
                     </form>
                 </div>
                 
