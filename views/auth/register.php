@@ -425,14 +425,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <?php if (!empty($success)): ?>
                     <div class="success-message">
                         <?php echo htmlspecialchars($success); ?>
-                        <p><a href="login.php">Clique aqui para fazer login</a></p>
+                        <p><a href="<?php echo LOGIN_URL; ?>">Clique aqui para fazer login</a></p>
                     </div>
                 <?php endif; ?>
 
                 <div class="register-header">
                     <div class="login-link">
                         <span>Já tem conta?</span>
-                        <a href="login.php">Login</a>
+                        <a href="<?php echo LOGIN_URL; ?>">Login</a>
                     </div>
                     <h1>Seja <span>BEM VINDO</span></h1>
                     <h2>Registro</h2>

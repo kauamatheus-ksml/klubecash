@@ -427,14 +427,14 @@ if (isset($_GET['token']) && !empty($_GET['token'])) {
                 <?php if (!empty($success)): ?>
                     <div class="success-message">
                         <?php echo htmlspecialchars($success); ?>
-                        <p><a href="login.php">Voltar para o login</a></p>
+                        <p><a href="<?php echo LOGIN_URL; ?>">Voltar para o login</a></p>
                     </div>
                 <?php endif; ?>
 
                 <div class="recover-header">
                     <div class="login-link">
                         <span>Lembra da senha?</span>
-                        <a href="login.php">Login</a>
+                        <a href="<?php echo LOGIN_URL; ?>">Login</a>
                     </div>
                     
                     <?php if ($validToken): ?>
