@@ -515,9 +515,17 @@ $dashboardData = $hasError ? [] : $result['data'];
                     <?php else: ?>
                         <?php foreach ($dashboardData['notificacoes'] as $notificacao): ?>
                             <div class="notification">
+                                <?php if (!empty($notificacao['link'])): ?>
+                                    <a href="<?php echo $notificacao['link']; ?>" style="text-decoration: none; color: inherit;">
+                                <?php endif; ?>
+                                
                                 <h4 class="notification-title"><?php echo htmlspecialchars($notificacao['titulo']); ?></h4>
                                 <p class="notification-text"><?php echo htmlspecialchars($notificacao['mensagem']); ?></p>
                                 <p class="notification-time"><?php echo date('d/m/Y H:i', strtotime($notificacao['data_criacao'])); ?></p>
+                                
+                                <?php if (!empty($notificacao['link'])): ?>
+                                    </a>
+                                <?php endif; ?>
                             </div>
                         <?php endforeach; ?>
                     <?php endif; ?>
