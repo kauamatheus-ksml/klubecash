@@ -474,6 +474,10 @@ class ClientController {
      */
     public static function updateProfile($userId, $data) {
         try {
+            // Registrar os dados recebidos para diagnóstico
+            error_log('Tentando atualizar perfil para usuário ID: ' . $userId);
+            error_log('Dados recebidos: ' . print_r($data, true));
+            
             // Verificar se é um cliente válido
             if (!self::validateClient($userId)) {
                 return ['status' => false, 'message' => 'Cliente não encontrado ou inativo.'];
@@ -481,11 +485,15 @@ class ClientController {
             
             $db = Database::getConnection();
             
+            // Verificar se as tabelas necessárias existem
+            self::ensureTablesExist($db);
+            
             // Iniciar transação
             $db->beginTransaction();
             
             // Atualizar dados básicos
             if (isset($data['nome']) && !empty($data['nome'])) {
+                error_log('Atualizando nome do usuário: ' . $data['nome']);
                 $updateStmt = $db->prepare("UPDATE usuarios SET nome = :nome WHERE id = :user_id");
                 $updateStmt->bindParam(':nome', $data['nome']);
                 $updateStmt->bindParam(':user_id', $userId);
@@ -494,6 +502,7 @@ class ClientController {
             
             // Atualizar senha se fornecida
             if (isset($data['senha_atual']) && isset($data['nova_senha']) && !empty($data['senha_atual']) && !empty($data['nova_senha'])) {
+                error_log('Tentando atualizar senha');
                 // Verificar senha atual
                 $checkStmt = $db->prepare("SELECT senha_hash FROM usuarios WHERE id = :user_id");
                 $checkStmt->bindParam(':user_id', $userId);
@@ -517,10 +526,31 @@ class ClientController {
                 $updatePassStmt->bindParam(':senha_hash', $senha_hash);
                 $updatePassStmt->bindParam(':user_id', $userId);
                 $updatePassStmt->execute();
+                error_log('Senha atualizada com sucesso');
             }
             
             // Atualizar/inserir endereço se fornecido
             if (isset($data['endereco']) && !empty($data['endereco'])) {
+                error_log('Processando dados de endereço');
+                
+                // Verificar se todos os campos necessários estão presentes
+                $requiredFields = ['cep', 'logradouro', 'numero', 'bairro', 'cidade', 'estado'];
+                $missingFields = [];
+                
+                foreach ($requiredFields as $field) {
+                    if (!isset($data['endereco'][$field]) || empty($data['endereco'][$field])) {
+                        $missingFields[] = $field;
+                    }
+                }
+                
+                if (!empty($missingFields)) {
+                    error_log('Campos de endereço faltando: ' . implode(', ', $missingFields));
+                    // Continuar mesmo com campos faltantes, preenchendo com vazios
+                    foreach ($missingFields as $field) {
+                        $data['endereco'][$field] = '';
+                    }
+                }
+                
                 // Verificar se já existe endereço
                 $checkAddrStmt = $db->prepare("SELECT id FROM usuarios_endereco WHERE usuario_id = :user_id LIMIT 1");
                 $checkAddrStmt->bindParam(':user_id', $userId);
@@ -528,6 +558,7 @@ class ClientController {
                 
                 if ($checkAddrStmt->rowCount() > 0) {
                     // Atualizar endereço existente
+                    error_log('Atualizando endereço existente');
                     $addrId = $checkAddrStmt->fetch(PDO::FETCH_ASSOC)['id'];
                     $updateAddrStmt = $db->prepare("
                         UPDATE usuarios_endereco 
@@ -545,6 +576,7 @@ class ClientController {
                     $updateAddrStmt->bindParam(':id', $addrId);
                 } else {
                     // Inserir novo endereço
+                    error_log('Inserindo novo endereço');
                     $updateAddrStmt = $db->prepare("
                         INSERT INTO usuarios_endereco 
                         (usuario_id, cep, logradouro, numero, complemento, bairro, cidade, estado, principal)
@@ -554,21 +586,39 @@ class ClientController {
                     $updateAddrStmt->bindParam(':user_id', $userId);
                 }
                 
-                // Bind dos parâmetros comuns
-                $updateAddrStmt->bindParam(':cep', $data['endereco']['cep']);
-                $updateAddrStmt->bindParam(':logradouro', $data['endereco']['logradouro']);
-                $updateAddrStmt->bindParam(':numero', $data['endereco']['numero']);
-                $updateAddrStmt->bindParam(':complemento', $data['endereco']['complemento'] ?? '');
-                $updateAddrStmt->bindParam(':bairro', $data['endereco']['bairro']);
-                $updateAddrStmt->bindParam(':cidade', $data['endereco']['cidade']);
-                $updateAddrStmt->bindParam(':estado', $data['endereco']['estado']);
+                // Garantir que os valores existam
+                $cep = isset($data['endereco']['cep']) ? $data['endereco']['cep'] : '';
+                $logradouro = isset($data['endereco']['logradouro']) ? $data['endereco']['logradouro'] : '';
+                $numero = isset($data['endereco']['numero']) ? $data['endereco']['numero'] : '';
+                $complemento = isset($data['endereco']['complemento']) ? $data['endereco']['complemento'] : '';
+                $bairro = isset($data['endereco']['bairro']) ? $data['endereco']['bairro'] : '';
+                $cidade = isset($data['endereco']['cidade']) ? $data['endereco']['cidade'] : '';
+                $estado = isset($data['endereco']['estado']) ? $data['endereco']['estado'] : '';
                 $principal = isset($data['endereco']['principal']) ? $data['endereco']['principal'] : 1;
+                
+                // Bind dos parâmetros comuns
+                $updateAddrStmt->bindParam(':cep', $cep);
+                $updateAddrStmt->bindParam(':logradouro', $logradouro);
+                $updateAddrStmt->bindParam(':numero', $numero);
+                $updateAddrStmt->bindParam(':complemento', $complemento);
+                $updateAddrStmt->bindParam(':bairro', $bairro);
+                $updateAddrStmt->bindParam(':cidade', $cidade);
+                $updateAddrStmt->bindParam(':estado', $estado);
                 $updateAddrStmt->bindParam(':principal', $principal);
-                $updateAddrStmt->execute();
+                
+                try {
+                    $updateAddrStmt->execute();
+                    error_log('Endereço salvo com sucesso');
+                } catch (PDOException $e) {
+                    error_log('Erro ao salvar endereço: ' . $e->getMessage());
+                    throw $e; // Relançar para ser capturado pelo catch externo
+                }
             }
             
             // Atualizar/inserir contato se fornecido
             if (isset($data['contato']) && !empty($data['contato'])) {
+                error_log('Processando dados de contato');
+                
                 // Verificar se já existe contato
                 $checkContactStmt = $db->prepare("SELECT id FROM usuarios_contato WHERE usuario_id = :user_id LIMIT 1");
                 $checkContactStmt->bindParam(':user_id', $userId);
@@ -576,6 +626,7 @@ class ClientController {
                 
                 if ($checkContactStmt->rowCount() > 0) {
                     // Atualizar contato existente
+                    error_log('Atualizando contato existente');
                     $contactId = $checkContactStmt->fetch(PDO::FETCH_ASSOC)['id'];
                     $updateContactStmt = $db->prepare("
                         UPDATE usuarios_contato 
@@ -588,6 +639,7 @@ class ClientController {
                     $updateContactStmt->bindParam(':id', $contactId);
                 } else {
                     // Inserir novo contato
+                    error_log('Inserindo novo contato');
                     $updateContactStmt = $db->prepare("
                         INSERT INTO usuarios_contato 
                         (usuario_id, telefone, celular, email_alternativo)
@@ -597,26 +649,98 @@ class ClientController {
                     $updateContactStmt->bindParam(':user_id', $userId);
                 }
                 
+                // Garantir que os valores existam
+                $telefone = isset($data['contato']['telefone']) ? $data['contato']['telefone'] : '';
+                $celular = isset($data['contato']['celular']) ? $data['contato']['celular'] : '';
+                $email_alternativo = isset($data['contato']['email_alternativo']) ? $data['contato']['email_alternativo'] : '';
+                
                 // Bind dos parâmetros comuns
-                $updateContactStmt->bindParam(':telefone', $data['contato']['telefone'] ?? '');
-                $updateContactStmt->bindParam(':celular', $data['contato']['celular'] ?? '');
-                $updateContactStmt->bindParam(':email_alternativo', $data['contato']['email_alternativo'] ?? '');
-                $updateContactStmt->execute();
+                $updateContactStmt->bindParam(':telefone', $telefone);
+                $updateContactStmt->bindParam(':celular', $celular);
+                $updateContactStmt->bindParam(':email_alternativo', $email_alternativo);
+                
+                try {
+                    $updateContactStmt->execute();
+                    error_log('Contato salvo com sucesso');
+                } catch (PDOException $e) {
+                    error_log('Erro ao salvar contato: ' . $e->getMessage());
+                    throw $e; // Relançar para ser capturado pelo catch externo
+                }
             }
             
             // Confirmar transação
             $db->commit();
+            error_log('Transação concluída com sucesso - Perfil atualizado');
             
             return ['status' => true, 'message' => 'Perfil atualizado com sucesso.'];
             
         } catch (PDOException $e) {
             // Reverter transação em caso de erro
-            if ($db->inTransaction()) {
+            if (isset($db) && $db->inTransaction()) {
                 $db->rollBack();
             }
             
-            error_log('Erro ao atualizar perfil: ' . $e->getMessage());
-            return ['status' => false, 'message' => 'Erro ao atualizar perfil. Tente novamente.'];
+            // Log detalhado do erro
+            error_log('ERRO DETALHADO ao atualizar perfil: ' . $e->getMessage());
+            error_log('Código do erro: ' . $e->getCode());
+            error_log('Trace: ' . $e->getTraceAsString());
+            
+            // Em ambiente de desenvolvimento, mostrar erro detalhado
+            if (defined('DEBUG_MODE') && DEBUG_MODE) {
+                return ['status' => false, 'message' => 'Erro ao atualizar perfil: ' . $e->getMessage()];
+            } else {
+                return ['status' => false, 'message' => 'Erro ao atualizar perfil. Tente novamente.'];
+            }
+        }
+    }
+    
+    /**
+     * Verifica e cria as tabelas necessárias se não existirem
+     * 
+     * @param PDO $db Conexão com o banco de dados
+     * @return void
+     */
+    private static function ensureTablesExist($db) {
+        try {
+            // Verificar e criar tabela de endereço
+            $stmt = $db->query("SHOW TABLES LIKE 'usuarios_endereco'");
+            if ($stmt->rowCount() == 0) {
+                error_log('Criando tabela usuarios_endereco');
+                $createTable = "CREATE TABLE usuarios_endereco (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    usuario_id INT NOT NULL,
+                    cep VARCHAR(10) DEFAULT NULL,
+                    logradouro VARCHAR(255) DEFAULT NULL,
+                    numero VARCHAR(20) DEFAULT NULL,
+                    complemento VARCHAR(100) DEFAULT NULL,
+                    bairro VARCHAR(100) DEFAULT NULL,
+                    cidade VARCHAR(100) DEFAULT NULL,
+                    estado VARCHAR(50) DEFAULT NULL,
+                    principal TINYINT(1) DEFAULT 1,
+                    FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+                )";
+                
+                $db->exec($createTable);
+            }
+            
+            // Verificar e criar tabela de contato
+            $stmt = $db->query("SHOW TABLES LIKE 'usuarios_contato'");
+            if ($stmt->rowCount() == 0) {
+                error_log('Criando tabela usuarios_contato');
+                $createTable = "CREATE TABLE usuarios_contato (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    usuario_id INT NOT NULL,
+                    telefone VARCHAR(20) DEFAULT NULL,
+                    celular VARCHAR(20) DEFAULT NULL,
+                    email_alternativo VARCHAR(100) DEFAULT NULL,
+                    FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+                )";
+                
+                $db->exec($createTable);
+            }
+        } catch (PDOException $e) {
+            error_log('Erro ao verificar/criar tabelas: ' . $e->getMessage());
+            // Não é necessário relançar a exceção, apenas registrar o erro
         }
     }
     
