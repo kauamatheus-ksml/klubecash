@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="shortcut icon" type="image/jpg" href="KlubeCashLOGO.ico"/>
+  <title>Em Breve | KlubeCash</title>
+  <style>
+    /* Root resets */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background-color: #ffffff; color: #333333; }
+
+    /* Header */
+    .kc-header { background-color: #F47920; padding: 16px 0; text-align: center; }
+    .kc-header__logo { width: 180px; max-width: 80%; height: auto; }
+
+    /* Main container grid */
+    .kc-container {
+      display: grid;
+      grid-template-columns: 55% 45%;
+      align-items: center;
+      justify-items: center;
+      gap: 60px;
+      padding: 60px 80px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    /* Left image */
+    .kc-image-section { width: 100%; }
+    .kc-hero-img { width: 100%; max-width: 480px; height: auto; display: block; margin: 0 auto; }
+
+    /* Right content */
+    .kc-content-section { width: 100%; max-width: 400px; }
+    .kc-title { font-size: 32px; font-weight: 700; color: #F47920; line-height: 1.3; margin-bottom: 16px; }
+    .kc-promise { font-size: 16px; color: #F47920; margin-bottom: 24px; }
+    .kc-subtitle { font-size: 16px; color: #333333; margin-bottom: 16px; }
+
+    /* Form */
+    .kc-form { display: flex; flex-direction: column; gap: 16px; }
+    .kc-input-email {
+      width: 100%;
+      padding: 14px 18px;
+      border: 2px solid #3B82F6;
+      border-radius: 8px;
+      font-size: 16px;
+      outline: none;
+    }
+    .kc-input-email::placeholder { color: #9CA3AF; text-transform: lowercase; }
+    .kc-btn-send {
+      background-color: #F47920;
+      color: #ffffff;
+      padding: 14px 18px;
+      font-size: 18px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      transition: background-color 0.2s ease;
+    }
+    .kc-btn-send:hover { background-color: #d96f1d; }
+
+    /* Social icons row */
+    .kc-social { display: flex; gap: 20px; justify-content: flex-start; margin-top: 32px; }
+    .kc-social__icon { width: 32px; height: 32px; }
+
+    /* Mobile adjustments */
+    @media (max-width: 768px) {
+      .kc-container {
+        grid-template-columns: 1fr;
+        padding: 20px;
+        gap: 20px;
+      }
+      .kc-header__logo { width: 140px; }
+      .kc-image-section { order: -1; }
+      .kc-hero-img { max-width: 260px; }
+      .kc-title { font-size: 28px; text-align: center; margin-bottom: 12px; }
+      .kc-promise { text-align: center; margin-bottom: 16px; }
+      .kc-subtitle { text-align: center; margin-bottom: 12px; }
+      .kc-input-email { border-color: #F47920; }
+      .kc-form { width: 100%; }
+      .kc-btn-send { font-size: 16px; }
+      .kc-social { justify-content: center; margin-top: 24px; }
+    }
+  </style>
+</head>
+<body>
+
+    <header class="kc-header">
+        <img src="Logo-KlubeCash.png" alt="KlubeCash Logo" class="kc-header__logo">
+      </header>
+    
+      <main class="kc-container">
+        <div class="kc-image-section">
+          <img src="PessoaFeliz.png" alt="Pessoa feliz celebrando" class="kc-hero-img">
+        </div>
+    
+        <div class="kc-content-section">
+          <h1 class="kc-title">Em breve você poderá conhecer esse incrível projeto, aguarde só mais um pouquinho...</h1>
+          <p class="kc-promise">Prometo que você não vai se arrepender.</p>
+          <p class="kc-subtitle">Deseja receber as novidades quando elas chegarem, direto no seu email?</p>
+          <form id="emailForm" class="kc-form">
+            <input type="email" name="email" id="email" class="kc-input-email" placeholder="email" required>
+            <button type="submit" class="kc-btn-send">Enviar</button>
+          </form>
+          <div id="msg" style="margin-top:12px; font-size:14px;"></div>
+          <div class="kc-social">
+            <!-- <a href="#"><img src="FacebookIcon.png" alt="Facebook" class="kc-social__icon"></a>-->
+            <a href="https://www.instagram.com/klubecash?igsh=NXlyeHZjZzMxM24%3D&utm_source=qr"><img src="InstagramIcon.png" alt="Instagram" class="kc-social__icon"></a>
+            <a href="https://www.tiktok.com/@klube.cash?is_from_webapp=1&sender_device=pc"><img src="TikTokIcon.png" alt="TikTok" class="kc-social__icon"></a>
+          </div>
+        </div>
+      </main>
+  <script>
+    document.getElementById('emailForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      const btn = e.target.querySelector('button');
+      const msg = document.getElementById('msg');
+      btn.disabled = true;
+      btn.textContent = 'Enviando…';
+      const form = new FormData(e.target);
+      try {
+        const res = await fetch('save-email.php', {
+          method: 'POST',
+          body: form
+        });
+        const json = await res.json();
+        if (json.success) {
+          msg.style.color = 'orange';
+          msg.textContent = 'Obrigado! Email cadastrado.';
+          e.target.reset();
+        } else {
+          msg.style.color = 'red';
+          msg.textContent = json.message;
+        }
+      } catch (err) {
+        msg.style.color = 'red';
+        msg.textContent = 'Erro de comunicação.';
+      }
+      btn.disabled = false;
+      btn.textContent = 'Enviar';
+    });
+  </script>
+
+</body>
+</html>
