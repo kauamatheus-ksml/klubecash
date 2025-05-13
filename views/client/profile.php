@@ -468,7 +468,10 @@ try {
                         <div class="details-value">
                             <?php 
                             $ultimoLogin = $profileData['perfil']['ultimo_login'] ?? null;
-                            echo $ultimoLogin ? date('d/m/Y H:i', strtotime($ultimoLogin)) : 'Não disponível';
+                            echo $ultimoLogin 
+                                ? date('d/m/Y H:i', strtotime($ultimoLogin . ' -3 hours')) 
+                                : 'Não disponível';
+                            
                             ?>
                         </div>
                     </div>
