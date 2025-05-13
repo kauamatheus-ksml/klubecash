@@ -1,4 +1,6 @@
 <?php
+date_default_timezone_set('America/Sao_Paulo');
+
 //config/database.php
 /**
  * Configuração de conexão com o banco de dados
