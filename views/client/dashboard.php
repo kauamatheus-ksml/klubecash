@@ -549,7 +549,10 @@ $dashboardData = $hasError ? [] : $result['data'];
                                 
                                 <h4 class="notification-title"><?php echo htmlspecialchars($notificacao['titulo']); ?></h4>
                                 <p class="notification-text"><?php echo htmlspecialchars($notificacao['mensagem']); ?></p>
-                                <p class="notification-time"><?php echo date('d/m/Y H:i', strtotime($notificacao['data_criacao'])); ?></p>
+                                <p class="notification-time" style="font-size: 12px; color: #888; margin-top: 5px;">
+                                    <?php echo date('d/m/Y H:i', strtotime($notificacao['data_criacao'])); ?>
+                                </p>
+
                                 
                                 <?php if ($hasLink): ?>
                                     </a>
