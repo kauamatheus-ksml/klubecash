@@ -191,8 +191,17 @@ class StoreController {
             $insertStmt->bindParam(':descricao', $descricao);
             $insertStmt->bindParam(':website', $website);
             
-            // Status inicial (pendente para aprovação ou aprovado direto se for cadastro pelo admin)
-            $initialStatus = AuthController::isAdmin() ? STORE_APPROVED : STORE_PENDING;
+            // Status inicial - sempre pendente para cadastros pela página pública
+            $initialStatus = STORE_PENDING; // Padrão: pendente
+
+            // Apenas se for um admin E estiver usando o painel administrativo (verificando através do referer)
+            if (AuthController::isAdmin() && isset($_SERVER['HTTP_REFERER'])) {
+                $referer = $_SERVER['HTTP_REFERER'];
+                // Verificar se a requisição veio do painel admin
+                if (strpos($referer, '/admin/') !== false) {
+                    $initialStatus = STORE_APPROVED;
+                }
+            }
             $insertStmt->bindParam(':status', $initialStatus);
             
             $insertStmt->execute();
