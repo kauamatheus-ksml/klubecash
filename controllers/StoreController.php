@@ -182,11 +182,14 @@ class StoreController {
             $insertStmt->bindParam(':cnpj', $data['cnpj']);
             $insertStmt->bindParam(':email', $data['email']);
             $insertStmt->bindParam(':telefone', $data['telefone']);
-            $insertStmt->bindParam(':categoria', $data['categoria'] ?? 'Outros');
+            $categoria = $data['categoria'] ?? 'Outros';
             $porcentagemCashback = isset($data['porcentagem_cashback']) ? $data['porcentagem_cashback'] : DEFAULT_CASHBACK_TOTAL;
             $insertStmt->bindParam(':porcentagem_cashback', $porcentagemCashback);
-            $insertStmt->bindParam(':descricao', $data['descricao'] ?? '');
-            $insertStmt->bindParam(':website', $data['website'] ?? '');
+            $descricao = $data['descricao'] ?? '';
+            $website = $data['website'] ?? '';
+            $insertStmt->bindParam(':categoria', $categoria);
+            $insertStmt->bindParam(':descricao', $descricao);
+            $insertStmt->bindParam(':website', $website);
             
             // Status inicial (pendente para aprovação ou aprovado direto se for cadastro pelo admin)
             $initialStatus = AuthController::isAdmin() ? STORE_APPROVED : STORE_PENDING;
@@ -211,7 +214,8 @@ class StoreController {
                 $addressStmt->bindParam(':cep', $data['endereco']['cep']);
                 $addressStmt->bindParam(':logradouro', $data['endereco']['logradouro']);
                 $addressStmt->bindParam(':numero', $data['endereco']['numero']);
-                $addressStmt->bindParam(':complemento', $data['endereco']['complemento'] ?? '');
+                $complemento = $data['endereco']['complemento'] ?? '';
+                $addressStmt->bindParam(':complemento', $complemento);
                 $addressStmt->bindParam(':bairro', $data['endereco']['bairro']);
                 $addressStmt->bindParam(':cidade', $data['endereco']['cidade']);
                 $addressStmt->bindParam(':estado', $data['endereco']['estado']);
