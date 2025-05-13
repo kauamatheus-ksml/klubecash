@@ -458,6 +458,7 @@ $categorias = [
                         <li>Você concorda em oferecer o cashback conforme a porcentagem cadastrada.</li>
                         <li>O Klube Cash poderá exibir sua loja no catálogo de parceiros.</li>
                         <li>Todas as transações serão processadas de acordo com as regras do sistema.</li>
+                        <li>O parceiro se compromete a oferecer o cashback conforme a porcentagem estabelecida no cadastro.</li>
                     </ul>
                     <div class="form-group" style="margin-top: 15px;">
                         <label>
