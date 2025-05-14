@@ -89,4 +89,24 @@ define('ADMIN_TRANSACTION_DETAILS_URL', SITE_URL . '/admin/transacao');
 // Adicionar nas URLs para admin
 define('ADMIN_REPORTS_URL', SITE_URL . '/admin/relatorios');
 
+// URL para o dashboard da loja
+define('STORE_DASHBOARD_URL', SITE_URL . '/store/dashboard');
 
+// URLs adicionais para loja
+define('STORE_TRANSACTIONS_URL', SITE_URL . '/store/transacoes');
+define('STORE_PENDING_TRANSACTIONS_URL', SITE_URL . '/store/transacoes-pendentes');
+define('STORE_REGISTER_TRANSACTION_URL', SITE_URL . '/store/registrar-transacao');
+define('STORE_BATCH_UPLOAD_URL', SITE_URL . '/store/upload-lote');
+define('STORE_PAYMENT_URL', SITE_URL . '/store/pagamento');
+define('STORE_PAYMENT_HISTORY_URL', SITE_URL . '/store/historico-pagamentos');
+
+// URLs adicionais para admin
+define('ADMIN_COMMISSIONS_URL', SITE_URL . '/admin/comissoes');
+define('ADMIN_PAYMENTS_URL', SITE_URL . '/admin/pagamentos');
+
+
+// Status adicionais de transação
+define('TRANSACTION_PAYMENT_PENDING', 'pagamento_pendente');  // Quando pagamento foi registrado mas ainda não aprovado
+
+// Diretório para exportação
+define('EXPORTS_DIR', ROOT_DIR . '/exports');
