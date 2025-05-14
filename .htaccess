@@ -74,18 +74,7 @@ ErrorDocument 500 /views/errors/500.php
 
 
 
-# Reescrever URLs amigáveis para a área da loja
-RewriteRule ^store/dashboard/?$ views/store/dashboard.php [L]
-RewriteRule ^store/transacoes/?$ views/store/transactions.php [L]
-RewriteRule ^store/transacoes-pendentes/?$ views/store/pending-transactions.php [L]
-RewriteRule ^store/registrar-transacao/?$ views/store/register-transaction.php [L]
-RewriteRule ^store/upload-lote/?$ views/store/batch-upload.php [L]
-RewriteRule ^store/pagamento/?$ views/store/payment.php [L]
-RewriteRule ^store/historico-pagamentos/?$ views/store/payment-history.php [L]
 
-# Novas regras para área admin
-RewriteRule ^admin/comissoes/?$ views/admin/commissions.php [L]
-RewriteRule ^admin/pagamentos/?$ views/admin/payments.php [L]
 
 
 # Configurações de performance
