@@ -760,17 +760,7 @@ if ($isLoggedIn) {
                     <p>Compre nas melhores lojas e marcas parceiras em todo o Brasil.</p>
                 </div>
                 
-                <div class="benefit-card">
-                    <div class="benefit-icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="2" y="4" width="20" height="16" rx="2"></rect>
-                            <path d="M7 15h0"></path>
-                            <path d="M2 9.5h20"></path>
-                        </svg>
-                    </div>
-                    <h3 class="benefit-title">Diversas Formas de Resgate</h3>
-                    <p>Transfira para sua conta, converta em produtos ou use em novas compras.</p>
-                </div>
+                
             </div>
         </div>
     </section>
@@ -884,14 +874,7 @@ if ($isLoggedIn) {
                 </div>
                 
                 <div class="accordion-item">
-                    <div class="accordion-header">
-                        <span>Como posso resgatar meu saldo de cashback?</span>
-                        <span class="accordion-icon">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <polyline points="6 9 12 15 18 9"></polyline>
-                            </svg>
-                        </span>
-                    </div>
+                    
                     <div class="accordion-content">
                         <div class="accordion-content-inner">
                             <p>Você pode transferir o saldo para sua conta bancária, converter em produtos ou usar como desconto em novas compras nas lojas parceiras. O valor mínimo para saque é de R$ 20,00.</p>
