@@ -287,7 +287,7 @@ if ($isLoggedIn) {
     </section>
     
     <!-- FAQ -->
-    <section class="section faq" id="faq">
+        <section class="section faq" id="faq">
         <div class="container">
             <div class="section-title" data-aos="fade-up">
                 <span class="section-subtitle">Dúvidas frequentes</span>
@@ -483,18 +483,25 @@ if ($isLoggedIn) {
         
         accordionItems.forEach(item => {
             const header = item.querySelector('.accordion-header');
+            const content = item.querySelector('.accordion-content');
+
+            // Garantir que o conteúdo comece fechado
+            content.style.maxHeight = "0px";
             
-            header.addEventListener('click', () => {
+             header.addEventListener('click', () => {
+                // Verificar se este item está ativo
                 const isActive = item.classList.contains('active');
                 
-                // Fechar todos os itens
+                // Fechar todos os itens primeiro
                 accordionItems.forEach(accordionItem => {
                     accordionItem.classList.remove('active');
+                    accordionItem.querySelector('.accordion-content').style.maxHeight = "0px";
                 });
                 
                 // Se o item clicado não estava ativo, abri-lo
                 if (!isActive) {
                     item.classList.add('active');
+                    content.style.maxHeight = content.scrollHeight + "px";
                 }
             });
         });

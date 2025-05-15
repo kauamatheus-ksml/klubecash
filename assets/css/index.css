@@ -468,6 +468,7 @@ h1, h2, h3, h4, h5, h6 {
     text-align: center;
     margin-bottom: 4rem;
     position: relative;
+    width: 100%;
 }
 
 .section-subtitle {
@@ -481,6 +482,9 @@ h1, h2, h3, h4, h5, h6 {
     margin-bottom: 1rem;
     text-transform: uppercase;
     letter-spacing: 1px;
+    position: relative;
+    z-index: 2;
+    white-space: nowrap; /* Evita quebra de texto */
 }
 
 .section-title h2 {
@@ -896,7 +900,6 @@ h1, h2, h3, h4, h5, h6 {
     text-align: left;
     color: var(--dark-gray);
     position: relative;
-    overflow: hidden;
     z-index: 1;
 }
 
@@ -922,10 +925,8 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .accordion-icon {
-    transition: transform 0.4s ease;
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
+    transform: rotate(0deg);
+    transition: transform 0.3s ease;
 }
 
 .accordion-item.active .accordion-icon {
@@ -935,17 +936,18 @@ h1, h2, h3, h4, h5, h6 {
 .accordion-content {
     max-height: 0;
     overflow: hidden;
-    transition: max-height 0.4s cubic-bezier(0, 1, 0, 1);
+    transition: max-height 0.4s ease-out;
 }
 
 .accordion-item.active .accordion-content {
-    max-height: 1000px;
-    transition: max-height 0.4s cubic-bezier(1, 0, 1, 0);
+    max-height: fit-content; /* Isso será substituído pelo JavaScript */
 }
 
 .accordion-content-inner {
     padding: 0 1.5rem 1.5rem;
 }
+
+
 
 /* Footer */
 .footer {
@@ -1122,6 +1124,16 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 @media (max-width: 768px) {
+    .faq .section-title {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .faq .section-subtitle {
+        margin-bottom: 1rem;
+    }
+
     .hamburger {
         display: block;
     }
@@ -1254,6 +1266,15 @@ h1, h2, h3, h4, h5, h6 {
     
     .footer-grid {
         gap: 2rem;
+    }
+}
+@media (max-width: 767px) {
+    .accordion-header {
+        padding: 1.25rem;
+    }
+    
+    .accordion-content-inner {
+        padding: 0 1.25rem 1.25rem;
     }
 }
 
