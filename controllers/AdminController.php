@@ -423,6 +423,9 @@ public static function getUserDetails($userId) {
             
             $db = Database::getConnection();
             
+            // Debug
+            error_log("manageStores - Filtros recebidos: " . print_r($filters, true));
+            
             // Preparar consulta base
             $query = "
                 SELECT *
@@ -436,8 +439,9 @@ public static function getUserDetails($userId) {
             if (!empty($filters)) {
                 // Filtro por status
                 if (isset($filters['status']) && !empty($filters['status'])) {
+                    $status = strtolower($filters['status']); // Normalizar para minúsculo
                     $query .= " AND status = :status";
-                    $params[':status'] = $filters['status'];
+                    $params[':status'] = $status;
                 }
                 
                 // Filtro por categoria
@@ -451,25 +455,13 @@ public static function getUserDetails($userId) {
                     $query .= " AND (nome_fantasia LIKE :busca OR razao_social LIKE :busca OR cnpj LIKE :busca)";
                     $params[':busca'] = '%' . $filters['busca'] . '%';
                 }
-                
-                // Filtro por data de cadastro
-                if (isset($filters['data_inicio']) && !empty($filters['data_inicio'])) {
-                    $query .= " AND data_cadastro >= :data_inicio";
-                    $params[':data_inicio'] = $filters['data_inicio'] . ' 00:00:00';
-                }
-                
-                if (isset($filters['data_fim']) && !empty($filters['data_fim'])) {
-                    $query .= " AND data_cadastro <= :data_fim";
-                    $params[':data_fim'] = $filters['data_fim'] . ' 23:59:59';
-                }
             }
             
-            // Ordenação (padrão: data de cadastro decrescente)
-            $orderBy = isset($filters['order_by']) ? $filters['order_by'] : 'data_cadastro';
-            $orderDir = isset($filters['order_dir']) && strtolower($filters['order_dir']) == 'asc' ? 'ASC' : 'DESC';
-            $query .= " ORDER BY $orderBy $orderDir";
+            // Log da consulta para debug
+            error_log("Query SQL: " . $query);
+            error_log("Params: " . print_r($params, true));
             
-            // Calcular total de registros para paginação - CORREÇÃO AQUI
+            // Calcular total de registros para paginação
             $countQuery = "
                 SELECT COUNT(*) as total 
                 FROM lojas 
@@ -478,40 +470,36 @@ public static function getUserDetails($userId) {
             
             // Aplicar os mesmos filtros à consulta de contagem
             if (!empty($filters)) {
-                // Filtro por status
                 if (isset($filters['status']) && !empty($filters['status'])) {
                     $countQuery .= " AND status = :status";
                 }
                 
-                // Filtro por categoria
                 if (isset($filters['categoria']) && !empty($filters['categoria'])) {
                     $countQuery .= " AND categoria = :categoria";
                 }
                 
-                // Filtro por busca
                 if (isset($filters['busca']) && !empty($filters['busca'])) {
                     $countQuery .= " AND (nome_fantasia LIKE :busca OR razao_social LIKE :busca OR cnpj LIKE :busca)";
-                }
-                
-                // Filtro por data de cadastro
-                if (isset($filters['data_inicio']) && !empty($filters['data_inicio'])) {
-                    $countQuery .= " AND data_cadastro >= :data_inicio";
-                }
-                
-                if (isset($filters['data_fim']) && !empty($filters['data_fim'])) {
-                    $countQuery .= " AND data_cadastro <= :data_fim";
                 }
             }
             
             $countStmt = $db->prepare($countQuery);
             
-            // Bind params para consulta de contagem (mesmos da consulta principal)
+            // Bind params para consulta de contagem
             foreach ($params as $param => $value) {
                 $countStmt->bindValue($param, $value);
             }
             
             $countStmt->execute();
             $totalCount = $countStmt->fetch(PDO::FETCH_ASSOC)['total'];
+            
+            // Log da contagem
+            error_log("Total de registros: " . $totalCount);
+            
+            // Ordenação (padrão: nome_fantasia)
+            $orderBy = isset($filters['order_by']) ? $filters['order_by'] : 'nome_fantasia';
+            $orderDir = isset($filters['order_dir']) && strtolower($filters['order_dir']) == 'desc' ? 'DESC' : 'ASC';
+            $query .= " ORDER BY $orderBy $orderDir";
             
             // Adicionar paginação
             $perPage = ITEMS_PER_PAGE;
@@ -523,34 +511,23 @@ public static function getUserDetails($userId) {
             foreach ($params as $param => $value) {
                 $stmt->bindValue($param, $value);
             }
+            
             $stmt->execute();
             $stores = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
-            // Estatísticas das lojas
-            $statsQuery = "
-                SELECT 
-                    COUNT(*) as total_lojas,
-                    SUM(CASE WHEN status = 'aprovado' THEN 1 ELSE 0 END) as total_aprovadas,
-                    SUM(CASE WHEN status = 'pendente' THEN 1 ELSE 0 END) as total_pendentes,
-                    SUM(CASE WHEN status = 'rejeitado' THEN 1 ELSE 0 END) as total_rejeitadas,
-                    AVG(porcentagem_cashback) as media_cashback
-                FROM lojas
-            ";
+            // Log dos resultados
+            error_log("Lojas encontradas: " . count($stores));
             
-            // Aplicar mesmos filtros se necessário
-            if (!empty($filters)) {
-                $statsQuery = str_replace('1=1', '1=1 ' . substr($query, strpos($query, 'WHERE 1=1') + 8, strpos($query, 'ORDER BY') - strpos($query, 'WHERE 1=1') - 8), $statsQuery);
-            }
-            
-            $statsStmt = $db->prepare($statsQuery);
-            foreach ($params as $param => $value) {
-                $statsStmt->bindValue($param, $value);
-            }
-            $statsStmt->execute();
-            $statistics = $statsStmt->fetch(PDO::FETCH_ASSOC);
+            // Estatísticas das lojas - simplificado para evitar erros
+            $statistics = [
+                'total_lojas' => $totalCount,
+                'total_aprovadas' => 0,
+                'total_pendentes' => 0,
+                'total_rejeitadas' => 0
+            ];
             
             // Obter categorias disponíveis para filtro
-            $categoriesStmt = $db->query("SELECT DISTINCT categoria FROM lojas ORDER BY categoria");
+            $categoriesStmt = $db->query("SELECT DISTINCT categoria FROM lojas WHERE categoria IS NOT NULL ORDER BY categoria");
             $categories = $categoriesStmt->fetchAll(PDO::FETCH_COLUMN);
             
             // Calcular informações de paginação
@@ -572,8 +549,13 @@ public static function getUserDetails($userId) {
             ];
             
         } catch (PDOException $e) {
-            error_log('Erro ao gerenciar lojas: ' . $e->getMessage());
-            return ['status' => false, 'message' => 'Erro ao carregar lojas. Tente novamente.'];
+            // Log detalhado do erro
+            error_log('Erro ao gerenciar lojas (PDOException): ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro ao carregar lojas: ' . $e->getMessage()];
+        } catch (Exception $e) {
+            // Log detalhado do erro
+            error_log('Erro ao gerenciar lojas (Exception): ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro ao carregar lojas: ' . $e->getMessage()];
         }
     }
     

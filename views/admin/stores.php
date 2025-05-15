@@ -22,7 +22,7 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION[
 // Obter parâmetros de paginação e filtros
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $search = isset($_GET['search']) ? $_GET['search'] : '';
-$status = isset($_GET['status']) ? $_GET['status'] : '';
+$status = isset($_GET['status']) ? strtolower($_GET['status']) : ''; // Convertendo para minúsculo
 $category = isset($_GET['category']) ? $_GET['category'] : '';
 
 // Preparar filtros
@@ -37,9 +37,27 @@ if (!empty($category)) {
     $filters['categoria'] = $category;
 }
 
+// Adicionando log para debug
+error_log("Filtros: " . print_r($filters, true));
+
 try {
+    // Testar conexão com banco
+    $db = Database::getConnection();
+    if (!$db) {
+        throw new Exception("Erro na conexão com o banco de dados");
+    }
+    
+    // Verificar se tabela 'lojas' existe
+    $testQuery = $db->query("SHOW TABLES LIKE 'lojas'");
+    if ($testQuery->rowCount() == 0) {
+        throw new Exception("Tabela 'lojas' não encontrada no banco de dados");
+    }
+    
     // Obter dados das lojas
     $result = AdminController::manageStores($filters, $page);
+    
+    // Log para debug
+    error_log("Resultado da consulta: " . print_r($result, true));
 
     // Verificar se houve erro
     $hasError = !$result['status'];
@@ -47,72 +65,13 @@ try {
 
     // Dados para exibição na página
     $stores = $hasError ? [] : $result['data']['lojas'];
-    $statistics = $hasError ? [] : $result['data']['estatisticas'];
-    $categories = $hasError ? [] : $result['data']['categorias'];
-    $pagination = $hasError ? [] : $result['data']['paginacao'];
+    $statistics = $hasError ? [] : (isset($result['data']['estatisticas']) ? $result['data']['estatisticas'] : []);
+    $categories = $hasError ? [] : (isset($result['data']['categorias']) ? $result['data']['categorias'] : []);
+    $pagination = $hasError ? [] : (isset($result['data']['paginacao']) ? $result['data']['paginacao'] : []);
 } catch (Exception $e) {
     $hasError = true;
     $errorMessage = "Erro ao processar a requisição: " . $e->getMessage();
-    $stores = [];
-    $statistics = [];
-    $pagination = [];
-    $categories = [];
-}
-?><?php
-// views/admin/stores.php
-// Definir o menu ativo na sidebar
-$activeMenu = 'lojas';
-
-// Incluir conexão com o banco de dados e arquivos necessários
-require_once '../../config/database.php';
-require_once '../../config/constants.php';
-require_once '../../controllers/AuthController.php';
-require_once '../../controllers/AdminController.php';
-
-// Iniciar sessão
-session_start();
-
-// Verificar se o usuário está logado e é administrador
-if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION['user_type'] !== USER_TYPE_ADMIN) {
-    // Redirecionar para a página de login com mensagem de erro
-    header("Location: /views/auth/login.php?error=acesso_restrito");
-    exit;
-}
-
-// Obter parâmetros de paginação e filtros
-$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
-$search = isset($_GET['search']) ? $_GET['search'] : '';
-$status = isset($_GET['status']) ? $_GET['status'] : '';
-$category = isset($_GET['category']) ? $_GET['category'] : '';
-
-// Preparar filtros
-$filters = [];
-if (!empty($search)) {
-    $filters['busca'] = $search;
-}
-if (!empty($status)) {
-    $filters['status'] = $status;
-}
-if (!empty($category)) {
-    $filters['categoria'] = $category;
-}
-
-try {
-    // Obter dados das lojas
-    $result = AdminController::manageStores($filters, $page);
-
-    // Verificar se houve erro
-    $hasError = !$result['status'];
-    $errorMessage = $hasError ? $result['message'] : '';
-
-    // Dados para exibição na página
-    $stores = $hasError ? [] : $result['data']['lojas'];
-    $statistics = $hasError ? [] : $result['data']['estatisticas'];
-    $categories = $hasError ? [] : $result['data']['categorias'];
-    $pagination = $hasError ? [] : $result['data']['paginacao'];
-} catch (Exception $e) {
-    $hasError = true;
-    $errorMessage = "Erro ao processar a requisição: " . $e->getMessage();
+    error_log("Erro em stores.php: " . $e->getMessage());
     $stores = [];
     $statistics = [];
     $pagination = [];
@@ -180,6 +139,8 @@ try {
                         <?php endif; ?>
                         
                         <button type="submit" class="btn btn-secondary">Filtrar</button>
+                        <!-- Botão para limpar filtros -->
+                        <a href="?" class="btn btn-outline-secondary">Limpar Filtros</a>
                     </div>
                 </form>
             </div>
