@@ -6,9 +6,9 @@
 
 // Informações básicas do sistema
 define('SYSTEM_NAME', 'Klube Cash');
-define('SYSTEM_VERSION', '1.0.0');
+define('SYSTEM_VERSION', '2.0.0');
 define('SITE_URL', 'https://klubecash.com');
-define('ADMIN_EMAIL', 'admin@klubecash.com');
+define('ADMIN_EMAIL', 'contato@klubecash.com');
 
 // Diretórios
 define('ROOT_DIR', dirname(__DIR__));
