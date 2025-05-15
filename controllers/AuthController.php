@@ -54,6 +54,11 @@ class AuthController {
                 // Registrar a sessão no banco de dados
                 self::registerSession($user['id']);
                 
+                // Associar usuário à loja se for do tipo loja
+                if ($user['tipo'] === USER_TYPE_STORE) {
+                    self::associateStoreUser($user['id'], $email);
+                }
+
                 return [
                     'status' => true, 
                     'message' => 'Login efetuado com sucesso.', 
@@ -71,7 +76,49 @@ class AuthController {
             return ['status' => false, 'message' => 'Erro ao processar o login. Tente novamente.'];
         }
     }
-    
+    // Adicione este código no AuthController.php após o login bem-sucedido
+
+    /**
+     * Associa um usuário do tipo loja à sua respectiva loja
+     * 
+     * @param int $userId ID do usuário
+     * @param string $userEmail Email do usuário
+     * @return bool Verdadeiro se associado com sucesso
+     */
+    private static function associateStoreUser($userId, $userEmail) {
+        try {
+            $db = Database::getConnection();
+            
+            // Verificar se o usuário já está associado a alguma loja
+            $checkStmt = $db->prepare("SELECT id FROM lojas WHERE usuario_id = :usuario_id");
+            $checkStmt->bindParam(':usuario_id', $userId);
+            $checkStmt->execute();
+            
+            if ($checkStmt->rowCount() > 0) {
+                return true; // Já está associado
+            }
+            
+            // Encontrar loja com o mesmo email do usuário
+            $storeStmt = $db->prepare("SELECT id FROM lojas WHERE email = :email AND usuario_id IS NULL");
+            $storeStmt->bindParam(':email', $userEmail);
+            $storeStmt->execute();
+            
+            if ($storeStmt->rowCount() > 0) {
+                $store = $storeStmt->fetch(PDO::FETCH_ASSOC);
+                
+                // Associar usuário à loja
+                $updateStmt = $db->prepare("UPDATE lojas SET usuario_id = :usuario_id WHERE id = :loja_id");
+                $updateStmt->bindParam(':usuario_id', $userId);
+                $updateStmt->bindParam(':loja_id', $store['id']);
+                return $updateStmt->execute();
+            }
+            
+            return false;
+        } catch (PDOException $e) {
+            error_log('Erro ao associar usuário à loja: ' . $e->getMessage());
+            return false;
+        }
+    }
     /**
      * Registra um novo usuário
      * 
