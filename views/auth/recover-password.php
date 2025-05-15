@@ -152,7 +152,7 @@ if (isset($_GET['token']) && !empty($_GET['token'])) {
     <link rel="stylesheet" href="../../assets/css/auth.css">
     <link rel="stylesheet" href="../../assets/css/responsive.css">
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
-    <link rel="stylesheet" href="../../assets/css/recover-password.css">
+    <link rel="stylesheet" href="../../assets/css/views/auth/recover-password.css">
 </head>
 <body>
     <!-- Versão Mobile -->
