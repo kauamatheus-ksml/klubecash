@@ -7,6 +7,7 @@
  * 
  * @param string $activeMenu - O ID do menu ativo atual
  */
+require_once '../../config/constants.php';
 // Iniciar sessão apenas se ainda não estiver ativa
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -18,7 +19,7 @@ if (!isset($_SESSION['user_id'])) {
 }
 // Verificar se o usuário é loja
 if ($_SESSION['user_type'] !== 'loja') {
-    header('Location: ' . CLIENT_DASHBOARD_URL);
+    header('Location: ' . STORE_DASHBOARD_URL);
     exit;
 }
 // Verificar se $activeMenu está definido, caso contrário definir como 'dashboard'

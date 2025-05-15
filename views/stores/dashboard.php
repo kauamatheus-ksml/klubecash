@@ -428,7 +428,7 @@ foreach ($monthlyStats as $stat) {
 <body>
     <div class="dashboard-container">
         <!-- Incluir sidebar/menu lateral -->
-        <?php include_once '../components/sidebar.php'; ?>
+        <?php include_once '../components/sidebar-store.php'; ?>
         
         <div class="main-content">
             <div class="dashboard-header">
