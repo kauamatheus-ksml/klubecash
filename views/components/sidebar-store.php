@@ -19,7 +19,7 @@ if (!isset($_SESSION['user_id'])) {
 }
 // Verificar se o usuário é loja
 if ($_SESSION['user_type'] !== 'loja') {
-    header('Location: ' . STORE_DASHBOARD_URL);
+    header('Location: ' . CLIENT_DASHBOARD_URL);
     exit;
 }
 // Verificar se $activeMenu está definido, caso contrário definir como 'dashboard'
@@ -124,7 +124,8 @@ if (!isset($activeMenu)) {
         </a>
     </div>
 </div>
-<!-- Script da Sidebar -->
+
+<!-- Script para responsividade da Sidebar -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // Elementos da DOM
