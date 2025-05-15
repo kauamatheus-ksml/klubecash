@@ -52,8 +52,7 @@ RewriteRule ^registro/?$ views/auth/register.php [L]
 RewriteRule ^recuperar-senha/?$ views/auth/recover-password.php [L]
 
 # Impedir loops de redirecionamento
-RewriteCond %{ENV:REDIRECT_STATUS} !200
-RewriteRule ^views/auth/login\.php$ login [R=301,L]
+
 # Assegurar que forçar HTTPS não cause loops
 RewriteCond %{HTTPS} off
 RewriteCond %{HTTP_HOST} ^klubecash\.com$ [NC]
@@ -87,15 +86,14 @@ ErrorDocument 500 /views/errors/500.php
 
 
 # Reescrever URLs amigáveis para a área da loja
-
-RewriteRule ^stores/dashboard/?$ views/stores/dashboard.php [L]
-RewriteRule ^stores/transacoes/?$ views/stores/transactions.php [L]
-RewriteRule ^stores/transacoes-pendentes/?$ views/stores/pending-commissions.php [L]
-RewriteRule ^stores/registrar-transacao/?$ views/stores/register-transaction.php [L]
-RewriteRule ^stores/upload-lote/?$ views/stores/batch-upload.php [L]
-RewriteRule ^stores/pagamento/?$ views/stores/payment.php [L]
-RewriteRule ^stores/historico-pagamentos/?$ views/stores/payment-history.php [L]
-RewriteRule ^stores/perfil/?$ views/stores/profile.php [L]
+RewriteRule ^store/dashboard/?$ views/stores/dashboard.php [L]
+RewriteRule ^store/transacoes/?$ views/stores/transactions.php [L]
+RewriteRule ^store/transacoes-pendentes/?$ views/stores/pending-commissions.php [L]
+RewriteRule ^store/registrar-transacao/?$ views/stores/register-transaction.php [L]
+RewriteRule ^store/upload-lote/?$ views/stores/batch-upload.php [L]
+RewriteRule ^store/pagamento/?$ views/stores/payment.php [L]
+RewriteRule ^store/historico-pagamentos/?$ views/stores/payment-history.php [L]
+RewriteRule ^store/perfil/?$ views/stores/profile.php [L]
 
 # Novas regras para área admin
 RewriteRule ^admin/comissoes/?$ views/admin/commissions.php [L]

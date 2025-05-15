@@ -90,7 +90,7 @@ define('ADMIN_TRANSACTION_DETAILS_URL', SITE_URL . '/admin/transacao');
 define('ADMIN_REPORTS_URL', SITE_URL . '/admin/relatorios');
 
 // URL para o dashboard da loja
-define('STORE_DASHBOARD_URL', SITE_URL . '/stores/dashboard');
+define('STORE_DASHBOARD_URL', SITE_URL . '/store/dashboard');
 
 // URLs adicionais para loja
 define('STORE_TRANSACTIONS_URL', SITE_URL . '/stores/transacoes');
