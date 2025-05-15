@@ -126,7 +126,7 @@ $activeMenu = 'dashboard';
     <title>Dashboard da Loja - Klube Cash</title>
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
     <link rel="stylesheet" href="../../assets/css/main.css">
-    <link rel="stylesheet" href="../../assets/css/store.css">
+    <link rel="stylesheet" href="../../assets/css/views/stores/dashboard.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
@@ -299,12 +299,12 @@ $activeMenu = 'dashboard';
                             <?php if (count($recentTransactions) > 0): ?>
                                 <?php foreach ($recentTransactions as $transaction): ?>
                                     <tr>
-                                        <td><?php echo date('d/m/Y H:i', strtotime($transaction['data_transacao'])); ?></td>
-                                        <td><?php echo htmlspecialchars($transaction['cliente_nome']); ?></td>
-                                        <td><?php echo htmlspecialchars($transaction['codigo_transacao'] ?? 'N/A'); ?></td>
-                                        <td>R$ <?php echo number_format($transaction['valor_total'], 2, ',', '.'); ?></td>
-                                        <td>R$ <?php echo number_format($transaction['valor_cashback'], 2, ',', '.'); ?></td>
-                                        <td>
+                                        <td data-label="Data"><?php echo date('d/m/Y H:i', strtotime($transaction['data_transacao'])); ?></td>
+                                        <td data-label="Cliente"><?php echo htmlspecialchars($transaction['cliente_nome']); ?></td>
+                                        <td data-label="Código"><?php echo htmlspecialchars($transaction['codigo_transacao'] ?? 'N/A'); ?></td>
+                                        <td data-label="Valor">R$ <?php echo number_format($transaction['valor_total'], 2, ',', '.'); ?></td>
+                                        <td data-label="Cashback">R$ <?php echo number_format($transaction['valor_cashback'], 2, ',', '.'); ?></td>
+                                        <td data-label="Status">
                                             <span class="status-badge <?php echo $transaction['status']; ?>">
                                                 <?php 
                                                     switch ($transaction['status']) {
