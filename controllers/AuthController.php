@@ -429,6 +429,8 @@ if (basename($_SERVER['PHP_SELF']) === 'AuthController.php') {
                     // Redirecionar com base no tipo de usuário
                     if ($_SESSION['user_type'] == USER_TYPE_ADMIN) {
                         header('Location: ' . ADMIN_DASHBOARD_URL);
+                    } else if ($_SESSION['user_type'] == USER_TYPE_STORE) {
+                        header('Location: ' . STORE_DASHBOARD_URL);
                     } else {
                         header('Location: ' . CLIENT_DASHBOARD_URL);
                     }
@@ -480,12 +482,14 @@ if (basename($_SERVER['PHP_SELF']) === 'AuthController.php') {
                 $result = AuthController::recoverPassword($email);
                 
                 if ($result['status']) {
-                    // Redirecionar com mensagem de sucesso
-                    header('Location: ' . RECOVER_PASSWORD_URL . '?success=' . urlencode($result['message']));
-                    exit;
-                } else {
-                    // Redirecionar com mensagem de erro
-                    header('Location: ' . SITE_URL . '/recuperar-senha?error=' . urlencode($result['message']));
+                    // Redirecionar com base no tipo de usuário
+                    if ($_SESSION['user_type'] == USER_TYPE_ADMIN) {
+                        header('Location: ' . ADMIN_DASHBOARD_URL);
+                    } else if ($_SESSION['user_type'] == USER_TYPE_STORE) {
+                        header('Location: ' . STORE_DASHBOARD_URL); 
+                    } else {
+                        header('Location: ' . CLIENT_DASHBOARD_URL);
+                    }
                     exit;
                 }
             }
