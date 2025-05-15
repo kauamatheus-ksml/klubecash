@@ -93,12 +93,12 @@ define('ADMIN_REPORTS_URL', SITE_URL . '/admin/relatorios');
 define('STORE_DASHBOARD_URL', SITE_URL . '/store/dashboard');
 
 // URLs adicionais para loja
-define('STORE_TRANSACTIONS_URL', SITE_URL . '/stores/transacoes');
-define('STORE_PENDING_TRANSACTIONS_URL', SITE_URL . '/stores/transacoes-pendentes');
-define('STORE_REGISTER_TRANSACTION_URL', SITE_URL . '/stores/registrar-transacao');
-define('STORE_BATCH_UPLOAD_URL', SITE_URL . '/stores/upload-lote');
-define('STORE_PAYMENT_URL', SITE_URL . '/stores/pagamento');
-define('STORE_PAYMENT_HISTORY_URL', SITE_URL . '/stores/historico-pagamentos');
+define('STORE_TRANSACTIONS_URL', SITE_URL . '/store/transacoes');
+define('STORE_PENDING_TRANSACTIONS_URL', SITE_URL . '/store/transacoes-pendentes');
+define('STORE_REGISTER_TRANSACTION_URL', SITE_URL . '/store/registrar-transacao');
+define('STORE_BATCH_UPLOAD_URL', SITE_URL . '/store/upload-lote');
+define('STORE_PAYMENT_URL', SITE_URL . '/store/pagamento');
+define('STORE_PAYMENT_HISTORY_URL', SITE_URL . '/store/historico-pagamentos');
 
 // URLs adicionais para admin
 define('ADMIN_COMMISSIONS_URL', SITE_URL . '/admin/comissoes');

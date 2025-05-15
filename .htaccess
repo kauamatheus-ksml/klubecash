@@ -86,14 +86,14 @@ ErrorDocument 500 /views/errors/500.php
 
 
 # Reescrever URLs amigáveis para a área da loja
-RewriteRule ^store/dashboard/?$ views/stores/dashboard.php [L]
-RewriteRule ^store/transacoes/?$ views/stores/transactions.php [L]
-RewriteRule ^store/transacoes-pendentes/?$ views/stores/pending-commissions.php [L]
-RewriteRule ^store/registrar-transacao/?$ views/stores/register-transaction.php [L]
-RewriteRule ^store/upload-lote/?$ views/stores/batch-upload.php [L]
-RewriteRule ^store/pagamento/?$ views/stores/payment.php [L]
-RewriteRule ^store/historico-pagamentos/?$ views/stores/payment-history.php [L]
-RewriteRule ^store/perfil/?$ views/stores/profile.php [L]
+RewriteRule ^store/dashboard/?$ views/stores/dashboard.php [L,QSA]
+RewriteRule ^store/transacoes/?$ views/stores/transactions.php [L,QSA]
+RewriteRule ^store/transacoes-pendentes/?$ views/stores/pending-commissions.php [L,QSA]
+RewriteRule ^store/registrar-transacao/?$ views/stores/register-transaction.php [L,QSA]
+RewriteRule ^store/upload-lote/?$ views/stores/batch-upload.php [L,QSA]
+RewriteRule ^store/pagamento/?$ views/stores/payment.php [L,QSA]
+RewriteRule ^store/historico-pagamentos/?$ views/stores/payment-history.php [L,QSA]
+RewriteRule ^store/perfil/?$ views/stores/profile.php [L,QSA]
 
 # Novas regras para área admin
 RewriteRule ^admin/comissoes/?$ views/admin/commissions.php [L]
