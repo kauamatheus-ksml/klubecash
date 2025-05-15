@@ -58,6 +58,66 @@ try {
     $pagination = [];
     $categories = [];
 }
+?><?php
+// views/admin/stores.php
+// Definir o menu ativo na sidebar
+$activeMenu = 'lojas';
+
+// Incluir conexão com o banco de dados e arquivos necessários
+require_once '../../config/database.php';
+require_once '../../config/constants.php';
+require_once '../../controllers/AuthController.php';
+require_once '../../controllers/AdminController.php';
+
+// Iniciar sessão
+session_start();
+
+// Verificar se o usuário está logado e é administrador
+if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION['user_type'] !== USER_TYPE_ADMIN) {
+    // Redirecionar para a página de login com mensagem de erro
+    header("Location: /views/auth/login.php?error=acesso_restrito");
+    exit;
+}
+
+// Obter parâmetros de paginação e filtros
+$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
+$search = isset($_GET['search']) ? $_GET['search'] : '';
+$status = isset($_GET['status']) ? $_GET['status'] : '';
+$category = isset($_GET['category']) ? $_GET['category'] : '';
+
+// Preparar filtros
+$filters = [];
+if (!empty($search)) {
+    $filters['busca'] = $search;
+}
+if (!empty($status)) {
+    $filters['status'] = $status;
+}
+if (!empty($category)) {
+    $filters['categoria'] = $category;
+}
+
+try {
+    // Obter dados das lojas
+    $result = AdminController::manageStores($filters, $page);
+
+    // Verificar se houve erro
+    $hasError = !$result['status'];
+    $errorMessage = $hasError ? $result['message'] : '';
+
+    // Dados para exibição na página
+    $stores = $hasError ? [] : $result['data']['lojas'];
+    $statistics = $hasError ? [] : $result['data']['estatisticas'];
+    $categories = $hasError ? [] : $result['data']['categorias'];
+    $pagination = $hasError ? [] : $result['data']['paginacao'];
+} catch (Exception $e) {
+    $hasError = true;
+    $errorMessage = "Erro ao processar a requisição: " . $e->getMessage();
+    $stores = [];
+    $statistics = [];
+    $pagination = [];
+    $categories = [];
+}
 ?>
 
 <!DOCTYPE html>
@@ -101,7 +161,7 @@ try {
                     </div>
                     
                     <div class="filter-controls">
-                        <select name="status" class="form-select" style="width: auto; display: inline-block; margin-right: 10px;" onchange="this.form.submit()">
+                        <select name="status" class="form-select" style="width: auto; display: inline-block; margin-right: 10px;">
                             <option value="">Todos os status</option>
                             <option value="aprovado" <?php echo $status === 'aprovado' ? 'selected' : ''; ?>>Aprovado</option>
                             <option value="pendente" <?php echo $status === 'pendente' ? 'selected' : ''; ?>>Pendente</option>
@@ -109,7 +169,7 @@ try {
                         </select>
                         
                         <?php if (!empty($categories)): ?>
-                        <select name="category" class="form-select" style="width: auto; display: inline-block;" onchange="this.form.submit()">
+                        <select name="category" class="form-select" style="width: auto; display: inline-block;">
                             <option value="">Todas as categorias</option>
                             <?php foreach ($categories as $cat): ?>
                             <option value="<?php echo htmlspecialchars($cat); ?>" <?php echo $category === $cat ? 'selected' : ''; ?>>
@@ -118,6 +178,8 @@ try {
                             <?php endforeach; ?>
                         </select>
                         <?php endif; ?>
+                        
+                        <button type="submit" class="btn btn-secondary">Filtrar</button>
                     </div>
                 </form>
             </div>

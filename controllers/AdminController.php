@@ -469,38 +469,47 @@ public static function getUserDetails($userId) {
             $orderDir = isset($filters['order_dir']) && strtolower($filters['order_dir']) == 'asc' ? 'ASC' : 'DESC';
             $query .= " ORDER BY $orderBy $orderDir";
             
-            // Calcular total de registros para paginação
+            // Calcular total de registros para paginação - CORREÇÃO AQUI
             $countQuery = "
-            SELECT COUNT(*) as total 
-            FROM usuarios 
-            WHERE 1=1
+                SELECT COUNT(*) as total 
+                FROM lojas 
+                WHERE 1=1
             ";
+            
+            // Aplicar os mesmos filtros à consulta de contagem
             if (!empty($filters)) {
-            if (isset($filters['tipo']) && !empty($filters['tipo'])) {
-                $countQuery .= " AND tipo = :tipo";
+                // Filtro por status
+                if (isset($filters['status']) && !empty($filters['status'])) {
+                    $countQuery .= " AND status = :status";
+                }
+                
+                // Filtro por categoria
+                if (isset($filters['categoria']) && !empty($filters['categoria'])) {
+                    $countQuery .= " AND categoria = :categoria";
+                }
+                
+                // Filtro por busca
+                if (isset($filters['busca']) && !empty($filters['busca'])) {
+                    $countQuery .= " AND (nome_fantasia LIKE :busca OR razao_social LIKE :busca OR cnpj LIKE :busca)";
+                }
+                
+                // Filtro por data de cadastro
+                if (isset($filters['data_inicio']) && !empty($filters['data_inicio'])) {
+                    $countQuery .= " AND data_cadastro >= :data_inicio";
+                }
+                
+                if (isset($filters['data_fim']) && !empty($filters['data_fim'])) {
+                    $countQuery .= " AND data_cadastro <= :data_fim";
+                }
             }
-
-            if (isset($filters['status']) && !empty($filters['status'])) {
-                $countQuery .= " AND status = :status";
-            }
-
-            if (isset($filters['busca']) && !empty($filters['busca'])) {
-                $countQuery .= " AND (nome LIKE :busca_nome OR email LIKE :busca_email)";
-            }
-
-            if (isset($filters['data_inicio']) && !empty($filters['data_inicio'])) {
-                $countQuery .= " AND data_criacao >= :data_inicio";
-            }
-
-            if (isset($filters['data_fim']) && !empty($filters['data_fim'])) {
-                $countQuery .= " AND data_criacao <= :data_fim";
-            }
-            }
-
+            
             $countStmt = $db->prepare($countQuery);
+            
+            // Bind params para consulta de contagem (mesmos da consulta principal)
             foreach ($params as $param => $value) {
-            $countStmt->bindValue($param, $value);
+                $countStmt->bindValue($param, $value);
             }
+            
             $countStmt->execute();
             $totalCount = $countStmt->fetch(PDO::FETCH_ASSOC)['total'];
             
