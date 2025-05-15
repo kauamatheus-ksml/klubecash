@@ -35,18 +35,18 @@ class Email {
         // Verificar se as constantes estão definidas
         if (defined('SMTP_HOST')) {
             self::$host = SMTP_HOST;
-            self::$port = defined('SMTP_PORT') ? SMTP_PORT : 587;
-            self::$username = defined('SMTP_USERNAME') ? SMTP_USERNAME : '';
-            self::$password = defined('SMTP_PASSWORD') ? SMTP_PASSWORD : '';
+            self::$port = defined('SMTP_PORT') ? SMTP_PORT : 465;
+            self::$username = defined('SMTP_USERNAME') ? SMTP_USERNAME : 'klubecash@klubecash.com';
+            self::$password = defined('SMTP_PASSWORD') ? SMTP_PASSWORD : 'Aaku_2004@';
             self::$fromEmail = defined('SMTP_FROM_EMAIL') ? SMTP_FROM_EMAIL : 'noreply@klubecash.com';
             self::$fromName = defined('SMTP_FROM_NAME') ? SMTP_FROM_NAME : 'Klube Cash';
             self::$encryption = defined('SMTP_ENCRYPTION') ? SMTP_ENCRYPTION : PHPMailer::ENCRYPTION_STARTTLS;
         } else {
             // Configurações padrão se as constantes não estiverem definidas
-            self::$host = 'smtp.example.com';
-            self::$port = 587;
-            self::$username = 'user@example.com';
-            self::$password = 'password';
+            self::$host = 'smtp.hostinger.com';
+            self::$port = 465;
+            self::$username = 'klubecash@klubecash.com';
+            self::$password = 'Aaku_2004@';
             self::$fromEmail = 'noreply@klubecash.com';
             self::$fromName = 'Klube Cash';
             self::$encryption = PHPMailer::ENCRYPTION_STARTTLS;

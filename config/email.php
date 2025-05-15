@@ -8,7 +8,7 @@
 // Configurações SMTP
 define('SMTP_HOST', 'smtp.hostinger.com');
 define('SMTP_PORT', 465);
-define('SMTP_USERNAME', 'Klube Cash');
+define('SMTP_USERNAME', 'klubecash@klubecash.com');
 define('SMTP_PASSWORD', 'Aaku_2004@'); // Substitua pela senha real - removi a senha por segurança
 define('SMTP_FROM_EMAIL', 'klubecash@klubecash.com');
 define('SMTP_FROM_NAME', 'Klube Cash');
