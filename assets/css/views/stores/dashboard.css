@@ -35,9 +35,10 @@
   .main-content {
     flex: 1;
     padding: 1.5rem;
-    margin-left: 250px;
-    transition: var(--transition);
+    margin-left: 250px; /* Deve corresponder à largura da sidebar */
+    transition: margin-left 0.3s ease;
   }
+  
   
   /* Cabeçalho */
   .dashboard-header {
@@ -460,9 +461,8 @@
   
   @media (max-width: 991.98px) {
     .main-content {
-      margin-left: 0;
-      padding: 1.25rem;
-    }
+        margin-left: 0; /* Remove a margem quando a sidebar é ocultada */
+      }
     
     .dashboard-header {
       margin-top: 60px;
