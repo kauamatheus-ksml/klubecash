@@ -87,8 +87,9 @@ ErrorDocument 500 /views/errors/500.php
 
 
 # Reescrever URLs amigáveis para a área da loja
+
 RewriteRule ^stores/dashboard/?$ views/stores/dashboard.php [L]
-RewriteRule ^store/transacoes/?$ views/store/transactions.php [L]
+RewriteRule ^stores/transacoes/?$ views/stores/transactions.php [L]
 RewriteRule ^stores/transacoes-pendentes/?$ views/stores/pending-commissions.php [L]
 RewriteRule ^stores/registrar-transacao/?$ views/stores/register-transaction.php [L]
 RewriteRule ^stores/upload-lote/?$ views/stores/batch-upload.php [L]
