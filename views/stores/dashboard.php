@@ -1,463 +1,344 @@
 <?php
-// views/stores/dashboard.php
-require_once '../../config/constants.php';
-require_once '../../config/database.php';
-require_once '../../controllers/AuthController.php';
-require_once '../../controllers/StoreController.php';
-require_once '../../controllers/TransactionController.php';
-require_once '../../models/Store.php';
+// views/store/dashboard.php
+// Painel principal para lojas parceiras no sistema Klube Cash
 
-// Verificar se o usuário está logado
+// Iniciar sessão e verificar autenticação
 session_start();
-if (!isset($_SESSION['user_id'])) {
-    header('Location: ' . LOGIN_URL);
+require_once __DIR__ . '/../../controllers/AuthController.php';
+require_once __DIR__ . '/../../controllers/StoreController.php';
+require_once __DIR__ . '/../../controllers/TransactionController.php';
+require_once __DIR__ . '/../../controllers/CommissionController.php';
+require_once __DIR__ . '/../../config/constants.php';
+
+// Verificar se o usuário está autenticado e é uma loja
+if (!AuthController::isAuthenticated() || !AuthController::isStore()) {
+    header('Location: ' . LOGIN_URL . '?error=' . urlencode('Acesso restrito a lojas parceiras.'));
     exit;
 }
 
-// Verificar se o usuário é uma loja
-if ($_SESSION['user_type'] !== 'loja') {
-    header('Location: ' . CLIENT_DASHBOARD_URL);
+// Obter dados do usuário logado
+$userData = AuthController::getCurrentUser();
+$userId = $userData['id'];
+
+// Obter dados da loja vinculada ao usuário
+$storeData = StoreController::getStoreByUserId($userId);
+
+if (!$storeData) {
+    header('Location: ' . LOGIN_URL . '?error=' . urlencode('Perfil de loja não encontrado.'));
     exit;
 }
 
-// Obter ID da loja associada ao usuário
-$db = Database::getConnection();
-$stmt = $db->prepare("SELECT id FROM lojas WHERE usuario_id = ?");
-$stmt->execute([$_SESSION['user_id']]);
-$store = $stmt->fetch(PDO::FETCH_ASSOC);
+$storeId = $storeData['id'];
 
-if (!$store) {
-    // Se o usuário é do tipo loja mas não tem loja associada
-    echo "Erro: Perfil de loja não encontrado. Entre em contato com o suporte.";
-    exit;
+// Obter dados para o dashboard
+$pendingCommissions = TransactionController::getPendingTransactions($storeId);
+$paymentHistory = TransactionController::getPaymentHistory($storeId);
+$storeCommissions = CommissionController::getStoreCommissions($storeId);
+
+// Calcular estatísticas
+$totalTransactions = 0;
+$totalSales = 0;
+$totalCommissions = 0;
+$pendingCommissionsCount = 0;
+$pendingCommissionsValue = 0;
+
+if ($pendingCommissions['status'] && isset($pendingCommissions['data']['totais'])) {
+    $pendingCommissionsCount = $pendingCommissions['data']['totais']['total_transacoes'];
+    $pendingCommissionsValue = $pendingCommissions['data']['totais']['total_valor_comissoes'];
+    $totalSales += $pendingCommissions['data']['totais']['total_valor_compras'];
 }
 
-$storeId = $store['id'];
-$storeModel = new Store($storeId);
-
-// Obter estatísticas para o dashboard
-// Filtro padrão: últimos 30 dias
-$filters = [
-    'data_inicio' => date('Y-m-d', strtotime('-30 days')),
-    'data_fim' => date('Y-m-d')
-];
-
-// Obter estatísticas da loja
-$stats = $storeModel->getEstatisticas($filters);
-
-// Obter últimas transações
-$transacoesData = $storeModel->getTransacoes(['limit' => 5], 1, 5);
-$ultimasTransacoes = $transacoesData['transacoes'];
-
-// Obter comissões pendentes
-$comissoesPendentes = TransactionController::getPendingTransactions($storeId, [], 1);
-$totalPendente = 0;
-if ($comissoesPendentes['status']) {
-    $totalPendente = $comissoesPendentes['data']['totais']['total_valor_comissoes'];
+if ($storeCommissions['status'] && isset($storeCommissions['data']['totais'])) {
+    $totalTransactions = $storeCommissions['data']['totais']['total_comissoes'];
+    $totalCommissions = $storeCommissions['data']['totais']['total_valor'];
 }
 
-// Título da página
+// Dados para gráficos
+$lastTransactions = [];
+$monthlyData = [];
+
+// Obter dados para o gráfico mensal (últimos 6 meses)
+$currentMonth = date('n');
+$currentYear = date('Y');
+
+for ($i = 0; $i < 6; $i++) {
+    $month = $currentMonth - $i;
+    $year = $currentYear;
+    
+    if ($month <= 0) {
+        $month += 12;
+        $year--;
+    }
+    
+    $monthName = date('M', mktime(0, 0, 0, $month, 1, $year));
+    $monthlyData[$i] = [
+        'month' => $monthName,
+        'year' => $year,
+        'sales' => 0,
+        'commissions' => 0
+    ];
+}
+
+// Simular dados para o gráfico (em produção, estes viriam do banco de dados)
+$monthlyData[0]['sales'] = 15000;
+$monthlyData[0]['commissions'] = 1500;
+$monthlyData[1]['sales'] = 12500;
+$monthlyData[1]['commissions'] = 1250;
+$monthlyData[2]['sales'] = 14000;
+$monthlyData[2]['commissions'] = 1400;
+$monthlyData[3]['sales'] = 10000;
+$monthlyData[3]['commissions'] = 1000;
+$monthlyData[4]['sales'] = 11500;
+$monthlyData[4]['commissions'] = 1150;
+$monthlyData[5]['sales'] = 13000;
+$monthlyData[5]['commissions'] = 1300;
+
+// Inverter para ordem cronológica
+$monthlyData = array_reverse($monthlyData);
+
+// Obter últimas 5 transações
+if ($pendingCommissions['status'] && isset($pendingCommissions['data']['transacoes'])) {
+    $lastTransactions = array_slice($pendingCommissions['data']['transacoes'], 0, 5);
+}
+
+// Incluir o cabeçalho e barra lateral
 $pageTitle = "Dashboard da Loja";
+$currentPage = "dashboard";
+include_once __DIR__ . '/../components/header.php';
+include_once __DIR__ . '/../components/sidebar.php';
 ?>
 
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?php echo $pageTitle; ?> - Klube Cash</title>
-    <link rel="stylesheet" href="../../assets/css/main.css">
-    <link rel="stylesheet" href="../../assets/css/store.css">
-    <link rel="stylesheet" href="../../assets/css/responsive.css">
-    <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-</head>
-<body>
-    <div class="admin-layout">
-        <!-- Incluir navbar -->
-        <?php include('../components/navbar.php'); ?>
-        
-        <div class="main-container">
-            <!-- Incluir sidebar para loja -->
-            <?php 
-            $activeMenu = 'dashboard'; 
-            include('../components/sidebar-store.php'); 
-            ?>
-            
-            <main id="mainContent" class="content">
-                <div class="page-header">
-                    <h1>Dashboard</h1>
-                    <p>Bem-vindo ao painel de controle da sua loja no Klube Cash</p>
+<div class="content-wrapper">
+    <div class="content-header">
+        <div class="container-fluid">
+            <div class="row mb-2">
+                <div class="col-sm-6">
+                    <h1 class="m-0">Dashboard da Loja</h1>
                 </div>
-                
-                <!-- Cards de Resumo -->
-                <div class="summary-cards">
-                    <div class="card">
-                        <div class="card-content">
-                            <h3>Vendas Totais</h3>
-                            <p class="card-value">R$ <?php echo number_format($stats['total_vendas'] ?? 0, 2, ',', '.'); ?></p>
-                            <p class="card-period">Últimos 30 dias</p>
-                        </div>
-                        <div class="card-icon">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <line x1="12" y1="1" x2="12" y2="23"></line>
-                                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-                            </svg>
-                        </div>
-                    </div>
-                    
-                    <div class="card">
-                        <div class="card-content">
-                            <h3>Comissões Pendentes</h3>
-                            <p class="card-value">R$ <?php echo number_format($totalPendente, 2, ',', '.'); ?></p>
-                            <p class="card-period">A pagar</p>
-                        </div>
-                        <div class="card-icon warning">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <circle cx="12" cy="12" r="10"></circle>
-                                <line x1="12" y1="8" x2="12" y2="12"></line>
-                                <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                            </svg>
-                        </div>
-                    </div>
-                    
-                    <div class="card">
-                        <div class="card-content">
-                            <h3>Transações</h3>
-                            <p class="card-value"><?php echo $stats['total_transacoes'] ?? 0; ?></p>
-                            <p class="card-period">Últimos 30 dias</p>
-                        </div>
-                        <div class="card-icon success">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
-                                <line x1="1" y1="10" x2="23" y2="10"></line>
-                            </svg>
-                        </div>
-                    </div>
-                    
-                    <div class="card">
-                        <div class="card-content">
-                            <h3>Ticket Médio</h3>
-                            <p class="card-value">R$ <?php echo number_format($stats['ticket_medio'] ?? 0, 2, ',', '.'); ?></p>
-                            <p class="card-period">Últimos 30 dias</p>
-                        </div>
-                        <div class="card-icon info">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                                <circle cx="12" cy="7" r="4"></circle>
-                            </svg>
+                <div class="col-sm-6">
+                    <ol class="breadcrumb float-sm-right">
+                        <li class="breadcrumb-item"><a href="<?= STORE_DASHBOARD_URL ?>">Home</a></li>
+                        <li class="breadcrumb-item active">Dashboard</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <section class="content">
+        <div class="container-fluid">
+            <!-- Info boxes -->
+            <div class="row">
+                <div class="col-12 col-sm-6 col-md-3">
+                    <div class="info-box">
+                        <span class="info-box-icon bg-info"><i class="fas fa-shopping-cart"></i></span>
+                        <div class="info-box-content">
+                            <span class="info-box-text">Total de Vendas</span>
+                            <span class="info-box-number">R$ <?= number_format($totalSales, 2, ',', '.') ?></span>
                         </div>
                     </div>
                 </div>
-                
-                <!-- Alerta de Comissões Pendentes -->
-                <?php if ($totalPendente > 0): ?>
-                <div class="alert warning">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <line x1="12" y1="8" x2="12" y2="12"></line>
-                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                    </svg>
-                    <div>
-                        <h4>Comissões Pendentes</h4>
-                        <p>Você tem R$ <?php echo number_format($totalPendente, 2, ',', '.'); ?> em comissões pendentes de pagamento.</p>
+                <div class="col-12 col-sm-6 col-md-3">
+                    <div class="info-box">
+                        <span class="info-box-icon bg-success"><i class="fas fa-money-bill-wave"></i></span>
+                        <div class="info-box-content">
+                            <span class="info-box-text">Total de Comissões</span>
+                            <span class="info-box-number">R$ <?= number_format($totalCommissions, 2, ',', '.') ?></span>
+                        </div>
                     </div>
-                    <a href="<?php echo STORE_PENDING_TRANSACTIONS_URL; ?>" class="btn btn-warning">Ver Detalhes</a>
                 </div>
-                <?php endif; ?>
-                
-                <!-- Ações Rápidas -->
-                <div class="quick-actions">
-                    <h2>Ações Rápidas</h2>
-                    <div class="actions-grid">
-                        <a href="<?php echo STORE_REGISTER_TRANSACTION_URL; ?>" class="action-card">
-                            <div class="action-icon">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <line x1="12" y1="5" x2="12" y2="19"></line>
-                                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                                </svg>
-                            </div>
-                            <h3>Registrar Venda</h3>
-                            <p>Cadastre uma nova transação de cliente</p>
-                        </a>
-                        
-                        <a href="<?php echo STORE_BATCH_UPLOAD_URL; ?>" class="action-card">
-                            <div class="action-icon">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                    <polyline points="17 8 12 3 7 8"></polyline>
-                                    <line x1="12" y1="3" x2="12" y2="15"></line>
-                                </svg>
-                            </div>
-                            <h3>Upload em Lote</h3>
-                            <p>Importe múltiplas transações de uma vez</p>
-                        </a>
-                        
-                        <a href="<?php echo STORE_PAYMENT_URL; ?>" class="action-card">
-                            <div class="action-icon">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
-                                    <line x1="1" y1="10" x2="23" y2="10"></line>
-                                </svg>
-                            </div>
-                            <h3>Realizar Pagamento</h3>
-                            <p>Pague as comissões pendentes</p>
-                        </a>
-                        
-                        <a href="<?php echo STORE_PAYMENT_HISTORY_URL; ?>" class="action-card">
-                            <div class="action-icon">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <circle cx="12" cy="12" r="10"></circle>
-                                    <polyline points="12 6 12 12 16 14"></polyline>
-                                </svg>
-                            </div>
-                            <h3>Histórico</h3>
-                            <p>Veja seus pagamentos anteriores</p>
+                <div class="col-12 col-sm-6 col-md-3">
+                    <div class="info-box">
+                        <span class="info-box-icon bg-warning"><i class="fas fa-clock"></i></span>
+                        <div class="info-box-content">
+                            <span class="info-box-text">Comissões Pendentes</span>
+                            <span class="info-box-number">R$ <?= number_format($pendingCommissionsValue, 2, ',', '.') ?></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-sm-6 col-md-3">
+                    <div class="info-box">
+                        <span class="info-box-icon bg-danger"><i class="fas fa-exclamation-circle"></i></span>
+                        <div class="info-box-content">
+                            <span class="info-box-text">Transações Pendentes</span>
+                            <span class="info-box-number"><?= $pendingCommissionsCount ?></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Alertas -->
+            <?php if ($pendingCommissionsCount > 0): ?>
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="alert alert-warning">
+                        <h5><i class="icon fas fa-exclamation-triangle"></i> Atenção!</h5>
+                        Você possui <?= $pendingCommissionsCount ?> transações pendentes de pagamento, 
+                        totalizando R$ <?= number_format($pendingCommissionsValue, 2, ',', '.') ?>.
+                        <a href="<?= STORE_PENDING_TRANSACTIONS_URL ?>" class="btn btn-sm btn-warning ml-3">
+                            Ver Transações Pendentes
                         </a>
                     </div>
                 </div>
-                
-                <!-- Gráfico de Desempenho -->
-                <div class="chart-container">
-                    <h2>Desempenho de Vendas</h2>
-                    <div class="chart-wrapper">
-                        <canvas id="salesChart"></canvas>
+            </div>
+            <?php endif; ?>
+
+            <!-- Ações Rápidas -->
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Ações Rápidas</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-3 col-sm-6">
+                                    <a href="<?= STORE_REGISTER_TRANSACTION_URL ?>" class="btn btn-primary btn-lg btn-block">
+                                        <i class="fas fa-cash-register"></i> Nova Transação
+                                    </a>
+                                </div>
+                                <div class="col-md-3 col-sm-6">
+                                    <a href="<?= STORE_BATCH_UPLOAD_URL ?>" class="btn btn-success btn-lg btn-block">
+                                        <i class="fas fa-file-upload"></i> Upload em Lote
+                                    </a>
+                                </div>
+                                <div class="col-md-3 col-sm-6">
+                                    <a href="<?= STORE_PAYMENT_URL ?>" class="btn btn-warning btn-lg btn-block">
+                                        <i class="fas fa-money-check-alt"></i> Pagar Comissões
+                                    </a>
+                                </div>
+                                <div class="col-md-3 col-sm-6">
+                                    <a href="<?= STORE_PAYMENT_HISTORY_URL ?>" class="btn btn-info btn-lg btn-block">
+                                        <i class="fas fa-history"></i> Histórico de Pagamentos
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                
-                <!-- Últimas Transações -->
-                <div class="recent-transactions">
-                    <div class="section-header">
-                        <h2>Últimas Transações</h2>
-                        <a href="<?php echo STORE_TRANSACTIONS_URL; ?>" class="link-more">Ver todas</a>
-                    </div>
-                    
-                    <?php if (empty($ultimasTransacoes)): ?>
-                        <div class="empty-state">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <circle cx="12" cy="12" r="10"></circle>
-                                <line x1="12" y1="8" x2="12" y2="12"></line>
-                                <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                            </svg>
-                            <h3>Nenhuma transação encontrada</h3>
-                            <p>Ainda não há registros de transações. Comece a registrar suas vendas!</p>
-                            <a href="<?php echo STORE_REGISTER_TRANSACTION_URL; ?>" class="btn btn-primary">Registrar Venda</a>
+            </div>
+
+            <!-- Gráfico de Vendas e Comissões -->
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Vendas e Comissões nos Últimos 6 Meses</h3>
                         </div>
-                    <?php else: ?>
-                        <div class="table-responsive">
-                            <table class="data-table">
+                        <div class="card-body">
+                            <canvas id="salesChart" style="min-height: 250px; height: 250px; max-height: 250px; max-width: 100%;"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Últimas Transações -->
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Últimas Transações</h3>
+                            <div class="card-tools">
+                                <a href="<?= STORE_PENDING_TRANSACTIONS_URL ?>" class="btn btn-tool">
+                                    <i class="fas fa-list"></i> Ver Todas
+                                </a>
+                            </div>
+                        </div>
+                        <div class="card-body table-responsive p-0">
+                            <table class="table table-hover text-nowrap">
                                 <thead>
                                     <tr>
-                                        <th>Data</th>
+                                        <th>ID</th>
                                         <th>Cliente</th>
-                                        <th>Valor</th>
-                                        <th>Cashback</th>
+                                        <th>Valor da Venda</th>
+                                        <th>Comissão</th>
+                                        <th>Data</th>
                                         <th>Status</th>
-                                        <th>Ações</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <?php foreach ($ultimasTransacoes as $transacao): ?>
+                                    <?php if (empty($lastTransactions)): ?>
                                     <tr>
-                                        <td><?php echo date('d/m/Y H:i', strtotime($transacao['data_transacao'])); ?></td>
-                                        <td><?php echo htmlspecialchars($transacao['nome_usuario']); ?></td>
-                                        <td>R$ <?php echo number_format($transacao['valor_total'], 2, ',', '.'); ?></td>
-                                        <td>R$ <?php echo number_format($transacao['valor_cashback'], 2, ',', '.'); ?></td>
-                                        <td>
-                                            <span class="status-badge <?php echo strtolower($transacao['status']); ?>">
-                                                <?php 
-                                                    switch($transacao['status']) {
-                                                        case 'pendente': echo 'Pendente'; break;
-                                                        case 'aprovado': echo 'Aprovado'; break;
-                                                        case 'cancelado': echo 'Cancelado'; break;
-                                                        default: echo ucfirst($transacao['status']);
-                                                    }
-                                                ?>
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <div class="action-buttons">
-                                                <a href="javascript:void(0)" class="btn-icon view-transaction" data-id="<?php echo $transacao['id']; ?>">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                                        <circle cx="11" cy="11" r="8"></circle>
-                                                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                                                    </svg>
-                                                </a>
-                                            </div>
-                                        </td>
+                                        <td colspan="6" class="text-center">Nenhuma transação encontrada</td>
                                     </tr>
-                                    <?php endforeach; ?>
+                                    <?php else: ?>
+                                        <?php foreach ($lastTransactions as $transaction): ?>
+                                        <tr>
+                                            <td><?= $transaction['id'] ?></td>
+                                            <td><?= $transaction['cliente_nome'] ?></td>
+                                            <td>R$ <?= number_format($transaction['valor_total'], 2, ',', '.') ?></td>
+                                            <td>R$ <?= number_format($transaction['valor_cashback'], 2, ',', '.') ?></td>
+                                            <td><?= date('d/m/Y H:i', strtotime($transaction['data_transacao'])) ?></td>
+                                            <td>
+                                                <span class="badge badge-warning">
+                                                    <?= $transaction['status'] === TRANSACTION_PENDING ? 'Pendente' : $transaction['status'] ?>
+                                                </span>
+                                            </td>
+                                        </tr>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
                                 </tbody>
                             </table>
                         </div>
-                    <?php endif; ?>
-                </div>
-            </main>
-        </div>
-    </div>
-    
-    <!-- Modal para Detalhes da Transação -->
-    <div id="transactionModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Detalhes da Transação</h2>
-                <span class="close">&times;</span>
-            </div>
-            <div class="modal-body" id="transactionDetails">
-                <!-- Detalhes da transação serão carregados aqui via AJAX -->
-                <div class="loading">
-                    <div class="spinner"></div>
-                    <p>Carregando detalhes...</p>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
-    
-    <script src="../../assets/js/main.js"></script>
-    <script src="../../assets/js/store.js"></script>
-    <script>
-        // Dados para o gráfico (simulados - seria melhor gerar via PHP)
-        const salesData = {
-            labels: [
-                <?php 
-                // Gerar labels para os últimos 10 dias
-                for($i = 10; $i >= 0; $i--) {
-                    echo "'" . date('d/m', strtotime("-$i days")) . "',";
-                }
-                ?>
-            ],
-            datasets: [{
-                label: 'Vendas (R$)',
-                data: [
-                    <?php 
-                    // Dados simulados - em uma implementação real, viriam do banco de dados
-                    for($i = 0; $i < 11; $i++) {
-                        echo rand(500, 5000) . ",";
-                    }
-                    ?>
-                ],
-                borderColor: '#FF7A00',
-                backgroundColor: 'rgba(255, 122, 0, 0.1)',
-                borderWidth: 2,
-                fill: true,
-                tension: 0.4
-            }]
-        };
+    </section>
+</div>
 
+<!-- Scripts específicos para o dashboard -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    $(document).ready(function() {
+        // Dados para o gráfico
+        const monthlyData = <?= json_encode($monthlyData) ?>;
+        
         // Configuração do gráfico
-        const config = {
-            type: 'line',
-            data: salesData,
+        const ctx = document.getElementById('salesChart').getContext('2d');
+        const salesChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: monthlyData.map(item => item.month + '/' + item.year),
+                datasets: [
+                    {
+                        label: 'Vendas (R$)',
+                        backgroundColor: 'rgba(60,141,188,0.9)',
+                        borderColor: 'rgba(60,141,188,0.8)',
+                        pointRadius: false,
+                        pointColor: '#3b8bba',
+                        pointStrokeColor: 'rgba(60,141,188,1)',
+                        pointHighlightFill: '#fff',
+                        pointHighlightStroke: 'rgba(60,141,188,1)',
+                        data: monthlyData.map(item => item.sales)
+                    },
+                    {
+                        label: 'Comissões (R$)',
+                        backgroundColor: 'rgba(210, 214, 222, 1)',
+                        borderColor: 'rgba(210, 214, 222, 1)',
+                        pointRadius: false,
+                        pointColor: 'rgba(210, 214, 222, 1)',
+                        pointStrokeColor: '#c1c7d1',
+                        pointHighlightFill: '#fff',
+                        pointHighlightStroke: 'rgba(220,220,220,1)',
+                        data: monthlyData.map(item => item.commissions)
+                    }
+                ]
+            },
             options: {
                 responsive: true,
-                plugins: {
-                    legend: {
-                        position: 'top',
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                return 'R$ ' + context.raw.toFixed(2).replace('.', ',');
-                            }
-                        }
-                    }
-                },
+                maintainAspectRatio: false,
                 scales: {
                     y: {
-                        beginAtZero: true,
-                        ticks: {
-                            callback: function(value) {
-                                return 'R$ ' + value.toFixed(2).replace('.', ',');
-                            }
-                        }
+                        beginAtZero: true
                     }
                 }
-            },
-        };
-
-        // Inicializar o gráfico
-        const myChart = new Chart(
-            document.getElementById('salesChart'),
-            config
-        );
-
-        // Funcionalidade do modal
-        const modal = document.getElementById("transactionModal");
-        const closeBtn = document.getElementsByClassName("close")[0];
-        const viewButtons = document.querySelectorAll(".view-transaction");
-        
-        viewButtons.forEach(button => {
-            button.addEventListener("click", function() {
-                const transactionId = this.getAttribute("data-id");
-                // Aqui você carregaria os detalhes da transação via AJAX
-                document.getElementById("transactionDetails").innerHTML = `
-                    <div class="transaction-info">
-                        <div class="info-group">
-                            <span class="label">ID da Transação:</span>
-                            <span class="value">${transactionId}</span>
-                        </div>
-                        <div class="info-group">
-                            <span class="label">Data:</span>
-                            <span class="value">Carregando...</span>
-                        </div>
-                        <!-- Mais detalhes seriam carregados aqui -->
-                    </div>
-                `;
-                modal.style.display = "block";
-                
-                // Simulação de carregamento AJAX (em produção, use fetch ou XMLHttpRequest)
-                setTimeout(() => {
-                    document.getElementById("transactionDetails").innerHTML = `
-                        <div class="transaction-info">
-                            <div class="info-group">
-                                <span class="label">ID da Transação:</span>
-                                <span class="value">${transactionId}</span>
-                            </div>
-                            <div class="info-group">
-                                <span class="label">Data:</span>
-                                <span class="value">01/05/2025 14:30</span>
-                            </div>
-                            <div class="info-group">
-                                <span class="label">Cliente:</span>
-                                <span class="value">João Silva (joao@email.com)</span>
-                            </div>
-                            <div class="info-group">
-                                <span class="label">Valor da Venda:</span>
-                                <span class="value">R$ 150,00</span>
-                            </div>
-                            <div class="info-group">
-                                <span class="label">Cashback (5%):</span>
-                                <span class="value">R$ 7,50</span>
-                            </div>
-                            <div class="info-group">
-                                <span class="label">Comissão Klube Cash (5%):</span>
-                                <span class="value">R$ 7,50</span>
-                            </div>
-                            <div class="info-group">
-                                <span class="label">Status:</span>
-                                <span class="value status-badge pendente">Pendente</span>
-                            </div>
-                            <div class="info-group">
-                                <span class="label">Código Interno:</span>
-                                <span class="value">VENDA-12345</span>
-                            </div>
-                        </div>
-                    `;
-                }, 1000);
-            });
-        });
-        
-        // Fechar o modal ao clicar no X
-        closeBtn.addEventListener("click", function() {
-            modal.style.display = "none";
-        });
-        
-        // Fechar o modal ao clicar fora dele
-        window.addEventListener("click", function(event) {
-            if (event.target == modal) {
-                modal.style.display = "none";
             }
         });
-    </script>
-</body>
-</html>
+    });
+</script>
+
+<?php
+// Incluir o rodapé
+include_once __DIR__ . '/../components/footer.php';
+?>
