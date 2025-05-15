@@ -5,14 +5,18 @@ require_once '../../config/database.php';
 
 // Verificar se já existe uma sessão ativa
 session_start();
-if (isset($_SESSION['user_id'])) {
+if (isset($_SESSION['user_id']) && !isset($_GET['force_login'])) {
     // Redirecionar com base no tipo de usuário
     if ($_SESSION['user_type'] == USER_TYPE_ADMIN) {
         header('Location: ' . ADMIN_DASHBOARD_URL);
+        exit;
+    } else if ($_SESSION['user_type'] == USER_TYPE_STORE) {
+        header('Location: ' . STORE_DASHBOARD_URL);
+        exit;
     } else {
         header('Location: ' . CLIENT_DASHBOARD_URL);
+        exit;
     }
-    exit;
 }
 
 // Processar o formulário de login
