@@ -155,9 +155,7 @@
         transform: translateX(0);
     }
     
-    .main-content {
-        padding-left: 0rem;
-    }
+    
     
     .sidebar-toggle {
         display: flex;
