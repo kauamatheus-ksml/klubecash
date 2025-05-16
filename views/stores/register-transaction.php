@@ -103,6 +103,7 @@ $activeMenu = 'register-transaction';
     <title>Registrar Venda - Klube Cash</title>
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
     <link rel="stylesheet" href="../../assets/css/main.css">
+    <link rel="stylesheet" href="../../assets/css/sidebar-styles.css">
     <link rel="stylesheet" href="../../assets/css/views/stores/register-transaction.css">
 </head>
 <body>
@@ -276,18 +277,26 @@ $activeMenu = 'register-transaction';
             const porcentagemAdmin = <?php echo DEFAULT_CASHBACK_ADMIN; ?>;
             const porcentagemTotal = <?php echo DEFAULT_CASHBACK_TOTAL; ?>;
             
+            // Função para formatar valores como moeda
+            function formatCurrency(value) {
+                return value.toLocaleString('pt-BR', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                });
+            }
+            
             // Função para calcular e atualizar a simulação
             function atualizarSimulacao() {
                 const valor = parseFloat(valorInput.value) || 0;
                 
-                const valorCliente = (valor * porcentagemCliente / 100).toFixed(2);
-                const valorAdmin = (valor * porcentagemAdmin / 100).toFixed(2);
-                const valorTotal = (valor * porcentagemTotal / 100).toFixed(2);
+                const valorCliente = valor * porcentagemCliente / 100;
+                const valorAdmin = valor * porcentagemAdmin / 100;
+                const valorTotal = valor * porcentagemTotal / 100;
                 
-                displayValorVenda.textContent = `R$ ${valor.toFixed(2).replace('.', ',')}`;
-                displayValorCliente.textContent = `R$ ${valorCliente.replace('.', ',')}`;
-                displayValorAdmin.textContent = `R$ ${valorAdmin.replace('.', ',')}`;
-                displayValorTotal.textContent = `R$ ${valorTotal.replace('.', ',')}`;
+                displayValorVenda.textContent = `R$ ${formatCurrency(valor)}`;
+                displayValorCliente.textContent = `R$ ${formatCurrency(valorCliente)}`;
+                displayValorAdmin.textContent = `R$ ${formatCurrency(valorAdmin)}`;
+                displayValorTotal.textContent = `R$ ${formatCurrency(valorTotal)}`;
             }
             
             // Atualizar quando o valor mudar
@@ -306,15 +315,20 @@ $activeMenu = 'register-transaction';
                 
                 header.addEventListener('click', () => {
                     // Toggle active class
-                    item.classList.toggle('active');
+                    const isActive = item.classList.contains('active');
                     
-                    // Update icon
-                    if (item.classList.contains('active')) {
-                        icon.textContent = '-';
+                    // Fechar todos os itens
+                    accordionItems.forEach(i => {
+                        i.classList.remove('active');
+                        i.querySelector('.accordion-content').style.maxHeight = '0';
+                        i.querySelector('.accordion-icon').textContent = '+';
+                    });
+                    
+                    // Se o item clicado não estava ativo, abri-lo
+                    if (!isActive) {
+                        item.classList.add('active');
                         content.style.maxHeight = content.scrollHeight + 'px';
-                    } else {
-                        icon.textContent = '+';
-                        content.style.maxHeight = '0';
+                        icon.textContent = '-';
                     }
                 });
             });
