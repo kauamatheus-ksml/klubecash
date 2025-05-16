@@ -1,0 +1,404 @@
+/* Estilos específicos para a página de upload em lote */
+.content-card {
+    background-color: #fff;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    margin-bottom: 25px;
+    padding: 25px;
+}
+
+.upload-wrapper {
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+/* Estilos para os passos */
+.upload-steps {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 40px;
+}
+
+.step-item {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    opacity: 0.6;
+    transition: opacity 0.3s;
+}
+
+.step-item.active {
+    opacity: 1;
+}
+
+.step-number {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: #ddd;
+    color: #666;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    margin-right: 15px;
+    transition: all 0.3s;
+}
+
+.step-item.active .step-number {
+    background-color: #FF7A00;
+    color: white;
+}
+
+.step-text h3 {
+    margin: 0 0 5px 0;
+    font-size: 16px;
+    color: #333;
+}
+
+.step-text p {
+    margin: 0;
+    font-size: 13px;
+    color: #666;
+}
+
+.step-separator {
+    flex: 1;
+    height: 2px;
+    background-color: #ddd;
+    margin: 0 15px;
+    max-width: 80px;
+}
+
+/* Estilos para a seção de template */
+.template-section {
+    margin-bottom: 40px;
+    padding-bottom: 30px;
+    border-bottom: 1px dashed #ddd;
+}
+
+.template-section h2 {
+    font-size: 20px;
+    margin-bottom: 15px;
+    color: #333;
+}
+
+.template-preview {
+    overflow-x: auto;
+    margin: 20px 0;
+}
+
+.csv-template {
+    width: 100%;
+    border-collapse: collapse;
+    border: 1px solid #eee;
+}
+
+.csv-template th {
+    background-color: #f5f5f5;
+    padding: 12px 15px;
+    text-align: left;
+    font-weight: 600;
+    color: #333;
+    border-bottom: 2px solid #ddd;
+}
+
+.csv-template td {
+    padding: 10px 15px;
+    border-bottom: 1px solid #eee;
+    color: #666;
+}
+
+.csv-template tr:last-child td {
+    border-bottom: none;
+}
+
+.template-instructions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 15px;
+    margin: 20px 0;
+}
+
+.instruction {
+    display: flex;
+    flex-direction: column;
+    background-color: #f9f9f9;
+    padding: 15px;
+    border-radius: 8px;
+}
+
+.instruction strong {
+    color: #FF7A00;
+    margin-bottom: 5px;
+}
+
+.instruction span {
+    font-size: 13px;
+    color: #555;
+    line-height: 1.4;
+}
+
+.template-download {
+    margin-top: 25px;
+    text-align: center;
+}
+
+/* Estilos para a seção de upload */
+.upload-section h2 {
+    font-size: 20px;
+    margin-bottom: 15px;
+    color: #333;
+}
+
+.file-upload-container {
+    margin: 25px 0;
+}
+
+.file-upload-area {
+    border: 2px dashed #ddd;
+    border-radius: 10px;
+    padding: 30px;
+    text-align: center;
+    transition: all 0.3s;
+    cursor: pointer;
+}
+
+.file-upload-area:hover, 
+.file-upload-area.highlight {
+    border-color: #FF7A00;
+    background-color: rgba(255, 122, 0, 0.05);
+}
+
+.file-upload-area.file-ready {
+    border-color: #28a745;
+    background-color: rgba(40, 167, 69, 0.05);
+}
+
+.file-upload-area svg {
+    color: #999;
+    margin-bottom: 15px;
+    transition: color 0.3s;
+}
+
+.file-upload-area:hover svg,
+.file-upload-area.highlight svg {
+    color: #FF7A00;
+}
+
+.file-upload-area.file-ready svg {
+    color: #28a745;
+}
+
+.upload-text {
+    margin: 0;
+    color: #666;
+    font-size: 16px;
+}
+
+.file-selected {
+    margin: 0;
+    color: #28a745;
+    font-weight: 600;
+}
+
+.file-input {
+    display: none;
+}
+
+.upload-notes {
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    padding: 15px 20px;
+    margin: 20px 0;
+}
+
+.upload-notes ul {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.upload-notes li {
+    margin-bottom: 6px;
+    color: #555;
+    font-size: 14px;
+}
+
+.upload-notes li:last-child {
+    margin-bottom: 0;
+}
+
+.form-actions {
+    display: flex;
+    gap: 15px;
+    margin-top: 30px;
+}
+
+/* Alerta */
+.alert {
+    display: flex;
+    align-items: flex-start;
+    padding: 16px 20px;
+    border-radius: 8px;
+    margin-bottom: 25px;
+    gap: 15px;
+}
+
+.alert svg {
+    flex-shrink: 0;
+    margin-top: 3px;
+}
+
+.alert div {
+    flex-grow: 1;
+}
+
+.alert h4 {
+    margin: 0 0 5px 0;
+    font-size: 16px;
+}
+
+.alert p {
+    margin: 0 0 10px 0;
+    color: inherit;
+}
+
+.alert.success {
+    background-color: #ecf9f0;
+    color: #0d6832;
+    border-left: 4px solid #0d6832;
+}
+
+.alert.success svg {
+    color: #0d6832;
+}
+
+.alert.error {
+    background-color: #ffeef0;
+    color: #cc0022;
+    border-left: 4px solid #cc0022;
+}
+
+.alert.error svg {
+    color: #cc0022;
+}
+
+.error-details {
+    background-color: rgba(0, 0, 0, 0.05);
+    border-radius: 6px;
+    padding: 10px 15px;
+    margin-top: 10px;
+}
+
+.error-details h5 {
+    margin: 0 0 8px 0;
+    font-size: 14px;
+}
+
+.error-details ul {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.error-details li {
+    margin-bottom: 5px;
+    font-size: 13px;
+}
+
+/* Seção de ajuda */
+.help-section {
+    margin-top: 40px;
+    margin-bottom: 40px;
+}
+
+.help-section h3 {
+    margin-bottom: 20px;
+    font-size: 18px;
+    color: #333;
+}
+
+.accordion {
+    border: 1px solid #eee;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.accordion-item {
+    border-bottom: 1px solid #eee;
+}
+
+.accordion-item:last-child {
+    border-bottom: none;
+}
+
+.accordion-header {
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    padding: 15px 20px;
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.accordion-icon {
+    font-size: 20px;
+    color: #FF7A00;
+}
+
+.accordion-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+    padding: 0 20px;
+}
+
+.accordion-item.active .accordion-content {
+    padding-bottom: 20px;
+    max-height: 200px;
+}
+
+.accordion-content p {
+    margin: 0;
+    color: #555;
+    line-height: 1.5;
+}
+
+/* Responsivo */
+@media (max-width: 768px) {
+    .upload-steps {
+        flex-direction: column;
+        gap: 20px;
+        align-items: flex-start;
+    }
+    
+    .step-separator {
+        display: none;
+    }
+    
+    .template-instructions {
+        grid-template-columns: 1fr;
+    }
+    
+    .form-actions {
+        flex-direction: column;
+    }
+    
+    .form-actions .btn {
+        width: 100%;
+    }
+    
+    .content-card {
+        padding: 20px 15px;
+    }
+    
+    .file-upload-area {
+        padding: 20px 15px;
+    }
+}
