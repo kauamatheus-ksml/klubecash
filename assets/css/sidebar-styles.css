@@ -107,7 +107,7 @@
 
 /* Container principal - ajuste para a sidebar */
 .main-content {
-
+    padding-left: 250px;
     transition: padding-left 0.3s ease;
 }
 
