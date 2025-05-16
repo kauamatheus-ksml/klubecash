@@ -79,7 +79,7 @@ if ($result['status'] && isset($result['data']['totais'])) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
     <title>Comissões Pendentes - Klube Cash</title>
-    <link rel="stylesheet" href="../../assets/css/main.css">
+    ]
     <link rel="stylesheet" href="../../assets/css/views/stores/pending-commissions.css">
 </head>
 <body>
