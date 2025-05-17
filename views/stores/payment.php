@@ -86,7 +86,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         }
     }
 } else if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_payment'])) {
-    // Processar o envio do formulário de pagamento
     // Validar campos obrigatórios
     if (!isset($_POST['transacoes']) || !isset($_POST['valor_total']) || !isset($_POST['metodo_pagamento'])) {
         $error = 'Dados de pagamento incompletos. Tente novamente.';
