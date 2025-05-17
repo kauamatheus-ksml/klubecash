@@ -450,10 +450,14 @@ class TransactionController {
      */
     public static function registerPayment($data) {
         try {
+            // Log para depuração
+            error_log('Iniciando processamento de pagamento: ' . print_r($data, true));
+            
             // Validar dados obrigatórios
             $requiredFields = ['loja_id', 'transacoes', 'valor_total', 'metodo_pagamento'];
             foreach ($requiredFields as $field) {
                 if (!isset($data[$field]) || empty($data[$field])) {
+                    error_log('Campo obrigatório ausente: ' . $field);
                     return ['status' => false, 'message' => 'Dados do pagamento incompletos. Campo faltante: ' . $field];
                 }
             }
@@ -468,175 +472,173 @@ class TransactionController {
             }
             
             // Verificar se as transações pertencem à loja
-            $transactionIds = $data['transacoes'];
-            if (!is_array($transactionIds) || count($transactionIds) == 0) {
+            $transactionIds = is_array($data['transacoes']) ? $data['transacoes'] : explode(',', $data['transacoes']);
+            if (empty($transactionIds)) {
                 return ['status' => false, 'message' => 'Lista de transações inválida.'];
             }
             
             $db = Database::getConnection();
             
             // Verificar se a loja existe
-            $storeStmt = $db->prepare("SELECT id, nome_fantasia FROM lojas WHERE id = :loja_id AND status = :status");
+            $storeStmt = $db->prepare("SELECT id, nome_fantasia FROM lojas WHERE id = :loja_id");
             $storeStmt->bindParam(':loja_id', $data['loja_id']);
-            $statusAprovado = STORE_APPROVED;
-            $storeStmt->bindParam(':status', $statusAprovado);
             $storeStmt->execute();
             $store = $storeStmt->fetch(PDO::FETCH_ASSOC);
             
             if (!$store) {
-                return ['status' => false, 'message' => 'Loja não encontrada ou não aprovada.'];
+                return ['status' => false, 'message' => 'Loja não encontrada.'];
             }
             
             // Iniciar transação
             $db->beginTransaction();
+            error_log('Transação iniciada');
             
-            // Verificar e validar as transações
-            $placeholders = implode(',', array_fill(0, count($transactionIds), '?'));
-            $transStmt = $db->prepare("
-                SELECT t.id, t.valor_cashback, t.valor_total, t.usuario_id, t.status, u.nome as cliente_nome
-                FROM transacoes_cashback t
-                JOIN usuarios u ON t.usuario_id = u.id
-                WHERE t.id IN ($placeholders) AND t.loja_id = ? AND t.status = ?
-            ");
-            
-            $bindParams = array_merge($transactionIds, [$data['loja_id'], TRANSACTION_PENDING]);
-            for ($i = 0; $i < count($bindParams); $i++) {
-                $transStmt->bindValue($i + 1, $bindParams[$i]);
-            }
-            
-            $transStmt->execute();
-            $transactions = $transStmt->fetchAll(PDO::FETCH_ASSOC);
-            
-            // Verificar se todas as transações foram encontradas
-            if (count($transactions) != count($transactionIds)) {
-                $db->rollBack();
-                return ['status' => false, 'message' => 'Algumas transações não foram encontradas ou não estão pendentes.'];
-            }
-            
-            // Calcular valor total das comissões
-            $totalComissoes = 0;
-            foreach ($transactions as $transaction) {
-                $totalComissoes += $transaction['valor_cashback'];
-            }
-            
-            // Validar valor do pagamento
-            if (abs($totalComissoes - $data['valor_total']) > 0.01) { // Tolerância de 0.01 para arredondamentos
-                $db->rollBack();
+            try {
+                // Verificar e validar as transações
+                $placeholders = implode(',', array_fill(0, count($transactionIds), '?'));
+                $transStmt = $db->prepare("
+                    SELECT t.id, t.valor_total, t.valor_cashback, t.status, u.nome as cliente_nome
+                    FROM transacoes_cashback t
+                    JOIN usuarios u ON t.usuario_id = u.id
+                    WHERE t.id IN ($placeholders) AND t.loja_id = ? AND t.status = ?
+                ");
+                
+                $bindParams = array_merge($transactionIds, [$data['loja_id'], 'pendente']);
+                for ($i = 0; $i < count($bindParams); $i++) {
+                    $transStmt->bindValue($i + 1, $bindParams[$i]);
+                }
+                
+                $transStmt->execute();
+                $transactions = $transStmt->fetchAll(PDO::FETCH_ASSOC);
+                error_log('Transações encontradas: ' . count($transactions));
+                
+                // Verificar se todas as transações foram encontradas
+                if (count($transactions) != count($transactionIds)) {
+                    $db->rollBack();
+                    return ['status' => false, 'message' => 'Algumas transações não foram encontradas ou não estão pendentes.'];
+                }
+                
+                // Calcular valor total das comissões
+                $totalComissoes = 0;
+                foreach ($transactions as $transaction) {
+                    $totalComissoes += floatval($transaction['valor_cashback']);
+                }
+                error_log('Total comissões calculado: ' . $totalComissoes);
+                
+                // Validar valor do pagamento (com tolerância)
+                if (abs($totalComissoes - floatval($data['valor_total'])) > 0.01) {
+                    $db->rollBack();
+                    return [
+                        'status' => false, 
+                        'message' => 'O valor do pagamento (R$ ' . number_format(floatval($data['valor_total']), 2, ',', '.') . 
+                                     ') não corresponde ao total das comissões (R$ ' . number_format($totalComissoes, 2, ',', '.') . ').'
+                    ];
+                }
+                
+                // Registrar o pagamento
+                $paymentStmt = $db->prepare("
+                    INSERT INTO pagamentos_comissao (
+                        loja_id, valor_total, metodo_pagamento, 
+                        numero_referencia, comprovante, observacao, 
+                        data_registro, status
+                    ) VALUES (
+                        :loja_id, :valor_total, :metodo_pagamento,
+                        :numero_referencia, :comprovante, :observacao,
+                        NOW(), :status
+                    )
+                ");
+                
+                $paymentStmt->bindParam(':loja_id', $data['loja_id']);
+                $paymentStmt->bindParam(':valor_total', $data['valor_total']);
+                $paymentStmt->bindParam(':metodo_pagamento', $data['metodo_pagamento']);
+                
+                $numeroReferencia = isset($data['numero_referencia']) ? $data['numero_referencia'] : '';
+                $paymentStmt->bindParam(':numero_referencia', $numeroReferencia);
+                
+                $comprovante = isset($data['comprovante']) ? $data['comprovante'] : '';
+                $paymentStmt->bindParam(':comprovante', $comprovante);
+                
+                $observacao = isset($data['observacao']) ? $data['observacao'] : '';
+                $paymentStmt->bindParam(':observacao', $observacao);
+                
+                $status = 'pendente'; // Status inicial do pagamento
+                $paymentStmt->bindParam(':status', $status);
+                
+                $paymentResult = $paymentStmt->execute();
+                error_log('Pagamento registrado: ' . ($paymentResult ? 'sim' : 'não'));
+                
+                if (!$paymentResult) {
+                    $db->rollBack();
+                    return ['status' => false, 'message' => 'Erro ao registrar pagamento no banco de dados.'];
+                }
+                
+                $paymentId = $db->lastInsertId();
+                error_log('ID do pagamento: ' . $paymentId);
+                
+                // Registrar as transações associadas ao pagamento
+                $transactionPaymentStmt = $db->prepare("
+                    INSERT INTO pagamentos_transacoes (
+                        pagamento_id, transacao_id
+                    ) VALUES (
+                        :pagamento_id, :transacao_id
+                    )
+                ");
+                
+                foreach ($transactionIds as $transactionId) {
+                    $transactionPaymentStmt->bindParam(':pagamento_id', $paymentId);
+                    $transactionPaymentStmt->bindParam(':transacao_id', $transactionId);
+                    $transactionResult = $transactionPaymentStmt->execute();
+                    
+                    if (!$transactionResult) {
+                        $db->rollBack();
+                        return ['status' => false, 'message' => 'Erro ao associar transação ao pagamento.'];
+                    }
+                }
+                error_log('Transações associadas ao pagamento');
+                
+                // Atualizar status das transações para 'pagamento_pendente'
+                $updateTransStmt = $db->prepare("
+                    UPDATE transacoes_cashback 
+                    SET status = :novo_status 
+                    WHERE id IN ($placeholders)
+                ");
+                
+                $novoStatus = 'pagamento_pendente';
+                $updateTransStmt->bindParam(':novo_status', $novoStatus);
+                
+                for ($i = 0; $i < count($transactionIds); $i++) {
+                    $updateTransStmt->bindValue($i + 1, $transactionIds[$i]);
+                }
+                
+                $updateResult = $updateTransStmt->execute();
+                error_log('Status das transações atualizado: ' . ($updateResult ? 'sim' : 'não'));
+                
+                if (!$updateResult) {
+                    $db->rollBack();
+                    return ['status' => false, 'message' => 'Erro ao atualizar status das transações.'];
+                }
+                
+                // Confirmar transação
+                $db->commit();
+                error_log('Transação confirmada com sucesso');
+                
                 return [
-                    'status' => false, 
-                    'message' => 'O valor do pagamento (R$ ' . number_format($data['valor_total'], 2, ',', '.') . 
-                                 ') não corresponde ao total das comissões (R$ ' . number_format($totalComissoes, 2, ',', '.') . ').'
+                    'status' => true,
+                    'message' => 'Pagamento registrado com sucesso! Aguardando aprovação do administrador.',
+                    'data' => [
+                        'payment_id' => $paymentId,
+                        'total_transacoes' => count($transactionIds),
+                        'valor_total' => $data['valor_total']
+                    ]
                 ];
-            }
-            
-            // Registrar o pagamento
-            $paymentStmt = $db->prepare("
-                INSERT INTO pagamentos_comissao (
-                    loja_id, valor_total, metodo_pagamento, 
-                    numero_referencia, comprovante, observacao, 
-                    data_registro, status
-                ) VALUES (
-                    :loja_id, :valor_total, :metodo_pagamento,
-                    :numero_referencia, :comprovante, :observacao,
-                    NOW(), :status
-                )
-            ");
-            
-            $paymentStmt->bindParam(':loja_id', $data['loja_id']);
-            $paymentStmt->bindParam(':valor_total', $data['valor_total']);
-            $paymentStmt->bindParam(':metodo_pagamento', $data['metodo_pagamento']);
-            
-            $numeroReferencia = isset($data['numero_referencia']) ? $data['numero_referencia'] : '';
-            $paymentStmt->bindParam(':numero_referencia', $numeroReferencia);
-            
-            $comprovante = isset($data['comprovante']) ? $data['comprovante'] : '';
-            $paymentStmt->bindParam(':comprovante', $comprovante);
-            
-            $observacao = isset($data['observacao']) ? $data['observacao'] : '';
-            $paymentStmt->bindParam(':observacao', $observacao);
-            
-            $status = 'pendente'; // Status inicial do pagamento
-            $paymentStmt->bindParam(':status', $status);
-            
-            $paymentStmt->execute();
-            $paymentId = $db->lastInsertId();
-            
-            // Registrar as transações associadas ao pagamento
-            $transactionPaymentStmt = $db->prepare("
-                INSERT INTO pagamentos_transacoes (
-                    pagamento_id, transacao_id
-                ) VALUES (
-                    :pagamento_id, :transacao_id
-                )
-            ");
-            
-            foreach ($transactionIds as $transactionId) {
-                $transactionPaymentStmt->bindParam(':pagamento_id', $paymentId);
-                $transactionPaymentStmt->bindParam(':transacao_id', $transactionId);
-                $transactionPaymentStmt->execute();
-            }
-            
-            // Atualizar status das transações para 'pagamento_pendente'
-            $updateTransStmt = $db->prepare("
-                UPDATE transacoes_cashback 
-                SET status = :novo_status 
-                WHERE id IN ($placeholders)
-            ");
-            
-            $novoStatus = 'pagamento_pendente';
-            $updateTransStmt->bindParam(':novo_status', $novoStatus);
-            
-            for ($i = 0; $i < count($transactionIds); $i++) {
-                $updateTransStmt->bindValue($i + 1, $transactionIds[$i]);
-            }
-            
-            $updateTransStmt->execute();
-            
-            // Enviar notificação ao administrador
-            self::createNotification(
-                1, // Admin ID padrão
-                'Novo pagamento de comissão registrado',
-                'A loja ' . $store['nome_fantasia'] . ' registrou um pagamento de R$ ' . 
-                number_format($data['valor_total'], 2, ',', '.') . ' para ' . count($transactionIds) . ' transações.',
-                'info'
-            );
-            
-            // Enviar email para o administrador
-            $adminEmail = ADMIN_EMAIL;
-            $subject = 'Novo Pagamento de Comissão - Klube Cash';
-            $message = "
-                <h3>Novo Pagamento de Comissão</h3>
-                <p>A loja <strong>{$store['nome_fantasia']}</strong> registrou um novo pagamento de comissão.</p>
-                <p><strong>Valor:</strong> R$ " . number_format($data['valor_total'], 2, ',', '.') . "</p>
-                <p><strong>Método:</strong> {$data['metodo_pagamento']}</p>
-                <p><strong>Transações:</strong> " . count($transactionIds) . "</p>
-                <p><strong>Data:</strong> " . date('d/m/Y H:i:s') . "</p>
-                <p>Este pagamento requer sua aprovação no painel administrativo.</p>
-                <p>Atenciosamente,<br>Sistema Klube Cash</p>
-            ";
-            
-            Email::send($adminEmail, $subject, $message);
-            
-            // Confirmar transação
-            $db->commit();
-            
-            return [
-                'status' => true,
-                'message' => 'Pagamento registrado com sucesso! Aguardando aprovação do administrador.',
-                'data' => [
-                    'payment_id' => $paymentId,
-                    'total_transacoes' => count($transactionIds),
-                    'valor_total' => $data['valor_total']
-                ]
-            ];
-            
-        } catch (PDOException $e) {
-            // Reverter transação em caso de erro
-            if (isset($db) && $db->inTransaction()) {
+                
+            } catch (Exception $e) {
                 $db->rollBack();
+                error_log('Exceção no processamento do pagamento: ' . $e->getMessage());
+                return ['status' => false, 'message' => 'Erro ao processar pagamento: ' . $e->getMessage()];
             }
-            
-            error_log('Erro ao registrar pagamento: ' . $e->getMessage());
+        } catch (Exception $e) {
+            error_log('Exceção geral no registerPayment: ' . $e->getMessage());
             return ['status' => false, 'message' => 'Erro ao registrar pagamento. Tente novamente.'];
         }
     }

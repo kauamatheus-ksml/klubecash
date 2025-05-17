@@ -10,8 +10,15 @@ require_once '../../controllers/AuthController.php';
 require_once '../../controllers/TransactionController.php';
 require_once '../../utils/FileUpload.php';
 
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
+
+
 // Iniciar sessão
 session_start();
+
+echo "Limite de upload: " . ini_get('upload_max_filesize');
+echo "<br>Limite de POST: " . ini_get('post_max_size');
 
 // Verificar se o usuário está logado e é uma loja
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION['user_type'] !== 'loja') {
@@ -87,7 +94,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 } else if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_payment'])) {
     // Processar o envio do formulário de pagamento
-    
+    echo "<pre>";
+    echo "POST: ";
+    print_r($_POST);
+    echo "FILES: ";
+    print_r($_FILES);
+    echo "Resultado: ";
+    print_r($result);
+    echo "</pre>";
+    die();
     // Validar campos obrigatórios
     if (!isset($_POST['transacoes']) || !isset($_POST['valor_total']) || !isset($_POST['metodo_pagamento'])) {
         $error = 'Dados de pagamento incompletos. Tente novamente.';
@@ -103,8 +118,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         if (isset($_FILES['comprovante']) && $_FILES['comprovante']['error'] === UPLOAD_ERR_OK) {
             // Criar diretório de uploads se não existir
             $uploadDir = ROOT_DIR . '/uploads/comprovantes';
+
             if (!is_dir($uploadDir)) {
                 mkdir($uploadDir, 0755, true);
+                echo "Pasta de uploads criada!";
+            }
+            if (!is_writable($uploadDir)) {
+                echo "Pasta de uploads sem permissão de escrita!";
             }
             
             // Gerar nome único para o arquivo
