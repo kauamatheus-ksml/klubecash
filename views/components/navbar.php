@@ -33,6 +33,7 @@ $isStore = $userType === 'loja';
         left: 0;
         right: 0;
         z-index: 100;
+        
     }
     
     .navbar-brand {
