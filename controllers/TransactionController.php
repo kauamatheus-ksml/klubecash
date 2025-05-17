@@ -1046,16 +1046,16 @@ class TransactionController {
             }
             
             // Construir consulta
-            // Construir consulta
             $query = "
             SELECT t.*, u.nome as cliente_nome, u.email as cliente_email
             FROM transacoes_cashback t
             JOIN usuarios u ON t.usuario_id = u.id
-            WHERE t.loja_id = :loja_id
+            WHERE t.loja_id = :loja_id AND t.status = :status
             ";
 
             $params = [
-            ':loja_id' => $storeId
+            ':loja_id' => $storeId,
+            ':status' => TRANSACTION_PENDING  // Use a constante TRANSACTION_PENDING
             ];
 
             // Aplicar filtro de status corretamente
