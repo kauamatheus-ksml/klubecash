@@ -12,17 +12,15 @@ require_once '../../controllers/TransactionController.php';
 // Iniciar sessão
 session_start();
 
-// ADIÇÃO SOLICITADA: Habilitar logs de erro e debug inicial
-ini_set('display_errors', 1); // Mostrar erros (útil para desenvolvimento)
+// Habilitar logs de erro e debug inicial
+ini_set('display_errors', 1); // Mostrar erros (útil para desenvolvimento, DESATIVE em produção)
 ini_set('log_errors', 1);     // Habilitar log de erros
 error_reporting(E_ALL);     // Reportar todos os tipos de erros
 
-// Log de debug inicial para payments.php
 error_log("payments.php - Início da execução. Method: " . $_SERVER['REQUEST_METHOD']);
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST) { // Adicionada verificação se POST não está vazio
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST)) {
     error_log("payments.php - POST data: " . print_r($_POST, true));
 }
-// FIM DA ADIÇÃO SOLICITADA
 
 // Verificar se o usuário está logado e é administrador
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION['user_type'] !== 'admin') {
@@ -63,6 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // Obter lista de pagamentos
 $filters = [];
 $page = isset($_GET['page']) ? intval($_GET['page']) : 1;
+if ($page < 1) $page = 1; // Garantir que a página não seja menor que 1
 
 // Aplicar filtros se fornecidos
 if (isset($_GET['status']) && !empty($_GET['status'])) {
@@ -75,90 +74,68 @@ if (isset($_GET['data_fim']) && !empty($_GET['data_fim'])) {
     $filters['data_fim'] = $_GET['data_fim'];
 }
 
-// Obter pagamentos do banco
 $db = Database::getConnection();
 
-// Construir consulta
-$query = "
-    SELECT p.*, l.nome_fantasia, l.email as loja_email,
-           COALESCE((SELECT COUNT(*) FROM pagamentos_transacoes pt WHERE pt.pagamento_id = p.id), 0) as total_transacoes
-    FROM pagamentos_comissao p
-    JOIN lojas l ON p.loja_id = l.id
-    WHERE 1=1
-";
+// --- Construção da Query ---
+$selectPart = "SELECT p.*, l.nome_fantasia, l.email as loja_email,
+                      COALESCE((SELECT COUNT(*) FROM pagamentos_transacoes pt WHERE pt.pagamento_id = p.id), 0) as total_transacoes";
+$fromPart = "FROM pagamentos_comissao p JOIN lojas l ON p.loja_id = l.id";
+$wherePart = "WHERE 1=1";
+$paramsForWhere = []; // Parâmetros apenas para a cláusula WHERE
 
-$params = [];
-
-// Aplicar filtros
+// Aplicar filtros à cláusula WHERE
 if (!empty($filters['status'])) {
-    $query .= " AND p.status = :status";
-    $params[':status'] = $filters['status'];
+    $wherePart .= " AND p.status = :status";
+    $paramsForWhere[':status'] = $filters['status'];
 }
-
 if (!empty($filters['data_inicio'])) {
-    $query .= " AND p.data_registro >= :data_inicio";
-    $params[':data_inicio'] = $filters['data_inicio'] . ' 00:00:00';
+    $wherePart .= " AND p.data_registro >= :data_inicio";
+    $paramsForWhere[':data_inicio'] = $filters['data_inicio'] . ' 00:00:00';
 }
-
 if (!empty($filters['data_fim'])) {
-    $query .= " AND p.data_registro <= :data_fim";
-    $params[':data_fim'] = $filters['data_fim'] . ' 23:59:59';
+    $wherePart .= " AND p.data_registro <= :data_fim";
+    $paramsForWhere[':data_fim'] = $filters['data_fim'] . ' 23:59:59';
 }
+// --- Fim da construção da Query para WHERE ---
 
-// Salvar a parte principal da query antes de adicionar ORDER BY para o count
-$baseQueryForCount = $query; 
-
-$query .= " ORDER BY p.data_registro DESC";
-
-// Contagem para paginação - CORRIGIDO CONFORME SOLICITAÇÃO
-// Remove a cláusula ORDER BY da query base para a contagem, se existir.
-$baseQueryWithoutOrderBy = preg_replace('/\sORDER BY\s.*$/i', '', $baseQueryForCount);
-$countQuery = preg_replace('/SELECT p\.\*.*?FROM/i', 'SELECT COUNT(DISTINCT p.id) as total FROM', $baseQueryWithoutOrderBy); // Usar DISTINCT p.id se houver joins que possam duplicar p
-
+// Contagem para paginação
+// A query de contagem deve usar as mesmas condições de filtro (FROM e WHERE)
+$countQuery = "SELECT COUNT(DISTINCT p.id) as total " . $fromPart . " " . $wherePart;
 $countStmt = $db->prepare($countQuery);
-// Para a query de contagem, precisamos apenas dos parâmetros de filtro (WHERE clause)
-$countParams = [];
-if (!empty($filters['status'])) {
-    $countParams[':status'] = $filters['status'];
-}
-if (!empty($filters['data_inicio'])) {
-    $countParams[':data_inicio'] = $filters['data_inicio'] . ' 00:00:00';
-}
-if (!empty($filters['data_fim'])) {
-    $countParams[':data_fim'] = $filters['data_fim'] . ' 23:59:59';
-}
-
-foreach ($countParams as $param => $value) {
-    $countStmt->bindValue($param, $value);
+foreach ($paramsForWhere as $paramName => $paramValue) {
+    $countStmt->bindValue($paramName, $paramValue);
 }
 $countStmt->execute();
 $resultCount = $countStmt->fetch(PDO::FETCH_ASSOC);
-$totalCount = $resultCount ? $resultCount['total'] : 0; // CORREÇÃO APLICADA AQUI (antiga linha 119)
+$totalCount = $resultCount ? (int)$resultCount['total'] : 0; // Linha corrigida (era ~136)
 
 // Paginação
-$perPage = defined('ITEMS_PER_PAGE') ? ITEMS_PER_PAGE : 10; // Usar constante ou valor padrão
-$totalPages = ($totalCount > 0) ? ceil($totalCount / $perPage) : 1; // Evitar divisão por zero e garantir pelo menos 1 página
-$page = max(1, min($page, $totalPages)); // Garantir que a página esteja dentro dos limites
+$perPage = defined('ITEMS_PER_PAGE') ? ITEMS_PER_PAGE : 10;
+$totalPages = ($totalCount > 0) ? ceil($totalCount / $perPage) : 1;
+$page = max(1, min($page, $totalPages)); // Garante que a página atual está dentro dos limites
 $offset = ($page - 1) * $perPage;
 
-$query .= " LIMIT :offset, :limit";
-// Adicionar parâmetros de paginação ao array $params original usado para a query principal
-$params[':offset'] = $offset;
-$params[':limit'] = $perPage;
+// Query principal para buscar dados
+$mainQuery = $selectPart . " " . $fromPart . " " . $wherePart . " ORDER BY p.data_registro DESC LIMIT :offset, :limit";
+$stmt = $db->prepare($mainQuery);
 
-// Executar consulta principal
-$stmt = $db->prepare($query);
-foreach ($params as $param => $value) {
-    if ($param == ':offset' || $param == ':limit') {
-        $stmt->bindValue($param, (int)$value, PDO::PARAM_INT); // Garantir que offset e limit sejam inteiros
+// Bind parâmetros para a query principal (filtros + paginação)
+$paramsForMainQuery = $paramsForWhere; // Começa com os filtros
+$paramsForMainQuery[':offset'] = $offset;
+$paramsForMainQuery[':limit'] = $perPage;
+
+foreach ($paramsForMainQuery as $paramName => $paramValue) {
+    if ($paramName == ':offset' || $paramName == ':limit') {
+        $stmt->bindValue($paramName, (int)$paramValue, PDO::PARAM_INT);
     } else {
-        $stmt->bindValue($param, $value);
+        $stmt->bindValue($paramName, $paramValue);
     }
 }
 $stmt->execute();
 $payments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Estatísticas
+// Estatísticas (globais ou filtradas, dependendo da necessidade)
+// Se quiser estatísticas filtradas, construa $statsQuery com $wherePart e $paramsForWhere
 $statsQuery = "
     SELECT 
         COUNT(*) as total_pagamentos,
@@ -170,11 +147,15 @@ $statsQuery = "
         COUNT(CASE WHEN status = 'rejeitado' THEN 1 END) as count_rejeitado
     FROM pagamentos_comissao
 ";
-// Aplicar filtros às estatísticas também, se necessário (opcional, depende do requisito)
-// Se for aplicar filtros, a query de estatísticas precisaria ser construída dinamicamente como a query principal.
-// Por ora, as estatísticas são globais.
-$statsStmt = $db->query($statsQuery);
+// Para estatísticas filtradas, adicione a cláusula WHERE:
+// $statsQuery .= " " . $wherePart;
+// $statsStmt = $db->prepare($statsQuery);
+// foreach ($paramsForWhere as $paramName => $paramValue) { $statsStmt->bindValue($paramName, $paramValue); }
+// $statsStmt->execute();
+
+$statsStmt = $db->query($statsQuery); // Para estatísticas globais
 $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
+
 ?>
 
 <!DOCTYPE html>
@@ -393,18 +374,18 @@ $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
                         <label for="status">Status</label>
                         <select id="status" name="status">
                             <option value="">Todos</option>
-                            <option value="pendente" <?php echo (isset($_GET['status']) && $_GET['status'] === 'pendente') ? 'selected' : ''; ?>>Pendente</option>
-                            <option value="aprovado" <?php echo (isset($_GET['status']) && $_GET['status'] === 'aprovado') ? 'selected' : ''; ?>>Aprovado</option>
-                            <option value="rejeitado" <?php echo (isset($_GET['status']) && $_GET['status'] === 'rejeitado') ? 'selected' : ''; ?>>Rejeitado</option>
+                            <option value="pendente" <?php echo (isset($filters['status']) && $filters['status'] === 'pendente') ? 'selected' : ''; ?>>Pendente</option>
+                            <option value="aprovado" <?php echo (isset($filters['status']) && $filters['status'] === 'aprovado') ? 'selected' : ''; ?>>Aprovado</option>
+                            <option value="rejeitado" <?php echo (isset($filters['status']) && $filters['status'] === 'rejeitado') ? 'selected' : ''; ?>>Rejeitado</option>
                         </select>
                     </div>
                     <div class="form-group">
                         <label for="data_inicio">Data Início</label>
-                        <input type="date" id="data_inicio" name="data_inicio" value="<?php echo isset($_GET['data_inicio']) ? htmlspecialchars($_GET['data_inicio']) : ''; ?>">
+                        <input type="date" id="data_inicio" name="data_inicio" value="<?php echo isset($filters['data_inicio']) ? htmlspecialchars($filters['data_inicio']) : ''; ?>">
                     </div>
                     <div class="form-group">
                         <label for="data_fim">Data Fim</label>
-                        <input type="date" id="data_fim" name="data_fim" value="<?php echo isset($_GET['data_fim']) ? htmlspecialchars($_GET['data_fim']) : ''; ?>">
+                        <input type="date" id="data_fim" name="data_fim" value="<?php echo isset($filters['data_fim']) ? htmlspecialchars($filters['data_fim']) : ''; ?>">
                     </div>
                     <div class="form-group">
                         <button type="submit" class="btn btn-primary">Filtrar</button>
@@ -478,19 +459,19 @@ $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
                             </div>
                             <div class="pagination-links">
                                 <?php if ($page > 1): ?>
-                                    <a href="?page=1<?php echo !empty($_GET['status']) ? '&status=' . urlencode($_GET['status']) : ''; ?><?php echo !empty($_GET['data_inicio']) ? '&data_inicio=' . urlencode($_GET['data_inicio']) : ''; ?><?php echo !empty($_GET['data_fim']) ? '&data_fim=' . urlencode($_GET['data_fim']) : ''; ?>" class="page-link">
+                                    <a href="?page=1<?php echo !empty($filters['status']) ? '&status=' . urlencode($filters['status']) : ''; ?><?php echo !empty($filters['data_inicio']) ? '&data_inicio=' . urlencode($filters['data_inicio']) : ''; ?><?php echo !empty($filters['data_fim']) ? '&data_fim=' . urlencode($filters['data_fim']) : ''; ?>" class="page-link">
                                         Primeira
                                     </a>
-                                    <a href="?page=<?php echo $page - 1; ?><?php echo !empty($_GET['status']) ? '&status=' . urlencode($_GET['status']) : ''; ?><?php echo !empty($_GET['data_inicio']) ? '&data_inicio=' . urlencode($_GET['data_inicio']) : ''; ?><?php echo !empty($_GET['data_fim']) ? '&data_fim=' . urlencode($_GET['data_fim']) : ''; ?>" class="page-link">
+                                    <a href="?page=<?php echo $page - 1; ?><?php echo !empty($filters['status']) ? '&status=' . urlencode($filters['status']) : ''; ?><?php echo !empty($filters['data_inicio']) ? '&data_inicio=' . urlencode($filters['data_inicio']) : ''; ?><?php echo !empty($filters['data_fim']) ? '&data_fim=' . urlencode($filters['data_fim']) : ''; ?>" class="page-link">
                                         Anterior
                                     </a>
                                 <?php endif; ?>
                                 
                                 <?php if ($page < $totalPages): ?>
-                                    <a href="?page=<?php echo $page + 1; ?><?php echo !empty($_GET['status']) ? '&status=' . urlencode($_GET['status']) : ''; ?><?php echo !empty($_GET['data_inicio']) ? '&data_inicio=' . urlencode($_GET['data_inicio']) : ''; ?><?php echo !empty($_GET['data_fim']) ? '&data_fim=' . urlencode($_GET['data_fim']) : ''; ?>" class="page-link">
+                                    <a href="?page=<?php echo $page + 1; ?><?php echo !empty($filters['status']) ? '&status=' . urlencode($filters['status']) : ''; ?><?php echo !empty($filters['data_inicio']) ? '&data_inicio=' . urlencode($filters['data_inicio']) : ''; ?><?php echo !empty($filters['data_fim']) ? '&data_fim=' . urlencode($filters['data_fim']) : ''; ?>" class="page-link">
                                         Próxima
                                     </a>
-                                    <a href="?page=<?php echo $totalPages; ?><?php echo !empty($_GET['status']) ? '&status=' . urlencode($_GET['status']) : ''; ?><?php echo !empty($_GET['data_inicio']) ? '&data_inicio=' . urlencode($_GET['data_inicio']) : ''; ?><?php echo !empty($_GET['data_fim']) ? '&data_fim=' . urlencode($_GET['data_fim']) : ''; ?>" class="page-link">
+                                    <a href="?page=<?php echo $totalPages; ?><?php echo !empty($filters['status']) ? '&status=' . urlencode($filters['status']) : ''; ?><?php echo !empty($filters['data_inicio']) ? '&data_inicio=' . urlencode($filters['data_inicio']) : ''; ?><?php echo !empty($filters['data_fim']) ? '&data_fim=' . urlencode($filters['data_fim']) : ''; ?>" class="page-link">
                                         Última
                                     </a>
                                 <?php endif; ?>
@@ -518,7 +499,7 @@ $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Detalhes do Pagamento</h2>
-                <span class="close">&times;</span>
+                <span class="close" onclick="closeModal('detailsModal')">&times;</span>
             </div>
             <div id="detailsContent">
                 <p>Carregando...</p>
@@ -530,7 +511,7 @@ $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Aprovar Pagamento</h2>
-                <span class="close">&times;</span>
+                <span class="close" onclick="closeModal('approveModal')">&times;</span>
             </div>
             <form method="POST" action="">
                 <input type="hidden" name="action" value="approve">
@@ -551,7 +532,7 @@ $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Rejeitar Pagamento</h2>
-                <span class="close">&times;</span>
+                <span class="close" onclick="closeModal('rejectModal')">&times;</span>
             </div>
             <form method="POST" action="">
                 <input type="hidden" name="action" value="reject">
@@ -572,7 +553,7 @@ $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Comprovante de Pagamento</h2>
-                <span class="close">&times;</span>
+                <span class="close" onclick="closeModal('receiptModal')">&times;</span>
             </div>
             <div id="receiptContent">
                 <img id="receiptImage" src="" alt="Comprovante" style="max-width: 100%; height: auto;">
@@ -581,13 +562,6 @@ $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
     </div>
     
     <script>
-        // Fechar modais
-        document.addEventListener('click', function(e) {
-            if (e.target.classList.contains('close') || e.target.classList.contains('modal')) {
-                e.target.closest('.modal').style.display = 'none';
-            }
-        });
-        
         function closeModal(modalId) {
             document.getElementById(modalId).style.display = 'none';
         }
@@ -603,10 +577,11 @@ $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
         }
         
         function viewPaymentDetails(paymentId) {
-            document.getElementById('detailsModal').style.display = 'block';
-            document.getElementById('detailsContent').innerHTML = '<p>Carregando detalhes...</p>';
+            const modal = document.getElementById('detailsModal');
+            const content = document.getElementById('detailsContent');
+            modal.style.display = 'block';
+            content.innerHTML = '<p>Carregando detalhes...</p>';
             
-            // Fazer requisição AJAX para obter detalhes
             fetch('../../controllers/TransactionController.php', {
                 method: 'POST',
                 headers: {
@@ -617,18 +592,18 @@ $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
             .then(response => response.json())
             .then(data => {
                 if (data.status) {
-                    renderPaymentDetails(data.data);
+                    renderPaymentDetails(data.data, content);
                 } else {
-                    document.getElementById('detailsContent').innerHTML = '<p class="error">Erro ao carregar detalhes: ' + data.message + '</p>';
+                    content.innerHTML = '<p class="error">Erro ao carregar detalhes: ' + (data.message || 'Erro desconhecido.') + '</p>';
                 }
             })
             .catch(error => {
                 console.error('Erro na requisição:', error);
-                document.getElementById('detailsContent').innerHTML = '<p class="error">Erro de conexão. Tente novamente.</p>';
+                content.innerHTML = '<p class="error">Erro de conexão. Tente novamente.</p>';
             });
         }
         
-        function renderPaymentDetails(data) {
+        function renderPaymentDetails(data, contentElement) {
             const payment = data.pagamento;
             const transactions = data.transacoes;
             
@@ -636,52 +611,53 @@ $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
                 <div style="margin-bottom: 20px;">
                     <h3>Informações do Pagamento</h3>
                     <p><strong>ID:</strong> ${payment.id}</p>
-                    <p><strong>Loja:</strong> ${payment.loja_nome}</p>
+                    <p><strong>Loja:</strong> ${payment.loja_nome || 'N/A'}</p>
                     <p><strong>Valor Total:</strong> R$ ${parseFloat(payment.valor_total).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
-                    <p><strong>Método:</strong> ${payment.metodo_pagamento}</p>
-                    <p><strong>Data:</strong> ${new Date(payment.data_registro).toLocaleDateString('pt-BR')}</p>
+                    <p><strong>Método:</strong> ${payment.metodo_pagamento || 'N/A'}</p>
+                    <p><strong>Data:</strong> ${payment.data_registro ? new Date(payment.data_registro).toLocaleString('pt-BR') : 'N/A'}</p>
                     ${payment.numero_referencia ? `<p><strong>Referência:</strong> ${payment.numero_referencia}</p>` : ''}
                     ${payment.observacao ? `<p><strong>Observação (Loja):</strong> ${payment.observacao}</p>` : ''}
                     ${payment.observacao_admin ? `<p><strong>Observação (Admin):</strong> ${payment.observacao_admin}</p>` : ''}
                 </div>
                 
                 <div>
-                    <h3>Transações Incluídas (${transactions.length})</h3>
-                    <div style="max-height: 300px; overflow-y: auto;">
-                        <table class="table" style="width: 100%;">
-                            <thead>
-                                <tr>
-                                    <th>Cliente</th>
-                                    <th>Data Trans.</th>
-                                    <th>Valor Compra</th>
-                                    <th>Cashback Cliente</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-            `;
+                    <h3>Transações Incluídas (${transactions.length})</h3>`;
             
-            transactions.forEach(transaction => {
-                html += `
-                    <tr>
-                        <td>${transaction.cliente_nome}</td>
-                        <td>${new Date(transaction.data_transacao).toLocaleDateString('pt-BR')}</td>
-                        <td>R$ ${parseFloat(transaction.valor_total).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
-                        <td>R$ ${parseFloat(transaction.valor_cliente).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
-                    </tr>
-                `;
-            });
+            if (transactions.length > 0) {
+                html += `<div style="max-height: 300px; overflow-y: auto;">
+                            <table class="table" style="width: 100%;">
+                                <thead>
+                                    <tr>
+                                        <th>Cliente</th>
+                                        <th>Data Trans.</th>
+                                        <th>Valor Compra</th>
+                                        <th>Cashback Cliente</th>
+                                    </tr>
+                                </thead>
+                                <tbody>`;
+                transactions.forEach(transaction => {
+                    html += `
+                        <tr>
+                            <td>${transaction.cliente_nome || 'N/A'}</td>
+                            <td>${transaction.data_transacao ? new Date(transaction.data_transacao).toLocaleDateString('pt-BR') : 'N/A'}</td>
+                            <td>R$ ${parseFloat(transaction.valor_total).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                            <td>R$ ${parseFloat(transaction.valor_cliente).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                        </tr>
+                    `;
+                });
+                html += `       </tbody>
+                            </table>
+                        </div>`;
+            } else {
+                html += '<p>Nenhuma transação associada a este pagamento.</p>';
+            }
+            html += `</div>`;
             
-            html += `
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            `;
-            
-            document.getElementById('detailsContent').innerHTML = html;
+            contentElement.innerHTML = html;
         }
         
         function viewReceipt(filename) {
+            if (!filename) return;
             document.getElementById('receiptImage').src = '../../uploads/comprovantes/' + filename;
             document.getElementById('receiptModal').style.display = 'block';
         }
