@@ -13,7 +13,14 @@ require_once '../../utils/FileUpload.php';
 // Mostrar erros para depuração
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
-
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    echo '<div style="background: yellow; padding: 20px; position: fixed; top: 0; left: 0; z-index: 9999; width: 100%;">';
+    echo '<h3>DEBUG POST RECEBIDO:</h3>';
+    echo '<pre>' . print_r($_POST, true) . '</pre>';
+    echo '<pre>' . print_r($_FILES, true) . '</pre>';
+    echo '</div>';
+    echo '<div style="margin-top: 200px;"></div>';
+}
 // Iniciar sessão
 session_start();
 
