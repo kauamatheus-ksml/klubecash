@@ -1,17 +1,11 @@
 <?php
-// ADICIONAR LOGO APÓS session_start() em payment.php
+// views/stores/payment.php - VERSÃO CORRIGIDA
 
 // Habilitar logs de erro
 ini_set('display_errors', 1);
 ini_set('log_errors', 1);
 error_reporting(E_ALL);
 
-// Log de debug
-error_log("payment.php - Início da execução. Method: " . $_SERVER['REQUEST_METHOD']);
-if ($_POST) {
-    error_log("payment.php - POST data: " . print_r($_POST, true));
-}
-// views/stores/payment.php
 // Definir o menu ativo na sidebar
 $activeMenu = 'payment';
 
@@ -26,34 +20,36 @@ if (!defined('ROOT_DIR')) {
     define('ROOT_DIR', dirname(dirname(__DIR__)));
 }
 
-
-
-
 // Iniciar sessão
 session_start();
 
+// ADICIONAR TOKEN CSRF
+if (!isset($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
+// Log inicial
+error_log("payment.php - Method: " . $_SERVER['REQUEST_METHOD']);
+
 // Verificar se o usuário está logado e é uma loja
-if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION['user_type'] !== 'loja') {
+if (!isset($_SESSION['user_id']) || $_SESSION['user_type'] !== 'loja') {
     header("Location: " . LOGIN_URL . "?error=acesso_restrito");
     exit;
 }
 
-// Obter ID do usuário logado
 $userId = $_SESSION['user_id'];
 
-// Obter dados da loja associada ao usuário
+// Obter dados da loja
 $db = Database::getConnection();
 $storeQuery = $db->prepare("SELECT id, nome_fantasia FROM lojas WHERE usuario_id = :usuario_id");
 $storeQuery->bindParam(':usuario_id', $userId);
 $storeQuery->execute();
 
-// Verificar se o usuário tem uma loja associada
 if ($storeQuery->rowCount() == 0) {
-    header('Location: ' . LOGIN_URL . '?error=' . urlencode('Sua conta não está associada a nenhuma loja. Entre em contato com o suporte.'));
+    header('Location: ' . LOGIN_URL . '?error=' . urlencode('Loja não encontrada.'));
     exit;
 }
 
-// Obter os dados da loja
 $store = $storeQuery->fetch(PDO::FETCH_ASSOC);
 $storeId = $store['id'];
 $storeName = $store['nome_fantasia'];
@@ -65,15 +61,18 @@ $transactionIds = [];
 $totalValue = 0;
 $transactions = [];
 
-// Verificar se está vindo da página de comissões pendentes (primeiro POST)
+// PRIMEIRO POST - Vindo da página de comissões pendentes
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'payment_form') {
+    error_log("payment.php - Primeiro POST recebido");
+    
     if (!isset($_POST['transacoes']) || !is_array($_POST['transacoes']) || count($_POST['transacoes']) === 0) {
         $error = 'Selecione pelo menos uma transação para realizar o pagamento.';
+        error_log("payment.php - Erro: Nenhuma transação selecionada");
     } else {
-        // Obter IDs das transações selecionadas
         $transactionIds = array_map('intval', $_POST['transacoes']);
+        error_log("payment.php - Transações selecionadas: " . implode(',', $transactionIds));
         
-        // Validar se todas as transações pertencem à loja
+        // Validar transações
         $placeholders = implode(',', array_fill(0, count($transactionIds), '?'));
         $validationQuery = "
             SELECT t.id, t.codigo_transacao, t.valor_total, t.valor_cashback, t.valor_cliente, 
@@ -93,131 +92,148 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $stmt->execute();
         $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
-        // Verificar se todas as transações foram encontradas
         if (count($transactions) !== count($transactionIds)) {
-            $error = 'Algumas transações selecionadas não são válidas para pagamento.';
+            $error = 'Algumas transações selecionadas não são válidas.';
+            error_log("payment.php - Erro: Transações inválidas");
         } else {
-            // Calcular valor total a pagar
             foreach ($transactions as $transaction) {
                 $totalValue += floatval($transaction['valor_cashback']);
             }
+            error_log("payment.php - Valor total calculado: $totalValue");
         }
     }
-} else if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_payment'])) {
-    // Processar o envio do formulário de pagamento (segundo POST)
+}
+// SEGUNDO POST - Enviando formulário de pagamento
+elseif ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_payment'])) {
+    error_log("payment.php - Segundo POST recebido");
+    error_log("payment.php - POST data: " . print_r($_POST, true));
     
-    // Debug - log dos dados recebidos
-    error_log('payment.php - POST recebido: ' . print_r($_POST, true));
-    error_log('payment.php - FILES recebido: ' . print_r($_FILES, true));
-    
+    // VALIDAR CSRF TOKEN
+    if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
+        $error = 'Token de segurança inválido. Recarregue a página.';
+        error_log("payment.php - Erro: CSRF token inválido");
+    }
     // Validar campos obrigatórios
-    if (!isset($_POST['transacoes']) || !isset($_POST['valor_total']) || !isset($_POST['metodo_pagamento'])) {
-        $error = 'Dados de pagamento incompletos. Tente novamente.';
+    elseif (!isset($_POST['transacoes']) || !isset($_POST['valor_total']) || !isset($_POST['metodo_pagamento'])) {
+        $error = 'Dados de pagamento incompletos.';
+        error_log("payment.php - Erro: Dados incompletos");
     } else {
+        // Processar dados
         $transactionIds = explode(',', $_POST['transacoes']);
+        $transactionIds = array_map('intval', array_filter($transactionIds));
         $totalValue = floatval($_POST['valor_total']);
-        $metodoPagamento = $_POST['metodo_pagamento'];
-        $numeroReferencia = $_POST['numero_referencia'] ?? '';
-        $observacao = $_POST['observacao'] ?? '';
+        $metodoPagamento = trim($_POST['metodo_pagamento']);
+        $numeroReferencia = trim($_POST['numero_referencia'] ?? '');
+        $observacao = trim($_POST['observacao'] ?? '');
         
-        // Debug
-        error_log('payment.php - Processando pagamento - IDs: ' . implode(',', $transactionIds));
-        error_log('payment.php - Valor total: ' . $totalValue);
+        error_log("payment.php - Processando: IDs=" . implode(',', $transactionIds) . ", Valor=$totalValue");
         
-        // Processar upload de comprovante, se houver
-        $comprovante = '';
-        if (isset($_FILES['comprovante']) && $_FILES['comprovante']['error'] === UPLOAD_ERR_OK) {
-            // Criar diretório de uploads se não existir
-            $uploadDir = ROOT_DIR . '/uploads/comprovantes';
-            if (!is_dir($uploadDir)) {
-                mkdir($uploadDir, 0755, true);
-            }
-            
-            // Processar upload
-            $fileInfo = pathinfo($_FILES['comprovante']['name']);
-            $extension = strtolower($fileInfo['extension']);
-            $allowedExtensions = ['jpg', 'jpeg', 'png', 'pdf'];
-            
-            if (in_array($extension, $allowedExtensions)) {
-                $fileName = 'comprovante_' . $storeId . '_' . date('YmdHis') . '_' . uniqid() . '.' . $extension;
-                $filePath = $uploadDir . '/' . $fileName;
+        // Validações adicionais
+        if (empty($transactionIds)) {
+            $error = 'Nenhuma transação válida encontrada.';
+            error_log("payment.php - Erro: Nenhuma transação válida");
+        } elseif ($totalValue <= 0) {
+            $error = 'Valor total inválido.';
+            error_log("payment.php - Erro: Valor inválido");
+        } elseif (empty($metodoPagamento)) {
+            $error = 'Método de pagamento é obrigatório.';
+            error_log("payment.php - Erro: Método de pagamento vazio");
+        } else {
+            // Processar upload (se houver)
+            $comprovante = '';
+            if (isset($_FILES['comprovante']) && $_FILES['comprovante']['error'] === UPLOAD_ERR_OK) {
+                error_log("payment.php - Processando upload");
                 
-                if (move_uploaded_file($_FILES['comprovante']['tmp_name'], $filePath)) {
-                    $comprovante = $fileName;
-                    error_log('payment.php - Comprovante salvo: ' . $fileName);
-                } else {
-                    $error = 'Erro ao fazer upload do comprovante.';
-                    error_log('payment.php - Erro no upload do comprovante');
+                $uploadDir = ROOT_DIR . '/uploads/comprovantes';
+                if (!is_dir($uploadDir)) {
+                    mkdir($uploadDir, 0755, true);
+                    error_log("payment.php - Diretório criado: $uploadDir");
                 }
-            } else {
-                $error = 'Formato de arquivo não permitido.';
-                error_log('payment.php - Formato de arquivo inválido: ' . $extension);
-            }
-        }
-        
-        // Se não houver erro, registrar o pagamento
-        if (empty($error)) {
-            // Preparar dados para o controller
-            $paymentData = [
-                'loja_id' => $storeId,
-                'transacoes' => $transactionIds,
-                'valor_total' => $totalValue,
-                'metodo_pagamento' => $metodoPagamento,
-                'numero_referencia' => $numeroReferencia,
-                'comprovante' => $comprovante,
-                'observacao' => $observacao
-            ];
-            
-            // Chamar o controller
-            $result = TransactionController::registerPayment($paymentData);
-            
-            if ($result['status']) {
-                $success = true;
-                // Redirecionar com parâmetro de sucesso
-                header('Location: ' . STORE_PENDING_TRANSACTIONS_URL . '?payment_success=1');
-                exit;
-            } else {
-                $error = $result['message'];
-                error_log('payment.php - Erro no pagamento: ' . $result['message']);
-            }
-        }
-        
-        // Se há erro, recarregar transações para mostrar o formulário novamente
-        if (!empty($error)) {
-            $placeholders = implode(',', array_fill(0, count($transactionIds), '?'));
-            $validationQuery = "
-                SELECT t.id, t.codigo_transacao, t.valor_total, t.valor_cashback, t.valor_cliente, 
-                       t.data_transacao, u.nome as cliente_nome
-                FROM transacoes_cashback t
-                JOIN usuarios u ON t.usuario_id = u.id
-                WHERE t.id IN ($placeholders) AND t.loja_id = ? AND t.status = ?
-            ";
-            
-            $stmt = $db->prepare($validationQuery);
-            $bindParams = array_merge($transactionIds, [$storeId, TRANSACTION_PENDING]);
-            
-            for ($i = 0; $i < count($bindParams); $i++) {
-                $stmt->bindValue($i + 1, $bindParams[$i]);
+                
+                $fileInfo = pathinfo($_FILES['comprovante']['name']);
+                $extension = strtolower($fileInfo['extension']);
+                $allowedExtensions = ['jpg', 'jpeg', 'png', 'pdf'];
+                
+                if (in_array($extension, $allowedExtensions)) {
+                    $fileName = 'comprovante_' . $storeId . '_' . date('YmdHis') . '_' . uniqid() . '.' . $extension;
+                    $filePath = $uploadDir . '/' . $fileName;
+                    
+                    if (move_uploaded_file($_FILES['comprovante']['tmp_name'], $filePath)) {
+                        $comprovante = $fileName;
+                        error_log("payment.php - Upload realizado: $fileName");
+                    } else {
+                        $error = 'Erro ao fazer upload do comprovante.';
+                        error_log("payment.php - Erro no upload");
+                    }
+                } else {
+                    $error = 'Formato de arquivo não permitido. Use JPG, PNG ou PDF.';
+                    error_log("payment.php - Erro: Formato inválido");
+                }
             }
             
-            $stmt->execute();
-            $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            // Se não houve erro, registrar pagamento
+            if (empty($error)) {
+                $paymentData = [
+                    'loja_id' => $storeId,
+                    'transacoes' => $transactionIds,
+                    'valor_total' => $totalValue,
+                    'metodo_pagamento' => $metodoPagamento,
+                    'numero_referencia' => $numeroReferencia,
+                    'comprovante' => $comprovante,
+                    'observacao' => $observacao
+                ];
+                
+                error_log("payment.php - Chamando registerPayment");
+                $result = TransactionController::registerPayment($paymentData);
+                error_log("payment.php - Resultado: " . print_r($result, true));
+                
+                if ($result['status']) {
+                    $success = true;
+                    // Redirecionar após sucesso
+                    header('Location: ' . STORE_PAYMENT_HISTORY_URL . '?success=1');
+                    exit;
+                } else {
+                    $error = $result['message'];
+                    error_log("payment.php - Erro no registerPayment: " . $result['message']);
+                }
+            }
             
-            // Recalcular total
-            $totalValue = 0;
-            foreach ($transactions as $transaction) {
-                $totalValue += floatval($transaction['valor_cashback']);
+            // Se houve erro, recarregar transações
+            if (!empty($error)) {
+                // Revalidar transações para mostrar formulário novamente
+                $placeholders = implode(',', array_fill(0, count($transactionIds), '?'));
+                $reloadQuery = "
+                    SELECT t.id, t.codigo_transacao, t.valor_total, t.valor_cashback, t.valor_cliente, 
+                           t.data_transacao, u.nome as cliente_nome
+                    FROM transacoes_cashback t
+                    JOIN usuarios u ON t.usuario_id = u.id
+                    WHERE t.id IN ($placeholders) AND t.loja_id = ? AND t.status = ?
+                ";
+                
+                $stmt = $db->prepare($reloadQuery);
+                $bindParams = array_merge($transactionIds, [$storeId, TRANSACTION_PENDING]);
+                
+                for ($i = 0; $i < count($bindParams); $i++) {
+                    $stmt->bindValue($i + 1, $bindParams[$i]);
+                }
+                
+                $stmt->execute();
+                $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                // Recalcular total
+                $totalValue = 0;
+                foreach ($transactions as $transaction) {
+                    $totalValue += floatval($transaction['valor_cashback']);
+                }
             }
         }
     }
 } else {
-    // Acesso direto à página - redirecionar para comissões pendentes
+    // Acesso direto - redirecionar
     header('Location: ' . STORE_PENDING_TRANSACTIONS_URL);
     exit;
 }
-// Definir o título da página
 
-// Métodos de pagamento disponíveis
 $metodosPagamento = [
     'pix' => 'PIX',
     'transferencia' => 'Transferência Bancária',
@@ -234,268 +250,323 @@ $metodosPagamento = [
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
     <title>Realizar Pagamento - Klube Cash</title>
-    <link rel="stylesheet" href="../../assets/css/main.css">
-    <link rel="stylesheet" href="../../assets/css/views/stores/payment.css">
+    <style>
+        .alert {
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 8px;
+        }
+        .alert.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .alert.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            margin: 5px;
+        }
+        .btn-primary {
+            background-color: #FF7A00;
+            color: white;
+        }
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+        }
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .table th, .table td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        .table th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+        }
+        .file-upload-container {
+            position: relative;
+        }
+        .file-input {
+            position: absolute;
+            left: -9999px;
+        }
+        .file-upload-button {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .payment-instructions {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+        .payment-summary-box {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+        }
+        .summary-item {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+        }
+        .form-actions {
+            text-align: right;
+            margin-top: 20px;
+        }
+    </style>
 </head>
 <body>
-    <?php include_once '../components/sidebar-store.php'; ?>
-    
-    <div class="main-content" id="mainContent">
-        <div class="dashboard-wrapper">
-            <!-- Cabeçalho -->
-            <div class="dashboard-header">
-                <h1>Realizar Pagamento</h1>
-                <p class="subtitle">Pague as comissões devidas para liberar o cashback aos seus clientes</p>
+    <div class="container">
+        <h1>Realizar Pagamento</h1>
+        
+        <?php if (!empty($error)): ?>
+            <div class="alert error">
+                <strong>Erro:</strong> <?php echo htmlspecialchars($error); ?>
+            </div>
+        <?php endif; ?>
+        
+        <?php if ($success): ?>
+            <div class="alert success">
+                <strong>Sucesso!</strong> Pagamento registrado com sucesso!
+            </div>
+        <?php elseif (!empty($transactions)): ?>
+            <!-- Resumo das Transações -->
+            <div class="card">
+                <h3>Resumo das Transações</h3>
+                <p>Você selecionou <strong><?php echo count($transactions); ?></strong> transações para pagamento, totalizando <strong>R$ <?php echo number_format($totalValue, 2, ',', '.'); ?></strong></p>
+                
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Código</th>
+                                <th>Cliente</th>
+                                <th>Data</th>
+                                <th>Valor Venda</th>
+                                <th>Comissão</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($transactions as $transaction): ?>
+                                <tr>
+                                    <td><?php echo htmlspecialchars($transaction['codigo_transacao'] ?? 'N/A'); ?></td>
+                                    <td><?php echo htmlspecialchars($transaction['cliente_nome']); ?></td>
+                                    <td><?php echo date('d/m/Y H:i', strtotime($transaction['data_transacao'])); ?></td>
+                                    <td>R$ <?php echo number_format($transaction['valor_total'], 2, ',', '.'); ?></td>
+                                    <td>R$ <?php echo number_format($transaction['valor_cashback'], 2, ',', '.'); ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
             </div>
             
-            <?php if ($success): ?>
-                <!-- Mensagem de sucesso -->
-                <div class="success-container">
-                    <div class="success-icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <path d="M8 12l2 2 4-4"></path>
-                        </svg>
-                    </div>
-                    <h2>Pagamento Registrado com Sucesso!</h2>
-                    <p>Seu pagamento foi registrado e está aguardando aprovação do administrador. O cashback será liberado para os clientes assim que o pagamento for aprovado.</p>
+            <!-- Formulário de Pagamento -->
+            <div class="card">
+                <h3>Formulário de Pagamento</h3>
+                <form method="POST" action="" enctype="multipart/form-data" id="paymentForm">
+                    <!-- ADICIONAR CSRF TOKEN -->
+                    <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+                    <input type="hidden" name="transacoes" value="<?php echo implode(',', $transactionIds); ?>">
+                    <input type="hidden" name="valor_total" value="<?php echo $totalValue; ?>">
                     
-                    <div class="success-actions">
-                        <a href="<?php echo STORE_PAYMENT_HISTORY_URL; ?>" class="btn btn-primary">Ver Histórico de Pagamentos</a>
-                        <a href="<?php echo STORE_PENDING_TRANSACTIONS_URL; ?>" class="btn btn-secondary">Voltar para Comissões Pendentes</a>
+                    <div class="form-group">
+                        <label for="metodo_pagamento">Método de Pagamento *</label>
+                        <select id="metodo_pagamento" name="metodo_pagamento" required>
+                            <option value="">Selecione um método</option>
+                            <?php foreach ($metodosPagamento as $key => $value): ?>
+                                <option value="<?php echo $key; ?>" <?php echo (isset($_POST['metodo_pagamento']) && $_POST['metodo_pagamento'] === $key) ? 'selected' : ''; ?>>
+                                    <?php echo $value; ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
                     </div>
-                </div>
-            <?php elseif (!empty($error)): ?>
-                <!-- Mensagem de erro -->
-                <div class="alert error">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <line x1="12" y1="8" x2="12" y2="12"></line>
-                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                    </svg>
-                    <div>
-                        <h4>Erro ao processar pagamento</h4>
-                        <p><?php echo $error; ?></p>
+                    
+                    <div class="form-group">
+                        <label for="numero_referencia">Número de Referência</label>
+                        <input type="text" id="numero_referencia" name="numero_referencia" 
+                               value="<?php echo htmlspecialchars($_POST['numero_referencia'] ?? ''); ?>"
+                               placeholder="Ex: ID da transação, número do comprovante">
+                        <small>Opcional. Use para rastrear seu pagamento internamente.</small>
                     </div>
-                    <a href="<?php echo STORE_PENDING_TRANSACTIONS_URL; ?>" class="btn btn-secondary">Voltar</a>
-                </div>
-            <?php else: ?>
-                <!-- Formulário de pagamento -->
-                <div class="payment-container">
-                    <div class="card transactions-summary">
-                        <div class="card-header">
-                            <div class="card-title">Resumo das Transações</div>
-                        </div>
-                        <div class="summary-content">
-                            <p class="summary-text">Você selecionou <strong><?php echo count($transactions); ?></strong> transações para pagamento, totalizando <strong>R$ <?php echo number_format($totalValue, 2, ',', '.'); ?></strong></p>
-                            
-                            <!-- Lista de transações -->
-                            <div class="table-responsive">
-                                <table class="table">
-                                    <thead>
-                                        <tr>
-                                            <th>Código</th>
-                                            <th>Cliente</th>
-                                            <th>Data</th>
-                                            <th>Valor Venda</th>
-                                            <th>Comissão</th>
-                                            <th>Cashback Cliente</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php foreach ($transactions as $transaction): ?>
-                                            <tr>
-                                                <td><?php echo htmlspecialchars($transaction['codigo_transacao'] ?? 'N/A'); ?></td>
-                                                <td><?php echo htmlspecialchars($transaction['cliente_nome']); ?></td>
-                                                <td><?php echo date('d/m/Y H:i', strtotime($transaction['data_transacao'])); ?></td>
-                                                <td>R$ <?php echo number_format($transaction['valor_total'], 2, ',', '.'); ?></td>
-                                                <td>R$ <?php echo number_format($transaction['valor_cashback'], 2, ',', '.'); ?></td>
-                                                <td>R$ <?php echo number_format($transaction['valor_cliente'], 2, ',', '.'); ?></td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
+                    
+                    <!-- Instruções PIX -->
+                    <div id="pixInstructions" style="display: none;">
+                        <div class="payment-instructions">
+                            <h4>Instruções para Pagamento via PIX</h4>
+                            <p><strong>Chave PIX:</strong> (11) 98765-4321 (Telefone)</p>
+                            <p><strong>Nome:</strong> Klube Cash Serviços Financeiros Ltda</p>
+                            <p><strong>Valor:</strong> R$ <?php echo number_format($totalValue, 2, ',', '.'); ?></p>
                         </div>
                     </div>
                     
-                    <div class="card payment-form-container">
-                        <div class="card-header">
-                            <div class="card-title">Formulário de Pagamento</div>
+                    <!-- Instruções Transferência -->
+                    <div id="transferenciaInstructions" style="display: none;">
+                        <div class="payment-instructions">
+                            <h4>Instruções para Transferência Bancária</h4>
+                            <p><strong>Banco:</strong> 123 - Banco Digital</p>
+                            <p><strong>Agência:</strong> 0001</p>
+                            <p><strong>Conta:</strong> 12345-6</p>
+                            <p><strong>CNPJ:</strong> 12.345.678/0001-90</p>
+                            <p><strong>Valor:</strong> R$ <?php echo number_format($totalValue, 2, ',', '.'); ?></p>
                         </div>
-                        <form method="POST" action="" enctype="multipart/form-data" class="payment-form">
-                            <input type="hidden" name="transacoes" value="<?php echo implode(',', $transactionIds); ?>">
-                            <input type="hidden" name="valor_total" value="<?php echo $totalValue; ?>">
-                            
-                            <div class="form-group">
-                                <label for="metodo_pagamento">Método de Pagamento*</label>
-                                <select id="metodo_pagamento" name="metodo_pagamento" required>
-                                    <option value="">Selecione um método</option>
-                                    <?php foreach ($metodosPagamento as $key => $value): ?>
-                                        <option value="<?php echo $key; ?>"><?php echo $value; ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                            
-                            <div class="form-group" id="numeroReferenciaContainer">
-                                <label for="numero_referencia">Número de Referência</label>
-                                <input type="text" id="numero_referencia" name="numero_referencia" placeholder="Ex: ID da transação, número do comprovante">
-                                <small>Opcional. Use para rastrear seu pagamento internamente.</small>
-                            </div>
-                            
-                            <div class="form-group" id="pixInstructions" style="display: none;">
-                                <div class="payment-instructions">
-                                    <h3>Instruções para Pagamento via PIX</h3>
-                                    <p>Faça um PIX para as seguintes informações:</p>
-                                    <p><strong>Chave PIX:</strong> (11) 98765-4321 (Telefone)</p>
-                                    <p><strong>Nome:</strong> Klube Cash Serviços Financeiros Ltda</p>
-                                    <p><strong>Banco:</strong> Banco Digital</p>
-                                    <p><strong>Valor:</strong> R$ <?php echo number_format($totalValue, 2, ',', '.'); ?></p>
-                                    <p class="payment-note">Após realizar o pagamento, anexe o comprovante no campo abaixo.</p>
-                                </div>
-                            </div>
-                            
-                            <div class="form-group" id="transferenciaInstructions" style="display: none;">
-                                <div class="payment-instructions">
-                                    <h3>Instruções para Transferência Bancária</h3>
-                                    <p>Faça uma transferência para a seguinte conta:</p>
-                                    <p><strong>Banco:</strong> 123 - Banco Digital</p>
-                                    <p><strong>Agência:</strong> 0001</p>
-                                    <p><strong>Conta:</strong> 12345-6</p>
-                                    <p><strong>CNPJ:</strong> 12.345.678/0001-90</p>
-                                    <p><strong>Nome:</strong> Klube Cash Serviços Financeiros Ltda</p>
-                                    <p><strong>Valor:</strong> R$ <?php echo number_format($totalValue, 2, ',', '.'); ?></p>
-                                    <p class="payment-note">Após realizar a transferência, anexe o comprovante no campo abaixo.</p>
-                                </div>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label for="comprovante">Comprovante de Pagamento</label>
-                                <div class="file-upload-container">
-                                    <input type="file" id="comprovante" name="comprovante" accept=".jpg,.jpeg,.png,.pdf" class="file-input">
-                                    <label for="comprovante" class="file-upload-button">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                            <polyline points="17 8 12 3 7 8"></polyline>
-                                            <line x1="12" y1="3" x2="12" y2="15"></line>
-                                        </svg>
-                                        Selecionar Arquivo
-                                    </label>
-                                    <span id="file-name" class="file-name">Nenhum arquivo selecionado</span>
-                                </div>
-                                <small>Formatos permitidos: JPG, PNG, PDF. Tamanho máximo: 5MB</small>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label for="observacao">Observações (opcional)</label>
-                                <textarea id="observacao" name="observacao" rows="3" placeholder="Informações adicionais sobre o pagamento"></textarea>
-                            </div>
-                            
-                            <div class="payment-summary-box">
-                                <div class="summary-header">Resumo do Pagamento</div>
-                                <div class="summary-item">
-                                    <span class="item-label">Total de Transações:</span>
-                                    <span class="item-value"><?php echo count($transactions); ?></span>
-                                </div>
-                                <div class="summary-item">
-                                    <span class="item-label">Valor Total:</span>
-                                    <span class="item-value">R$ <?php echo number_format($totalValue, 2, ',', '.'); ?></span>
-                                </div>
-                                <div class="summary-item payment-method">
-                                    <span class="item-label">Método de Pagamento:</span>
-                                    <span class="item-value" id="paymentMethodDisplay">-</span>
-                                </div>
-                            </div>
-                            
-                            <div class="form-actions">
-                                <button type="submit" name="submit_payment" value="1" class="btn btn-primary">Confirmar Pagamento</button>
-                                <a href="<?php echo STORE_PENDING_TRANSACTIONS_URL; ?>" class="btn btn-secondary">Cancelar</a>
-                            </div>
-                        </form>
                     </div>
                     
-                    <!-- Informações Adicionais -->
-                    <div class="card info-card">
-                        <div class="card-header">
-                            <div class="card-title">Informações Importantes</div>
+                    <div class="form-group">
+                        <label for="comprovante">Comprovante de Pagamento</label>
+                        <div class="file-upload-container">
+                            <input type="file" id="comprovante" name="comprovante" accept=".jpg,.jpeg,.png,.pdf" class="file-input">
+                            <label for="comprovante" class="file-upload-button">
+                                Selecionar Arquivo
+                            </label>
+                            <span id="file-name">Nenhum arquivo selecionado</span>
                         </div>
-                        <div class="info-content">
-                            <p>O pagamento das comissões é necessário para que o cashback seja liberado para seus clientes. Após o envio deste formulário, nossa equipe validará o pagamento em até 24 horas úteis.</p>
-                            <p>Após a aprovação, o cashback será automaticamente liberado para os clientes, que receberão uma notificação por email.</p>
-                            <p>Em caso de dúvidas ou problemas, entre em contato com nosso suporte pelo email <a href="mailto:suporte@klubecash.com">suporte@klubecash.com</a>.</p>
+                        <small>Formatos permitidos: JPG, PNG, PDF. Tamanho máximo: 5MB</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="observacao">Observações (opcional)</label>
+                        <textarea id="observacao" name="observacao" rows="3" 
+                                  placeholder="Informações adicionais sobre o pagamento"><?php echo htmlspecialchars($_POST['observacao'] ?? ''); ?></textarea>
+                    </div>
+                    
+                    <div class="payment-summary-box">
+                        <h4>Resumo do Pagamento</h4>
+                        <div class="summary-item">
+                            <span>Total de Transações:</span>
+                            <span><?php echo count($transactions); ?></span>
+                        </div>
+                        <div class="summary-item">
+                            <span>Valor Total:</span>
+                            <span>R$ <?php echo number_format($totalValue, 2, ',', '.'); ?></span>
+                        </div>
+                        <div class="summary-item">
+                            <span>Método de Pagamento:</span>
+                            <span id="paymentMethodDisplay">-</span>
                         </div>
                     </div>
-                </div>
-            <?php endif; ?>
-        </div>
+                    
+                    <div class="form-actions">
+                        <button type="submit" name="submit_payment" value="1" class="btn btn-primary" id="submitBtn">
+                            Confirmar Pagamento
+                        </button>
+                        <a href="<?php echo STORE_PENDING_TRANSACTIONS_URL; ?>" class="btn btn-secondary">Cancelar</a>
+                    </div>
+                </form>
+            </div>
+        <?php endif; ?>
     </div>
     
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Mostrar nome do arquivo selecionado
             const fileInput = document.getElementById('comprovante');
-            const fileNameDisplay = document.getElementById('file-name');
-            
-            if (fileInput) {
-                fileInput.addEventListener('change', function() {
-                    if (this.files && this.files.length > 0) {
-                        fileNameDisplay.textContent = this.files[0].name;
-                        
-                        // Validar tamanho do arquivo (máximo 5MB)
-                        const fileSize = this.files[0].size / 1024 / 1024; // em MB
-                        if (fileSize > 5) {
-                            alert('O arquivo é muito grande. O tamanho máximo permitido é 5MB.');
-                            this.value = '';
-                            fileNameDisplay.textContent = 'Nenhum arquivo selecionado';
-                        }
-                    } else {
-                        fileNameDisplay.textContent = 'Nenhum arquivo selecionado';
-                    }
-                });
-            }
-            
-            // Mostrar/ocultar instruções de pagamento com base no método selecionado
-            const metodoPagamento = document.getElementById('metodo_pagamento');
+            const fileDisplay = document.getElementById('file-name');
+            const methodSelect = document.getElementById('metodo_pagamento');
             const pixInstructions = document.getElementById('pixInstructions');
             const transferenciaInstructions = document.getElementById('transferenciaInstructions');
             const paymentMethodDisplay = document.getElementById('paymentMethodDisplay');
+            const form = document.getElementById('paymentForm');
+            const submitBtn = document.getElementById('submitBtn');
             
-            if (metodoPagamento) {
-                metodoPagamento.addEventListener('change', function() {
-                    // Atualizar método exibido no resumo
-                    paymentMethodDisplay.textContent = this.options[this.selectedIndex].text;
-                    
-                    // Mostrar instruções correspondentes
-                    if (this.value === 'pix') {
-                        pixInstructions.style.display = 'block';
-                        transferenciaInstructions.style.display = 'none';
-                    } else if (this.value === 'transferencia') {
-                        pixInstructions.style.display = 'none';
-                        transferenciaInstructions.style.display = 'block';
+            // Upload de arquivo
+            if (fileInput) {
+                fileInput.addEventListener('change', function() {
+                    if (this.files && this.files.length > 0) {
+                        const file = this.files[0];
+                        fileDisplay.textContent = file.name;
+                        
+                        // Validar tamanho (5MB = 5 * 1024 * 1024 bytes)
+                        if (file.size > 5 * 1024 * 1024) {
+                            alert('Arquivo muito grande. Máximo permitido: 5MB');
+                            this.value = '';
+                            fileDisplay.textContent = 'Nenhum arquivo selecionado';
+                        }
                     } else {
-                        pixInstructions.style.display = 'none';
-                        transferenciaInstructions.style.display = 'none';
+                        fileDisplay.textContent = 'Nenhum arquivo selecionado';
                     }
                 });
             }
             
-            // Validação do formulário antes de enviar
-            const paymentForm = document.querySelector('.payment-form');
+            // Método de pagamento
+            if (methodSelect) {
+                methodSelect.addEventListener('change', function() {
+                    const method = this.value;
+                    const methodText = this.options[this.selectedIndex].text;
+                    
+                    paymentMethodDisplay.textContent = methodText;
+                    
+                    // Mostrar/ocultar instruções
+                    pixInstructions.style.display = method === 'pix' ? 'block' : 'none';
+                    transferenciaInstructions.style.display = method === 'transferencia' ? 'block' : 'none';
+                });
+                
+                // Trigger inicial se já houver valor selecionado
+                if (methodSelect.value) {
+                    methodSelect.dispatchEvent(new Event('change'));
+                }
+            }
             
-            if (paymentForm) {
-                paymentForm.addEventListener('submit', function(e) {
-                    const method = metodoPagamento.value;
+            // Validação do formulário
+            if (form) {
+                form.addEventListener('submit', function(e) {
+                    const method = methodSelect.value;
                     
                     if (!method) {
                         e.preventDefault();
                         alert('Por favor, selecione um método de pagamento.');
+                        methodSelect.focus();
                         return false;
                     }
                     
-                    // Se estiver enviando o formulário, mostrar mensagem de carregamento
-                    if (confirm('Confirmar o pagamento de R$ <?php echo number_format($totalValue, 2, ',', '.'); ?>?')) {
-                        // Adicionar mensagem de processamento
-                        const submitBtn = document.querySelector('button[type="submit"]');
+                    // Confirmação
+                    const totalValue = '<?php echo number_format($totalValue, 2, ",", "."); ?>';
+                    if (confirm(`Confirmar o pagamento de R$ ${totalValue}?`)) {
+                        // Desabilitar botão para evitar duplo envio
                         submitBtn.disabled = true;
                         submitBtn.textContent = 'Processando...';
                         return true;
