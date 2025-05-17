@@ -83,7 +83,7 @@ $db = Database::getConnection();
 // Construir consulta
 $query = "
     SELECT p.*, l.nome_fantasia, l.email as loja_email,
-           (SELECT COUNT(*) FROM pagamentos_transacoes WHERE pagamento_id = p.id) as total_transacoes
+           COALESCE((SELECT COUNT(*) FROM pagamentos_transacoes pt WHERE pt.pagamento_id = p.id), 0) as total_transacoes
     FROM pagamentos_comissao p
     JOIN lojas l ON p.loja_id = l.id
     WHERE 1=1
