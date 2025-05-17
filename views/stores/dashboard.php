@@ -142,14 +142,857 @@ $activeMenu = 'dashboard';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard da Loja - Klube Cash</title>
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
-    <link rel="stylesheet" href="../../assets/css/main.css">
-    <link rel="stylesheet" href="../../assets/css/views/stores/dashboard.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+    /* Variáveis e configurações globais */
+    :root {
+        --primary-color: #FF7A00;
+        --primary-dark: #E06E00;
+        --primary-light: #FFF0E6;
+        --secondary-color: #2A3F54;
+        --success-color: #28A745;
+        --warning-color: #FFC107; 
+        --danger-color: #DC3545;
+        --info-color: #17A2B8;
+        --light-gray: #F8F9FA;
+        --medium-gray: #6C757D;
+        --dark-gray: #343A40;
+        --white: #FFFFFF;
+        --shadow-sm: 0 2px 8px rgba(0,0,0,0.04);
+        --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+        --shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
+        --border-radius: 12px;
+        --transition: all 0.3s ease;
+    }
+    
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background-color: #F5F7FA;
+        color: var(--dark-gray);
+        line-height: 1.5;
+        margin: 0;
+        padding: 0;
+    }
+    
+    /* Layout do dashboard */
+    .dashboard-container {
+        display: flex;
+        min-height: 100vh;
+    }
+    
+    .main-content {
+        flex: 1;
+        padding: 1.5rem;
+        margin-left: 250px; /* Largura da sidebar */
+        transition: margin-left 0.3s ease;
+    }
+    
+    /* Cabeçalho */
+    .dashboard-header {
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid rgba(0,0,0,0.05);
+    }
+    
+    .dashboard-title {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: var(--secondary-color);
+        margin-bottom: 0.5rem;
+    }
+    
+    .welcome-user {
+        color: var(--medium-gray);
+        font-size: 1rem;
+    }
+    
+    /* Cards estatísticos */
+    .summary-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+    
+    .card {
+        background-color: var(--white);
+        border-radius: var(--border-radius);
+        padding: 1.5rem;
+        box-shadow: var(--shadow-md);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: var(--transition);
+        border: none;
+        overflow: hidden;
+        position: relative;
+    }
+    
+    .card:hover {
+        transform: translateY(-5px);
+        box-shadow: var(--shadow-lg);
+    }
+    
+    .card::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        height: 100%;
+        width: 4px;
+        background-color: var(--primary-color);
+        opacity: 0;
+        transition: var(--transition);
+    }
+    
+    .card:hover::before {
+        opacity: 1;
+    }
+    
+    .card-content {
+        flex: 1;
+    }
+    
+    .card-content h3 {
+        font-size: 0.85rem;
+        color: var(--medium-gray);
+        margin-bottom: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .card-value {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: var(--secondary-color);
+        margin-bottom: 0.5rem;
+        line-height: 1.2;
+    }
+    
+    .card-period {
+        font-size: 0.85rem;
+        color: var(--medium-gray);
+    }
+    
+    .info-card {
+        background-color: #f8f9fa;
+        border-radius: 10px;
+        padding: 20px;
+        margin-bottom: 25px;
+        border: 1px solid #e9ecef;
+    }
+    
+    .info-card h3 {
+        margin-bottom: 15px;
+        color: #333;
+        font-size: 18px;
+    }
+    
+    .info-number {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background-color: #FF7A00;
+        color: white;
+        font-weight: bold;
+    }
+    
+    .info-content {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+    }
+    
+    .info-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 15px;
+    }
+    
+    .info-item h4 {
+        margin: 0 0 5px 0;
+        font-size: 16px;
+        color: #444;
+    }
+    
+    .info-item p {
+        margin: 0;
+        color: #666;
+        font-size: 14px;
+    }
+    
+    .card-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: var(--primary-light);
+        color: var(--primary-color);
+        transition: var(--transition);
+    }
+    
+    .card:hover .card-icon {
+        transform: scale(1.1);
+    }
+    
+    .card-icon.success {
+        background-color: rgba(40, 167, 69, 0.1);
+        color: var(--success-color);
+    }
+    
+    .card-icon.warning {
+        background-color: rgba(255, 193, 7, 0.1);
+        color: var(--warning-color);
+    }
+    
+    .card-icon.info {
+        background-color: rgba(23, 162, 184, 0.1);
+        color: var(--info-color);
+    }
+    
+    /* Alerta */
+    .alert {
+        background-color: var(--white);
+        border-radius: var(--border-radius);
+        padding: 1.25rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        box-shadow: var(--shadow-md);
+        margin-bottom: 2rem;
+        border-left: 4px solid;
+    }
+    
+    .alert.warning {
+        border-color: var(--warning-color);
+    }
+    
+    .alert.warning svg {
+        color: var(--warning-color);
+    }
+    
+    .alert h4 {
+        margin: 0 0 0.35rem 0;
+        font-size: 1.1rem;
+        color: var(--dark-gray);
+    }
+    
+    .alert p {
+        margin: 0;
+        color: var(--medium-gray);
+        font-size: 0.9rem;
+    }
+    
+    .btn-warning {
+        background-color: #ffc107;
+        color: #333;
+        font-weight: 600;
+        padding: 8px 15px;
+        border-radius: 5px;
+        text-decoration: none;
+        transition: background-color 0.3s;
+        white-space: nowrap;
+    }
+    
+    .btn-warning:hover {
+        background-color: #e0a800;
+        transform: translateY(-2px);
+    }
+    
+    /* Seções */
+    .quick-actions, .chart-container, .recent-transactions {
+        background-color: var(--white);
+        border-radius: var(--border-radius);
+        padding: 1.5rem;
+        box-shadow: var(--shadow-md);
+        margin-bottom: 2rem;
+    }
+    
+    .quick-actions h2, .chart-container h2, .section-header h2 {
+        font-size: 1.25rem;
+        color: var(--secondary-color);
+        margin-top: 0;
+        margin-bottom: 1.25rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+    }
+    
+    .quick-actions h2::after, .chart-container h2::after, .section-header h2::after {
+        content: '';
+        height: 3px;
+        width: 2rem;
+        background-color: var(--primary-color);
+        margin-left: 0.75rem;
+        border-radius: 3px;
+    }
+    
+    /* Ações rápidas */
+    .actions-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 1.25rem;
+    }
+    
+    .action-card {
+        background-color: var(--light-gray);
+        border-radius: var(--border-radius);
+        padding: 1.5rem;
+        text-decoration: none;
+        color: var(--dark-gray);
+        transition: var(--transition);
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .action-card::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        height: 3px;
+        width: 0;
+        background-color: var(--primary-color);
+        transition: var(--transition);
+    }
+    
+    .action-card:hover {
+        transform: translateY(-5px);
+        background-color: var(--white);
+        box-shadow: var(--shadow-md);
+    }
+    
+    .action-card:hover::after {
+        width: 100%;
+    }
+    
+    .action-icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background-color: var(--primary-light);
+        color: var(--primary-color);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 1rem;
+        transition: var(--transition);
+    }
+    
+    .action-card:hover .action-icon {
+        transform: scale(1.1);
+        background-color: var(--primary-color);
+        color: var(--white);
+    }
+    
+    .action-card h3 {
+        font-size: 1.1rem;
+        margin-bottom: 0.5rem;
+        color: var(--secondary-color);
+    }
+    
+    .action-card p {
+        font-size: 0.9rem;
+        color: var(--medium-gray);
+        margin: 0;
+    }
+    
+    /* Gráfico */
+    .chart-wrapper {
+        height: 300px;
+        position: relative;
+    }
+    
+    /* Tabela */
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.25rem;
+    }
+    
+    .link-more {
+        color: var(--primary-color);
+        text-decoration: none;
+        font-size: 0.9rem;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        transition: var(--transition);
+    }
+    
+    .link-more:hover {
+        color: var(--primary-dark);
+    }
+    
+    .link-more::after {
+        content: '→';
+        margin-left: 0.4rem;
+        transition: var(--transition);
+    }
+    
+    .link-more:hover::after {
+        transform: translateX(3px);
+    }
+    
+    .table-responsive {
+        overflow-x: auto;
+    }
+    
+    .data-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    
+    .data-table th {
+        padding: 0.75rem 1rem;
+        text-align: left;
+        font-size: 0.85rem;
+        color: var(--medium-gray);
+        border-bottom: 2px solid var(--light-gray);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .data-table td {
+        padding: 1rem;
+        border-bottom: 1px solid var(--light-gray);
+        font-size: 0.95rem;
+        color: var(--dark-gray);
+        vertical-align: middle;
+    }
+    
+    .data-table tr:last-child td {
+        border-bottom: none;
+    }
+    
+    .data-table tr:hover td {
+        background-color: rgba(245, 247, 250, 0.5);
+    }
+    
+    .status-badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 50px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    
+    .status-badge.pendente {
+        background-color: rgba(255, 193, 7, 0.1);
+        color: var(--warning-color);
+    }
+    
+    .status-badge.aprovado {
+        background-color: rgba(40, 167, 69, 0.1);
+        color: var(--success-color);
+    }
+    
+    .status-badge.cancelado {
+        background-color: rgba(220, 53, 69, 0.1);
+        color: var(--danger-color);
+    }
+    
+    /* Estado vazio */
+    .empty-state {
+        text-align: center;
+        padding: 3rem 1rem;
+    }
+    
+    .empty-state svg {
+        color: #D1D5DB;
+        margin-bottom: 1rem;
+    }
+    
+    .empty-state h3 {
+        font-size: 1.1rem;
+        margin-bottom: 0.5rem;
+        color: var(--secondary-color);
+    }
+    
+    .empty-state p {
+        color: var(--medium-gray);
+        margin-bottom: 1.5rem;
+        font-size: 0.95rem;
+    }
+    
+    .btn-primary {
+        background-color: var(--primary-color);
+        color: var(--white);
+        font-weight: 600;
+        padding: 0.6rem 1.2rem;
+        border-radius: var(--border-radius);
+        text-decoration: none;
+        display: inline-block;
+        transition: var(--transition);
+        border: none;
+        cursor: pointer;
+    }
+    
+    .btn-primary:hover {
+        background-color: var(--primary-dark);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(255, 122, 0, 0.25);
+    }
+    
+    /* ===== SIDEBAR STYLES ===== */
+    /* Sidebar */
+    .sidebar {
+        width: 250px;
+        height: 100vh;
+        background-color: var(--white);
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: 100;
+        transition: transform 0.3s ease;
+        border-right: 1px solid #EEEEEE;
+    }
+    
+    .sidebar-header {
+        padding: 20px;
+        border-bottom: 1px solid #EEEEEE;
+        display: flex;
+        align-items: center;
+    }
+    
+    .sidebar-logo {
+        height: 40px;
+    }
+    
+    .sidebar-nav {
+        padding: 0;
+        list-style: none;
+    }
+    
+    .sidebar-nav-item {
+        display: block;
+        padding: 15px 20px;
+        text-decoration: none;
+        color: var(--dark-gray);
+        border-left: 3px solid transparent;
+        transition: all 0.2s ease;
+    }
+    
+    .sidebar-nav-item:hover {
+        background-color: var(--primary-light);
+        color: var(--primary-color);
+    }
+    
+    .sidebar-nav-item.active {
+        background-color: var(--primary-light);
+        color: var(--primary-color);
+        border-left-color: var(--primary-color);
+    }
+    
+    .sidebar-nav-item svg {
+        margin-right: 10px;
+        font-size: 18px;
+        vertical-align: middle;
+    }
+    
+    .sidebar-footer {
+        position: absolute;
+        bottom: 0;
+        width: 100%;
+        padding: 20px;
+        border-top: 1px solid #EEEEEE;
+    }
+    
+    .logout-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        padding: 10px;
+        background-color: var(--primary-color);
+        border: none;
+        border-radius: 8px;
+        color: var(--white);
+        font-weight: 600;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+        text-decoration: none;
+    }
+    
+    .logout-btn:hover {
+        background-color: #E06E00;
+    }
+    
+    .logout-btn svg {
+        margin-right: 8px;
+    }
+    
+    /* Mostrar/ocultar sidebar em dispositivos móveis */
+    .sidebar-toggle {
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        width: 40px;
+        height: 40px;
+        background-color: var(--white);
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        box-shadow: var(--shadow-sm);
+        z-index: 99;
+        display: none;
+    }
+    
+    /* Overlay para dispositivos móveis */
+    .overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 90;
+        display: none;
+    }
+    
+    .overlay.active {
+        display: block;
+    }
+    
+    /* Responsividade */
+    @media (max-width: 1199.98px) {
+        .actions-grid {
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        }
+    }
+    
+    @media (max-width: 991.98px) {
+        .main-content {
+            margin-left: 0; /* Remove a margem quando a sidebar é ocultada */
+        }
+        
+        .sidebar {
+            transform: translateX(-100%);
+        }
+        
+        .sidebar.open {
+            transform: translateX(0);
+        }
+        
+        .sidebar-toggle {
+            display: flex;
+        }
+        
+        .dashboard-header {
+            margin-top: 60px;
+        }
+        
+        .summary-cards {
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        }
+    }
+    
+    @media (max-width: 767.98px) {
+        .summary-cards {
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+        
+        .actions-grid {
+            grid-template-columns: 1fr 1fr;
+        }
+        
+        .alert {
+            flex-direction: column;
+            text-align: center;
+            align-items: center;
+        }
+        
+        .alert .btn {
+            margin-left: 0;
+            margin-top: 1rem;
+            width: 100%;
+        }
+        
+        .card-value {
+            font-size: 1.5rem;
+        }
+    }
+    
+    @media (max-width: 575.98px) {
+        .summary-cards {
+            grid-template-columns: 1fr;
+        }
+        
+        .actions-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .main-content {
+            padding: 1rem;
+        }
+        
+        .dashboard-title {
+            font-size: 1.5rem;
+        }
+        
+        .card {
+            padding: 1.25rem;
+        }
+        
+        /* Melhorar visibilidade da tabela em celulares */
+        .data-table {
+            display: block;
+            width: 100%;
+        }
+        
+        .data-table thead {
+            display: none;
+        }
+        
+        .data-table tbody {
+            display: block;
+            width: 100%;
+        }
+        
+        .data-table tr {
+            display: block;
+            margin-bottom: 1rem;
+            border: 1px solid var(--light-gray);
+            border-radius: var(--border-radius);
+            padding: 0.75rem;
+        }
+        
+        .data-table td {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--light-gray);
+            padding: 0.75rem 0;
+        }
+        
+        .data-table td:last-child {
+            border-bottom: none;
+        }
+        
+        .data-table td::before {
+            content: attr(data-label);
+            font-weight: 600;
+            margin-right: 1rem;
+            width: 40%;
+            color: var(--secondary-color);
+        }
+    }
+    </style>
 </head>
 <body>
     <div class="dashboard-container">
-        <!-- Incluir sidebar/menu lateral -->
-        <?php include_once '../components/sidebar-store.php'; ?>
+        <!-- Sidebar integrada -->
+        <!-- Sidebar Toggle Button (visível apenas em dispositivos móveis) -->
+        <div class="sidebar-toggle" id="sidebarToggle">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+        </div>
+        
+        <!-- Overlay para dispositivos móveis -->
+        <div class="overlay" id="overlay"></div>
+        
+        <!-- Sidebar -->
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <img src="../../assets/images/logo.png" alt="KlubeCash" class="sidebar-logo">
+            </div>
+            
+            <ul class="sidebar-nav">
+                <li>
+                    <a href="<?php echo STORE_DASHBOARD_URL; ?>" class="sidebar-nav-item <?php echo ($activeMenu == 'dashboard') ? 'active' : ''; ?>">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                            <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                        </svg>
+                        Dashboard
+                    </a>
+                </li>
+                <li>
+                    <a href="<?php echo STORE_REGISTER_TRANSACTION_URL; ?>" class="sidebar-nav-item <?php echo ($activeMenu == 'register-transaction') ? 'active' : ''; ?>">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        Registrar Venda
+                    </a>
+                </li>
+                <li>
+                    <a href="<?php echo STORE_BATCH_UPLOAD_URL; ?>" class="sidebar-nav-item <?php echo ($activeMenu == 'batch-upload') ? 'active' : ''; ?>">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                        Upload em Lote
+                    </a>
+                </li>
+                <li>
+                    <a href="<?php echo STORE_PENDING_TRANSACTIONS_URL; ?>" class="sidebar-nav-item <?php echo ($activeMenu == 'pending-commissions') ? 'active' : ''; ?>">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                        Comissões Pendentes
+                    </a>
+                </li>
+                <li>
+                    <a href="<?php echo STORE_PAYMENT_HISTORY_URL; ?>" class="sidebar-nav-item <?php echo ($activeMenu == 'payment-history') ? 'active' : ''; ?>">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+                            <line x1="1" y1="10" x2="23" y2="10"></line>
+                        </svg>
+                        Histórico de Pagamentos
+                    </a>
+                </li>
+                <li>
+                    <a href="<?php echo STORE_PAYMENT_URL; ?>" class="sidebar-nav-item <?php echo ($activeMenu == 'payment') ? 'active' : ''; ?>">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="12" y1="1" x2="12" y2="23"></line>
+                            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                        </svg>
+                        Realizar Pagamento
+                    </a>
+                </li>
+                <li>
+                    <a href="<?php echo SITE_URL; ?>/stores/perfil" class="sidebar-nav-item <?php echo ($activeMenu == 'profile') ? 'active' : ''; ?>">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="12" cy="7" r="4"></circle>
+                        </svg>
+                        Meu Perfil
+                    </a>
+                </li>
+            </ul>
+            
+            <div class="sidebar-footer">
+                <a href="<?php echo SITE_URL; ?>/controllers/AuthController.php?action=logout" class="logout-btn">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                        <polyline points="16 17 21 12 16 7"></polyline>
+                        <line x1="21" y1="12" x2="9" y2="12"></line>
+                    </svg>
+                    Sair
+                </a>
+            </div>
+        </div>
         
         <div class="main-content" id="mainContent">
             <div class="dashboard-header">
@@ -354,6 +1197,7 @@ $activeMenu = 'dashboard';
                     </table>
                 </div>
             </div>
+            
             <!-- Adicionar novo card informativo sobre o fluxo de cashback -->
             <div class="info-card">
                 <h3>Como Funciona o Cashback no Klube Cash</h3>
@@ -388,10 +1232,8 @@ $activeMenu = 'dashboard';
                     </div>
                 </div>
             </div>
-            
         </div>
     </div>
-    
     
     <script>
         // Configuração do gráfico de vendas mensais
@@ -422,6 +1264,48 @@ $activeMenu = 'dashboard';
                     }
                 }
             }
+        });
+        
+        // Script para responsividade da Sidebar
+        document.addEventListener('DOMContentLoaded', function() {
+            // Elementos da DOM
+            const sidebarToggle = document.getElementById('sidebarToggle');
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('overlay');
+            const mainContent = document.getElementById('mainContent');
+            
+            // Evento para mostrar/ocultar a sidebar em dispositivos móveis
+            if (sidebarToggle) {
+                sidebarToggle.addEventListener('click', toggleSidebar);
+            }
+            
+            if (overlay) {
+                overlay.addEventListener('click', toggleSidebar);
+            }
+            
+            /**
+             * Alterna a visibilidade da sidebar em dispositivos móveis
+             */
+            function toggleSidebar() {
+                sidebar.classList.toggle('open');
+                overlay.classList.toggle('active');
+            }
+            
+            /**
+             * Verifica o tamanho da tela e ajusta a sidebar conforme necessário
+             */
+            function checkScreenSize() {
+                if (window.innerWidth > 768) {
+                    sidebar.classList.remove('open');
+                    overlay.classList.remove('active');
+                }
+            }
+            
+            // Verificar o tamanho da tela ao carregar e redimensionar
+            window.addEventListener('resize', checkScreenSize);
+            
+            // Inicializar
+            checkScreenSize();
         });
     </script>
 </body>
