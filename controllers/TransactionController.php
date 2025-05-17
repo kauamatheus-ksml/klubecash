@@ -1048,29 +1048,29 @@ class TransactionController {
                 return ['status' => false, 'message' => 'Loja não encontrada.'];
             }
             
-            // Consulta corrigida
+            // Construir consulta
             $query = "
             SELECT t.*, u.nome as cliente_nome, u.email as cliente_email
             FROM transacoes_cashback t
             JOIN usuarios u ON t.usuario_id = u.id
             WHERE t.loja_id = :loja_id AND t.status = :status
             ";
-            
+
             $params = [
             ':loja_id' => $storeId,
-            ':status' => TRANSACTION_PENDING
+            ':status' => TRANSACTION_PENDING  // Use a constante TRANSACTION_PENDING
             ];
 
-                // Remover a linha duplicada - NÃO adicionar novamente a condição de status
-                // Aplicar apenas outros filtros adicionais
-                if (!empty($filters)) {
-                    // Filtro por período
-                    if (isset($filters['data_inicio']) && !empty($filters['data_inicio'])) {
-                        $query .= " AND t.data_transacao >= :data_inicio";
-                        $params[':data_inicio'] = $filters['data_inicio'] . ' 00:00:00';
-                    }
-                    
-                    // Outros filtros continuam normalmente...
+            // Aplicar filtro de status corretamente
+            $query .= " AND t.status = :status";
+            $params[':status'] = TRANSACTION_PENDING; // Usar a constante em vez da string literal
+            
+            // Aplicar filtros
+            if (!empty($filters)) {
+                // Filtro por período
+                if (isset($filters['data_inicio']) && !empty($filters['data_inicio'])) {
+                    $query .= " AND t.data_transacao >= :data_inicio";
+                    $params[':data_inicio'] = $filters['data_inicio'] . ' 00:00:00';
                 }
                 
                 if (isset($filters['data_fim']) && !empty($filters['data_fim'])) {
