@@ -11,7 +11,7 @@ require_once '../../controllers/TransactionController.php';
 
 // Iniciar sessão
 session_start();
-
+echo "Loja ID: " . $storeId;
 // Verificar se o usuário está logado e é uma loja
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION['user_type'] !== 'loja') {
     // Redirecionar para a página de login com mensagem de erro
