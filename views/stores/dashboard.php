@@ -46,7 +46,9 @@ $storeId = $store['id'];
 $salesQuery = $db->prepare("
     SELECT COUNT(*) as total_vendas, 
            SUM(valor_total) as valor_total_vendas,
-           SUM(valor_cashback) as valor_total_cashback
+           SUM(valor_cashback) as valor_total_cashback,
+           SUM(valor_cliente) as valor_total_cliente,
+           SUM(valor_admin) as valor_total_admin
     FROM transacoes_cashback 
     WHERE loja_id = :loja_id
 ");
@@ -57,17 +59,32 @@ $salesStats = $salesQuery->fetch(PDO::FETCH_ASSOC);
 // 2. Comissões pendentes
 $pendingQuery = $db->prepare("
     SELECT COUNT(*) as total_pendentes, 
-           SUM(valor_cashback) as valor_pendente
+           SUM(valor_cashback) as valor_pendente,
+           SUM(valor_cliente) as valor_cliente_pendente,
+           COUNT(DISTINCT usuario_id) as clientes_afetados
     FROM transacoes_cashback 
     WHERE loja_id = :loja_id AND status = :status
 ");
+
+$paidQuery = $db->prepare("
+    SELECT COUNT(*) as total_pagas, 
+           SUM(valor_cashback) as valor_pago
+    FROM transacoes_cashback 
+    WHERE loja_id = :loja_id AND status = :status
+");
+$paidQuery->bindParam(':loja_id', $storeId);
+$status = 'aprovado';
+$paidQuery->bindParam(':status', $status);
+$paidQuery->execute();
+$paidStats = $paidQuery->fetch(PDO::FETCH_ASSOC);
+
 $pendingQuery->bindParam(':loja_id', $storeId);
 $status = 'pendente';
 $pendingQuery->bindParam(':status', $status);
 $pendingQuery->execute();
 $pendingStats = $pendingQuery->fetch(PDO::FETCH_ASSOC);
 
-// 3. Últimas transações
+// 4. Últimas transações
 $recentQuery = $db->prepare("
     SELECT t.*, u.nome as cliente_nome
     FROM transacoes_cashback t
@@ -80,7 +97,7 @@ $recentQuery->bindParam(':loja_id', $storeId);
 $recentQuery->execute();
 $recentTransactions = $recentQuery->fetchAll(PDO::FETCH_ASSOC);
 
-// 4. Estatísticas de vendas por mês (últimos 6 meses)
+// 5. Estatísticas de vendas por mês (últimos 6 meses)
 $monthlyQuery = $db->prepare("
     SELECT 
         DATE_FORMAT(data_transacao, '%Y-%m') as mes,
@@ -174,9 +191,9 @@ $activeMenu = 'dashboard';
                 
                 <div class="card">
                     <div class="card-content">
-                        <h3>Comissões Pendentes</h3>
+                        <h3>Comissões Pendentes (10%)</h3>
                         <div class="card-value">R$ <?php echo number_format($pendingStats['valor_pendente'], 2, ',', '.'); ?></div>
-                        <div class="card-period"><?php echo number_format($pendingStats['total_pendentes'], 0, ',', '.'); ?> transações aguardando</div>
+                        <div class="card-period"><?php echo number_format($pendingStats['total_pendentes'], 0, ',', '.'); ?> transações aguardando pagamento</div>
                     </div>
                     <div class="card-icon warning">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -189,9 +206,9 @@ $activeMenu = 'dashboard';
                 
                 <div class="card">
                     <div class="card-content">
-                        <h3>Total de Cashback</h3>
-                        <div class="card-value">R$ <?php echo number_format($salesStats['valor_total_cashback'], 2, ',', '.'); ?></div>
-                        <div class="card-period">Gerado para clientes</div>
+                        <h3>Cashback Gerado (5%)</h3>
+                        <div class="card-value">R$ <?php echo number_format($salesStats['valor_total_cliente'], 2, ',', '.'); ?></div>
+                        <div class="card-period">Destinado aos clientes</div>
                     </div>
                     <div class="card-icon info">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -211,11 +228,47 @@ $activeMenu = 'dashboard';
                 </svg>
                 <div>
                     <h4>Comissões Pendentes</h4>
-                    <p>Você tem <?php echo $pendingStats['total_pendentes']; ?> transações com pagamento pendente. Realize o pagamento para liberar o cashback aos clientes.</p>
+                    <p>Você tem <?php echo $pendingStats['total_pendentes']; ?> transações com pagamento pendente, totalizando R$ <?php echo number_format($pendingStats['valor_pendente'], 2, ',', '.'); ?>. 
+                    Esta pendência afeta <?php echo $pendingStats['clientes_afetados']; ?> clientes que aguardam a liberação de R$ <?php echo number_format($pendingStats['valor_cliente_pendente'], 2, ',', '.'); ?> em cashback.</p>
                 </div>
-                <a href="<?php echo STORE_PENDING_TRANSACTIONS_URL; ?>" class="btn btn-warning">Ver Pendências</a>
+                <a href="<?php echo STORE_PENDING_TRANSACTIONS_URL; ?>" class="btn btn-warning">Pagar Comissões</a>
             </div>
             <?php endif; ?>
+
+            <!-- Adicionar novo card informativo sobre o fluxo de cashback -->
+            <div class="info-card">
+                <h3>Como Funciona o Cashback no Klube Cash</h3>
+                <div class="info-content">
+                    <div class="info-item">
+                        <span class="info-number">1</span>
+                        <div>
+                            <h4>Registro da Venda</h4>
+                            <p>Você registra suas vendas no sistema com o valor total e o cliente</p>
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-number">2</span>
+                        <div>
+                            <h4>Pagamento da Comissão</h4>
+                            <p>Você paga a comissão de 10% sobre o valor da venda</p>
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-number">3</span>
+                        <div>
+                            <h4>Distribuição do Cashback</h4>
+                            <p>5% vai para o cliente como cashback e 5% fica com a plataforma</p>
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-number">4</span>
+                        <div>
+                            <h4>Liberação para o Cliente</h4>
+                            <p>O cashback é liberado para o cliente após a aprovação do pagamento</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
             
             <!-- Links rápidos para ações -->
             <div class="quick-actions">
