@@ -75,21 +75,7 @@ if ($result['status'] && isset($result['data']['totais'])) {
 
 
 ?>
-<?php
-// Verificar se há um parâmetro de sucesso na URL
-if (isset($_GET['payment_success']) && $_GET['payment_success'] == 1) {
-    echo '<div class="alert success">';
-    echo '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">';
-    echo '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>';
-    echo '<polyline points="22 4 12 14.01 9 11.01"></polyline>';
-    echo '</svg>';
-    echo '<div>';
-    echo '<h4>Pagamento registrado com sucesso!</h4>';
-    echo '<p>Seu pagamento foi registrado e está aguardando aprovação do administrador.</p>';
-    echo '</div>';
-    echo '</div>';
-}
-?>
+
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -177,7 +163,6 @@ if (isset($_GET['payment_success']) && $_GET['payment_success'] == 1) {
                 </div>
                 
                 <?php if ($result['status'] && count($result['data']['transacoes']) > 0): ?>
-                    
                     <form id="paymentForm" method="POST" action="<?php echo STORE_PAYMENT_URL; ?>">
                         <div class="table-responsive">
                             <table class="table">
@@ -199,8 +184,8 @@ if (isset($_GET['payment_success']) && $_GET['payment_success'] == 1) {
                                         <tr>
                                             <td>
                                                 <input type="checkbox" name="transacoes[]" value="<?php echo $transaction['id']; ?>" 
-                                                    class="transaction-checkbox" 
-                                                    data-value="<?php echo $transaction['valor_cashback']; ?>">
+                                                       class="transaction-checkbox" 
+                                                       data-value="<?php echo $transaction['valor_cashback']; ?>">
                                             </td>
                                             <td><?php echo htmlspecialchars($transaction['codigo_transacao'] ?? 'N/A'); ?></td>
                                             <td><?php echo htmlspecialchars($transaction['cliente_nome']); ?></td>
@@ -213,6 +198,7 @@ if (isset($_GET['payment_success']) && $_GET['payment_success'] == 1) {
                                 </tbody>
                             </table>
                         </div>
+                        
                         <input type="hidden" name="loja_id" value="<?php echo $storeId; ?>">
                         <input type="hidden" name="action" value="payment_form">
                         
@@ -227,7 +213,6 @@ if (isset($_GET['payment_success']) && $_GET['payment_success'] == 1) {
                                     <span class="value" id="totalValue">R$ 0,00</span>
                                 </div>
                             </div>
-                            <button type="submit" id="paySelectedBtn" class="btn btn-primary" disabled>Pagar Selecionadas</button>
                         </div>
                     </form>
                     
@@ -291,13 +276,16 @@ if (isset($_GET['payment_success']) && $_GET['payment_success'] == 1) {
             const paymentForm = document.getElementById('paymentForm');
             const paymentSummary = document.getElementById('paymentSummary');
             
+            // Função para formatar valores como moeda
             function formatCurrency(value) {
-                return 'R$ ' + value.toLocaleString('pt-BR', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
+                return value.toLocaleString('pt-BR', {
+                    style: 'currency',
+                    currency: 'BRL',
+                    minimumFractionDigits: 2
                 });
             }
             
+            // Função para atualizar resumo de pagamento
             function updatePaymentSummary() {
                 const selectedCheckboxes = document.querySelectorAll('.transaction-checkbox:checked');
                 const selectedCount = selectedCheckboxes.length;
@@ -310,14 +298,18 @@ if (isset($_GET['payment_success']) && $_GET['payment_success'] == 1) {
                 selectedCountElement.textContent = selectedCount;
                 totalValueElement.textContent = formatCurrency(totalValue);
                 
-                // Habilitar/desabilitar botão
+                // Habilitar/desabilitar botão de pagamento
                 paySelectedBtn.disabled = selectedCount === 0;
                 
-                // Mostrar/esconder resumo
-                paymentSummary.style.display = selectedCount > 0 ? 'block' : 'none';
+                // Mostrar/esconder resumo de pagamento
+                if (selectedCount > 0) {
+                    paymentSummary.style.display = 'block';
+                } else {
+                    paymentSummary.style.display = 'none';
+                }
             }
             
-            // Select all
+            // Evento para selecionar/deselecionar todos
             if (selectAllCheckbox) {
                 selectAllCheckbox.addEventListener('change', function() {
                     transactionCheckboxes.forEach(checkbox => {
@@ -327,34 +319,29 @@ if (isset($_GET['payment_success']) && $_GET['payment_success'] == 1) {
                 });
             }
             
-            // Individual checkboxes
+            // Eventos para checkboxes individuais
             transactionCheckboxes.forEach(checkbox => {
                 checkbox.addEventListener('change', function() {
+                    // Verificar se todos estão selecionados
                     const allChecked = Array.from(transactionCheckboxes).every(cb => cb.checked);
                     if (selectAllCheckbox) {
                         selectAllCheckbox.checked = allChecked;
                     }
+                    
                     updatePaymentSummary();
                 });
             });
             
-            // Submit form - CORRIGIR
-            if (paymentForm) {
-                paymentForm.addEventListener('submit', function(e) {
-                    const selectedCount = document.querySelectorAll('.transaction-checkbox:checked').length;
-                    
-                    if (selectedCount === 0) {
-                        e.preventDefault();
-                        alert('Selecione pelo menos uma transação para pagar.');
-                        return false;
+            // Evento para botão de pagamento
+            if (paySelectedBtn) {
+                paySelectedBtn.addEventListener('click', function() {
+                    if (document.querySelectorAll('.transaction-checkbox:checked').length > 0) {
+                        paymentForm.submit();
                     }
-                    
-                    // Permitir envio
-                    return true;
                 });
             }
             
-            // Inicializar
+            // Inicializar resumo
             updatePaymentSummary();
         });
     </script>
