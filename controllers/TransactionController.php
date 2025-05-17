@@ -450,109 +450,91 @@ class TransactionController {
      */
     public static function registerPayment($data) {
         try {
-            // Log para verificar o input
-            error_log('Iniciando processamento de pagamento: ' . print_r($data, true));
-            error_log('Dados de pagamento recebidos: ' . print_r($data, true));
-            
-            // Validações básicas
-            if (!isset($data['loja_id']) || !isset($data['transacoes']) || !isset($data['valor_total'])) {
-                return ['status' => false, 'message' => 'Dados incompletos para registro de pagamento'];
+            // Validar dados obrigatórios
+            $requiredFields = ['loja_id', 'transacoes', 'valor_total', 'metodo_pagamento'];
+            foreach ($requiredFields as $field) {
+                if (!isset($data[$field]) || empty($data[$field])) {
+                    return ['status' => false, 'message' => 'Dados incompletos: ' . $field];
+                }
             }
             
             $db = Database::getConnection();
             
+            // Se transacoes é string, converter para array
+            if (is_string($data['transacoes'])) {
+                $transactionIds = explode(',', $data['transacoes']);
+            } else {
+                $transactionIds = $data['transacoes'];
+            }
+            
+            // Validar transações
+            $placeholders = implode(',', array_fill(0, count($transactionIds), '?'));
+            $validationQuery = "
+                SELECT id FROM transacoes_cashback 
+                WHERE id IN ($placeholders) AND loja_id = ? AND status = 'pendente'
+            ";
+            
+            $stmt = $db->prepare($validationQuery);
+            $params = array_merge($transactionIds, [$data['loja_id']]);
+            $stmt->execute($params);
+            
+            if ($stmt->rowCount() !== count($transactionIds)) {
+                return ['status' => false, 'message' => 'Transações inválidas para pagamento.'];
+            }
+            
             // Iniciar transação
             $db->beginTransaction();
             
-            try {
-                // 1. Inserir o registro de pagamento
-                $stmtPayment = $db->prepare("
-                    INSERT INTO pagamentos_comissao (
-                        loja_id, valor_total, metodo_pagamento, numero_referencia, 
-                        comprovante, observacao, data_registro, status
-                    ) VALUES (
-                        :loja_id, :valor_total, :metodo_pagamento, :numero_referencia,
-                        :comprovante, :observacao, NOW(), 'pendente'
-                    )
+            // Registrar pagamento
+            $paymentStmt = $db->prepare("
+                INSERT INTO pagamentos_comissao (
+                    loja_id, valor_total, metodo_pagamento, 
+                    numero_referencia, comprovante, observacao, status
+                ) VALUES (?, ?, ?, ?, ?, ?, 'pendente')
+            ");
+            
+            $paymentStmt->execute([
+                $data['loja_id'],
+                $data['valor_total'],
+                $data['metodo_pagamento'],
+                $data['numero_referencia'] ?? '',
+                $data['comprovante'] ?? '',
+                $data['observacao'] ?? ''
+            ]);
+            
+            $paymentId = $db->lastInsertId();
+            
+            // Associar transações ao pagamento
+            foreach ($transactionIds as $transactionId) {
+                $assocStmt = $db->prepare("
+                    INSERT INTO pagamentos_transacoes (pagamento_id, transacao_id) 
+                    VALUES (?, ?)
                 ");
-                
-                $stmtPayment->bindParam(':loja_id', $data['loja_id'], PDO::PARAM_INT);
-                $stmtPayment->bindParam(':valor_total', $data['valor_total'], PDO::PARAM_STR);
-                $stmtPayment->bindParam(':metodo_pagamento', $data['metodo_pagamento'], PDO::PARAM_STR);
-                $stmtPayment->bindParam(':numero_referencia', $data['numero_referencia'], PDO::PARAM_STR);
-                $stmtPayment->bindParam(':comprovante', $data['comprovante'], PDO::PARAM_STR);
-                $stmtPayment->bindParam(':observacao', $data['observacao'], PDO::PARAM_STR);
-                
-                $resultPayment = $stmtPayment->execute();
-                
-                if (!$resultPayment) {
-                    throw new Exception("Erro ao inserir o pagamento: " . implode(", ", $stmtPayment->errorInfo()));
-                }
-                
-                $paymentId = $db->lastInsertId();
-                
-                // 2. Processar as transações
-                $transactionIds = is_array($data['transacoes']) ? $data['transacoes'] : explode(',', $data['transacoes']);
-                
-                if (empty($transactionIds)) {
-                    throw new Exception("Nenhuma transação selecionada para o pagamento");
-                }
-                
-                // Associar transações ao pagamento
-                $stmtPT = $db->prepare("
-                    INSERT INTO pagamentos_transacoes (pagamento_id, transacao_id)
-                    VALUES (:pagamento_id, :transacao_id)
-                ");
-                
-                foreach ($transactionIds as $transId) {
-                    $stmtPT->bindParam(':pagamento_id', $paymentId, PDO::PARAM_INT);
-                    $stmtPT->bindParam(':transacao_id', $transId, PDO::PARAM_INT);
-                    
-                    $resultPT = $stmtPT->execute();
-                    if (!$resultPT) {
-                        throw new Exception("Erro ao associar transação #$transId ao pagamento");
-                    }
-                }
-                
-                // 3. Atualizar o status das transações para 'pagamento_pendente'
-                $placeholders = implode(',', array_fill(0, count($transactionIds), '?'));
-                $stmtUpdateT = $db->prepare("
-                    UPDATE transacoes_cashback 
-                    SET status = 'pagamento_pendente' 
-                    WHERE id IN ($placeholders)
-                ");
-                
-                // Adicionar os IDs como parâmetros
-                for ($i = 0; $i < count($transactionIds); $i++) {
-                    $stmtUpdateT->bindValue($i+1, $transactionIds[$i], PDO::PARAM_INT);
-                }
-                
-                $resultUpdateT = $stmtUpdateT->execute();
-                if (!$resultUpdateT) {
-                    throw new Exception("Erro ao atualizar status das transações: " . implode(", ", $stmtUpdateT->errorInfo()));
-                }
-                
-                // Confirmar todas as alterações
-                $db->commit();
-                
-                return [
-                    'status' => true,
-                    'message' => 'Pagamento registrado com sucesso! Aguardando aprovação.',
-                    'data' => [
-                        'payment_id' => $paymentId,
-                        'transactions' => count($transactionIds)
-                    ]
-                ];
-                
-            } catch (Exception $e) {
-                // Reverter todas as alterações em caso de erro
-                $db->rollBack();
-                error_log('Erro na transação de pagamento: ' . $e->getMessage());
-                return ['status' => false, 'message' => 'Erro ao processar pagamento: ' . $e->getMessage()];
+                $assocStmt->execute([$paymentId, $transactionId]);
             }
+            
+            // Atualizar status das transações
+            $updateStmt = $db->prepare("
+                UPDATE transacoes_cashback 
+                SET status = 'pagamento_pendente' 
+                WHERE id IN ($placeholders)
+            ");
+            $updateStmt->execute($transactionIds);
+            
+            $db->commit();
+            
+            return [
+                'status' => true,
+                'message' => 'Pagamento registrado com sucesso!',
+                'data' => ['payment_id' => $paymentId]
+            ];
+            
         } catch (Exception $e) {
-            error_log('Erro ao registrar pagamento: ' . $e->getMessage());
-            return ['status' => false, 'message' => 'Erro no sistema: ' . $e->getMessage()];
+            if (isset($db) && $db->inTransaction()) {
+                $db->rollBack();
+            }
+            error_log('Erro registerPayment: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro ao registrar pagamento: ' . $e->getMessage()];
         }
     }
     
