@@ -109,14 +109,15 @@ if (!empty($filters['data_fim'])) {
 
 $query .= " ORDER BY p.data_registro DESC";
 
-// Contagem para paginação
-$countQuery = str_replace("p.*, l.nome_fantasia, l.email as loja_email, (SELECT COUNT(*) FROM pagamentos_transacoes WHERE pagamento_id = p.id) as total_transacoes", "COUNT(*) as total", $query);
+// Contagem para paginação - CORRIGIR
+$countQuery = preg_replace('/SELECT p\..*?FROM/', 'SELECT COUNT(*) as total FROM', $query);
 $countStmt = $db->prepare($countQuery);
 foreach ($params as $param => $value) {
     $countStmt->bindValue($param, $value);
 }
 $countStmt->execute();
-$totalCount = $countStmt->fetch(PDO::FETCH_ASSOC)['total'];
+$result = $countStmt->fetch(PDO::FETCH_ASSOC);
+$totalCount = $result ? $result['total'] : 0; // LINHA 119 - CORRIGIDA
 
 // Paginação
 $perPage = ITEMS_PER_PAGE;
