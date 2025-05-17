@@ -1018,9 +1018,18 @@ class TransactionController {
                 return ['status' => false, 'message' => 'Usuário não autenticado.'];
             }
             
-            // Apenas a loja dona das transações ou admin podem acessar
-            if (AuthController::isStore() && AuthController::getCurrentUserId() != $storeId) {
-                return ['status' => false, 'message' => 'Acesso não autorizado.'];
+            // Código corrigido
+            if (AuthController::isStore()) {
+                $db = Database::getConnection();
+                $storeQuery = $db->prepare("SELECT id FROM lojas WHERE usuario_id = :usuario_id AND id = :store_id");
+                $userId = AuthController::getCurrentUserId();
+                $storeQuery->bindParam(':usuario_id', $userId);
+                $storeQuery->bindParam(':store_id', $storeId);
+                $storeQuery->execute();
+                
+                if ($storeQuery->rowCount() == 0) {
+                    return ['status' => false, 'message' => 'Acesso não autorizado.'];
+                }
             }
             
             $db = Database::getConnection();
