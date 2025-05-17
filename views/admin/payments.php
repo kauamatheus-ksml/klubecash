@@ -1,18 +1,4 @@
 <?php
-// ADICIONAR LOGO APÓS session_start() em payment.php
-
-// Habilitar logs de erro
-ini_set('display_errors', 1);
-ini_set('log_errors', 1);
-error_reporting(E_ALL);
-
-// Log de debug
-error_log("payment.php - Início da execução. Method: " . $_SERVER['REQUEST_METHOD']);
-if ($_POST) {
-    error_log("payment.php - POST data: " . print_r($_POST, true));
-}
-
-
 // views/admin/payments.php
 // Definir o menu ativo na sidebar
 $activeMenu = 'pagamentos';
@@ -25,6 +11,18 @@ require_once '../../controllers/TransactionController.php';
 
 // Iniciar sessão
 session_start();
+
+// ADIÇÃO SOLICITADA: Habilitar logs de erro e debug inicial
+ini_set('display_errors', 1); // Mostrar erros (útil para desenvolvimento)
+ini_set('log_errors', 1);     // Habilitar log de erros
+error_reporting(E_ALL);     // Reportar todos os tipos de erros
+
+// Log de debug inicial para payments.php
+error_log("payments.php - Início da execução. Method: " . $_SERVER['REQUEST_METHOD']);
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $_POST) { // Adicionada verificação se POST não está vazio
+    error_log("payments.php - POST data: " . print_r($_POST, true));
+}
+// FIM DA ADIÇÃO SOLICITADA
 
 // Verificar se o usuário está logado e é administrador
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION['user_type'] !== 'admin') {
@@ -107,33 +105,52 @@ if (!empty($filters['data_fim'])) {
     $params[':data_fim'] = $filters['data_fim'] . ' 23:59:59';
 }
 
+// Salvar a parte principal da query antes de adicionar ORDER BY para o count
+$baseQueryForCount = $query; 
+
 $query .= " ORDER BY p.data_registro DESC";
 
-// Contagem para paginação - CORRIGIR
-$countQuery = preg_replace('/SELECT p\..*?FROM/', 'SELECT COUNT(*) as total FROM', $query);
+// Contagem para paginação - CORRIGIDO CONFORME SOLICITAÇÃO
+// Remove a cláusula ORDER BY da query base para a contagem, se existir.
+$baseQueryWithoutOrderBy = preg_replace('/\sORDER BY\s.*$/i', '', $baseQueryForCount);
+$countQuery = preg_replace('/SELECT p\.\*.*?FROM/i', 'SELECT COUNT(DISTINCT p.id) as total FROM', $baseQueryWithoutOrderBy); // Usar DISTINCT p.id se houver joins que possam duplicar p
+
 $countStmt = $db->prepare($countQuery);
-foreach ($params as $param => $value) {
+// Para a query de contagem, precisamos apenas dos parâmetros de filtro (WHERE clause)
+$countParams = [];
+if (!empty($filters['status'])) {
+    $countParams[':status'] = $filters['status'];
+}
+if (!empty($filters['data_inicio'])) {
+    $countParams[':data_inicio'] = $filters['data_inicio'] . ' 00:00:00';
+}
+if (!empty($filters['data_fim'])) {
+    $countParams[':data_fim'] = $filters['data_fim'] . ' 23:59:59';
+}
+
+foreach ($countParams as $param => $value) {
     $countStmt->bindValue($param, $value);
 }
 $countStmt->execute();
-$result = $countStmt->fetch(PDO::FETCH_ASSOC);
-$totalCount = $result ? $result['total'] : 0; // LINHA 119 - CORRIGIDA
+$resultCount = $countStmt->fetch(PDO::FETCH_ASSOC);
+$totalCount = $resultCount ? $resultCount['total'] : 0; // CORREÇÃO APLICADA AQUI (antiga linha 119)
 
 // Paginação
-$perPage = ITEMS_PER_PAGE;
-$totalPages = ceil($totalCount / $perPage);
-$page = max(1, min($page, $totalPages));
+$perPage = defined('ITEMS_PER_PAGE') ? ITEMS_PER_PAGE : 10; // Usar constante ou valor padrão
+$totalPages = ($totalCount > 0) ? ceil($totalCount / $perPage) : 1; // Evitar divisão por zero e garantir pelo menos 1 página
+$page = max(1, min($page, $totalPages)); // Garantir que a página esteja dentro dos limites
 $offset = ($page - 1) * $perPage;
 
 $query .= " LIMIT :offset, :limit";
+// Adicionar parâmetros de paginação ao array $params original usado para a query principal
 $params[':offset'] = $offset;
 $params[':limit'] = $perPage;
 
-// Executar consulta
+// Executar consulta principal
 $stmt = $db->prepare($query);
 foreach ($params as $param => $value) {
     if ($param == ':offset' || $param == ':limit') {
-        $stmt->bindValue($param, $value, PDO::PARAM_INT);
+        $stmt->bindValue($param, (int)$value, PDO::PARAM_INT); // Garantir que offset e limit sejam inteiros
     } else {
         $stmt->bindValue($param, $value);
     }
@@ -153,6 +170,9 @@ $statsQuery = "
         COUNT(CASE WHEN status = 'rejeitado' THEN 1 END) as count_rejeitado
     FROM pagamentos_comissao
 ";
+// Aplicar filtros às estatísticas também, se necessário (opcional, depende do requisito)
+// Se for aplicar filtros, a query de estatísticas precisaria ser construída dinamicamente como a query principal.
+// Por ora, as estatísticas são globais.
 $statsStmt = $db->query($statsQuery);
 $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
 ?>
@@ -322,13 +342,11 @@ $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
     
     <div class="main-content" id="mainContent">
         <div class="dashboard-wrapper">
-            <!-- Cabeçalho -->
             <div class="dashboard-header">
                 <h1>Gerenciar Pagamentos</h1>
                 <p class="subtitle">Aprovar ou rejeitar pagamentos de comissões das lojas</p>
             </div>
             
-            <!-- Alertas -->
             <?php if (!empty($success)): ?>
                 <div class="alert success">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -350,7 +368,6 @@ $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
                 </div>
             <?php endif; ?>
             
-            <!-- Estatísticas -->
             <div class="stats-container">
                 <div class="stat-card">
                     <div class="stat-card-title">Total de Pagamentos</div>
@@ -370,7 +387,6 @@ $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
                 </div>
             </div>
             
-            <!-- Filtros -->
             <div class="filter-container">
                 <form method="GET" action="" class="filter-form">
                     <div class="form-group">
@@ -397,7 +413,6 @@ $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
                 </form>
             </div>
             
-            <!-- Lista de Pagamentos -->
             <div class="card">
                 <div class="card-header">
                     <div class="card-title">Lista de Pagamentos</div>
@@ -456,7 +471,6 @@ $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
                         </table>
                     </div>
                     
-                    <!-- Paginação -->
                     <?php if ($totalPages > 1): ?>
                         <div class="pagination">
                             <div class="pagination-info">
@@ -500,7 +514,6 @@ $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
         </div>
     </div>
     
-    <!-- Modal de Detalhes -->
     <div id="detailsModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -513,7 +526,6 @@ $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
         </div>
     </div>
     
-    <!-- Modal de Aprovação -->
     <div id="approveModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -535,7 +547,6 @@ $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
         </div>
     </div>
     
-    <!-- Modal de Rejeição -->
     <div id="rejectModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -557,7 +568,6 @@ $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
         </div>
     </div>
     
-    <!-- Modal de Comprovante -->
     <div id="receiptModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -631,7 +641,8 @@ $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
                     <p><strong>Método:</strong> ${payment.metodo_pagamento}</p>
                     <p><strong>Data:</strong> ${new Date(payment.data_registro).toLocaleDateString('pt-BR')}</p>
                     ${payment.numero_referencia ? `<p><strong>Referência:</strong> ${payment.numero_referencia}</p>` : ''}
-                    ${payment.observacao ? `<p><strong>Observação:</strong> ${payment.observacao}</p>` : ''}
+                    ${payment.observacao ? `<p><strong>Observação (Loja):</strong> ${payment.observacao}</p>` : ''}
+                    ${payment.observacao_admin ? `<p><strong>Observação (Admin):</strong> ${payment.observacao_admin}</p>` : ''}
                 </div>
                 
                 <div>
@@ -641,9 +652,9 @@ $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
                             <thead>
                                 <tr>
                                     <th>Cliente</th>
-                                    <th>Data</th>
-                                    <th>Valor</th>
-                                    <th>Cashback</th>
+                                    <th>Data Trans.</th>
+                                    <th>Valor Compra</th>
+                                    <th>Cashback Cliente</th>
                                 </tr>
                             </thead>
                             <tbody>
