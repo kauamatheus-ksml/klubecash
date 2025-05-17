@@ -1055,8 +1055,12 @@ class TransactionController {
             
             $params = [
                 ':loja_id' => $storeId,
-                ':status' => TRANSACTION_PENDING
+                ':status' => 'pendente'  // Ou TRANSACTION_PENDING se for uma constante
             ];
+            
+            // Verifica se a consulta filtra exclusivamente pelo status 'pendente'
+            // Adicione esta verificação em algum lugar da consulta SQL:
+            $query .= " AND t.status = :status";
             
             // Aplicar filtros
             if (!empty($filters)) {

@@ -26,6 +26,7 @@ define('DEFAULT_CASHBACK_STORE', 1.00);  // 1% para a loja
 define('TRANSACTION_PENDING', 'pendente');
 define('TRANSACTION_APPROVED', 'aprovado');
 define('TRANSACTION_CANCELED', 'cancelado');
+define('TRANSACTION_PAYMENT_PENDING', 'pagamento_pendente');
 
 // Status de usuário
 define('USER_ACTIVE', 'ativo');

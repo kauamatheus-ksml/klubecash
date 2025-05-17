@@ -70,8 +70,26 @@ if ($result['status'] && isset($result['data']['totais'])) {
     $totalValorVendas = $result['data']['totais']['total_valor_compras'];
     $totalValorComissoes = $result['data']['totais']['total_valor_comissoes'];
 }
-?>
 
+
+
+
+?>
+<?php
+// Verificar se há um parâmetro de sucesso na URL
+if (isset($_GET['payment_success']) && $_GET['payment_success'] == 1) {
+    echo '<div class="alert success">';
+    echo '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">';
+    echo '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>';
+    echo '<polyline points="22 4 12 14.01 9 11.01"></polyline>';
+    echo '</svg>';
+    echo '<div>';
+    echo '<h4>Pagamento registrado com sucesso!</h4>';
+    echo '<p>Seu pagamento foi registrado e está aguardando aprovação do administrador.</p>';
+    echo '</div>';
+    echo '</div>';
+}
+?>
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>

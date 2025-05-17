@@ -154,8 +154,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             
             if ($result['status']) {
                 $success = true;
-            } else {
-                $error = $result['message'];
+                // Redirecionar com parâmetro de sucesso
+                header('Location: ' . STORE_PENDING_TRANSACTIONS_URL . '?payment_success=1');
+                exit;
             }
         }
     }
