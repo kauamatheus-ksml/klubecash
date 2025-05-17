@@ -177,6 +177,7 @@ if (isset($_GET['payment_success']) && $_GET['payment_success'] == 1) {
                 </div>
                 
                 <?php if ($result['status'] && count($result['data']['transacoes']) > 0): ?>
+                    
                     <form id="paymentForm" method="POST" action="<?php echo STORE_PAYMENT_URL; ?>">
                         <div class="table-responsive">
                             <table class="table">
@@ -198,8 +199,8 @@ if (isset($_GET['payment_success']) && $_GET['payment_success'] == 1) {
                                         <tr>
                                             <td>
                                                 <input type="checkbox" name="transacoes[]" value="<?php echo $transaction['id']; ?>" 
-                                                       class="transaction-checkbox" 
-                                                       data-value="<?php echo $transaction['valor_cashback']; ?>">
+                                                    class="transaction-checkbox" 
+                                                    data-value="<?php echo $transaction['valor_cashback']; ?>">
                                             </td>
                                             <td><?php echo htmlspecialchars($transaction['codigo_transacao'] ?? 'N/A'); ?></td>
                                             <td><?php echo htmlspecialchars($transaction['cliente_nome']); ?></td>
@@ -212,7 +213,6 @@ if (isset($_GET['payment_success']) && $_GET['payment_success'] == 1) {
                                 </tbody>
                             </table>
                         </div>
-                        
                         <input type="hidden" name="loja_id" value="<?php echo $storeId; ?>">
                         <input type="hidden" name="action" value="payment_form">
                         
@@ -227,6 +227,7 @@ if (isset($_GET['payment_success']) && $_GET['payment_success'] == 1) {
                                     <span class="value" id="totalValue">R$ 0,00</span>
                                 </div>
                             </div>
+                            <button type="submit" id="paySelectedBtn" class="btn btn-primary" disabled>Pagar Selecionadas</button>
                         </div>
                     </form>
                     
@@ -290,16 +291,13 @@ if (isset($_GET['payment_success']) && $_GET['payment_success'] == 1) {
             const paymentForm = document.getElementById('paymentForm');
             const paymentSummary = document.getElementById('paymentSummary');
             
-            // Função para formatar valores como moeda
             function formatCurrency(value) {
-                return value.toLocaleString('pt-BR', {
-                    style: 'currency',
-                    currency: 'BRL',
-                    minimumFractionDigits: 2
+                return 'R$ ' + value.toLocaleString('pt-BR', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
                 });
             }
             
-            // Função para atualizar resumo de pagamento
             function updatePaymentSummary() {
                 const selectedCheckboxes = document.querySelectorAll('.transaction-checkbox:checked');
                 const selectedCount = selectedCheckboxes.length;
@@ -312,18 +310,14 @@ if (isset($_GET['payment_success']) && $_GET['payment_success'] == 1) {
                 selectedCountElement.textContent = selectedCount;
                 totalValueElement.textContent = formatCurrency(totalValue);
                 
-                // Habilitar/desabilitar botão de pagamento
+                // Habilitar/desabilitar botão
                 paySelectedBtn.disabled = selectedCount === 0;
                 
-                // Mostrar/esconder resumo de pagamento
-                if (selectedCount > 0) {
-                    paymentSummary.style.display = 'block';
-                } else {
-                    paymentSummary.style.display = 'none';
-                }
+                // Mostrar/esconder resumo
+                paymentSummary.style.display = selectedCount > 0 ? 'block' : 'none';
             }
             
-            // Evento para selecionar/deselecionar todos
+            // Select all
             if (selectAllCheckbox) {
                 selectAllCheckbox.addEventListener('change', function() {
                     transactionCheckboxes.forEach(checkbox => {
@@ -333,29 +327,34 @@ if (isset($_GET['payment_success']) && $_GET['payment_success'] == 1) {
                 });
             }
             
-            // Eventos para checkboxes individuais
+            // Individual checkboxes
             transactionCheckboxes.forEach(checkbox => {
                 checkbox.addEventListener('change', function() {
-                    // Verificar se todos estão selecionados
                     const allChecked = Array.from(transactionCheckboxes).every(cb => cb.checked);
                     if (selectAllCheckbox) {
                         selectAllCheckbox.checked = allChecked;
                     }
-                    
                     updatePaymentSummary();
                 });
             });
             
-            // Evento para botão de pagamento
-            if (paySelectedBtn) {
-                paySelectedBtn.addEventListener('click', function() {
-                    if (document.querySelectorAll('.transaction-checkbox:checked').length > 0) {
-                        paymentForm.submit();
+            // Submit form - CORRIGIR
+            if (paymentForm) {
+                paymentForm.addEventListener('submit', function(e) {
+                    const selectedCount = document.querySelectorAll('.transaction-checkbox:checked').length;
+                    
+                    if (selectedCount === 0) {
+                        e.preventDefault();
+                        alert('Selecione pelo menos uma transação para pagar.');
+                        return false;
                     }
+                    
+                    // Permitir envio
+                    return true;
                 });
             }
             
-            // Inicializar resumo
+            // Inicializar
             updatePaymentSummary();
         });
     </script>
