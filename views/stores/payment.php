@@ -329,7 +329,7 @@ $metodosPagamento = [
                             </div>
                             
                             <div class="form-actions">
-                                <button type="submit" name="submit_payment" class="btn btn-primary">Confirmar Pagamento</button>
+                            <button type="submit" name="submit_payment" value="1" class="btn btn-primary">Confirmar Pagamento</button>
                                 <a href="<?php echo STORE_PENDING_TRANSACTIONS_URL; ?>" class="btn btn-secondary">Cancelar</a>
                             </div>
                         </form>
