@@ -59,7 +59,9 @@ if (isset($_GET['valor_max']) && !empty($_GET['valor_max'])) {
 
 // Obter transações pendentes
 $result = TransactionController::getPendingTransactions($storeId, $filters, $page);
-
+echo "<pre>";
+print_r($result);
+echo "</pre>";
 // Calcular totais
 $totalTransacoes = 0;
 $totalValorVendas = 0;
