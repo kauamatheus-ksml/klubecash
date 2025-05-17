@@ -1055,15 +1055,11 @@ class TransactionController {
             JOIN usuarios u ON t.usuario_id = u.id
             WHERE t.loja_id = :loja_id AND t.status = :status
             ";
-
+    
             $params = [
             ':loja_id' => $storeId,
             ':status' => TRANSACTION_PENDING  // Use a constante TRANSACTION_PENDING
             ];
-
-            // Aplicar filtro de status corretamente
-            $query .= " AND t.status = :status";
-            $params[':status'] = TRANSACTION_PENDING; // Usar a constante em vez da string literal
             
             // Aplicar filtros
             if (!empty($filters)) {
