@@ -104,7 +104,421 @@ $activeMenu = 'register-transaction';
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
     
     <style>
-        
+        /* Variáveis e configurações globais */
+:root {
+    --primary-color: #FF7A00;
+    --primary-dark: #E06E00;
+    --primary-light: #FFF0E6;
+    --secondary-color: #2A3F54;
+    --success-color: #28A745;
+    --warning-color: #FFC107; 
+    --danger-color: #DC3545;
+    --info-color: #17A2B8;
+    --light-gray: #F8F9FA;
+    --medium-gray: #6C757D;
+    --dark-gray: #343A40;
+    --white: #FFFFFF;
+    --shadow-sm: 0 2px 8px rgba(0,0,0,0.04);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+    --shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
+    --border-radius: 12px;
+    --transition: all 0.3s ease;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #F5F7FA;
+    color: var(--dark-gray);
+    line-height: 1.5;
+    margin: 0;
+    padding: 0;
+}
+
+/* Layout do dashboard */
+.dashboard-container {
+    display: flex;
+    min-height: 100vh;
+}
+
+.main-content {
+    flex: 1;
+    padding: 1.5rem;
+    margin-left: 250px; /* Largura da sidebar */
+    transition: margin-left 0.3s ease;
+}
+
+/* Cabeçalho */
+.dashboard-header {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+}
+
+.dashboard-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--secondary-color);
+    margin-bottom: 0.5rem;
+}
+
+.welcome-user {
+    color: var(--medium-gray);
+    font-size: 1rem;
+}
+
+/* Alertas */
+.alert {
+    background-color: var(--white);
+    border-radius: var(--border-radius);
+    padding: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    box-shadow: var(--shadow-md);
+    margin-bottom: 2rem;
+    border-left: 4px solid;
+}
+
+.alert.success {
+    border-color: var(--success-color);
+}
+
+.alert.success svg {
+    color: var(--success-color);
+}
+
+.alert.error {
+    border-color: var(--danger-color);
+}
+
+.alert.error svg {
+    color: var(--danger-color);
+}
+
+.alert h4 {
+    margin: 0 0 0.35rem 0;
+    font-size: 1.1rem;
+    color: var(--dark-gray);
+}
+
+.alert p {
+    margin: 0;
+    color: var(--medium-gray);
+    font-size: 0.9rem;
+}
+
+.btn-success {
+    background-color: var(--success-color);
+    color: var(--white);
+    font-weight: 600;
+    padding: 8px 15px;
+    border-radius: 5px;
+    text-decoration: none;
+    transition: background-color 0.3s;
+    white-space: nowrap;
+}
+
+.btn-success:hover {
+    background-color: #218838;
+    transform: translateY(-2px);
+}
+
+/* Card de conteúdo */
+.content-card {
+    background-color: var(--white);
+    border-radius: var(--border-radius);
+    padding: 1.5rem;
+    box-shadow: var(--shadow-md);
+    margin-bottom: 2rem;
+}
+
+.form-wrapper {
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+/* Formulário */
+.form-row {
+    margin-bottom: 1.5rem;
+}
+
+.form-row.two-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: var(--secondary-color);
+}
+
+.form-group input, 
+.form-group textarea,
+.form-group select {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 1px solid #E1E5EA;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    transition: var(--transition);
+    background-color: var(--white);
+}
+
+.form-group input:focus, 
+.form-group textarea:focus,
+.form-group select:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(255, 122, 0, 0.1);
+    outline: none;
+}
+
+.form-group small {
+    display: block;
+    margin-top: 0.35rem;
+    color: var(--medium-gray);
+    font-size: 0.85rem;
+}
+
+/* Calculadora de cashback */
+.cashback-calculator {
+    background-color: var(--light-gray);
+    border-radius: var(--border-radius);
+    padding: 1.5rem;
+    margin: 1.5rem 0 2rem;
+}
+
+.cashback-calculator h3 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    color: var(--secondary-color);
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.cashback-details {
+    border: 1px solid #E1E5EA;
+    border-radius: 8px;
+    background-color: var(--white);
+    overflow: hidden;
+}
+
+.cashback-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #E1E5EA;
+}
+
+.cashback-item:last-child {
+    border-bottom: none;
+}
+
+.cashback-item.total {
+    background-color: #F5F7FA;
+    font-weight: 700;
+}
+
+.cashback-label {
+    color: var(--secondary-color);
+}
+
+.cashback-value {
+    font-weight: 600;
+}
+
+.cashback-note {
+    margin-top: 0.75rem;
+    font-size: 0.9rem;
+    color: var(--medium-gray);
+}
+
+/* Botões */
+.form-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 2rem;
+}
+
+.btn {
+    padding: 0.75rem 1.5rem;
+    border-radius: var(--border-radius);
+    font-size: 1rem;
+    font-weight: 600;
+    text-decoration: none;
+    text-align: center;
+    cursor: pointer;
+    transition: var(--transition);
+    border: none;
+}
+
+.btn-primary {
+    background-color: var(--primary-color);
+    color: var(--white);
+}
+
+.btn-primary:hover {
+    background-color: var(--primary-dark);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(255, 122, 0, 0.25);
+}
+
+.btn-secondary {
+    background-color: #E1E5EA;
+    color: var(--dark-gray);
+}
+
+.btn-secondary:hover {
+    background-color: #D1D5DB;
+    transform: translateY(-2px);
+}
+
+/* Seção de ajuda */
+.help-section {
+    background-color: var(--white);
+    border-radius: var(--border-radius);
+    padding: 1.5rem;
+    box-shadow: var(--shadow-md);
+    margin-bottom: 2rem;
+}
+
+.help-section h3 {
+    font-size: 1.25rem;
+    color: var(--secondary-color);
+    margin-top: 0;
+    margin-bottom: 1.25rem;
+    font-weight: 600;
+}
+
+.accordion {
+    border: 1px solid #E1E5EA;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.accordion-item {
+    border-bottom: 1px solid #E1E5EA;
+}
+
+.accordion-item:last-child {
+    border-bottom: none;
+}
+
+.accordion-header {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.25rem;
+    background-color: var(--white);
+    border: none;
+    text-align: left;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--secondary-color);
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.accordion-header:hover {
+    background-color: var(--light-gray);
+}
+
+.accordion-icon {
+    font-size: 1.5rem;
+    font-weight: 400;
+    transition: var(--transition);
+}
+
+.accordion-item.active .accordion-icon {
+    transform: rotate(45deg);
+}
+
+.accordion-content {
+    padding: 0 1.25rem;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+}
+
+.accordion-content p {
+    padding-bottom: 1.25rem;
+    margin: 0;
+    color: var(--medium-gray);
+}
+
+/* Responsividade */
+@media (max-width: 1199.98px) {
+    .form-row.two-columns {
+        gap: 1rem;
+    }
+}
+
+@media (max-width: 991.98px) {
+    .main-content {
+        margin-left: 0; /* Remove a margem quando a sidebar é ocultada */
+    }
+    
+    .dashboard-header {
+        margin-top: 60px;
+    }
+}
+
+@media (max-width: 767.98px) {
+    .form-row.two-columns {
+        grid-template-columns: 1fr;
+        gap: 0;
+    }
+    
+    .form-actions {
+        flex-direction: column;
+    }
+    
+    .form-actions .btn {
+        width: 100%;
+    }
+    
+    .alert {
+        flex-direction: column;
+        text-align: center;
+        align-items: center;
+    }
+    
+    .alert .btn {
+        margin-left: 0;
+        margin-top: 1rem;
+        width: 100%;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .main-content {
+        padding: 1rem;
+    }
+    
+    .dashboard-title {
+        font-size: 1.5rem;
+    }
+    
+    .content-card, 
+    .help-section {
+        padding: 1.25rem;
+    }
+    
+    .cashback-calculator {
+        padding: 1rem;
+    }
+    
+    .cashback-item {
+        padding: 0.75rem 1rem;
+    }
+}
     </style>
 </head>
 <body>
