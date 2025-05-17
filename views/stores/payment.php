@@ -89,73 +89,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             }
         }
     }
+// Após linha ~87, substitua toda a seção de processamento POST por:
 } else if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_payment'])) {
-    echo '<pre>DEBUG: ';
-    print_r($_POST);
-    echo '</pre>';
+    echo '<div style="background: #f0f0f0; padding: 20px; margin: 20px 0;">';
+    echo '<h3>DEBUG - Dados recebidos:</h3>';
+    echo '<pre>POST: ' . print_r($_POST, true) . '</pre>';
+    echo '<pre>FILES: ' . print_r($_FILES, true) . '</pre>';
 
-    // Processar o envio do formulário de pagamento
     // Validar campos obrigatórios
     if (!isset($_POST['transacoes']) || !isset($_POST['valor_total']) || !isset($_POST['metodo_pagamento'])) {
+        echo '<p style="color: red;">ERRO: Dados obrigatórios ausentes</p>';
         $error = 'Dados de pagamento incompletos. Tente novamente.';
     } else {
         $transactionIds = explode(',', $_POST['transacoes']);
-        $totalValue = floatval($_POST['valor_total']);
-        $metodoPagamento = $_POST['metodo_pagamento'];
-        $numeroReferencia = $_POST['numero_referencia'] ?? '';
-        $observacao = $_POST['observacao'] ?? '';
+        echo '<p>Transações: ' . print_r($transactionIds, true) . '</p>';
         
-        // Processar upload de comprovante, se houver
-        $comprovante = '';
-        if (isset($_FILES['comprovante']) && $_FILES['comprovante']['error'] === UPLOAD_ERR_OK) {
-            // Criar diretório de uploads se não existir
-            $uploadDir = ROOT_DIR . '/uploads/comprovantes';
-
-            if (!is_dir($uploadDir)) {
-                mkdir($uploadDir, 0755, true);
-            }
-            
-            // Gerar nome único para o arquivo
-            $fileName = 'comprovante_' . $storeId . '_' . date('YmdHis') . '_' . uniqid();
-            $result = FileUpload::processUpload($_FILES['comprovante'], $uploadDir, $fileName, ['jpg', 'jpeg', 'png', 'pdf']);
-            
-            if ($result['status']) {
-                $comprovante = $result['filename'];
-            } else {
-                $error = 'Erro ao fazer upload do comprovante: ' . $result['message'];
-            }
-        }
+        $paymentData = [
+            'loja_id' => $storeId,
+            'transacoes' => $transactionIds,
+            'valor_total' => floatval($_POST['valor_total']),
+            'metodo_pagamento' => $_POST['metodo_pagamento'],
+            'numero_referencia' => $_POST['numero_referencia'] ?? '',
+            'observacao' => $_POST['observacao'] ?? ''
+        ];
         
-        // Se não houver erro, registrar o pagamento
-        if (empty($error)) {
-            $paymentData = [
-                'loja_id' => $storeId,
-                'transacoes' => $transactionIds,
-                'valor_total' => $totalValue,
-                'metodo_pagamento' => $metodoPagamento,
-                'numero_referencia' => $numeroReferencia,
-                'comprovante' => $comprovante,
-                'observacao' => $observacao
-            ];
-            
-            // Log para depuração
-            error_log('Enviando dados para registerPayment: ' . print_r($paymentData, true));
-            
-            $result = TransactionController::registerPayment($paymentData);
-            
-            // Log do resultado
-            error_log('Resultado do registerPayment: ' . print_r($result, true));
-            
-            if ($result['status']) {
-                $success = true;
-                // Redirecionar com parâmetro de sucesso
-                header('Location: ' . STORE_PENDING_TRANSACTIONS_URL . '?payment_success=1');
-                exit;
-            } else {
-                $error = $result['message'];
-            }
+        echo '<p>Dados para enviar: ' . print_r($paymentData, true) . '</p>';
+        
+        $result = TransactionController::registerPayment($paymentData);
+        echo '<p>Resultado: ' . print_r($result, true) . '</p>';
+        
+        if ($result['status']) {
+            $success = true;
+        } else {
+            $error = $result['message'];
         }
     }
+    echo '</div>';
 } else {
     // Acesso direto à página - redirecionar para comissões pendentes
     header('Location: ' . STORE_PENDING_TRANSACTIONS_URL);
