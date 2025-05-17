@@ -30,6 +30,56 @@ class FileUpload {
         'log_errors' => true   // Registrar erros em log
     ];
     
+
+    /**
+    * Processa o upload de um arquivo
+    * 
+    * @param array $file Dados do arquivo ($_FILES['input_name'])
+    * @param string $uploadDir Diretório para salvar
+    * @param string $fileName Nome do arquivo base (sem extensão)
+    * @param array $allowedExtensions Extensões permitidas
+    * @return array Resultado do upload com status e mensagem
+    */
+    public static function processUpload($file, $uploadDir, $fileName, $allowedExtensions) {
+        // Verificar se o upload é válido
+        if (!isset($file) || $file['error'] !== UPLOAD_ERR_OK) {
+            return [
+                'status' => false,
+                'message' => 'Arquivo não enviado ou erro no upload: ' . $file['error']
+            ];
+        }
+        
+        // Verificar extensão
+        $fileInfo = pathinfo($file['name']);
+        $extension = strtolower($fileInfo['extension']);
+        
+        if (!in_array($extension, $allowedExtensions)) {
+            return [
+                'status' => false,
+                'message' => 'Tipo de arquivo não permitido. Extensões aceitas: ' . implode(', ', $allowedExtensions)
+            ];
+        }
+        
+        // Criar nome completo do arquivo
+        $finalFileName = $fileName . '.' . $extension;
+        $targetPath = $uploadDir . '/' . $finalFileName;
+        
+        // Mover arquivo
+        if (move_uploaded_file($file['tmp_name'], $targetPath)) {
+            return [
+                'status' => true,
+                'message' => 'Arquivo enviado com sucesso',
+                'filename' => $finalFileName,
+                'path' => $targetPath
+            ];
+        } else {
+            return [
+                'status' => false,
+                'message' => 'Falha ao mover o arquivo enviado para o destino'
+            ];
+        }
+    }
+    
     /**
      * Construtor
      * 

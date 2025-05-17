@@ -10,6 +10,10 @@ require_once '../../controllers/AuthController.php';
 require_once '../../controllers/TransactionController.php';
 require_once '../../utils/FileUpload.php';
 
+// Mostrar erros para depuração
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
+
 // Iniciar sessão
 session_start();
 
@@ -86,6 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         }
     }
 } else if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_payment'])) {
+    // Processar o envio do formulário de pagamento
     // Validar campos obrigatórios
     if (!isset($_POST['transacoes']) || !isset($_POST['valor_total']) || !isset($_POST['metodo_pagamento'])) {
         $error = 'Dados de pagamento incompletos. Tente novamente.';
@@ -108,12 +113,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             
             // Gerar nome único para o arquivo
             $fileName = 'comprovante_' . $storeId . '_' . date('YmdHis') . '_' . uniqid();
-            $uploadedFile = FileUpload::processUpload($_FILES['comprovante'], $uploadDir, $fileName, ['jpg', 'jpeg', 'png', 'pdf']);
+            $result = FileUpload::processUpload($_FILES['comprovante'], $uploadDir, $fileName, ['jpg', 'jpeg', 'png', 'pdf']);
             
-            if ($uploadedFile['status']) {
-                $comprovante = $uploadedFile['filename'];
+            if ($result['status']) {
+                $comprovante = $result['filename'];
             } else {
-                $error = 'Erro ao fazer upload do comprovante: ' . $uploadedFile['message'];
+                $error = 'Erro ao fazer upload do comprovante: ' . $result['message'];
             }
         }
         
@@ -129,7 +134,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 'observacao' => $observacao
             ];
             
+            // Log para depuração
+            error_log('Enviando dados para registerPayment: ' . print_r($paymentData, true));
+            
             $result = TransactionController::registerPayment($paymentData);
+            
+            // Log do resultado
+            error_log('Resultado do registerPayment: ' . print_r($result, true));
             
             if ($result['status']) {
                 $success = true;

@@ -43,10 +43,7 @@ RewriteCond %{REQUEST_FILENAME} !-d
 RewriteCond %{REQUEST_FILENAME}\.php -f
 RewriteRule ^(.*)$ $1.php [L]
 
-
-
 # Reescrever URLs amigáveis para autenticação
-#RewriteRule ^login/?$ views/auth/login.php [L]
 RewriteRule ^login/?$ views/auth/login.php [L,NC]
 RewriteRule ^registro/?$ views/auth/register.php [L]
 RewriteRule ^recuperar-senha/?$ views/auth/recover-password.php [L]
@@ -57,7 +54,6 @@ RewriteRule ^recuperar-senha/?$ views/auth/recover-password.php [L]
 RewriteCond %{HTTPS} off
 RewriteCond %{HTTP_HOST} ^klubecash\.com$ [NC]
 RewriteRule (.*) https://klubecash.com/$1 [R=301,L]
-
 
 # Reescrever URLs amigáveis para cliente
 RewriteRule ^cliente/dashboard/?$ views/client/dashboard.php [L]
@@ -80,11 +76,6 @@ RewriteRule ^lojas/detalhes/([0-9]+)/?$ views/stores/details.php?id=$1 [L]
 ErrorDocument 404 /views/errors/404.php
 ErrorDocument 500 /views/errors/500.php
 
-
-
-
-
-
 # Reescrever URLs amigáveis para a área da loja
 RewriteRule ^store/dashboard/?$ views/stores/dashboard.php [L,QSA]
 RewriteRule ^store/transacoes/?$ views/stores/transactions.php [L,QSA]
@@ -95,11 +86,9 @@ RewriteRule ^store/pagamento/?$ views/stores/payment.php [L,QSA]
 RewriteRule ^store/historico-pagamentos/?$ views/stores/payment-history.php [L,QSA]
 RewriteRule ^store/perfil/?$ views/stores/profile.php [L,QSA]
 
-
 # Novas regras para área admin
 RewriteRule ^admin/comissoes/?$ views/admin/commissions.php [L]
 RewriteRule ^admin/pagamentos/?$ views/admin/payments.php [L]
-
 
 # Configurações de performance
 <IfModule mod_expires.c>
