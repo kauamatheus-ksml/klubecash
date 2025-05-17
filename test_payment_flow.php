@@ -1,15 +1,21 @@
 <?php
-// test_payment_flow.php - CRIAR TEMPORARIAMENTE
+// test_payment_flow.php - ATUALIZAR
 require_once 'config/database.php';
 require_once 'config/constants.php';
+require_once 'controllers/AuthController.php';
 require_once 'controllers/TransactionController.php';
 
+// Simular login de admin
+session_start();
+$_SESSION['user_id'] = 11; // ID do admin
+$_SESSION['user_type'] = 'admin';
+
+echo "<h3>Teste do fluxo de pagamento:</h3>";
+
 try {
-    echo "<h3>Teste do fluxo de pagamento:</h3>";
-    
-    // 1. Criar transação de teste
     $db = Database::getConnection();
     
+    // Criar transação
     $stmt = $db->prepare("
         INSERT INTO transacoes_cashback 
         (usuario_id, loja_id, valor_total, valor_cashback, valor_cliente, valor_admin, valor_loja, status) 
@@ -17,34 +23,37 @@ try {
     ");
     $stmt->execute();
     $transId = $db->lastInsertId();
-    echo "Transação criada: ID $transId<br>";
+    echo "✅ Transação criada: ID $transId<br>";
     
-    // 2. Testar pagamento
+    // Testar pagamento
     $paymentData = [
         'loja_id' => 9,
         'transacoes' => [$transId],
         'valor_total' => 10.00,
-        'metodo_pagamento' => 'teste_flow'
+        'metodo_pagamento' => 'teste_completo'
     ];
     
     $result = TransactionController::registerPayment($paymentData);
-    echo "Resultado do pagamento: " . print_r($result, true) . "<br>";
+    echo "✅ Pagamento: " . ($result['status'] ? 'SUCESSO' : 'ERRO - ' . $result['message']) . "<br>";
     
     if ($result['status']) {
         $paymentId = $result['data']['payment_id'];
+        echo "✅ Payment ID: $paymentId<br>";
         
-        // 3. Verificar associação
-        $check = $db->prepare("SELECT * FROM pagamentos_transacoes WHERE pagamento_id = ?");
-        $check->execute([$paymentId]);
-        $associations = $check->fetchAll(PDO::FETCH_ASSOC);
-        echo "Associações criadas: " . print_r($associations, true) . "<br>";
+        // Testar aprovação
+        $approval = TransactionController::approvePayment($paymentId, 'Teste completo');
+        echo "✅ Aprovação: " . ($approval['status'] ? 'SUCESSO' : 'ERRO - ' . $approval['message']) . "<br>";
         
-        // 4. Testar aprovação
-        $approval = TransactionController::approvePayment($paymentId, 'Teste de aprovação');
-        echo "Resultado da aprovação: " . print_r($approval, true) . "<br>";
+        if ($approval['status']) {
+            // Verificar se transação foi atualizada
+            $check = $db->prepare("SELECT status FROM transacoes_cashback WHERE id = ?");
+            $check->execute([$transId]);
+            $status = $check->fetchColumn();
+            echo "✅ Status final da transação: $status<br>";
+        }
     }
     
 } catch (Exception $e) {
-    echo "Erro no teste: " . $e->getMessage();
+    echo "❌ Erro: " . $e->getMessage();
 }
 ?>

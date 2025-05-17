@@ -554,10 +554,9 @@ class TransactionController {
                 SELECT p.*, l.nome_fantasia as loja_nome
                 FROM pagamentos_comissao p
                 JOIN lojas l ON p.loja_id = l.id
-                WHERE p.id = :payment_id AND p.status = 'pendente'
+                WHERE p.id = ? AND p.status = 'pendente'
             ");
-            $paymentStmt->bindParam(':payment_id', $paymentId);
-            $paymentStmt->execute();
+            $paymentStmt->execute([$paymentId]);
             $payment = $paymentStmt->fetch(PDO::FETCH_ASSOC);
             
             if (!$payment) {
@@ -567,188 +566,116 @@ class TransactionController {
             // Iniciar transação
             $db->beginTransaction();
             
-            // Atualizar status do pagamento
-            $updatePaymentStmt = $db->prepare("
-                UPDATE pagamentos_comissao
-                SET status = :status, data_aprovacao = NOW(), observacao_admin = :observacao
-                WHERE id = :payment_id
-            ");
-            $status = 'aprovado';
-            $updatePaymentStmt->bindParam(':status', $status);
-            $updatePaymentStmt->bindParam(':observacao', $observacao);
-            $updatePaymentStmt->bindParam(':payment_id', $paymentId);
-            $updatePaymentStmt->execute();
-            
-            // Obter transações associadas ao pagamento
-            $transStmt = $db->prepare("
-                SELECT t.id, t.usuario_id
-                FROM pagamentos_transacoes pt
-                JOIN transacoes_cashback t ON pt.transacao_id = t.id
-                WHERE pt.pagamento_id = :payment_id
-            ");
-            $transStmt->bindParam(':payment_id', $paymentId);
-            $transStmt->execute();
-            $transactions = $transStmt->fetchAll(PDO::FETCH_ASSOC);
-            
-            // Atualizar status das transações para aprovado
-            if (count($transactions) > 0) {
-                $transactionIds = array_column($transactions, 'id');
-                $placeholders = implode(',', array_fill(0, count($transactionIds), '?'));
-                
-                $updateTransStmt = $db->prepare("
-                    UPDATE transacoes_cashback 
-                    SET status = :novo_status 
-                    WHERE id IN ($placeholders)
+            try {
+                // 1. Atualizar status do pagamento
+                $updatePaymentStmt = $db->prepare("
+                    UPDATE pagamentos_comissao
+                    SET status = 'aprovado', data_aprovacao = NOW(), observacao_admin = ?
+                    WHERE id = ?
                 ");
+                $updatePaymentStmt->execute([$observacao, $paymentId]);
                 
-                $novoStatus = TRANSACTION_APPROVED;
-                $updateTransStmt->bindParam(':novo_status', $novoStatus);
-                
-                for ($i = 0; $i < count($transactionIds); $i++) {
-                    $updateTransStmt->bindValue($i + 1, $transactionIds[$i]);
-                }
-                
-                $updateTransStmt->execute();
-                
-                // Atualizar comissões associadas
-                $updateComissionStmt = $db->prepare("
-                    UPDATE transacoes_comissao 
-                    SET status = :novo_status 
-                    WHERE transacao_id IN ($placeholders)
+                // 2. Obter transações associadas ao pagamento
+                $transStmt = $db->prepare("
+                    SELECT t.id, t.usuario_id
+                    FROM pagamentos_transacoes pt
+                    JOIN transacoes_cashback t ON pt.transacao_id = t.id
+                    WHERE pt.pagamento_id = ?
                 ");
+                $transStmt->execute([$paymentId]);
+                $transactions = $transStmt->fetchAll(PDO::FETCH_ASSOC);
                 
-                $updateComissionStmt->bindParam(':novo_status', $novoStatus);
-                
-                for ($i = 0; $i < count($transactionIds); $i++) {
-                    $updateComissionStmt->bindValue($i + 1, $transactionIds[$i]);
-                }
-                
-                $updateComissionStmt->execute();
-                
-                // Notificar clientes
-                $clienteNotificados = [];
-                foreach ($transactions as $transaction) {
-                    if (!in_array($transaction['usuario_id'], $clienteNotificados)) {
-                        // Obter detalhes do cliente
-                        $clientStmt = $db->prepare("
-                            SELECT id, nome, email FROM usuarios WHERE id = :usuario_id
-                        ");
-                        $clientStmt->bindParam(':usuario_id', $transaction['usuario_id']);
-                        $clientStmt->execute();
-                        $client = $clientStmt->fetch(PDO::FETCH_ASSOC);
-                        
-                        if ($client) {
-                            // Contar transações e calcular total de cashback para este cliente
-                            $clientTransStmt = $db->prepare("
-                                SELECT COUNT(*) as total_trans, SUM(valor_cliente) as total_cashback
-                                FROM transacoes_cashback
-                                WHERE id IN ($placeholders) AND usuario_id = :usuario_id
-                            ");
+                // 3. Atualizar status das transações para aprovado
+                if (count($transactions) > 0) {
+                    $transactionIds = array_column($transactions, 'id');
+                    $placeholders = implode(',', array_fill(0, count($transactionIds), '?'));
+                    
+                    $updateTransStmt = $db->prepare("
+                        UPDATE transacoes_cashback 
+                        SET status = 'aprovado' 
+                        WHERE id IN ($placeholders)
+                    ");
+                    $updateTransStmt->execute($transactionIds);
+                    
+                    // 4. Atualizar comissões (se existirem)
+                    $updateCommissionStmt = $db->prepare("
+                        UPDATE transacoes_comissao 
+                        SET status = 'aprovado' 
+                        WHERE transacao_id IN ($placeholders)
+                    ");
+                    $updateCommissionStmt->execute($transactionIds);
+                    
+                    // 5. Notificar clientes
+                    $clienteNotificados = [];
+                    foreach ($transactions as $transaction) {
+                        if (!in_array($transaction['usuario_id'], $clienteNotificados)) {
+                            // Obter detalhes do cliente
+                            $clientStmt = $db->prepare("SELECT nome, email FROM usuarios WHERE id = ?");
+                            $clientStmt->execute([$transaction['usuario_id']]);
+                            $client = $clientStmt->fetch(PDO::FETCH_ASSOC);
                             
-                            $clientTransStmt->bindParam(':usuario_id', $client['id']);
-                            
-                            for ($i = 0; $i < count($transactionIds); $i++) {
-                                $clientTransStmt->bindValue($i + 1, $transactionIds[$i]);
-                            }
-                            
-                            $clientTransStmt->execute();
-                            $clientTrans = $clientTransStmt->fetch(PDO::FETCH_ASSOC);
-                            
-                            // Criar notificação
-                            if ($clientTrans['total_trans'] > 0) {
-                                self::createNotification(
-                                    $client['id'],
-                                    'Cashback disponível!',
-                                    'Seu cashback de R$ ' . number_format($clientTrans['total_cashback'], 2, ',', '.') . 
-                                    ' da loja ' . $payment['loja_nome'] . ' está disponível.',
-                                    'success'
-                                );
+                            if ($client) {
+                                // Calcular total de cashback para este cliente
+                                $clientTransStmt = $db->prepare("
+                                    SELECT COUNT(*) as total_trans, SUM(valor_cliente) as total_cashback
+                                    FROM transacoes_cashback
+                                    WHERE id IN ($placeholders) AND usuario_id = ?
+                                ");
+                                $params = array_merge($transactionIds, [$transaction['usuario_id']]);
+                                $clientTransStmt->execute($params);
+                                $clientTrans = $clientTransStmt->fetch(PDO::FETCH_ASSOC);
                                 
-                                // Enviar email
-                                if (!empty($client['email'])) {
-                                    $subject = 'Cashback Disponível - Klube Cash';
-                                    $message = "
-                                        <h3>Olá, {$client['nome']}!</h3>
-                                        <p>Temos uma ótima notícia! Seu cashback foi aprovado e já está disponível em sua conta.</p>
-                                        <p><strong>Valor total:</strong> R$ " . number_format($clientTrans['total_cashback'], 2, ',', '.') . "</p>
-                                        <p><strong>Loja:</strong> {$payment['loja_nome']}</p>
-                                        <p><strong>Transações:</strong> {$clientTrans['total_trans']}</p>
-                                        <p>Acesse sua conta para visualizar os detalhes.</p>
-                                        <p>Atenciosamente,<br>Equipe Klube Cash</p>
-                                    ";
+                                // Criar notificação
+                                if ($clientTrans['total_trans'] > 0) {
+                                    self::createNotification(
+                                        $transaction['usuario_id'],
+                                        'Cashback disponível!',
+                                        'Seu cashback de R$ ' . number_format($clientTrans['total_cashback'], 2, ',', '.') . 
+                                        ' da loja ' . $payment['loja_nome'] . ' está disponível.',
+                                        'success'
+                                    );
                                     
-                                    Email::send($client['email'], $subject, $message, $client['nome']);
+                                    $clienteNotificados[] = $transaction['usuario_id'];
                                 }
-                                
-                                $clienteNotificados[] = $client['id'];
                             }
                         }
                     }
                 }
-            }
-            
-            // Notificar loja
-            $storeNotifyStmt = $db->prepare("
-                SELECT id, usuario_id, email FROM lojas WHERE id = :loja_id
-            ");
-            $storeNotifyStmt->bindParam(':loja_id', $payment['loja_id']);
-            $storeNotifyStmt->execute();
-            $storeNotify = $storeNotifyStmt->fetch(PDO::FETCH_ASSOC);
-            
-            if ($storeNotify) {
-                // Notificação no sistema (se houver usuário vinculado)
-                if (!empty($storeNotify['usuario_id'])) {
+                
+                // 6. Notificar loja (se tiver usuário associado)
+                $storeUserStmt = $db->prepare("SELECT usuario_id FROM lojas WHERE id = ?");
+                $storeUserStmt->execute([$payment['loja_id']]);
+                $storeUser = $storeUserStmt->fetch(PDO::FETCH_ASSOC);
+                
+                if ($storeUser && !empty($storeUser['usuario_id'])) {
                     self::createNotification(
-                        $storeNotify['usuario_id'],
+                        $storeUser['usuario_id'],
                         'Pagamento aprovado',
-                        'Seu pagamento de comissão no valor de R$ ' . number_format($payment['valor_total'], 2, ',', '.') . 
-                        ' foi aprovado.',
+                        'Seu pagamento de comissão no valor de R$ ' . number_format($payment['valor_total'], 2, ',', '.') . ' foi aprovado.',
                         'success'
                     );
                 }
                 
-                // Email
-                if (!empty($storeNotify['email'])) {
-                    $subject = 'Pagamento Aprovado - Klube Cash';
-                    $message = "
-                        <h3>Olá, {$payment['loja_nome']}!</h3>
-                        <p>Seu pagamento de comissão foi aprovado com sucesso.</p>
-                        <p><strong>Valor:</strong> R$ " . number_format($payment['valor_total'], 2, ',', '.') . "</p>
-                        <p><strong>Método:</strong> {$payment['metodo_pagamento']}</p>
-                        <p><strong>Data de aprovação:</strong> " . date('d/m/Y H:i:s') . "</p>";
-                    
-                    if (!empty($observacao)) {
-                        $message .= "<p><strong>Observação:</strong> " . nl2br(htmlspecialchars($observacao)) . "</p>";
-                    }
-                    
-                    $message .= "<p>O cashback já foi liberado para seus clientes.</p>
-                        <p>Atenciosamente,<br>Equipe Klube Cash</p>
-                    ";
-                    
-                    Email::send($storeNotify['email'], $subject, $message, $payment['loja_nome']);
-                }
-            }
-            
-            // Confirmar transação
-            $db->commit();
-            
-            return [
-                'status' => true,
-                'message' => 'Pagamento aprovado com sucesso! Cashback liberado para os clientes.',
-                'data' => [
-                    'payment_id' => $paymentId,
-                    'transacoes_atualizadas' => count($transactions)
-                ]
-            ];
-            
-        } catch (PDOException $e) {
-            // Reverter transação em caso de erro
-            if (isset($db) && $db->inTransaction()) {
+                // Commit da transação
+                $db->commit();
+                
+                return [
+                    'status' => true,
+                    'message' => 'Pagamento aprovado com sucesso! Cashback liberado para os clientes.',
+                    'data' => [
+                        'payment_id' => $paymentId,
+                        'transacoes_atualizadas' => count($transactions)
+                    ]
+                ];
+                
+            } catch (Exception $e) {
                 $db->rollBack();
+                throw $e;
             }
             
+        } catch (Exception $e) {
             error_log('Erro ao aprovar pagamento: ' . $e->getMessage());
-            return ['status' => false, 'message' => 'Erro ao aprovar pagamento. Tente novamente.'];
+            return ['status' => false, 'message' => 'Erro ao aprovar pagamento: ' . $e->getMessage()];
         }
     }
     
