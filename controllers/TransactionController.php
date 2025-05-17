@@ -1046,21 +1046,21 @@ class TransactionController {
             }
             
             // Construir consulta
+            // Construir consulta
             $query = "
-                SELECT t.*, u.nome as cliente_nome, u.email as cliente_email
-                FROM transacoes_cashback t
-                JOIN usuarios u ON t.usuario_id = u.id
-                WHERE t.loja_id = :loja_id AND t.status = :status
+            SELECT t.*, u.nome as cliente_nome, u.email as cliente_email
+            FROM transacoes_cashback t
+            JOIN usuarios u ON t.usuario_id = u.id
+            WHERE t.loja_id = :loja_id
             ";
-            
+
             $params = [
-                ':loja_id' => $storeId,
-                ':status' => 'pendente'  // Ou TRANSACTION_PENDING se for uma constante
+            ':loja_id' => $storeId
             ];
-            
-            // Verifica se a consulta filtra exclusivamente pelo status 'pendente'
-            // Adicione esta verificação em algum lugar da consulta SQL:
+
+            // Aplicar filtro de status corretamente
             $query .= " AND t.status = :status";
+            $params[':status'] = TRANSACTION_PENDING; // Usar a constante em vez da string literal
             
             // Aplicar filtros
             if (!empty($filters)) {
