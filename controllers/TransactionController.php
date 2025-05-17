@@ -602,18 +602,21 @@ class TransactionController {
                     SET status = :novo_status 
                     WHERE id IN ($placeholders)
                 ");
-                
-                $novoStatus = 'pagamento_pendente';
+
+                $novoStatus = TRANSACTION_PAYMENT_PENDING;
+
                 $updateTransStmt->bindParam(':novo_status', $novoStatus);
                 
                 for ($i = 0; $i < count($transactionIds); $i++) {
-                    $updateTransStmt->bindValue($i + 1, $transactionIds[$i]);
+                    // O índice dos parâmetros deve começar em 1, não em 0
+                    $updateTransStmt->bindValue($i + 1, $transactionIds[$i], PDO::PARAM_INT);
                 }
                 
                 $updateResult = $updateTransStmt->execute();
                 error_log('Status das transações atualizado: ' . ($updateResult ? 'sim' : 'não'));
                 
                 if (!$updateResult) {
+                    error_log('Erro ao atualizar status das transações: ' . print_r($updateTransStmt->errorInfo(), true));
                     $db->rollBack();
                     return ['status' => false, 'message' => 'Erro ao atualizar status das transações.'];
                 }
