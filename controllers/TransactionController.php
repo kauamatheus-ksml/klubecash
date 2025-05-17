@@ -451,6 +451,7 @@ class TransactionController {
     public static function registerPayment($data) {
         try {
             // Log para verificar o input
+            error_log('Iniciando processamento de pagamento: ' . print_r($data, true));
             error_log('Dados de pagamento recebidos: ' . print_r($data, true));
             
             // Validações básicas
