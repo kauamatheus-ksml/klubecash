@@ -8,7 +8,129 @@ require_once '../../config/database.php';
 require_once '../../config/constants.php';
 require_once '../../controllers/AuthController.php';
 require_once '../../controllers/TransactionController.php';
-require_once '../../utils/FileUpload.php';
+
+// Verificar se ROOT_DIR está definido
+if (!defined('ROOT_DIR')) {
+    define('ROOT_DIR', dirname(dirname(__DIR__)));
+}
+
+// Função para registrar pagamento diretamente
+function registerPaymentDirect($storeId, $transactionIds, $totalValue, $metodoPagamento, $numeroReferencia, $comprovante, $observacao) {
+    try {
+        $db = Database::getConnection();
+        
+        // Log de debug
+        error_log("Iniciando registerPaymentDirect - Loja: $storeId, Valor: $totalValue");
+        
+        // Validar transações
+        $placeholders = implode(',', array_fill(0, count($transactionIds), '?'));
+        $validationQuery = "
+            SELECT id, valor_cashback FROM transacoes_cashback 
+            WHERE id IN ($placeholders) AND loja_id = ? AND status = ?
+        ";
+        
+        $stmt = $db->prepare($validationQuery);
+        $params = array_merge($transactionIds, [$storeId, TRANSACTION_PENDING]);
+        
+        for ($i = 0; $i < count($params); $i++) {
+            $stmt->bindValue($i + 1, $params[$i]);
+        }
+        $stmt->execute();
+        
+        $validTransactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        if (count($validTransactions) !== count($transactionIds)) {
+            error_log("Transações inválidas. Esperado: " . count($transactionIds) . ", Encontrado: " . count($validTransactions));
+            return ['status' => false, 'message' => 'Transações inválidas para pagamento.'];
+        }
+        
+        // Calcular total para verificação
+        $calculatedTotal = 0;
+        foreach ($validTransactions as $trans) {
+            $calculatedTotal += floatval($trans['valor_cashback']);
+        }
+        
+        if (abs($calculatedTotal - $totalValue) > 0.01) {
+            return ['status' => false, 'message' => 'Valor total não confere.'];
+        }
+        
+        // Iniciar transação
+        $db->beginTransaction();
+        
+        // Registrar pagamento
+        $paymentStmt = $db->prepare("
+            INSERT INTO pagamentos_comissao (
+                loja_id, valor_total, metodo_pagamento, 
+                numero_referencia, comprovante, observacao, 
+                data_registro, status
+            ) VALUES (?, ?, ?, ?, ?, ?, NOW(), 'pendente')
+        ");
+        
+        $result = $paymentStmt->execute([
+            $storeId,
+            $totalValue,
+            $metodoPagamento,
+            $numeroReferencia ?: null,
+            $comprovante ?: null,
+            $observacao ?: null
+        ]);
+        
+        if (!$result) {
+            throw new Exception('Erro ao inserir pagamento: ' . implode(', ', $paymentStmt->errorInfo()));
+        }
+        
+        $paymentId = $db->lastInsertId();
+        error_log("Pagamento inserido com ID: $paymentId");
+        
+        // Associar transações
+        $assocStmt = $db->prepare("INSERT INTO pagamentos_transacoes (pagamento_id, transacao_id) VALUES (?, ?)");
+        
+        foreach ($transactionIds as $transactionId) {
+            $result = $assocStmt->execute([$paymentId, $transactionId]);
+            if (!$result) {
+                throw new Exception('Erro ao associar transação ' . $transactionId);
+            }
+        }
+        
+        error_log("Transações associadas: " . implode(',', $transactionIds));
+        
+        // Atualizar status das transações
+        $updateStmt = $db->prepare("
+            UPDATE transacoes_cashback 
+            SET status = 'pagamento_pendente' 
+            WHERE id IN ($placeholders)
+        ");
+        
+        for ($i = 0; $i < count($transactionIds); $i++) {
+            $updateStmt->bindValue($i + 1, $transactionIds[$i]);
+        }
+        
+        $result = $updateStmt->execute();
+        if (!$result) {
+            throw new Exception('Erro ao atualizar status das transações');
+        }
+        
+        error_log("Status das transações atualizado para pagamento_pendente");
+        
+        // Confirmar transação
+        $db->commit();
+        
+        error_log("Pagamento registrado com sucesso - ID: $paymentId");
+        
+        return [
+            'status' => true,
+            'message' => 'Pagamento registrado com sucesso!',
+            'data' => ['payment_id' => $paymentId]
+        ];
+        
+    } catch (Exception $e) {
+        if (isset($db) && $db->inTransaction()) {
+            $db->rollBack();
+        }
+        error_log('Erro registerPaymentDirect: ' . $e->getMessage());
+        return ['status' => false, 'message' => 'Erro ao registrar pagamento: ' . $e->getMessage()];
+    }
+}
 
 // Iniciar sessão
 session_start();
@@ -85,6 +207,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         }
     }
 } else if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_payment'])) {
+    // Debug - log dos dados recebidos
+    error_log('POST recebido: ' . print_r($_POST, true));
+    error_log('FILES recebido: ' . print_r($_FILES, true));
+    
     // Processar o envio do formulário de pagamento (segundo POST)
     
     // Validar campos obrigatórios
@@ -97,6 +223,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $numeroReferencia = $_POST['numero_referencia'] ?? '';
         $observacao = $_POST['observacao'] ?? '';
         
+        // Debug
+        error_log('Processando pagamento - IDs: ' . implode(',', $transactionIds));
+        error_log('Valor total: ' . $totalValue);
+        
         // Processar upload de comprovante, se houver
         $comprovante = '';
         if (isset($_FILES['comprovante']) && $_FILES['comprovante']['error'] === UPLOAD_ERR_OK) {
@@ -106,30 +236,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 mkdir($uploadDir, 0755, true);
             }
             
-            // Gerar nome único para o arquivo
-            $fileName = 'comprovante_' . $storeId . '_' . date('YmdHis') . '_' . uniqid();
-            $result = FileUpload::processUpload($_FILES['comprovante'], $uploadDir, $fileName, ['jpg', 'jpeg', 'png', 'pdf']);
+            // Processar upload manualmente (sem FileUpload class)
+            $fileInfo = pathinfo($_FILES['comprovante']['name']);
+            $extension = strtolower($fileInfo['extension']);
+            $allowedExtensions = ['jpg', 'jpeg', 'png', 'pdf'];
             
-            if ($result['status']) {
-                $comprovante = $result['filename'];
+            if (in_array($extension, $allowedExtensions)) {
+                $fileName = 'comprovante_' . $storeId . '_' . date('YmdHis') . '_' . uniqid() . '.' . $extension;
+                $filePath = $uploadDir . '/' . $fileName;
+                
+                if (move_uploaded_file($_FILES['comprovante']['tmp_name'], $filePath)) {
+                    $comprovante = $fileName;
+                    error_log('Comprovante salvo: ' . $fileName);
+                } else {
+                    $error = 'Erro ao fazer upload do comprovante.';
+                }
             } else {
-                $error = 'Erro ao fazer upload do comprovante: ' . $result['message'];
+                $error = 'Formato de arquivo não permitido.';
             }
         }
         
         // Se não houver erro, registrar o pagamento
         if (empty($error)) {
-            $paymentData = [
-                'loja_id' => $storeId,
-                'transacoes' => $transactionIds,
-                'valor_total' => $totalValue,
-                'metodo_pagamento' => $metodoPagamento,
-                'numero_referencia' => $numeroReferencia,
-                'comprovante' => $comprovante,
-                'observacao' => $observacao
-            ];
-            
-            $result = TransactionController::registerPayment($paymentData);
+            // Chamar a função direta
+            $result = registerPaymentDirect($storeId, $transactionIds, $totalValue, $metodoPagamento, $numeroReferencia, $comprovante, $observacao);
             
             if ($result['status']) {
                 $success = true;
@@ -138,10 +268,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 exit;
             } else {
                 $error = $result['message'];
+                error_log('Erro no pagamento: ' . $result['message']);
             }
         }
         
-        // Se chegou até aqui e há erro, recarregar as transações para exibir o formulário novamente
+        // Se há erro, recarregar transações
         if (!empty($error)) {
             $placeholders = implode(',', array_fill(0, count($transactionIds), '?'));
             $validationQuery = "
