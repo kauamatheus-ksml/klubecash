@@ -354,10 +354,8 @@ $activeMenu = 'dashboard';
                     </table>
                 </div>
             </div>
-        </div>
-    </div>
-    <!-- Adicionar novo card informativo sobre o fluxo de cashback -->
-    <div class="info-card">
+            <!-- Adicionar novo card informativo sobre o fluxo de cashback -->
+            <div class="info-card">
                 <h3>Como Funciona o Cashback no Klube Cash</h3>
                 <div class="info-content">
                     <div class="info-item">
@@ -391,6 +389,9 @@ $activeMenu = 'dashboard';
                 </div>
             </div>
             
+        </div>
+    </div>
+    
     
     <script>
         // Configuração do gráfico de vendas mensais
