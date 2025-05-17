@@ -1,4 +1,18 @@
 <?php
+// ADICIONAR LOGO APÓS session_start() em payment.php
+
+// Habilitar logs de erro
+ini_set('display_errors', 1);
+ini_set('log_errors', 1);
+error_reporting(E_ALL);
+
+// Log de debug
+error_log("payment.php - Início da execução. Method: " . $_SERVER['REQUEST_METHOD']);
+if ($_POST) {
+    error_log("payment.php - POST data: " . print_r($_POST, true));
+}
+
+
 // views/admin/payments.php
 // Definir o menu ativo na sidebar
 $activeMenu = 'pagamentos';
@@ -579,6 +593,7 @@ $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
         
         function viewPaymentDetails(paymentId) {
             document.getElementById('detailsModal').style.display = 'block';
+            document.getElementById('detailsContent').innerHTML = '<p>Carregando detalhes...</p>';
             
             // Fazer requisição AJAX para obter detalhes
             fetch('../../controllers/TransactionController.php', {
@@ -593,11 +608,12 @@ $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
                 if (data.status) {
                     renderPaymentDetails(data.data);
                 } else {
-                    document.getElementById('detailsContent').innerHTML = '<p>Erro ao carregar detalhes.</p>';
+                    document.getElementById('detailsContent').innerHTML = '<p class="error">Erro ao carregar detalhes: ' + data.message + '</p>';
                 }
             })
             .catch(error => {
-                document.getElementById('detailsContent').innerHTML = '<p>Erro de conexão.</p>';
+                console.error('Erro na requisição:', error);
+                document.getElementById('detailsContent').innerHTML = '<p class="error">Erro de conexão. Tente novamente.</p>';
             });
         }
         
