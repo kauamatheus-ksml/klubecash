@@ -11,7 +11,7 @@ require_once '../../controllers/TransactionController.php';
 
 // Iniciar sessão
 session_start();
-echo "Loja ID: " . $storeId;
+
 // Verificar se o usuário está logado e é uma loja
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION['user_type'] !== 'loja') {
     // Redirecionar para a página de login com mensagem de erro
@@ -59,9 +59,7 @@ if (isset($_GET['valor_max']) && !empty($_GET['valor_max'])) {
 
 // Obter transações pendentes
 $result = TransactionController::getPendingTransactions($storeId, $filters, $page);
-echo "<pre>";
-print_r($result);
-echo "</pre>";
+
 // Calcular totais
 $totalTransacoes = 0;
 $totalValorVendas = 0;
