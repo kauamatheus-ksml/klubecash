@@ -540,56 +540,66 @@ body {
     }
 }
 
+/* Melhorar responsividade geral */
 @media (max-width: 767.98px) {
-    .template-instructions {
-        grid-template-columns: 1fr;
+    /* Ajustar o padding do conteúdo principal */
+    .main-content {
+        padding: 1rem 0.75rem;
     }
     
-    .form-actions {
-        flex-direction: column;
+    /* Garantir que textos longos quebrem adequadamente */
+    .dashboard-header p, 
+    .template-section p {
+        overflow-wrap: break-word;
+        word-wrap: break-word;
+        hyphens: auto;
     }
     
-    .form-actions .btn {
+    /* Melhorar a exibição dos passos */
+    .step-item {
         width: 100%;
+        margin-bottom: 1rem;
     }
     
-    .file-upload-area {
-        padding: 1.5rem 1rem;
-    }
-    
-    .alert {
-        flex-direction: column;
-        text-align: center;
-    }
-    
-    .alert .btn {
-        margin-left: 0;
-        margin-top: 1rem;
-        width: 100%;
+    /* Corrigir margem da seção de template */
+    .template-section {
+        margin: 0 0 1.5rem 0;
     }
 }
 
+/* Correções específicas para a tabela CSV */
+.template-preview {
+    overflow-x: auto;
+    max-width: 100%;
+    -webkit-overflow-scrolling: touch;
+}
+
+.csv-template {
+    min-width: 500px; /* Garante espaço mínimo para o conteúdo */
+    width: 100%;
+}
+
+/* Melhorar versão mobile da tabela */
 @media (max-width: 575.98px) {
-    .main-content {
-        padding: 1rem;
-    }
-    
-    .dashboard-title {
-        font-size: 1.5rem;
-    }
-    
-    .content-card, 
-    .help-section {
-        padding: 1.25rem;
-    }
-    
     .template-preview {
-        padding: 1rem;
+        padding: 0.5rem;
+        margin: 1rem 0;
     }
     
     .csv-template th,
     .csv-template td {
         padding: 0.5rem;
-        font-size: 0.8rem;
+        font-size: 0.75rem;
+    }
+    
+    /* Garantir que o conteúdo da página não cause rolagem horizontal */
+    .content-card {
+        padding: 1rem;
+        overflow: hidden;
+    }
+    
+    .upload-wrapper {
+        width: 100%;
+        overflow: hidden;
     }
 }
