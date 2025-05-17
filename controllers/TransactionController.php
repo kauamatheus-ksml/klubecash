@@ -1059,10 +1059,8 @@ class TransactionController {
             ];
 
             // Aplicar filtro de status corretamente
-            // Se quiser incluir transações tanto pendentes quanto em pagamento pendente
-            $query .= " AND (t.status = :status_pendente OR t.status = :status_pagamento_pendente)";
-            $params[':status_pendente'] = TRANSACTION_PENDING;
-            $params[':status_pagamento_pendente'] = TRANSACTION_PAYMENT_PENDING;// Usar a constante em vez da string literal
+            $query .= " AND t.status = :status";
+            $params[':status'] = TRANSACTION_PENDING; // Usar a constante em vez da string literal
             
             // Aplicar filtros
             if (!empty($filters)) {
