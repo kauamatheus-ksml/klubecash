@@ -10,23 +10,11 @@ require_once '../../controllers/AuthController.php';
 require_once '../../controllers/TransactionController.php';
 require_once '../../utils/FileUpload.php';
 
-// Mostrar erros para depuração
-ini_set('display_errors', 1);
-error_reporting(E_ALL);
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    echo '<div style="background: yellow; padding: 20px; position: fixed; top: 0; left: 0; z-index: 9999; width: 100%;">';
-    echo '<h3>DEBUG POST RECEBIDO:</h3>';
-    echo '<pre>' . print_r($_POST, true) . '</pre>';
-    echo '<pre>' . print_r($_FILES, true) . '</pre>';
-    echo '</div>';
-    echo '<div style="margin-top: 200px;"></div>';
-}
 // Iniciar sessão
 session_start();
 
 // Verificar se o usuário está logado e é uma loja
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION['user_type'] !== 'loja') {
-    // Redirecionar para a página de login com mensagem de erro
     header("Location: " . LOGIN_URL . "?error=acesso_restrito");
     exit;
 }
@@ -58,7 +46,7 @@ $transactionIds = [];
 $totalValue = 0;
 $transactions = [];
 
-// Verificar se está vindo da página de comissões pendentes
+// Verificar se está vindo da página de comissões pendentes (primeiro POST)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'payment_form') {
     if (!isset($_POST['transacoes']) || !is_array($_POST['transacoes']) || count($_POST['transacoes']) === 0) {
         $error = 'Selecione pelo menos uma transação para realizar o pagamento.';
@@ -96,42 +84,91 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             }
         }
     }
-// Após linha ~87, substitua toda a seção de processamento POST por:
 } else if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_payment'])) {
-    echo '<div style="background: #f0f0f0; padding: 20px; margin: 20px 0;">';
-    echo '<h3>DEBUG - Dados recebidos:</h3>';
-    echo '<pre>POST: ' . print_r($_POST, true) . '</pre>';
-    echo '<pre>FILES: ' . print_r($_FILES, true) . '</pre>';
-
+    // Processar o envio do formulário de pagamento (segundo POST)
+    
     // Validar campos obrigatórios
     if (!isset($_POST['transacoes']) || !isset($_POST['valor_total']) || !isset($_POST['metodo_pagamento'])) {
-        echo '<p style="color: red;">ERRO: Dados obrigatórios ausentes</p>';
         $error = 'Dados de pagamento incompletos. Tente novamente.';
     } else {
         $transactionIds = explode(',', $_POST['transacoes']);
-        echo '<p>Transações: ' . print_r($transactionIds, true) . '</p>';
+        $totalValue = floatval($_POST['valor_total']);
+        $metodoPagamento = $_POST['metodo_pagamento'];
+        $numeroReferencia = $_POST['numero_referencia'] ?? '';
+        $observacao = $_POST['observacao'] ?? '';
         
-        $paymentData = [
-            'loja_id' => $storeId,
-            'transacoes' => $transactionIds,
-            'valor_total' => floatval($_POST['valor_total']),
-            'metodo_pagamento' => $_POST['metodo_pagamento'],
-            'numero_referencia' => $_POST['numero_referencia'] ?? '',
-            'observacao' => $_POST['observacao'] ?? ''
-        ];
+        // Processar upload de comprovante, se houver
+        $comprovante = '';
+        if (isset($_FILES['comprovante']) && $_FILES['comprovante']['error'] === UPLOAD_ERR_OK) {
+            // Criar diretório de uploads se não existir
+            $uploadDir = ROOT_DIR . '/uploads/comprovantes';
+            if (!is_dir($uploadDir)) {
+                mkdir($uploadDir, 0755, true);
+            }
+            
+            // Gerar nome único para o arquivo
+            $fileName = 'comprovante_' . $storeId . '_' . date('YmdHis') . '_' . uniqid();
+            $result = FileUpload::processUpload($_FILES['comprovante'], $uploadDir, $fileName, ['jpg', 'jpeg', 'png', 'pdf']);
+            
+            if ($result['status']) {
+                $comprovante = $result['filename'];
+            } else {
+                $error = 'Erro ao fazer upload do comprovante: ' . $result['message'];
+            }
+        }
         
-        echo '<p>Dados para enviar: ' . print_r($paymentData, true) . '</p>';
+        // Se não houver erro, registrar o pagamento
+        if (empty($error)) {
+            $paymentData = [
+                'loja_id' => $storeId,
+                'transacoes' => $transactionIds,
+                'valor_total' => $totalValue,
+                'metodo_pagamento' => $metodoPagamento,
+                'numero_referencia' => $numeroReferencia,
+                'comprovante' => $comprovante,
+                'observacao' => $observacao
+            ];
+            
+            $result = TransactionController::registerPayment($paymentData);
+            
+            if ($result['status']) {
+                $success = true;
+                // Redirecionar com parâmetro de sucesso
+                header('Location: ' . STORE_PENDING_TRANSACTIONS_URL . '?payment_success=1');
+                exit;
+            } else {
+                $error = $result['message'];
+            }
+        }
         
-        $result = TransactionController::registerPayment($paymentData);
-        echo '<p>Resultado: ' . print_r($result, true) . '</p>';
-        
-        if ($result['status']) {
-            $success = true;
-        } else {
-            $error = $result['message'];
+        // Se chegou até aqui e há erro, recarregar as transações para exibir o formulário novamente
+        if (!empty($error)) {
+            $placeholders = implode(',', array_fill(0, count($transactionIds), '?'));
+            $validationQuery = "
+                SELECT t.id, t.codigo_transacao, t.valor_total, t.valor_cashback, t.valor_cliente, 
+                       t.data_transacao, u.nome as cliente_nome
+                FROM transacoes_cashback t
+                JOIN usuarios u ON t.usuario_id = u.id
+                WHERE t.id IN ($placeholders) AND t.loja_id = ? AND t.status = ?
+            ";
+            
+            $stmt = $db->prepare($validationQuery);
+            $bindParams = array_merge($transactionIds, [$storeId, TRANSACTION_PENDING]);
+            
+            for ($i = 0; $i < count($bindParams); $i++) {
+                $stmt->bindValue($i + 1, $bindParams[$i]);
+            }
+            
+            $stmt->execute();
+            $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            // Recalcular total
+            $totalValue = 0;
+            foreach ($transactions as $transaction) {
+                $totalValue += floatval($transaction['valor_cashback']);
+            }
         }
     }
-    echo '</div>';
 } else {
     // Acesso direto à página - redirecionar para comissões pendentes
     header('Location: ' . STORE_PENDING_TRANSACTIONS_URL);
@@ -329,7 +366,7 @@ $metodosPagamento = [
                             </div>
                             
                             <div class="form-actions">
-                            <button type="submit" name="submit_payment" value="1" class="btn btn-primary">Confirmar Pagamento</button>
+                                <button type="submit" name="submit_payment" value="1" class="btn btn-primary">Confirmar Pagamento</button>
                                 <a href="<?php echo STORE_PENDING_TRANSACTIONS_URL; ?>" class="btn btn-secondary">Cancelar</a>
                             </div>
                         </form>
