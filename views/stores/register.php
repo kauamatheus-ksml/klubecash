@@ -24,6 +24,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'cnpj' => filter_input(INPUT_POST, 'cnpj', FILTER_SANITIZE_STRING),
         'email' => filter_input(INPUT_POST, 'email', FILTER_SANITIZE_EMAIL),
         'telefone' => filter_input(INPUT_POST, 'telefone', FILTER_SANITIZE_STRING),
+        'senha' => $_POST['senha'] ?? '', // Não sanitizar senha para preservar caracteres especiais
+        'confirma_senha' => $_POST['confirma_senha'] ?? '', // Não sanitizar para comparação
         'categoria' => filter_input(INPUT_POST, 'categoria', FILTER_SANITIZE_STRING),
         'descricao' => filter_input(INPUT_POST, 'descricao', FILTER_SANITIZE_STRING),
         'website' => filter_input(INPUT_POST, 'website', FILTER_SANITIZE_URL),
@@ -39,7 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ]
     ];
     
-    // Validar campos
+    // Validar campos obrigatórios manualmente para dar mensagens mais específicas
     $errors = [];
     
     if (empty($data['nome_fantasia'])) {
@@ -62,6 +64,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = 'Telefone é obrigatório';
     }
     
+    // Validação específica da senha
+    if (empty($data['senha'])) {
+        $errors[] = 'Senha é obrigatória';
+    } elseif (strlen($data['senha']) < 8) {
+        $errors[] = 'A senha deve ter pelo menos 8 caracteres';
+    }
+    
+    if (empty($data['confirma_senha'])) {
+        $errors[] = 'Confirmação de senha é obrigatória';
+    } elseif ($data['senha'] !== $data['confirma_senha']) {
+        $errors[] = 'As senhas não coincidem';
+    }
+    
+    if (empty($data['categoria'])) {
+        $errors[] = 'Categoria é obrigatória';
+    }
+    
+    // Validações de endereço
+    if (empty($data['endereco']['cep'])) {
+        $errors[] = 'CEP é obrigatório';
+    }
+    
+    if (empty($data['endereco']['logradouro'])) {
+        $errors[] = 'Logradouro é obrigatório';
+    }
+    
+    if (empty($data['endereco']['numero'])) {
+        $errors[] = 'Número é obrigatório';
+    }
+    
+    if (empty($data['endereco']['bairro'])) {
+        $errors[] = 'Bairro é obrigatório';
+    }
+    
+    if (empty($data['endereco']['cidade'])) {
+        $errors[] = 'Cidade é obrigatória';
+    }
+    
+    if (empty($data['endereco']['estado'])) {
+        $errors[] = 'Estado é obrigatório';
+    }
+    
     // Se não houver erros, prosseguir com o cadastro
     if (empty($errors)) {
         // Formatar CNPJ (remover caracteres especiais)
@@ -74,7 +118,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $success = $result['message'];
             
             // Limpar dados do formulário se cadastro bem-sucedido
-            if (!$result['awaiting_approval']) {
+            if (isset($result['data']['awaiting_approval']) && $result['data']['awaiting_approval']) {
+                // Manter dados se está aguardando aprovação (para casos onde o admin pode ver)
+            } else {
                 $data = [];
             }
         } else {
@@ -89,6 +135,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $categorias = [
     'Alimentação', 'Vestuário', 'Eletrônicos', 'Casa e Decoração', 
     'Beleza e Saúde', 'Serviços', 'Educação', 'Entretenimento', 'Outros'
+];
+
+// Carregar lista de estados brasileiros
+$estados = [
+    'AC' => 'Acre', 'AL' => 'Alagoas', 'AP' => 'Amapá', 'AM' => 'Amazonas',
+    'BA' => 'Bahia', 'CE' => 'Ceará', 'DF' => 'Distrito Federal', 'ES' => 'Espírito Santo',
+    'GO' => 'Goiás', 'MA' => 'Maranhão', 'MT' => 'Mato Grosso', 'MS' => 'Mato Grosso do Sul',
+    'MG' => 'Minas Gerais', 'PA' => 'Pará', 'PB' => 'Paraíba', 'PR' => 'Paraná',
+    'PE' => 'Pernambuco', 'PI' => 'Piauí', 'RJ' => 'Rio de Janeiro', 'RN' => 'Rio Grande do Norte',
+    'RS' => 'Rio Grande do Sul', 'RO' => 'Rondônia', 'RR' => 'Roraima', 'SC' => 'Santa Catarina',
+    'SP' => 'São Paulo', 'SE' => 'Sergipe', 'TO' => 'Tocantins'
 ];
 
 ?>
@@ -110,6 +167,7 @@ $categorias = [
             --medium-gray: #666666;
             --success-color: #4CAF50;
             --danger-color: #F44336;
+            --warning-color: #FF9800;
             --border-radius: 15px;
             --shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
             --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -177,7 +235,11 @@ $categorias = [
             color: var(--dark-gray);
         }
         
-        .form-control {
+        .required {
+            color: var(--danger-color);
+        }
+        
+        .form-control, .form-select {
             width: 100%;
             padding: 12px 15px;
             border: 1px solid #ddd;
@@ -186,7 +248,7 @@ $categorias = [
             transition: border-color 0.3s;
         }
         
-        .form-control:focus {
+        .form-control:focus, .form-select:focus {
             outline: none;
             border-color: var(--primary-color);
             box-shadow: 0 0 0 2px rgba(255, 122, 0, 0.2);
@@ -216,6 +278,17 @@ $categorias = [
             font-size: 18px;
         }
         
+        .checkbox-group {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .checkbox-group input[type="checkbox"] {
+            margin-top: 2px;
+        }
+        
         .btn {
             display: inline-block;
             padding: 12px 25px;
@@ -235,6 +308,12 @@ $categorias = [
             transform: translateY(-2px);
         }
         
+        .btn:disabled {
+            background-color: var(--medium-gray);
+            cursor: not-allowed;
+            transform: none;
+        }
+        
         .btn-block {
             display: block;
             width: 100%;
@@ -244,7 +323,6 @@ $categorias = [
             padding: 15px;
             border-radius: 8px;
             margin-bottom: 20px;
-            text-align: center;
         }
         
         .alert-danger {
@@ -257,6 +335,12 @@ $categorias = [
             background-color: #E6F7E6;
             color: var(--success-color);
             border: 1px solid var(--success-color);
+        }
+        
+        .alert-warning {
+            background-color: #FFF3E0;
+            color: var(--warning-color);
+            border: 1px solid var(--warning-color);
         }
         
         .benefits-section {
@@ -298,6 +382,29 @@ $categorias = [
             margin-bottom: 10px;
         }
         
+        .password-strength {
+            margin-top: 5px;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .password-strength.weak {
+            background-color: #ffebee;
+            color: #c62828;
+        }
+        
+        .password-strength.medium {
+            background-color: #fff3e0;
+            color: #ef6c00;
+        }
+        
+        .password-strength.strong {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+        }
+        
         @media (max-width: 768px) {
             .form-row {
                 grid-template-columns: 1fr;
@@ -305,6 +412,11 @@ $categorias = [
             
             .benefits-section {
                 grid-template-columns: 1fr;
+            }
+            
+            .container {
+                margin: 60px auto 20px;
+                padding: 0 15px;
             }
         }
     </style>
@@ -321,17 +433,17 @@ $categorias = [
         
         <?php if (!empty($error)): ?>
             <div class="alert alert-danger">
-                <?php echo htmlspecialchars($error); ?>
+                <?php echo $error; ?>
             </div>
         <?php endif; ?>
         
         <?php if (!empty($success)): ?>
             <div class="alert alert-success">
                 <?php echo htmlspecialchars($success); ?>
-                <?php if (isset($result['awaiting_approval']) && $result['awaiting_approval']): ?>
-                    <p>Sua solicitação foi recebida e está aguardando aprovação.</p>
+                <?php if (isset($result['data']['awaiting_approval']) && $result['data']['awaiting_approval']): ?>
+                    <p>Sua solicitação foi recebida e está aguardando aprovação. Você receberá um email quando sua loja for analisada.</p>
                 <?php else: ?>
-                    <p>Sua loja foi aprovada e já está ativa no sistema.</p>
+                    <p>Sua loja foi aprovada e já está ativa no sistema!</p>
                 <?php endif; ?>
             </div>
         <?php endif; ?>
@@ -342,26 +454,26 @@ $categorias = [
                 
                 <div class="form-row">
                     <div class="form-group">
-                        <label class="form-label" for="nome_fantasia">Nome Fantasia*</label>
+                        <label class="form-label" for="nome_fantasia">Nome Fantasia <span class="required">*</span></label>
                         <input type="text" id="nome_fantasia" name="nome_fantasia" class="form-control" required value="<?php echo isset($data['nome_fantasia']) ? htmlspecialchars($data['nome_fantasia']) : ''; ?>">
                     </div>
                     
                     <div class="form-group">
-                        <label class="form-label" for="razao_social">Razão Social*</label>
+                        <label class="form-label" for="razao_social">Razão Social <span class="required">*</span></label>
                         <input type="text" id="razao_social" name="razao_social" class="form-control" required value="<?php echo isset($data['razao_social']) ? htmlspecialchars($data['razao_social']) : ''; ?>">
                     </div>
                 </div>
                 
                 <div class="form-row">
                     <div class="form-group">
-                        <label class="form-label" for="cnpj">CNPJ*</label>
-                        <input type="text" id="cnpj" name="cnpj" class="form-control" required value="<?php echo isset($data['cnpj']) ? htmlspecialchars($data['cnpj']) : ''; ?>">
+                        <label class="form-label" for="cnpj">CNPJ <span class="required">*</span></label>
+                        <input type="text" id="cnpj" name="cnpj" class="form-control" required value="<?php echo isset($data['cnpj']) ? htmlspecialchars($data['cnpj']) : ''; ?>" placeholder="XX.XXX.XXX/XXXX-XX">
                         <small class="form-text">Digite apenas números ou formato XX.XXX.XXX/XXXX-XX</small>
                     </div>
                     
                     <div class="form-group">
-                        <label class="form-label" for="categoria">Categoria/Segmento*</label>
-                        <select id="categoria" name="categoria" class="form-control" required>
+                        <label class="form-label" for="categoria">Categoria/Segmento <span class="required">*</span></label>
+                        <select id="categoria" name="categoria" class="form-select" required>
                             <option value="">Selecione...</option>
                             <?php foreach ($categorias as $categoria): ?>
                                 <option value="<?php echo htmlspecialchars($categoria); ?>" <?php echo (isset($data['categoria']) && $data['categoria'] == $categoria) ? 'selected' : ''; ?>>
@@ -376,35 +488,37 @@ $categorias = [
                 
                 <div class="form-row">
                     <div class="form-group">
-                        <label class="form-label" for="email">E-mail*</label>
+                        <label class="form-label" for="email">E-mail <span class="required">*</span></label>
                         <input type="email" id="email" name="email" class="form-control" required value="<?php echo isset($data['email']) ? htmlspecialchars($data['email']) : ''; ?>">
+                        <small class="form-text">Este será seu email de acesso ao sistema</small>
                     </div>
                     
                     <div class="form-group">
-                        <label class="form-label" for="telefone">Telefone*</label>
-                        <input type="tel" id="telefone" name="telefone" class="form-control" required value="<?php echo isset($data['telefone']) ? htmlspecialchars($data['telefone']) : ''; ?>">
+                        <label class="form-label" for="telefone">Telefone <span class="required">*</span></label>
+                        <input type="tel" id="telefone" name="telefone" class="form-control" required value="<?php echo isset($data['telefone']) ? htmlspecialchars($data['telefone']) : ''; ?>" placeholder="(XX) XXXXX-XXXX">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="website">Website</label>
+                    <input type="url" id="website" name="website" class="form-control" value="<?php echo isset($data['website']) ? htmlspecialchars($data['website']) : ''; ?>" placeholder="https://www.suaempresa.com.br">
+                </div>
+                
+                <h2 class="section-title">Dados de Acesso</h2>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="senha">Senha de Acesso <span class="required">*</span></label>
+                        <input type="password" id="senha" name="senha" class="form-control" required minlength="8">
+                        <div id="password-feedback" class="password-strength" style="display: none;"></div>
+                        <small class="form-text">Mínimo de 8 caracteres. Use letras, números e símbolos para maior segurança.</small>
                     </div>
                     
-                    <h2 class="section-title">Dados de Acesso</h2>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label" for="senha">Senha de Acesso*</label>
-                            <input type="password" id="senha" name="senha" class="form-control" required minlength="8">
-                            <small class="form-text">Mínimo de 8 caracteres. Esta será sua senha para acessar o sistema.</small>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label class="form-label" for="confirma_senha">Confirme a Senha*</label>
-                            <input type="password" id="confirma_senha" name="confirma_senha" class="form-control" required minlength="8">
-                            <small class="form-text">Digite novamente sua senha para confirmação.</small>
-                        </div>
-                    </div>
-
-
                     <div class="form-group">
-                        <label class="form-label" for="website">Website</label>
-                        <input type="url" id="website" name="website" class="form-control" value="<?php echo isset($data['website']) ? htmlspecialchars($data['website']) : ''; ?>">
+                        <label class="form-label" for="confirma_senha">Confirme a Senha <span class="required">*</span></label>
+                        <input type="password" id="confirma_senha" name="confirma_senha" class="form-control" required minlength="8">
+                        <div id="password-match-feedback" style="display: none; font-size: 12px; margin-top: 5px;"></div>
+                        <small class="form-text">Digite novamente sua senha para confirmação.</small>
                     </div>
                 </div>
                 
@@ -412,19 +526,19 @@ $categorias = [
                 
                 <div class="form-row">
                     <div class="form-group">
-                        <label class="form-label" for="cep">CEP*</label>
-                        <input type="text" id="cep" name="cep" class="form-control" required value="<?php echo isset($data['endereco']['cep']) ? htmlspecialchars($data['endereco']['cep']) : ''; ?>">
+                        <label class="form-label" for="cep">CEP <span class="required">*</span></label>
+                        <input type="text" id="cep" name="cep" class="form-control" required value="<?php echo isset($data['endereco']['cep']) ? htmlspecialchars($data['endereco']['cep']) : ''; ?>" placeholder="XXXXX-XXX">
                     </div>
                 </div>
                 
                 <div class="form-row">
                     <div class="form-group">
-                        <label class="form-label" for="logradouro">Logradouro*</label>
+                        <label class="form-label" for="logradouro">Logradouro <span class="required">*</span></label>
                         <input type="text" id="logradouro" name="logradouro" class="form-control" required value="<?php echo isset($data['endereco']['logradouro']) ? htmlspecialchars($data['endereco']['logradouro']) : ''; ?>">
                     </div>
                     
                     <div class="form-group">
-                        <label class="form-label" for="numero">Número*</label>
+                        <label class="form-label" for="numero">Número <span class="required">*</span></label>
                         <input type="text" id="numero" name="numero" class="form-control" required value="<?php echo isset($data['endereco']['numero']) ? htmlspecialchars($data['endereco']['numero']) : ''; ?>">
                     </div>
                 </div>
@@ -436,56 +550,62 @@ $categorias = [
                     </div>
                     
                     <div class="form-group">
-                        <label class="form-label" for="bairro">Bairro*</label>
+                        <label class="form-label" for="bairro">Bairro <span class="required">*</span></label>
                         <input type="text" id="bairro" name="bairro" class="form-control" required value="<?php echo isset($data['endereco']['bairro']) ? htmlspecialchars($data['endereco']['bairro']) : ''; ?>">
                     </div>
                 </div>
                 
                 <div class="form-row">
                     <div class="form-group">
-                        <label class="form-label" for="cidade">Cidade*</label>
+                        <label class="form-label" for="cidade">Cidade <span class="required">*</span></label>
                         <input type="text" id="cidade" name="cidade" class="form-control" required value="<?php echo isset($data['endereco']['cidade']) ? htmlspecialchars($data['endereco']['cidade']) : ''; ?>">
                     </div>
                     
                     <div class="form-group">
-                        <label class="form-label" for="estado">Estado*</label>
-                        <input type="text" id="estado" name="estado" class="form-control" required value="<?php echo isset($data['endereco']['estado']) ? htmlspecialchars($data['endereco']['estado']) : ''; ?>">
+                        <label class="form-label" for="estado">Estado <span class="required">*</span></label>
+                        <select id="estado" name="estado" class="form-select" required>
+                            <option value="">Selecione...</option>
+                            <?php foreach ($estados as $uf => $nomeEstado): ?>
+                                <option value="<?php echo $uf; ?>" <?php echo (isset($data['endereco']['estado']) && $data['endereco']['estado'] == $uf) ? 'selected' : ''; ?>>
+                                    <?php echo $nomeEstado; ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
                     </div>
                 </div>
                 
                 <h2 class="section-title">Configurações de Cashback</h2>
                 
                 <div class="form-group">
-                    <label class="form-label" for="porcentagem_cashback">Porcentagem de Cashback</label>
+                    <label class="form-label" for="porcentagem_cashback">Porcentagem de Cashback (%)</label>
                     <input type="number" id="porcentagem_cashback" name="porcentagem_cashback" class="form-control" step="0.01" min="0" max="30" value="<?php echo isset($data['porcentagem_cashback']) ? htmlspecialchars($data['porcentagem_cashback']) : DEFAULT_CASHBACK_TOTAL; ?>">
-                    <small class="form-text">Porcentagem que será devolvida aos clientes (padrão: <?php echo DEFAULT_CASHBACK_TOTAL; ?>%)</small>
+                    <small class="form-text">Porcentagem que será devolvida aos clientes (padrão: <?php echo DEFAULT_CASHBACK_TOTAL; ?>%). Quanto maior a porcentagem, mais atrativa sua loja fica para os clientes.</small>
                 </div>
                 
                 <div class="form-group">
                     <label class="form-label" for="descricao">Descrição da Loja</label>
-                    <textarea id="descricao" name="descricao" class="form-control" rows="4"><?php echo isset($data['descricao']) ? htmlspecialchars($data['descricao']) : ''; ?></textarea>
-                    <small class="form-text">Descreva brevemente sua loja (produtos, diferenciais, etc)</small>
+                    <textarea id="descricao" name="descricao" class="form-control" rows="4" placeholder="Conte um pouco sobre sua loja, produtos oferecidos, diferenciais..."><?php echo isset($data['descricao']) ? htmlspecialchars($data['descricao']) : ''; ?></textarea>
+                    <small class="form-text">Esta descrição será exibida para os clientes no catálogo de lojas parceiras.</small>
                 </div>
                 
                 <div class="form-terms">
                     <h3>Termos e Condições</h3>
                     <p>Ao se cadastrar como loja parceira, você concorda com os seguintes termos:</p>
                     <ul>
-                        <li>O Klube Cash poderá analisar e aprovar sua solicitação antes de ativá-la no sistema.</li>
-                        <li>Você concorda em oferecer o cashback conforme a porcentagem cadastrada.</li>
-                        <li>O Klube Cash poderá exibir sua loja no catálogo de parceiros.</li>
-                        <li>Todas as transações serão processadas de acordo com as regras do sistema.</li>
-                        <li>O parceiro se compromete a oferecer o cashback conforme a porcentagem estabelecida no cadastro.</li>
+                        <li>O Klube Cash analisará sua solicitação e pode aprová-la ou rejeitá-la de acordo com nossos critérios.</li>
+                        <li>Você se compromete a oferecer o cashback conforme a porcentagem cadastrada.</li>
+                        <li>Sua loja será exibida no catálogo de parceiros após aprovação.</li>
+                        <li>Todas as transações de cashback devem ser processadas através do nosso sistema.</li>
+                        <li>Você terá acesso a um painel para gerenciar suas transações e relatórios.</li>
+                        <li>O Klube Cash se reserva o direito de cancelar a parceria em caso de violação dos termos.</li>
                     </ul>
-                    <div class="form-group" style="margin-top: 15px;">
-                        <label>
-                            <input type="checkbox" name="aceite_termos" required>
-                            Concordo com os termos e condições acima
-                        </label>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="aceite_termos" name="aceite_termos" required>
+                        <label for="aceite_termos">Li e concordo com os termos e condições acima <span class="required">*</span></label>
                     </div>
                 </div>
                 
-                <button type="submit" class="btn btn-block">Cadastrar Loja</button>
+                <button type="submit" class="btn btn-block" id="submit-btn">Cadastrar Loja</button>
             </form>
         </div>
         
@@ -493,13 +613,20 @@ $categorias = [
             <div class="benefit-card">
                 <div class="benefit-icon">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <path d="M16 12l-4 4-4-4"></path>
-                        <path d="M12 8v8"></path>
+                        <path d="M18 6L6 18"></path>
+                        <path d="M6 6l12 12"></path>
+                        <line x1="12" y1="2" x2="12" y2="6"></line>
+                        <line x1="12" y1="18" x2="12" y2="22"></line>
+                        <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line>
+                        <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line>
+                        <line x1="2" y1="12" x2="6" y2="12"></line>
+                        <line x1="18" y1="12" x2="22" y2="12"></line>
+                        <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line>
+                        <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line>
                     </svg>
                 </div>
                 <h3 class="benefit-title">Aumente suas Vendas</h3>
-                <p>O cashback é um forte incentivo para novos clientes e fidelização dos atuais.</p>
+                <p>O cashback é um forte incentivo para novos clientes escolherem sua loja e para fidelizar os atuais. Clientes tendem a retornar às lojas onde ganham benefícios.</p>
             </div>
             
             <div class="benefit-card">
@@ -512,18 +639,18 @@ $categorias = [
                     </svg>
                 </div>
                 <h3 class="benefit-title">Novos Clientes</h3>
-                <p>Acesse nossa base de usuários procurando por lojas que oferecem cashback.</p>
+                <p>Acesse nossa base crescente de usuários que procuram ativamente por lojas que oferecem cashback. Seja encontrado por clientes interessados em seus produtos.</p>
             </div>
             
             <div class="benefit-card">
                 <div class="benefit-icon">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline>
-                        <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path>
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <path d="M9 9h6v6H9z"></path>
                     </svg>
                 </div>
                 <h3 class="benefit-title">Fácil Implementação</h3>
-                <p>Sistema simples de integrar com seu negócio, sem complicações técnicas.</p>
+                <p>Sistema simples e intuitivo para integrar com seu negócio. Painel administrativo completo para gerenciar transações e acompanhar relatórios de vendas.</p>
             </div>
         </div>
     </div>
@@ -559,28 +686,6 @@ $categorias = [
             e.target.value = value;
         });
         
-        // Preenchimento automático do endereço pelo CEP
-        document.getElementById('cep').addEventListener('blur', function() {
-            const cep = this.value.replace(/\D/g, '');
-            
-            if (cep.length !== 8) {
-                return;
-            }
-            
-            fetch(`https://viacep.com.br/ws/${cep}/json/`)
-                .then(response => response.json())
-                .then(data => {
-                    if (!data.erro) {
-                        document.getElementById('logradouro').value = data.logradouro;
-                        document.getElementById('bairro').value = data.bairro;
-                        document.getElementById('cidade').value = data.localidade;
-                        document.getElementById('estado').value = data.uf;
-                        document.getElementById('numero').focus();
-                    }
-                })
-                .catch(error => console.error('Erro:', error));
-        });
-        
         // Máscara para o CEP
         document.getElementById('cep').addEventListener('input', function (e) {
             let value = e.target.value.replace(/\D/g, '');
@@ -592,19 +697,103 @@ $categorias = [
             e.target.value = value;
         });
         
-        // Validação de formulário
-        document.getElementById('store-form').addEventListener('submit', function(event) {
-            // Validações adicionais podem ser implementadas aqui
+        // Preenchimento automático do endereço pelo CEP
+        document.getElementById('cep').addEventListener('blur', function() {
+            const cep = this.value.replace(/\D/g, '');
+            
+            if (cep.length !== 8) {
+                return;
+            }
+            
+            // Mostrar indicador de carregamento
+            this.style.backgroundColor = '#f0f0f0';
+            
+            fetch(`https://viacep.com.br/ws/${cep}/json/`)
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.erro) {
+                        document.getElementById('logradouro').value = data.logradouro || '';
+                        document.getElementById('bairro').value = data.bairro || '';
+                        document.getElementById('cidade').value = data.localidade || '';
+                        document.getElementById('estado').value = data.uf || '';
+                        
+                        // Focar no campo número
+                        if (data.logradouro) {
+                            document.getElementById('numero').focus();
+                        }
+                    } else {
+                        alert('CEP não encontrado. Verifique se o CEP está correto.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro ao buscar CEP:', error);
+                    alert('Erro ao buscar CEP. Verifique sua conexão e tente novamente.');
+                })
+                .finally(() => {
+                    // Remover indicador de carregamento
+                    this.style.backgroundColor = '';
+                });
         });
         
+        // Validação de força da senha
+        document.getElementById('senha').addEventListener('input', function() {
+            const senha = this.value;
+            const feedback = document.getElementById('password-feedback');
+            
+            if (senha.length === 0) {
+                feedback.style.display = 'none';
+                return;
+            }
+            
+            let score = 0;
+            let texto = '';
+            let classe = '';
+            
+            // Critérios de força da senha
+            if (senha.length >= 8) score++;
+            if (/[a-z]/.test(senha)) score++;
+            if (/[A-Z]/.test(senha)) score++;
+            if (/[0-9]/.test(senha)) score++;
+            if (/[^A-Za-z0-9]/.test(senha)) score++;
+            
+            if (score < 3) {
+                texto = 'Senha fraca';
+                classe = 'weak';
+            } else if (score < 4) {
+                texto = 'Senha média';
+                classe = 'medium';
+            } else {
+                texto = 'Senha forte';
+                classe = 'strong';
+            }
+            
+            feedback.textContent = texto;
+            feedback.className = 'password-strength ' + classe;
+            feedback.style.display = 'block';
+        });
+        
+        // Validação de confirmação de senha
         function validatePasswords() {
             const senha = document.getElementById('senha').value;
             const confirmaSenha = document.getElementById('confirma_senha').value;
+            const feedback = document.getElementById('password-match-feedback');
+            
+            if (confirmaSenha.length === 0) {
+                feedback.style.display = 'none';
+                document.getElementById('confirma_senha').setCustomValidity('');
+                return true;
+            }
             
             if (senha !== confirmaSenha) {
+                feedback.textContent = 'As senhas não coincidem';
+                feedback.style.color = '#c62828';
+                feedback.style.display = 'block';
                 document.getElementById('confirma_senha').setCustomValidity('As senhas não coincidem');
                 return false;
             } else {
+                feedback.textContent = 'Senhas coincidem';
+                feedback.style.color = '#2e7d32';
+                feedback.style.display = 'block';
                 document.getElementById('confirma_senha').setCustomValidity('');
                 return true;
             }
@@ -616,12 +805,118 @@ $categorias = [
 
         // Validar antes do envio do formulário
         document.getElementById('store-form').addEventListener('submit', function(event) {
+            const submitBtn = document.getElementById('submit-btn');
+            
+            // Verificar se as senhas coincidem
             if (!validatePasswords()) {
                 event.preventDefault();
                 alert('Por favor, certifique-se de que as senhas coincidem.');
+                return false;
+            }
+            
+            // Verificar se todos os campos obrigatórios estão preenchidos
+            const requiredFields = this.querySelectorAll('[required]');
+            for (let field of requiredFields) {
+                if (!field.value.trim()) {
+                    field.focus();
+                    alert(`Por favor, preencha o campo: ${field.previousElementSibling.textContent.replace(' *', '')}`);
+                    event.preventDefault();
+                    return false;
+                }
+            }
+            
+            // Validar CNPJ
+            const cnpj = document.getElementById('cnpj').value.replace(/\D/g, '');
+            if (cnpj.length !== 14) {
+                alert('Por favor, informe um CNPJ válido com 14 dígitos.');
+                document.getElementById('cnpj').focus();
+                event.preventDefault();
+                return false;
+            }
+            
+            // Validar email
+            const email = document.getElementById('email').value;
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                alert('Por favor, informe um email válido.');
+                document.getElementById('email').focus();
+                event.preventDefault();
+                return false;
+            }
+            
+            // Validar CEP
+            const cep = document.getElementById('cep').value.replace(/\D/g, '');
+            if (cep.length !== 8) {
+                alert('Por favor, informe um CEP válido com 8 dígitos.');
+                document.getElementById('cep').focus();
+                event.preventDefault();
+                return false;
+            }
+            
+            // Desabilitar botão de envio para evitar cliques múltiplos
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Processando...';
+            
+            // Se chegou até aqui, o formulário é válido
+            return true;
+        });
+
+        // Validação de CNPJ (algoritmo básico)
+        function validarCNPJ(cnpj) {
+            cnpj = cnpj.replace(/[^\d]+/g, '');
+            
+            if (cnpj.length !== 14) return false;
+            
+            // Elimina CNPJs inválidos conhecidos
+            if (/^(\d)\1+$/.test(cnpj)) return false;
+            
+            // Valida DVs
+            let tamanho = cnpj.length - 2;
+            let numeros = cnpj.substring(0, tamanho);
+            let digitos = cnpj.substring(tamanho);
+            let soma = 0;
+            let pos = tamanho - 7;
+            
+            for (let i = tamanho; i >= 1; i--) {
+                soma += numeros.charAt(tamanho - i) * pos--;
+                if (pos < 2) pos = 9;
+            }
+            
+            let resultado = soma % 11 < 2 ? 0 : 11 - soma % 11;
+            if (resultado != digitos.charAt(0)) return false;
+            
+            tamanho = tamanho + 1;
+            numeros = cnpj.substring(0, tamanho);
+            soma = 0;
+            pos = tamanho - 7;
+            
+            for (let i = tamanho; i >= 1; i--) {
+                soma += numeros.charAt(tamanho - i) * pos--;
+                if (pos < 2) pos = 9;
+            }
+            
+            resultado = soma % 11 < 2 ? 0 : 11 - soma % 11;
+            if (resultado != digitos.charAt(1)) return false;
+            
+            return true;
+        }
+
+        // Validação em tempo real do CNPJ
+        document.getElementById('cnpj').addEventListener('blur', function() {
+            const cnpj = this.value;
+            if (cnpj && !validarCNPJ(cnpj)) {
+                this.setCustomValidity('CNPJ inválido');
+                this.style.borderColor = '#c62828';
+            } else {
+                this.setCustomValidity('');
+                this.style.borderColor = '';
             }
         });
 
+        // Remover estilo de erro quando o usuário começar a digitar novamente
+        document.getElementById('cnpj').addEventListener('input', function() {
+            this.style.borderColor = '';
+        });
     </script>
 </body>
 </html>

@@ -90,4 +90,25 @@ define('STORE_PROFILE_URL', SITE_URL . '/store/perfil');
 
 // Diretório para exportação
 define('EXPORTS_DIR', ROOT_DIR . '/exports');
+
+// Configurações de email (adicionar se não existirem)
+if (!defined('SMTP_HOST')) {
+    define('SMTP_HOST', 'smtp.hostinger.com');
+    define('SMTP_PORT', 465);
+    define('SMTP_USERNAME', 'klubecash@klubecash.com');
+    define('SMTP_PASSWORD', 'Aaku_2004@');
+    define('SMTP_FROM_EMAIL', 'noreply@klubecash.com');
+    define('SMTP_FROM_NAME', 'Klube Cash');
+    define('SMTP_ENCRYPTION', 'ssl');
+}
+
+// Log level
+if (!defined('LOG_LEVEL')) {
+    define('LOG_LEVEL', 'INFO');
+}
+
+// Environment
+if (!defined('ENVIRONMENT')) {
+    define('ENVIRONMENT', 'production');
+}
 ?>

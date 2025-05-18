@@ -15,7 +15,7 @@ RewriteBase /
     Header set X-Content-Type-Options "nosniff"
     
     # Política de segurança de conteúdo (CSP)
-    Header set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;"
+    Header set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' viacep.com.br;"
 </IfModule>
 
 # Bloquear acesso a arquivos sensíveis
