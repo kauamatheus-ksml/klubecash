@@ -228,7 +228,7 @@ try {
                         <option value="loja">Loja</option>
                     </select>
                 </div>
-                
+
                  <div class="form-group">
                     <label class="form-label" for="userEmail">E-mail</label>
                     <div id="emailSelectContainer" style="display: none;">
@@ -390,10 +390,11 @@ function showUserModal() {
     document.getElementById('userModalTitle').textContent = 'Adicionar Usuário';
     document.getElementById('userForm').reset();
     document.getElementById('userId').value = '';
-    document.getElementById('userPassword').required = true;
-    document.getElementById('passwordGroup').style.display = 'block';
-    document.getElementById('passwordHelp').textContent = 'Mínimo de 8 caracteres';
     currentUserId = null;
+    
+    // Por padrão, mostrar campo de senha
+    document.getElementById('passwordGroup').style.display = 'block';
+    document.getElementById('userPassword').required = true;
     
     // Resetar campos de loja
     resetStoreFields();
@@ -715,6 +716,12 @@ document.addEventListener('DOMContentLoaded', function() {
             isStoreUser = isStore;
             
             if (isStore) {
+                // Para usuários tipo loja, OCULTAR o campo de senha
+                // pois eles já têm senha definida no cadastro da loja
+                document.getElementById('passwordGroup').style.display = 'none';
+                document.getElementById('userPassword').required = false;
+                document.getElementById('userPassword').value = ''; // Limpar campo
+                
                 // Mostrar interface específica para lojas
                 document.getElementById('emailSelectContainer').style.display = 'block';
                 document.getElementById('userEmail').style.display = 'none';
@@ -728,6 +735,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     loadAvailableStores();
                 }
             } else {
+                // Para outros tipos de usuário, MOSTRAR o campo de senha
+                document.getElementById('passwordGroup').style.display = 'block';
+                document.getElementById('userPassword').required = true;
+                
                 // Mostrar interface normal para outros tipos de usuário
                 resetStoreFields();
             }
