@@ -385,6 +385,23 @@ $categorias = [
                         <input type="tel" id="telefone" name="telefone" class="form-control" required value="<?php echo isset($data['telefone']) ? htmlspecialchars($data['telefone']) : ''; ?>">
                     </div>
                     
+                    <h2 class="section-title">Dados de Acesso</h2>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label" for="senha">Senha de Acesso*</label>
+                            <input type="password" id="senha" name="senha" class="form-control" required minlength="8">
+                            <small class="form-text">Mínimo de 8 caracteres. Esta será sua senha para acessar o sistema.</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label" for="confirma_senha">Confirme a Senha*</label>
+                            <input type="password" id="confirma_senha" name="confirma_senha" class="form-control" required minlength="8">
+                            <small class="form-text">Digite novamente sua senha para confirmação.</small>
+                        </div>
+                    </div>
+
+
                     <div class="form-group">
                         <label class="form-label" for="website">Website</label>
                         <input type="url" id="website" name="website" class="form-control" value="<?php echo isset($data['website']) ? htmlspecialchars($data['website']) : ''; ?>">
@@ -579,6 +596,32 @@ $categorias = [
         document.getElementById('store-form').addEventListener('submit', function(event) {
             // Validações adicionais podem ser implementadas aqui
         });
+        
+        function validatePasswords() {
+            const senha = document.getElementById('senha').value;
+            const confirmaSenha = document.getElementById('confirma_senha').value;
+            
+            if (senha !== confirmaSenha) {
+                document.getElementById('confirma_senha').setCustomValidity('As senhas não coincidem');
+                return false;
+            } else {
+                document.getElementById('confirma_senha').setCustomValidity('');
+                return true;
+            }
+        }
+
+        // Aplicar validação em tempo real
+        document.getElementById('confirma_senha').addEventListener('input', validatePasswords);
+        document.getElementById('senha').addEventListener('input', validatePasswords);
+
+        // Validar antes do envio do formulário
+        document.getElementById('store-form').addEventListener('submit', function(event) {
+            if (!validatePasswords()) {
+                event.preventDefault();
+                alert('Por favor, certifique-se de que as senhas coincidem.');
+            }
+        });
+
     </script>
 </body>
 </html>
