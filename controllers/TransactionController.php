@@ -823,35 +823,36 @@ class TransactionController {
     }
     
     /**
-     * Obtém lista de transações pendentes para uma loja
-     * 
-     * @param int $storeId ID da loja
-     * @param array $filters Filtros adicionais
-     * @param int $page Página atual
-     * @return array Lista de transações pendentes
-     */
+    * Obtém lista de transações pendentes para uma loja
+    * 
+    * @param int $storeId ID da loja
+    * @param array $filters Filtros adicionais
+    * @param int $page Página atual
+    * @return array Lista de transações pendentes
+    */
     public static function getPendingTransactions($storeId, $filters = [], $page = 1) {
         try {
-            // Verificar se o usuário está autenticado e é loja ou admin
+            // Verificar se o usuário está autenticado
             if (!AuthController::isAuthenticated()) {
                 return ['status' => false, 'message' => 'Usuário não autenticado.'];
             }
             
-            // Código corrigido
-            if (AuthController::isStore()) {
-                $db = Database::getConnection();
-                $storeQuery = $db->prepare("SELECT id FROM lojas WHERE usuario_id = :usuario_id AND id = :store_id");
-                $userId = AuthController::getCurrentUserId();
-                $storeQuery->bindParam(':usuario_id', $userId);
-                $storeQuery->bindParam(':store_id', $storeId);
-                $storeQuery->execute();
-                
-                if ($storeQuery->rowCount() == 0) {
-                    return ['status' => false, 'message' => 'Acesso não autorizado.'];
-                }
-            }
-            
             $db = Database::getConnection();
+            
+            // Verificar permissões - apenas a loja dona das transações ou admin podem acessar
+            if (AuthController::isStore()) {
+                $currentUserId = AuthController::getCurrentUserId();
+                $storeOwnerQuery = $db->prepare("SELECT usuario_id FROM lojas WHERE id = :loja_id");
+                $storeOwnerQuery->bindParam(':loja_id', $storeId);
+                $storeOwnerQuery->execute();
+                $storeOwner = $storeOwnerQuery->fetch(PDO::FETCH_ASSOC);
+                
+                if (!$storeOwner || $storeOwner['usuario_id'] != $currentUserId) {
+                    return ['status' => false, 'message' => 'Acesso não autorizado a esta loja.'];
+                }
+            } elseif (!AuthController::isAdmin()) {
+                return ['status' => false, 'message' => 'Acesso não autorizado.'];
+            }
             
             // Verificar se a loja existe
             $storeStmt = $db->prepare("SELECT id FROM lojas WHERE id = :loja_id");
@@ -864,15 +865,15 @@ class TransactionController {
             
             // Construir consulta
             $query = "
-            SELECT t.*, u.nome as cliente_nome, u.email as cliente_email
-            FROM transacoes_cashback t
-            JOIN usuarios u ON t.usuario_id = u.id
-            WHERE t.loja_id = :loja_id AND t.status = :status
+                SELECT t.*, u.nome as cliente_nome, u.email as cliente_email
+                FROM transacoes_cashback t
+                JOIN usuarios u ON t.usuario_id = u.id
+                WHERE t.loja_id = :loja_id AND t.status = :status
             ";
-    
+            
             $params = [
-            ':loja_id' => $storeId,
-            ':status' => TRANSACTION_PENDING  // Use a constante TRANSACTION_PENDING
+                ':loja_id' => $storeId,
+                ':status' => TRANSACTION_PENDING
             ];
             
             // Aplicar filtros
@@ -922,7 +923,7 @@ class TransactionController {
             $totalCount = $countStmt->fetch(PDO::FETCH_ASSOC)['total'];
             
             // Paginação
-            $perPage = ITEMS_PER_PAGE;
+            $perPage = defined('ITEMS_PER_PAGE') ? ITEMS_PER_PAGE : 10;
             $totalPages = ceil($totalCount / $perPage);
             $page = max(1, min($page, $totalPages));
             $offset = ($page - 1) * $perPage;
@@ -1111,13 +1112,13 @@ class TransactionController {
     }
     
     /**
-     * Obtém histórico de pagamentos de uma loja
-     * 
-     * @param int $storeId ID da loja
-     * @param array $filters Filtros adicionais
-     * @param int $page Página atual
-     * @return array Histórico de pagamentos
-     */
+    * Obtém histórico de pagamentos de uma loja
+    * 
+    * @param int $storeId ID da loja
+    * @param array $filters Filtros adicionais
+    * @param int $page Página atual
+    * @return array Histórico de pagamentos
+    */
     public static function getPaymentHistory($storeId, $filters = [], $page = 1) {
         try {
             // Verificar se o usuário está autenticado
@@ -1125,15 +1126,25 @@ class TransactionController {
                 return ['status' => false, 'message' => 'Usuário não autenticado.'];
             }
             
-            // Apenas a loja dona dos pagamentos ou admin podem acessar
-            if (AuthController::isStore() && AuthController::getCurrentUserId() != $storeId) {
+            $db = Database::getConnection();
+            
+            // Verificar permissões - apenas a loja dona dos pagamentos ou admin podem acessar
+            if (AuthController::isStore()) {
+                $currentUserId = AuthController::getCurrentUserId();
+                $storeOwnerQuery = $db->prepare("SELECT usuario_id FROM lojas WHERE id = :loja_id");
+                $storeOwnerQuery->bindParam(':loja_id', $storeId);
+                $storeOwnerQuery->execute();
+                $storeOwner = $storeOwnerQuery->fetch(PDO::FETCH_ASSOC);
+                
+                if (!$storeOwner || $storeOwner['usuario_id'] != $currentUserId) {
+                    return ['status' => false, 'message' => 'Acesso não autorizado a esta loja.'];
+                }
+            } elseif (!AuthController::isAdmin()) {
                 return ['status' => false, 'message' => 'Acesso não autorizado.'];
             }
             
-            $db = Database::getConnection();
-            
             // Verificar se a loja existe
-            $storeStmt = $db->prepare("SELECT id FROM lojas WHERE id = :loja_id");
+            $storeStmt = $db->prepare("SELECT id, nome_fantasia FROM lojas WHERE id = :loja_id");
             $storeStmt->bindParam(':loja_id', $storeId);
             $storeStmt->execute();
             
@@ -1144,7 +1155,7 @@ class TransactionController {
             // Construir consulta
             $query = "
                 SELECT p.*,
-                       (SELECT COUNT(*) FROM pagamentos_transacoes WHERE pagamento_id = p.id) as total_transacoes
+                    (SELECT COUNT(*) FROM pagamentos_transacoes WHERE pagamento_id = p.id) as qtd_transacoes
                 FROM pagamentos_comissao p
                 WHERE p.loja_id = :loja_id
             ";
@@ -1183,7 +1194,7 @@ class TransactionController {
             $query .= " ORDER BY p.data_registro DESC";
             
             // Contagem total para paginação
-            $countQuery = str_replace("p.*, (SELECT COUNT(*) FROM pagamentos_transacoes WHERE pagamento_id = p.id) as total_transacoes", "COUNT(*) as total", $query);
+            $countQuery = str_replace("p.*, (SELECT COUNT(*) FROM pagamentos_transacoes WHERE pagamento_id = p.id) as qtd_transacoes", "COUNT(*) as total", $query);
             $countStmt = $db->prepare($countQuery);
             
             foreach ($params as $param => $value) {
@@ -1194,7 +1205,7 @@ class TransactionController {
             $totalCount = $countStmt->fetch(PDO::FETCH_ASSOC)['total'];
             
             // Paginação
-            $perPage = ITEMS_PER_PAGE;
+            $perPage = defined('ITEMS_PER_PAGE') ? ITEMS_PER_PAGE : 10;
             $totalPages = ceil($totalCount / $perPage);
             $page = max(1, min($page, $totalPages));
             $offset = ($page - 1) * $perPage;
