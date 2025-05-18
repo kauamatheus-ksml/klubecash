@@ -280,12 +280,12 @@ public static function getUserDetails($userId) {
      
     
     /**
-     * Atualiza status de um usuário
-     * 
-     * @param int $userId ID do usuário
-     * @param string $status Novo status (ativo, inativo, bloqueado)
-     * @return array Resultado da operação
-     */
+    * Atualiza dados de um usuário
+    * 
+    * @param int $userId ID do usuário
+    * @param array $data Novos dados do usuário
+    * @return array Resultado da operação
+    */
     public static function updateUser($userId, $data) {
         try {
             // Verificar se é um administrador
@@ -311,37 +311,65 @@ public static function getUserDetails($userId) {
             // Nome
             if (isset($data['nome']) && !empty($data['nome'])) {
                 $updateFields[] = "nome = :nome";
-                $params[':nome'] = $data['nome'];
+                $params[':nome'] = trim($data['nome']);
             }
             
-            // Email
+            // Email - validar se não existe em outro usuário
             if (isset($data['email']) && !empty($data['email'])) {
+                $emailCheckStmt = $db->prepare("SELECT id FROM usuarios WHERE email = :email AND id != :user_id");
+                $emailCheckStmt->bindParam(':email', $data['email']);
+                $emailCheckStmt->bindParam(':user_id', $userId);
+                $emailCheckStmt->execute();
+                
+                if ($emailCheckStmt->rowCount() > 0) {
+                    return ['status' => false, 'message' => 'Este email já está sendo usado por outro usuário.'];
+                }
+                
                 $updateFields[] = "email = :email";
-                $params[':email'] = $data['email'];
+                $params[':email'] = trim($data['email']);
+            }
+            
+            // Telefone
+            if (isset($data['telefone'])) {
+                $updateFields[] = "telefone = :telefone";
+                $params[':telefone'] = trim($data['telefone']);
             }
             
             // Tipo
             if (isset($data['tipo']) && !empty($data['tipo'])) {
-                $updateFields[] = "tipo = :tipo";
-                $params[':tipo'] = $data['tipo'];
+                $validTypes = [USER_TYPE_CLIENT, USER_TYPE_ADMIN, USER_TYPE_STORE];
+                if (in_array($data['tipo'], $validTypes)) {
+                    $updateFields[] = "tipo = :tipo";
+                    $params[':tipo'] = $data['tipo'];
+                }
             }
             
             // Status
             if (isset($data['status']) && !empty($data['status'])) {
-                $updateFields[] = "status = :status";
-                $params[':status'] = $data['status'];
+                $validStatus = [USER_ACTIVE, USER_INACTIVE, USER_BLOCKED];
+                if (in_array($data['status'], $validStatus)) {
+                    $updateFields[] = "status = :status";
+                    $params[':status'] = $data['status'];
+                }
             }
             
-            // Senha (opcional)
-            if (isset($data['senha']) && !empty($data['senha'])) {
-                $senha_hash = password_hash($data['senha'], PASSWORD_DEFAULT);
+            // Senha (opcional) - só incluir se foi fornecida e não está vazia
+            if (isset($data['senha']) && !empty(trim($data['senha']))) {
+                $senha = trim($data['senha']);
+                
+                // Validar comprimento mínimo apenas se a senha foi fornecida
+                if (strlen($senha) < PASSWORD_MIN_LENGTH) {
+                    return ['status' => false, 'message' => 'A senha deve ter no mínimo ' . PASSWORD_MIN_LENGTH . ' caracteres.'];
+                }
+                
+                $senha_hash = password_hash($senha, PASSWORD_DEFAULT);
                 $updateFields[] = "senha_hash = :senha_hash";
                 $params[':senha_hash'] = $senha_hash;
             }
             
             // Se não houver campos para atualizar
             if (empty($updateFields)) {
-                return ['status' => false, 'message' => 'Nenhum dado para atualizar.'];
+                return ['status' => false, 'message' => 'Nenhum dado válido para atualizar.'];
             }
             
             // Construir e executar a query de atualização

@@ -16,7 +16,6 @@ session_start();
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION['user_type'] !== USER_TYPE_ADMIN) {
     // Redirecionar para a página de login com mensagem de erro
     header("Location: " . LOGIN_URL . "?error=acesso_restrito");
-
     exit;
 }
 
@@ -27,6 +26,7 @@ $filters = [];
 // Verificar valores dos filtros para debug
 error_log('Filtros preparados: ' . print_r($filters, true));
 error_log('Página: ' . $page);
+
 try {
     // Obter dados dos usuários
     $result = AdminController::manageUsers($filters, $page);
@@ -78,6 +78,7 @@ try {
                     <button class="btn btn-danger btn-sm" onclick="bulkAction('bloqueado')">Bloquear</button>
                 </div>
             </div>
+            
             <!-- Container de mensagens -->
             <div id="messageContainer" class="alert-container"></div>
             
@@ -95,10 +96,10 @@ try {
                         <thead>
                             <tr>
                                 <th>
-                                <div class="checkbox-wrapper">
-                                    <input type="checkbox" class="user-checkbox" value="<?php echo $user['id']; ?>" onchange="toggleUserSelection(this, <?php echo $user['id']; ?>)">
-                                    <span class="checkmark"></span>
-                                </div>
+                                    <div class="checkbox-wrapper">
+                                        <input type="checkbox" id="selectAll" onchange="toggleSelectAll()">
+                                        <span class="checkmark"></span>
+                                    </div>
                                 </th>
                                 <th>Nome</th>
                                 <th>E-mail</th>
@@ -118,7 +119,7 @@ try {
                                     <tr>
                                         <td>
                                             <div class="checkbox-wrapper">
-                                                <input type="checkbox" class="user-checkbox" value="<?php echo $user['id']; ?>">
+                                                <input type="checkbox" class="user-checkbox" value="<?php echo $user['id']; ?>" onchange="toggleUserSelection(this, <?php echo $user['id']; ?>)">
                                                 <span class="checkmark"></span>
                                             </div>
                                         </td>
@@ -168,7 +169,7 @@ try {
                     </table>
                 </div>
                 
-                <!-- Paginação corrigida -->
+                <!-- Paginação -->
                 <?php if (!empty($pagination) && $pagination['total_paginas'] > 1): ?>
                     <div class="pagination">
                         <a href="?page=<?php echo max(1, $page - 1); ?>" class="pagination-arrow">
@@ -219,8 +220,7 @@ try {
             <form id="userForm" onsubmit="submitUserForm(event)">
                 <input type="hidden" id="userId" name="id" value="">
                 
-                <!-- Campos do formulário -->
-                 <div class="form-group">
+                <div class="form-group">
                     <label class="form-label" for="userType">Tipo</label>
                     <select class="form-select" id="userType" name="tipo">
                         <option value="cliente">Cliente</option>
@@ -229,7 +229,7 @@ try {
                     </select>
                 </div>
 
-                 <div class="form-group">
+                <div class="form-group">
                     <label class="form-label" for="userEmail">E-mail</label>
                     <div id="emailSelectContainer" style="display: none;">
                         <select class="form-select" id="userEmailSelect" name="email_select">
@@ -243,6 +243,7 @@ try {
                     <label class="form-label" for="userName">Nome</label>
                     <input type="text" class="form-control" id="userName" name="nome" required>
                 </div>
+                
                 <!-- Campos que serão preenchidos automaticamente quando for loja -->
                 <div id="storeDataFields" style="display: none;">
                     <div class="form-group">
@@ -261,16 +262,10 @@ try {
                     </div>
                 </div>
 
-                
-                
-
-                
                 <div class="form-group">
                     <label class="form-label" for="userPhone">Telefone</label>
                     <input type="text" class="form-control" id="userPhone" name="telefone">
                 </div>
-                
-                
                 
                 <div class="form-group">
                     <label class="form-label" for="userStatus">Status</label>
@@ -283,8 +278,8 @@ try {
                 
                 <div class="form-group" id="passwordGroup">
                     <label class="form-label" for="userPassword">Senha</label>
-                    <input type="password" class="form-control" id="userPassword" name="senha" required>
-                    <small id="passwordHelp" class="form-text">Mínimo de 8 caracteres</small>
+                    <input type="password" class="form-control" id="userPassword" name="senha">
+                    <small id="passwordHelp" class="form-text">Mínimo de 8 caracteres (deixe em branco para manter a senha atual ao editar)</small>
                 </div>
                 
                 <div class="form-footer">
@@ -301,6 +296,7 @@ let currentUserId = null;
 let selectedUsers = [];
 let availableStores = []; // Array com lojas disponíveis para vinculação
 let isStoreUser = false; // Flag para controlar se é usuário do tipo loja
+let isEditMode = false; // Flag para saber se estamos editando
 
 // Função para exibir mensagens
 function showMessage(message, type = 'success') {
@@ -391,10 +387,16 @@ function showUserModal() {
     document.getElementById('userForm').reset();
     document.getElementById('userId').value = '';
     currentUserId = null;
+    isEditMode = false; // Definir que estamos criando
     
-    // Por padrão, mostrar campo de senha
-    document.getElementById('passwordGroup').style.display = 'block';
-    document.getElementById('userPassword').required = true;
+    // Configurar campo de senha para criação
+    const passwordField = document.getElementById('userPassword');
+    const passwordGroup = document.getElementById('passwordGroup');
+    const passwordHelp = document.getElementById('passwordHelp');
+    
+    passwordGroup.style.display = 'block';
+    passwordField.required = true;
+    passwordHelp.textContent = 'Mínimo de 8 caracteres';
     
     // Resetar campos de loja
     resetStoreFields();
@@ -415,12 +417,22 @@ function hideUserModal() {
 function editUser(userId) {
     // Armazenar ID do usuário atual
     currentUserId = userId;
+    isEditMode = true; // Definir que estamos editando
     
     // Mostrar carregamento
     document.getElementById('userModalTitle').textContent = 'Carregando...';
     document.getElementById('userForm').reset();
     document.getElementById('userId').value = userId;
     document.getElementById('userModal').classList.add('show');
+    
+    // Configurar campo de senha para edição (opcional)
+    const passwordField = document.getElementById('userPassword');
+    const passwordGroup = document.getElementById('passwordGroup');
+    const passwordHelp = document.getElementById('passwordHelp');
+    
+    passwordGroup.style.display = 'block';
+    passwordField.required = false; // Senha opcional na edição
+    passwordHelp.textContent = 'Mínimo de 8 caracteres (deixe em branco para manter a senha atual)';
     
     // Resetar campos de loja (no modo edição, não mostramos a seleção de loja)
     resetStoreFields();
@@ -457,9 +469,7 @@ function editUser(userId) {
             document.getElementById('userType').value = userData.tipo;
             document.getElementById('userStatus').value = userData.status;
             
-            // Ocultar campo de senha na edição
-            document.getElementById('passwordGroup').style.display = 'none';
-            document.getElementById('userPassword').required = false;
+            // Limpar campo de senha
             document.getElementById('userPassword').value = '';
         } else {
             hideUserModal();
@@ -499,7 +509,7 @@ function deactivateUser(userId, userName) {
     }
 }
 
-// Função para enviar formulário (modificada para lidar com lojas)
+// Função para enviar formulário (com validação de senha corrigida)
 function submitUserForm(event) {
     event.preventDefault();
     
@@ -507,8 +517,35 @@ function submitUserForm(event) {
     const form = document.getElementById('userForm');
     const formData = new FormData(form);
     
+    // Verificar se estamos editando ou criando
+    const userId = formData.get('id');
+    const isEditing = userId !== '';
+    
+    // Validação específica para senha
+    const senha = formData.get('senha');
+    if (!isEditing) {
+        // Para criação, senha é obrigatória
+        if (!senha || senha.trim() === '') {
+            showMessage('Senha é obrigatória para criar um novo usuário', 'danger');
+            document.getElementById('userPassword').focus();
+            return;
+        }
+        if (senha.length < 8) {
+            showMessage('A senha deve ter no mínimo 8 caracteres', 'danger');
+            document.getElementById('userPassword').focus();
+            return;
+        }
+    } else {
+        // Para edição, senha é opcional, mas se fornecida deve ter no mínimo 8 caracteres
+        if (senha && senha.trim() !== '' && senha.length < 8) {
+            showMessage('A senha deve ter no mínimo 8 caracteres', 'danger');
+            document.getElementById('userPassword').focus();
+            return;
+        }
+    }
+    
     // Se for usuário do tipo loja, usar o email selecionado no select
-    if (isStoreUser) {
+    if (isStoreUser && !isEditing) {
         const selectedEmail = document.getElementById('userEmailSelect').value;
         if (selectedEmail) {
             formData.set('email', selectedEmail);
@@ -518,21 +555,17 @@ function submitUserForm(event) {
         }
     }
     
-    // Verificar se estamos editando ou criando
-    const userId = formData.get('id');
-    const isEditing = userId !== '';
-    
     // Mostrar indicador de carregamento
     const saveButton = form.querySelector('button[type="submit"]');
     const originalButtonText = saveButton.textContent;
     saveButton.textContent = 'Salvando...';
     saveButton.disabled = true;
     
-    // Converter FormData para URLSearchParams para melhor compatibilidade
+    // Converter FormData para URLSearchParams
     const data = new URLSearchParams();
     
     if (isEditing) {
-        // Para edição, usamos AdminController.php com action=update_user
+        // Para edição, usar AdminController.php
         data.append('action', 'update_user');
         data.append('user_id', userId);
         data.append('nome', formData.get('nome'));
@@ -541,19 +574,19 @@ function submitUserForm(event) {
         data.append('tipo', formData.get('tipo'));
         data.append('status', formData.get('status'));
         
-        // Senha opcional
-        if (formData.get('senha') && formData.get('senha').trim() !== '') {
-            data.append('senha', formData.get('senha'));
+        // Senha opcional - só incluir se foi preenchida
+        if (senha && senha.trim() !== '') {
+            data.append('senha', senha);
         }
         
         var url = '<?php echo SITE_URL; ?>/controllers/AdminController.php';
     } else {
-        // Para criação, usamos AuthController.php
+        // Para criação, usar AuthController.php
         data.append('action', 'register');
         data.append('nome', formData.get('nome'));
         data.append('email', formData.get('email'));
         data.append('telefone', formData.get('telefone') || '');
-        data.append('senha', formData.get('senha'));
+        data.append('senha', senha); // Senha obrigatória para criação
         data.append('tipo', formData.get('tipo'));
         data.append('ajax', '1'); // Indicar que é uma chamada AJAX
         
@@ -569,9 +602,7 @@ function submitUserForm(event) {
         },
         body: data
     })
-    .then(response => {
-        return response.text();
-    })
+    .then(response => response.text())
     .then(text => {
         console.log('Resposta completa do servidor:', text);
         
@@ -612,18 +643,24 @@ function submitUserForm(event) {
     });
 }
 
-// Função para atualizar a barra de ações em massa
-function updateBulkActionBar() {
-    const bulkActionBar = document.getElementById('bulkActionBar');
-    const selectedCount = document.getElementById('selectedCount');
+// Função para selecionar/desselecionar todos
+function toggleSelectAll() {
+    const selectAll = document.getElementById('selectAll');
+    const checkboxes = document.querySelectorAll('.user-checkbox');
     
-    selectedCount.textContent = selectedUsers.length;
+    selectedUsers = [];
     
-    if (selectedUsers.length > 0) {
-        bulkActionBar.style.display = 'flex';
-    } else {
-        bulkActionBar.style.display = 'none';
-    }
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = selectAll.checked;
+        if (selectAll.checked) {
+            const userId = parseInt(checkbox.value);
+            if (!selectedUsers.includes(userId)) {
+                selectedUsers.push(userId);
+            }
+        }
+    });
+    
+    updateBulkActionBar();
 }
 
 // Função para processar checkbox individual
@@ -644,24 +681,18 @@ function toggleUserSelection(checkbox, userId) {
     updateBulkActionBar();
 }
 
-// Função para selecionar/desselecionar todos
-function toggleSelectAll() {
-    const selectAll = document.getElementById('selectAll');
-    const checkboxes = document.querySelectorAll('.user-checkbox');
+// Função para atualizar a barra de ações em massa
+function updateBulkActionBar() {
+    const bulkActionBar = document.getElementById('bulkActionBar');
+    const selectedCount = document.getElementById('selectedCount');
     
-    selectedUsers = [];
+    selectedCount.textContent = selectedUsers.length;
     
-    checkboxes.forEach(checkbox => {
-        checkbox.checked = selectAll.checked;
-        if (selectAll.checked) {
-            const userId = parseInt(checkbox.value);
-            if (!selectedUsers.includes(userId)) {
-                selectedUsers.push(userId);
-            }
-        }
-    });
-    
-    updateBulkActionBar();
+    if (selectedUsers.length > 0) {
+        bulkActionBar.style.display = 'flex';
+    } else {
+        bulkActionBar.style.display = 'none';
+    }
 }
 
 // Função para executar ação em massa
@@ -715,13 +746,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const isStore = this.value === 'loja';
             isStoreUser = isStore;
             
-            if (isStore) {
-                // Para usuários tipo loja, OCULTAR o campo de senha
-                // pois eles já têm senha definida no cadastro da loja
-                document.getElementById('passwordGroup').style.display = 'none';
-                document.getElementById('userPassword').required = false;
-                document.getElementById('userPassword').value = ''; // Limpar campo
-                
+            if (isStore && !isEditMode) {
+                // Para usuários tipo loja em modo de criação
                 // Mostrar interface específica para lojas
                 document.getElementById('emailSelectContainer').style.display = 'block';
                 document.getElementById('userEmail').style.display = 'none';
@@ -735,11 +761,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     loadAvailableStores();
                 }
             } else {
-                // Para outros tipos de usuário, MOSTRAR o campo de senha
-                document.getElementById('passwordGroup').style.display = 'block';
-                document.getElementById('userPassword').required = true;
-                
-                // Mostrar interface normal para outros tipos de usuário
+                // Para outros tipos de usuário ou modo de edição
                 resetStoreFields();
             }
         });
