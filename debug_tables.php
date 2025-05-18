@@ -17,6 +17,7 @@ try {
         echo "<pre>" . $result['Create Table'] . "</pre><br>";
     }
     
+    
     // Verificar dados
     echo "<h3>Dados atuais:</h3>";
     

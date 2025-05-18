@@ -33,6 +33,7 @@ try {
         'metodo_pagamento' => 'teste_completo'
     ];
     
+    
     $result = TransactionController::registerPayment($paymentData);
     echo "✅ Pagamento: " . ($result['status'] ? 'SUCESSO' : 'ERRO - ' . $result['message']) . "<br>";
     

@@ -23,6 +23,7 @@ try {
         echo "Erro na inserção: " . print_r($stmt->errorInfo(), true);
     }
     
+    
 } catch (Exception $e) {
     echo "Erro: " . $e->getMessage();
 }
