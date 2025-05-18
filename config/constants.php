@@ -86,6 +86,7 @@ define('STORE_REGISTER_TRANSACTION_URL', SITE_URL . '/store/registrar-transacao'
 define('STORE_BATCH_UPLOAD_URL', SITE_URL . '/store/upload-lote');
 define('STORE_PAYMENT_URL', SITE_URL . '/store/pagamento');
 define('STORE_PAYMENT_HISTORY_URL', SITE_URL . '/store/historico-pagamentos');
+define('STORE_PROFILE_URL', SITE_URL . '/store/perfil');
 
 // Diretório para exportação
 define('EXPORTS_DIR', ROOT_DIR . '/exports');
