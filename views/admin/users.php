@@ -220,6 +220,16 @@ try {
                 <input type="hidden" id="userId" name="id" value="">
                 
                 <!-- Campos do formulário -->
+                 <div class="form-group">
+                    <label class="form-label" for="userEmail">E-mail</label>
+                    <div id="emailSelectContainer" style="display: none;">
+                        <select class="form-select" id="userEmailSelect" name="email_select">
+                            <option value="">Selecione uma loja...</option>
+                        </select>
+                    </div>
+                    <input type="email" class="form-control" id="userEmail" name="email" required>
+                </div>
+                
                 <div class="form-group">
                     <label class="form-label" for="userName">Nome</label>
                     <input type="text" class="form-control" id="userName" name="nome" required>
@@ -243,15 +253,7 @@ try {
                 </div>
 
                 
-                <div class="form-group">
-                    <label class="form-label" for="userEmail">E-mail</label>
-                    <div id="emailSelectContainer" style="display: none;">
-                        <select class="form-select" id="userEmailSelect" name="email_select">
-                            <option value="">Selecione uma loja...</option>
-                        </select>
-                    </div>
-                    <input type="email" class="form-control" id="userEmail" name="email" required>
-                </div>
+                
 
                 
                 <div class="form-group">
