@@ -120,14 +120,15 @@ class AuthController {
         }
     }
     /**
-     * Registra um novo usuário
-     * 
-     * @param string $nome Nome do usuário
-     * @param string $email Email do usuário
-     * @param string $telefone Telefone do usuário
-     * @param string $senha Senha do usuário
-     * @return array Resultado da operação com status e mensagem
-     */
+    * Registra um novo usuário
+    * 
+    * @param string $nome Nome do usuário
+    * @param string $email Email do usuário
+    * @param string $telefone Telefone do usuário
+    * @param string $senha Senha do usuário
+    * @param string $tipo Tipo do usuário
+    * @return array Resultado da operação com status e mensagem
+    */
     public static function register($nome, $email, $telefone, $senha, $tipo = null) {
         try {
             // Validar dados
@@ -164,15 +165,36 @@ class AuthController {
                 return ['status' => false, 'message' => 'Este email já está cadastrado. Por favor, use outro ou faça login.'];
             }
             
+            // Se for usuário do tipo loja, verificar se há uma loja aprovada com este email
+            $storeId = null;
+            if ($tipo === USER_TYPE_STORE) {
+                $storeStmt = $db->prepare("
+                    SELECT id FROM lojas 
+                    WHERE email = :email AND status = :status AND (usuario_id IS NULL OR usuario_id = 0)
+                ");
+                $storeStmt->bindParam(':email', $email);
+                $storeStatus = STORE_APPROVED;
+                $storeStmt->bindParam(':status', $storeStatus);
+                $storeStmt->execute();
+                
+                if ($storeStmt->rowCount() > 0) {
+                    $store = $storeStmt->fetch(PDO::FETCH_ASSOC);
+                    $storeId = $store['id'];
+                }
+            }
+            
             // Hash da senha
             $senha_hash = password_hash($senha, PASSWORD_DEFAULT);
             
             // Definir tipo de usuário (cliente é o padrão, mas admin pode alterar)
             $tipoUsuario = $tipo ?? USER_TYPE_CLIENT;
             
+            // Iniciar transação
+            $db->beginTransaction();
+            
             // Inserir novo usuário
             $stmt = $db->prepare("INSERT INTO usuarios (nome, email, senha_hash, tipo, status, data_criacao) 
-                                  VALUES (:nome, :email, :senha_hash, :tipo, :status, NOW())");
+                                VALUES (:nome, :email, :senha_hash, :tipo, :status, NOW())");
             $stmt->bindParam(':nome', $nome);
             $stmt->bindParam(':email', $email);
             $stmt->bindParam(':senha_hash', $senha_hash);
@@ -183,18 +205,41 @@ class AuthController {
             if ($stmt->execute()) {
                 $user_id = $db->lastInsertId();
                 
+                // Se for usuário do tipo loja e encontrou uma loja correspondente, vincular
+                if ($tipoUsuario === USER_TYPE_STORE && $storeId) {
+                    $linkStmt = $db->prepare("UPDATE lojas SET usuario_id = :usuario_id WHERE id = :loja_id");
+                    $linkStmt->bindParam(':usuario_id', $user_id);
+                    $linkStmt->bindParam(':loja_id', $storeId);
+                    
+                    if (!$linkStmt->execute()) {
+                        $db->rollBack();
+                        return ['status' => false, 'message' => 'Erro ao vincular usuário à loja.'];
+                    }
+                }
+                
+                // Commit da transação
+                $db->commit();
+                
                 // Enviar email de boas-vindas
                 Email::sendWelcome($email, $nome);
                 
                 return [
                     'status' => true, 
-                    'message' => 'Cadastro realizado com sucesso!', 
-                    'user_id' => $user_id
+                    'message' => 'Cadastro realizado com sucesso!' . 
+                                ($storeId ? ' Usuário vinculado à loja automaticamente.' : ''), 
+                    'user_id' => $user_id,
+                    'store_linked' => $storeId ? true : false
                 ];
             } else {
+                $db->rollBack();
                 return ['status' => false, 'message' => 'Erro ao cadastrar. Por favor, tente novamente.'];
             }
         } catch (PDOException $e) {
+            // Rollback em caso de erro
+            if (isset($db) && $db->inTransaction()) {
+                $db->rollBack();
+            }
+            
             error_log('Erro no registro: ' . $e->getMessage());
             return ['status' => false, 'message' => 'Erro ao processar o cadastro. Tente novamente.'];
         }

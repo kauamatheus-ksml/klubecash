@@ -558,13 +558,94 @@ public static function getUserDetails($userId) {
             return ['status' => false, 'message' => 'Erro ao carregar lojas: ' . $e->getMessage()];
         }
     }
-    
+    // Adicionar este método no AdminController.php
+
+/**
+ * Obtém lojas aprovadas sem usuário vinculado
+ * 
+ * @return array Lista de lojas sem usuário
+ */
+public static function getAvailableStores() {
+    try {
+        // Verificar se é um administrador
+        if (!self::validateAdmin()) {
+            return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
+        }
+        
+        $db = Database::getConnection();
+        
+        // Buscar lojas aprovadas sem usuário vinculado
+        $stmt = $db->prepare("
+            SELECT id, nome_fantasia, razao_social, cnpj, email, telefone, categoria
+            FROM lojas 
+            WHERE status = :status AND (usuario_id IS NULL OR usuario_id = 0)
+            ORDER BY nome_fantasia ASC
+        ");
+        $status = STORE_APPROVED;
+        $stmt->bindParam(':status', $status);
+        $stmt->execute();
+        
+        $stores = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        return [
+            'status' => true,
+            'data' => $stores
+        ];
+        
+    } catch (PDOException $e) {
+        error_log('Erro ao obter lojas disponíveis: ' . $e->getMessage());
+        return ['status' => false, 'message' => 'Erro ao carregar lojas disponíveis.'];
+    }
+}
+
     /**
-     * Obtém detalhes de uma loja específica
-     * 
-     * @param int $storeId ID da loja
-     * @return array Dados da loja
-     */
+    * Obtém dados de uma loja específica pelo email
+    * 
+    * @param string $email Email da loja
+    * @return array Dados da loja
+    */
+    public static function getStoreByEmail($email) {
+        try {
+            // Verificar se é um administrador
+            if (!self::validateAdmin()) {
+                return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
+            }
+            
+            $db = Database::getConnection();
+            
+            // Buscar loja pelo email
+            $stmt = $db->prepare("
+                SELECT id, nome_fantasia, razao_social, cnpj, email, telefone, categoria
+                FROM lojas 
+                WHERE email = :email AND status = :status AND (usuario_id IS NULL OR usuario_id = 0)
+            ");
+            $stmt->bindParam(':email', $email);
+            $status = STORE_APPROVED;
+            $stmt->bindParam(':status', $status);
+            $stmt->execute();
+            
+            $store = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$store) {
+                return ['status' => false, 'message' => 'Loja não encontrada ou já vinculada a um usuário.'];
+            }
+            
+            return [
+                'status' => true,
+                'data' => $store
+            ];
+            
+        } catch (PDOException $e) {
+            error_log('Erro ao obter dados da loja: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro ao carregar dados da loja.'];
+        }
+    }
+    /**
+    * Obtém detalhes de uma loja específica
+    * 
+    * @param int $storeId ID da loja
+    * @return array Dados da loja
+    */
     public static function getStoreDetails($storeId) {
         try {
             // Verificar se é um administrador
@@ -2090,7 +2171,17 @@ if (basename($_SERVER['PHP_SELF']) === 'AdminController.php') {
             $result = AdminController::createDatabaseBackup();
             echo json_encode($result);
             break;
+      
+        case 'get_available_stores':
+            $result = AdminController::getAvailableStores();
+            echo json_encode($result);
+            break;
             
+        case 'get_store_by_email':
+            $email = $_POST['email'] ?? '';
+            $result = AdminController::getStoreByEmail($email);
+            echo json_encode($result);
+            break;
         default:
             // Acesso inválido ao controlador
             header('Location: ' . ADMIN_DASHBOARD_URL);

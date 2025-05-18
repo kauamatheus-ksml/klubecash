@@ -224,11 +224,35 @@ try {
                     <label class="form-label" for="userName">Nome</label>
                     <input type="text" class="form-control" id="userName" name="nome" required>
                 </div>
+                <!-- Campos que serão preenchidos automaticamente quando for loja -->
+                <div id="storeDataFields" style="display: none;">
+                    <div class="form-group">
+                        <label class="form-label" for="storeName">Nome da Loja</label>
+                        <input type="text" class="form-control" id="storeName" readonly>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="storeDocument">CNPJ</label>
+                        <input type="text" class="form-control" id="storeDocument" readonly>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="storeCategory">Categoria</label>
+                        <input type="text" class="form-control" id="storeCategory" readonly>
+                    </div>
+                </div>
+
                 
                 <div class="form-group">
                     <label class="form-label" for="userEmail">E-mail</label>
+                    <div id="emailSelectContainer" style="display: none;">
+                        <select class="form-select" id="userEmailSelect" name="email_select">
+                            <option value="">Selecione uma loja...</option>
+                        </select>
+                    </div>
                     <input type="email" class="form-control" id="userEmail" name="email" required>
                 </div>
+
                 
                 <div class="form-group">
                     <label class="form-label" for="userPhone">Telefone</label>
@@ -268,9 +292,11 @@ try {
     </div>
     
     <script>
-        // Variáveis globais
+// Variáveis globais
 let currentUserId = null;
 let selectedUsers = [];
+let availableStores = []; // Array com lojas disponíveis para vinculação
+let isStoreUser = false; // Flag para controlar se é usuário do tipo loja
 
 // Função para exibir mensagens
 function showMessage(message, type = 'success') {
@@ -290,6 +316,71 @@ function showMessage(message, type = 'success') {
     }, 5000);
 }
 
+// Função para carregar lojas disponíveis (aprovadas e sem usuário vinculado)
+function loadAvailableStores() {
+    fetch('<?php echo SITE_URL; ?>/controllers/AdminController.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'action=get_available_stores'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status && data.data) {
+            availableStores = data.data;
+            populateStoreSelect();
+        } else {
+            console.warn('Nenhuma loja disponível encontrada');
+            availableStores = [];
+        }
+    })
+    .catch(error => {
+        console.error('Erro ao carregar lojas:', error);
+        availableStores = [];
+    });
+}
+
+// Função para popular o select de lojas
+function populateStoreSelect() {
+    const select = document.getElementById('userEmailSelect');
+    
+    // Limpar opções existentes
+    select.innerHTML = '<option value="">Selecione uma loja...</option>';
+    
+    // Adicionar lojas disponíveis
+    availableStores.forEach(store => {
+        const option = document.createElement('option');
+        option.value = store.email;
+        option.textContent = `${store.nome_fantasia} (${store.email})`;
+        option.dataset.storeData = JSON.stringify(store);
+        select.appendChild(option);
+    });
+}
+
+// Função para resetar campos relacionados a loja
+function resetStoreFields() {
+    // Ocultar container do select de lojas e mostrar input normal de email
+    document.getElementById('emailSelectContainer').style.display = 'none';
+    document.getElementById('userEmail').style.display = 'block';
+    document.getElementById('storeDataFields').style.display = 'none';
+    
+    // Limpar valores dos campos
+    document.getElementById('userEmailSelect').value = '';
+    document.getElementById('storeName').value = '';
+    document.getElementById('storeDocument').value = '';
+    document.getElementById('storeCategory').value = '';
+    
+    // Habilitar edição dos campos principais
+    document.getElementById('userEmail').readOnly = false;
+    document.getElementById('userName').readOnly = false;
+    document.getElementById('userPhone').readOnly = false;
+    document.getElementById('userEmail').required = true;
+    
+    // Resetar flag
+    isStoreUser = false;
+}
+
 // Função para mostrar modal de adicionar usuário
 function showUserModal() {
     document.getElementById('userModalTitle').textContent = 'Adicionar Usuário';
@@ -300,8 +391,14 @@ function showUserModal() {
     document.getElementById('passwordHelp').textContent = 'Mínimo de 8 caracteres';
     currentUserId = null;
     
+    // Resetar campos de loja
+    resetStoreFields();
+    
     // Mostrar modal
     document.getElementById('userModal').classList.add('show');
+    
+    // Carregar lojas disponíveis para o select
+    loadAvailableStores();
 }
 
 // Função para esconder modal
@@ -319,6 +416,9 @@ function editUser(userId) {
     document.getElementById('userForm').reset();
     document.getElementById('userId').value = userId;
     document.getElementById('userModal').classList.add('show');
+    
+    // Resetar campos de loja (no modo edição, não mostramos a seleção de loja)
+    resetStoreFields();
     
     // Fazer requisição AJAX para obter dados do usuário
     fetch('<?php echo SITE_URL; ?>/controllers/AdminController.php', {
@@ -394,13 +494,24 @@ function deactivateUser(userId, userName) {
     }
 }
 
-// Função para enviar formulário
+// Função para enviar formulário (modificada para lidar com lojas)
 function submitUserForm(event) {
     event.preventDefault();
     
     // Obter dados do formulário
     const form = document.getElementById('userForm');
     const formData = new FormData(form);
+    
+    // Se for usuário do tipo loja, usar o email selecionado no select
+    if (isStoreUser) {
+        const selectedEmail = document.getElementById('userEmailSelect').value;
+        if (selectedEmail) {
+            formData.set('email', selectedEmail);
+        } else {
+            showMessage('Por favor, selecione uma loja antes de continuar.', 'danger');
+            return;
+        }
+    }
     
     // Verificar se estamos editando ou criando
     const userId = formData.get('id');
@@ -471,7 +582,14 @@ function submitUserForm(event) {
     .then(data => {
         if (data.status) {
             hideUserModal();
-            showMessage(isEditing ? 'Usuário atualizado com sucesso!' : 'Usuário adicionado com sucesso!');
+            let message = isEditing ? 'Usuário atualizado com sucesso!' : 'Usuário adicionado com sucesso!';
+            
+            // Adicionar informação sobre vinculação da loja se aplicável
+            if (data.store_linked) {
+                message += ' A loja foi vinculada automaticamente ao usuário.';
+            }
+            
+            showMessage(message);
             setTimeout(() => {
                 location.reload();
             }, 1000);
@@ -511,7 +629,11 @@ function toggleUserSelection(checkbox, userId) {
         }
     } else {
         selectedUsers = selectedUsers.filter(id => id !== userId);
-        document.getElementById('selectAll').checked = false;
+        // Desmarcar o checkbox "selecionar todos" se nem todos estão selecionados
+        const selectAllCheckbox = document.getElementById('selectAll');
+        if (selectAllCheckbox) {
+            selectAllCheckbox.checked = false;
+        }
     }
     
     updateBulkActionBar();
@@ -578,6 +700,99 @@ function bulkAction(status) {
         });
     }
 }
-    </script>
+
+// Event Listeners - executados quando a página carrega
+document.addEventListener('DOMContentLoaded', function() {
+    // Event listener para mudança no tipo de usuário
+    const userTypeSelect = document.getElementById('userType');
+    if (userTypeSelect) {
+        userTypeSelect.addEventListener('change', function() {
+            const isStore = this.value === 'loja';
+            isStoreUser = isStore;
+            
+            if (isStore) {
+                // Mostrar interface específica para lojas
+                document.getElementById('emailSelectContainer').style.display = 'block';
+                document.getElementById('userEmail').style.display = 'none';
+                document.getElementById('storeDataFields').style.display = 'block';
+                
+                // Tornar campo de email não obrigatório quando usando select
+                document.getElementById('userEmail').required = false;
+                
+                // Carregar lojas se ainda não foram carregadas
+                if (availableStores.length === 0) {
+                    loadAvailableStores();
+                }
+            } else {
+                // Mostrar interface normal para outros tipos de usuário
+                resetStoreFields();
+            }
+        });
+    }
+    
+    // Event listener para mudança na seleção de loja
+    const emailSelect = document.getElementById('userEmailSelect');
+    if (emailSelect) {
+        emailSelect.addEventListener('change', function() {
+            const selectedEmail = this.value;
+            
+            if (selectedEmail) {
+                // Buscar dados detalhados da loja selecionada
+                fetch('<?php echo SITE_URL; ?>/controllers/AdminController.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: 'action=get_store_by_email&email=' + encodeURIComponent(selectedEmail)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status && data.data) {
+                        const store = data.data;
+                        
+                        // Preencher campos automaticamente com dados da loja
+                        document.getElementById('userEmail').value = store.email;
+                        document.getElementById('userName').value = store.nome_fantasia;
+                        document.getElementById('userPhone').value = store.telefone || '';
+                        
+                        // Preencher campos informativos (somente leitura)
+                        document.getElementById('storeName').value = store.nome_fantasia;
+                        document.getElementById('storeDocument').value = store.cnpj;
+                        document.getElementById('storeCategory').value = store.categoria || 'Não informado';
+                        
+                        // Tornar campos principais somente leitura para evitar alterações acidentais
+                        document.getElementById('userEmail').readOnly = true;
+                        document.getElementById('userName').readOnly = true;
+                        document.getElementById('userPhone').readOnly = true;
+                    } else {
+                        showMessage(data.message || 'Erro ao carregar dados da loja', 'danger');
+                        // Resetar campos em caso de erro
+                        document.getElementById('userEmail').value = '';
+                        document.getElementById('userName').value = '';
+                        document.getElementById('userPhone').value = '';
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro:', error);
+                    showMessage('Erro ao carregar dados da loja: ' + error.message, 'danger');
+                });
+            } else {
+                // Limpar campos se nenhuma loja for selecionada
+                document.getElementById('userEmail').value = '';
+                document.getElementById('userName').value = '';
+                document.getElementById('userPhone').value = '';
+                document.getElementById('storeName').value = '';
+                document.getElementById('storeDocument').value = '';
+                document.getElementById('storeCategory').value = '';
+                
+                // Reabilitar edição dos campos
+                document.getElementById('userEmail').readOnly = false;
+                document.getElementById('userName').readOnly = false;
+                document.getElementById('userPhone').readOnly = false;
+            }
+        });
+    }
+});
+</script>
 </body>
 </html>
