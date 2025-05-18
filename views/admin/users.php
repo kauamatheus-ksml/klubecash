@@ -221,6 +221,15 @@ try {
                 
                 <!-- Campos do formulário -->
                  <div class="form-group">
+                    <label class="form-label" for="userType">Tipo</label>
+                    <select class="form-select" id="userType" name="tipo">
+                        <option value="cliente">Cliente</option>
+                        <option value="admin">Administrador</option>
+                        <option value="loja">Loja</option>
+                    </select>
+                </div>
+                
+                 <div class="form-group">
                     <label class="form-label" for="userEmail">E-mail</label>
                     <div id="emailSelectContainer" style="display: none;">
                         <select class="form-select" id="userEmailSelect" name="email_select">
@@ -229,7 +238,7 @@ try {
                     </div>
                     <input type="email" class="form-control" id="userEmail" name="email" required>
                 </div>
-                
+
                 <div class="form-group">
                     <label class="form-label" for="userName">Nome</label>
                     <input type="text" class="form-control" id="userName" name="nome" required>
@@ -261,14 +270,7 @@ try {
                     <input type="text" class="form-control" id="userPhone" name="telefone">
                 </div>
                 
-                <div class="form-group">
-                    <label class="form-label" for="userType">Tipo</label>
-                    <select class="form-select" id="userType" name="tipo">
-                        <option value="cliente">Cliente</option>
-                        <option value="admin">Administrador</option>
-                        <option value="loja">Loja</option>
-                    </select>
-                </div>
+                
                 
                 <div class="form-group">
                     <label class="form-label" for="userStatus">Status</label>
