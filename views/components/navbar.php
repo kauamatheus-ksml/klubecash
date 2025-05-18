@@ -233,6 +233,15 @@ $isStore = $userType === 'loja';
                     </a>
                 </li>
                 <li class="navbar-item">
+                    <a href="<?php echo CLIENT_BALANCE_URL; ?>" class="navbar-link">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <path d="M12 6v6l4 2"></path>
+                        </svg>
+                        Saldo
+                    </a>
+                </li>
+                <li class="navbar-item">
                     <a href="<?php echo STORE_REGISTER_URL; ?>" class="navbar-link">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M3 3h18v18H3zM21 9H3M21 15H3M12 3v18"></path>

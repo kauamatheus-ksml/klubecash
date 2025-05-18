@@ -66,6 +66,8 @@ define('ADMIN_DASHBOARD_URL', SITE_URL . '/admin/dashboard');
 define('CLIENT_STATEMENT_URL', SITE_URL . '/cliente/extrato');
 define('CLIENT_STORES_URL', SITE_URL . '/cliente/lojas-parceiras');
 define('CLIENT_PROFILE_URL', SITE_URL . '/cliente/perfil');
+// URLs do cliente
+define('CLIENT_BALANCE_URL', SITE_URL . '/cliente/saldo');
 
 // URLs adicionais para admin
 define('ADMIN_USERS_URL', SITE_URL . '/admin/usuarios');

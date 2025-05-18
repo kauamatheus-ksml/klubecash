@@ -1475,7 +1475,124 @@ class ClientController {
             return [];
         }
     }
-    
+    /**
+    * Obtém o saldo de cashback do cliente por loja
+    * 
+    * @param int $userId ID do cliente
+    * @return array Saldos por loja e total
+    */
+    public static function getClientBalance($userId) {
+        try {
+            // Verificar se é um cliente válido
+            if (!self::validateClient($userId)) {
+                return ['status' => false, 'message' => 'Cliente não encontrado ou inativo.'];
+            }
+            
+            $db = Database::getConnection();
+            
+            // Obter saldo por loja - apenas transações aprovadas
+            $balanceQuery = "
+                SELECT 
+                    l.id as loja_id,
+                    l.nome_fantasia,
+                    l.logo,
+                    l.categoria,
+                    l.porcentagem_cashback,
+                    SUM(t.valor_cashback) as saldo_disponivel,
+                    COUNT(t.id) as total_transacoes,
+                    MAX(t.data_transacao) as ultima_transacao,
+                    SUM(t.valor_total) as total_compras
+                FROM transacoes_cashback t
+                JOIN lojas l ON t.loja_id = l.id
+                WHERE t.usuario_id = :user_id 
+                AND t.status = :status
+                GROUP BY l.id, l.nome_fantasia, l.logo, l.categoria, l.porcentagem_cashback
+                HAVING saldo_disponivel > 0
+                ORDER BY saldo_disponivel DESC
+            ";
+            
+            $balanceStmt = $db->prepare($balanceQuery);
+            $balanceStmt->bindParam(':user_id', $userId);
+            $status = TRANSACTION_APPROVED;
+            $balanceStmt->bindParam(':status', $status);
+            $balanceStmt->execute();
+            $saldosPorLoja = $balanceStmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            // Calcular saldo total
+            $saldoTotal = 0;
+            $totalTransacoes = 0;
+            $totalCompras = 0;
+            
+            foreach ($saldosPorLoja as $loja) {
+                $saldoTotal += $loja['saldo_disponivel'];
+                $totalTransacoes += $loja['total_transacoes'];
+                $totalCompras += $loja['total_compras'];
+            }
+            
+            // Obter estatísticas gerais
+            $estatisticasQuery = "
+                SELECT 
+                    COUNT(DISTINCT loja_id) as total_lojas_utilizadas,
+                    COUNT(*) as total_transacoes_historico,
+                    SUM(valor_total) as total_compras_historico,
+                    SUM(valor_cashback) as total_cashback_historico,
+                    AVG(valor_cashback) as media_cashback
+                FROM transacoes_cashback
+                WHERE usuario_id = :user_id
+                AND status = :status
+            ";
+            
+            $estatisticasStmt = $db->prepare($estatisticasQuery);
+            $estatisticasStmt->bindParam(':user_id', $userId);
+            $estatisticasStmt->bindParam(':status', $status);
+            $estatisticasStmt->execute();
+            $estatisticas = $estatisticasStmt->fetch(PDO::FETCH_ASSOC);
+            
+            // Obter saldo pendente (aguardando aprovação de pagamento)
+            $saldoPendenteQuery = "
+                SELECT 
+                    l.nome_fantasia,
+                    SUM(t.valor_cashback) as saldo_pendente
+                FROM transacoes_cashback t
+                JOIN lojas l ON t.loja_id = l.id
+                WHERE t.usuario_id = :user_id 
+                AND t.status = :status_pendente
+                GROUP BY l.id, l.nome_fantasia
+                HAVING saldo_pendente > 0
+                ORDER BY saldo_pendente DESC
+            ";
+            
+            $saldoPendenteStmt = $db->prepare($saldoPendenteQuery);
+            $saldoPendenteStmt->bindParam(':user_id', $userId);
+            $statusPendente = TRANSACTION_PENDING;
+            $saldoPendenteStmt->bindParam(':status_pendente', $statusPendente);
+            $saldoPendenteStmt->execute();
+            $saldosPendentes = $saldoPendenteStmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            return [
+                'status' => true,
+                'data' => [
+                    'saldo_total' => $saldoTotal,
+                    'saldos_por_loja' => $saldosPorLoja,
+                    'saldos_pendentes' => $saldosPendentes,
+                    'estatisticas' => [
+                        'total_lojas_com_saldo' => count($saldosPorLoja),
+                        'total_transacoes' => $totalTransacoes,
+                        'total_compras' => $totalCompras,
+                        'total_lojas_utilizadas' => $estatisticas['total_lojas_utilizadas'],
+                        'total_transacoes_historico' => $estatisticas['total_transacoes_historico'],
+                        'total_compras_historico' => $estatisticas['total_compras_historico'],
+                        'total_cashback_historico' => $estatisticas['total_cashback_historico'],
+                        'media_cashback' => $estatisticas['media_cashback']
+                    ]
+                ]
+            ];
+            
+        } catch (PDOException $e) {
+            error_log('Erro ao obter saldo do cliente: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro ao carregar saldo. Tente novamente.'];
+        }
+    }
     /**
     * Envia uma notificação para o cliente
     * 
@@ -1660,6 +1777,11 @@ if (basename($_SERVER['PHP_SELF']) === 'ClientController.php') {
             echo json_encode($result);
             break;
             
+        case 'balance':
+            $result = ClientController::getClientBalance($userId);
+            echo json_encode($result);
+            break;
+
         default:
             // Acesso inválido ao controlador
             header('Location: ' . CLIENT_DASHBOARD_URL);

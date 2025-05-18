@@ -60,6 +60,7 @@ RewriteRule ^cliente/dashboard/?$ views/client/dashboard.php [L]
 RewriteRule ^cliente/extrato/?$ views/client/statement.php [L]
 RewriteRule ^cliente/lojas-parceiras/?$ views/client/partner-stores.php [L]
 RewriteRule ^cliente/perfil/?$ views/client/profile.php [L]
+RewriteRule ^cliente/saldo/?$ views/client/balance.php [L]
 
 # Reescrever URLs amigáveis para admin
 RewriteRule ^admin/dashboard/?$ views/admin/dashboard.php [L]
