@@ -1,8 +1,5 @@
 <?php
-// views/admin/payments.php
-// Definir o menu ativo na sidebar
-$activeMenu = 'pagamentos';
-
+// views/stores/payment.php
 // Incluir arquivos necessários
 require_once '../../config/database.php';
 require_once '../../config/constants.php';
@@ -12,45 +9,112 @@ require_once '../../controllers/TransactionController.php';
 // Iniciar sessão
 session_start();
 
-// Habilitar logs de erro e debug inicial
-ini_set('display_errors', 1); // Mostrar erros (útil para desenvolvimento, DESATIVE em produção)
-ini_set('log_errors', 1);     // Habilitar log de erros
-error_reporting(E_ALL);     // Reportar todos os tipos de erros
-
-error_log("payments.php - Início da execução. Method: " . $_SERVER['REQUEST_METHOD']);
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST)) {
-    error_log("payments.php - POST data: " . print_r($_POST, true));
-}
-
-// Verificar se o usuário está logado e é administrador
-if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION['user_type'] !== 'admin') {
+// Verificar se o usuário está logado e é uma loja
+if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION['user_type'] !== 'loja') {
     header("Location: " . LOGIN_URL . "?error=acesso_restrito");
     exit;
 }
 
-// Processar ações (aprovar/rejeitar)
-$success = '';
+// Obter ID do usuário logado
+$userId = $_SESSION['user_id'];
+
+// Obter dados da loja associada ao usuário
+$db = Database::getConnection();
+$storeQuery = $db->prepare("SELECT id, nome_fantasia FROM lojas WHERE usuario_id = :usuario_id");
+$storeQuery->bindParam(':usuario_id', $userId);
+$storeQuery->execute();
+
+// Verificar se o usuário tem uma loja associada
+if ($storeQuery->rowCount() == 0) {
+    header('Location: ' . LOGIN_URL . '?error=' . urlencode('Sua conta não está associada a nenhuma loja. Entre em contato com o suporte.'));
+    exit;
+}
+
+// Obter os dados da loja
+$store = $storeQuery->fetch(PDO::FETCH_ASSOC);
+$storeId = $store['id'];
+$storeName = $store['nome_fantasia'];
+
+// Verificar se viemos da página de comissões pendentes
+$selectedTransactions = [];
+$totalValue = 0;
 $error = '';
+$success = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['action'])) {
-        if ($_POST['action'] === 'approve' && isset($_POST['payment_id'])) {
-            $paymentId = intval($_POST['payment_id']);
-            $observacao = $_POST['observacao'] ?? '';
-            $result = TransactionController::approvePayment($paymentId, $observacao);
+    if (isset($_POST['action']) && $_POST['action'] === 'payment_form') {
+        // Receber transações selecionadas da página anterior
+        if (isset($_POST['transacoes']) && is_array($_POST['transacoes'])) {
+            $selectedTransactions = $_POST['transacoes'];
             
-            if ($result['status']) {
-                $success = $result['message'];
-            } else {
-                $error = $result['message'];
+            // Buscar dados das transações selecionadas
+            if (!empty($selectedTransactions)) {
+                $placeholders = implode(',', array_fill(0, count($selectedTransactions), '?'));
+                $stmt = $db->prepare("
+                    SELECT t.*, u.nome as cliente_nome 
+                    FROM transacoes_cashback t
+                    JOIN usuarios u ON t.usuario_id = u.id
+                    WHERE t.id IN ($placeholders) AND t.loja_id = ? AND t.status = 'pendente'
+                ");
+                
+                $params = array_merge($selectedTransactions, [$storeId]);
+                $stmt->execute($params);
+                $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                foreach ($transactions as $transaction) {
+                    $totalValue += $transaction['valor_cashback'];
+                }
             }
-        } elseif ($_POST['action'] === 'reject' && isset($_POST['payment_id'])) {
-            $paymentId = intval($_POST['payment_id']);
-            $motivo = $_POST['motivo'] ?? '';
-            $result = TransactionController::rejectPayment($paymentId, $motivo);
+        } else {
+            $error = 'Nenhuma transação selecionada.';
+        }
+    } elseif (isset($_POST['action']) && $_POST['action'] === 'process_payment') {
+        // Processar o pagamento
+        $transactionIds = $_POST['transaction_ids'] ?? '';
+        $metodoPagamento = $_POST['metodo_pagamento'] ?? '';
+        $numeroReferencia = $_POST['numero_referencia'] ?? '';
+        $observacao = $_POST['observacao'] ?? '';
+        $valorTotal = floatval($_POST['valor_total'] ?? 0);
+        
+        if (empty($transactionIds) || empty($metodoPagamento) || $valorTotal <= 0) {
+            $error = 'Dados obrigatórios não informados.';
+        } else {
+            // Upload do comprovante
+            $comprovante = '';
+            if (isset($_FILES['comprovante']) && $_FILES['comprovante']['error'] === UPLOAD_ERR_OK) {
+                $uploadDir = '../../uploads/comprovantes/';
+                if (!file_exists($uploadDir)) {
+                    mkdir($uploadDir, 0755, true);
+                }
+                
+                $fileInfo = pathinfo($_FILES['comprovante']['name']);
+                $extension = strtolower($fileInfo['extension']);
+                
+                if (in_array($extension, ['jpg', 'jpeg', 'png', 'pdf'])) {
+                    $comprovante = 'comprovante_' . $storeId . '_' . time() . '.' . $extension;
+                    move_uploaded_file($_FILES['comprovante']['tmp_name'], $uploadDir . $comprovante);
+                }
+            }
+            
+            // Preparar dados do pagamento
+            $paymentData = [
+                'loja_id' => $storeId,
+                'transacoes' => explode(',', $transactionIds),
+                'valor_total' => $valorTotal,
+                'metodo_pagamento' => $metodoPagamento,
+                'numero_referencia' => $numeroReferencia,
+                'comprovante' => $comprovante,
+                'observacao' => $observacao
+            ];
+            
+            // Registrar pagamento
+            $result = TransactionController::registerPayment($paymentData);
             
             if ($result['status']) {
                 $success = $result['message'];
+                // Limpar dados da sessão
+                $selectedTransactions = [];
+                $totalValue = 0;
             } else {
                 $error = $result['message'];
             }
@@ -58,104 +122,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Obter lista de pagamentos
-$filters = [];
-$page = isset($_GET['page']) ? intval($_GET['page']) : 1;
-if ($page < 1) $page = 1; // Garantir que a página não seja menor que 1
-
-// Aplicar filtros se fornecidos
-if (isset($_GET['status']) && !empty($_GET['status'])) {
-    $filters['status'] = $_GET['status'];
-}
-if (isset($_GET['data_inicio']) && !empty($_GET['data_inicio'])) {
-    $filters['data_inicio'] = $_GET['data_inicio'];
-}
-if (isset($_GET['data_fim']) && !empty($_GET['data_fim'])) {
-    $filters['data_fim'] = $_GET['data_fim'];
+// Se não temos transações selecionadas, redirecionar
+if (empty($selectedTransactions) && !$success && !$error) {
+    header('Location: ' . STORE_PENDING_TRANSACTIONS_URL);
+    exit;
 }
 
-$db = Database::getConnection();
-
-// --- Construção da Query ---
-$selectPart = "SELECT p.*, l.nome_fantasia, l.email as loja_email,
-                      COALESCE((SELECT COUNT(*) FROM pagamentos_transacoes pt WHERE pt.pagamento_id = p.id), 0) as total_transacoes";
-$fromPart = "FROM pagamentos_comissao p JOIN lojas l ON p.loja_id = l.id";
-$wherePart = "WHERE 1=1";
-$paramsForWhere = []; // Parâmetros apenas para a cláusula WHERE
-
-// Aplicar filtros à cláusula WHERE
-if (!empty($filters['status'])) {
-    $wherePart .= " AND p.status = :status";
-    $paramsForWhere[':status'] = $filters['status'];
-}
-if (!empty($filters['data_inicio'])) {
-    $wherePart .= " AND p.data_registro >= :data_inicio";
-    $paramsForWhere[':data_inicio'] = $filters['data_inicio'] . ' 00:00:00';
-}
-if (!empty($filters['data_fim'])) {
-    $wherePart .= " AND p.data_registro <= :data_fim";
-    $paramsForWhere[':data_fim'] = $filters['data_fim'] . ' 23:59:59';
-}
-// --- Fim da construção da Query para WHERE ---
-
-// Contagem para paginação
-// A query de contagem deve usar as mesmas condições de filtro (FROM e WHERE)
-$countQuery = "SELECT COUNT(DISTINCT p.id) as total " . $fromPart . " " . $wherePart;
-$countStmt = $db->prepare($countQuery);
-foreach ($paramsForWhere as $paramName => $paramValue) {
-    $countStmt->bindValue($paramName, $paramValue);
-}
-$countStmt->execute();
-$resultCount = $countStmt->fetch(PDO::FETCH_ASSOC);
-$totalCount = $resultCount ? (int)$resultCount['total'] : 0; // Linha corrigida (era ~136)
-
-// Paginação
-$perPage = defined('ITEMS_PER_PAGE') ? ITEMS_PER_PAGE : 10;
-$totalPages = ($totalCount > 0) ? ceil($totalCount / $perPage) : 1;
-$page = max(1, min($page, $totalPages)); // Garante que a página atual está dentro dos limites
-$offset = ($page - 1) * $perPage;
-
-// Query principal para buscar dados
-$mainQuery = $selectPart . " " . $fromPart . " " . $wherePart . " ORDER BY p.data_registro DESC LIMIT :offset, :limit";
-$stmt = $db->prepare($mainQuery);
-
-// Bind parâmetros para a query principal (filtros + paginação)
-$paramsForMainQuery = $paramsForWhere; // Começa com os filtros
-$paramsForMainQuery[':offset'] = $offset;
-$paramsForMainQuery[':limit'] = $perPage;
-
-foreach ($paramsForMainQuery as $paramName => $paramValue) {
-    if ($paramName == ':offset' || $paramName == ':limit') {
-        $stmt->bindValue($paramName, (int)$paramValue, PDO::PARAM_INT);
-    } else {
-        $stmt->bindValue($paramName, $paramValue);
+// Buscar dados das transações para exibir
+$transactions = [];
+if (!empty($selectedTransactions)) {
+    $placeholders = implode(',', array_fill(0, count($selectedTransactions), '?'));
+    $stmt = $db->prepare("
+        SELECT t.*, u.nome as cliente_nome 
+        FROM transacoes_cashback t
+        JOIN usuarios u ON t.usuario_id = u.id
+        WHERE t.id IN ($placeholders) AND t.loja_id = ?
+    ");
+    
+    $params = array_merge($selectedTransactions, [$storeId]);
+    $stmt->execute($params);
+    $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Recalcular total
+    $totalValue = 0;
+    foreach ($transactions as $transaction) {
+        $totalValue += $transaction['valor_cashback'];
     }
 }
-$stmt->execute();
-$payments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Estatísticas (globais ou filtradas, dependendo da necessidade)
-// Se quiser estatísticas filtradas, construa $statsQuery com $wherePart e $paramsForWhere
-$statsQuery = "
-    SELECT 
-        COUNT(*) as total_pagamentos,
-        SUM(valor_total) as valor_total,
-        SUM(CASE WHEN status = 'pendente' THEN valor_total ELSE 0 END) as valor_pendente,
-        SUM(CASE WHEN status = 'aprovado' THEN valor_total ELSE 0 END) as valor_aprovado,
-        COUNT(CASE WHEN status = 'pendente' THEN 1 END) as count_pendente,
-        COUNT(CASE WHEN status = 'aprovado' THEN 1 END) as count_aprovado,
-        COUNT(CASE WHEN status = 'rejeitado' THEN 1 END) as count_rejeitado
-    FROM pagamentos_comissao
-";
-// Para estatísticas filtradas, adicione a cláusula WHERE:
-// $statsQuery .= " " . $wherePart;
-// $statsStmt = $db->prepare($statsQuery);
-// foreach ($paramsForWhere as $paramName => $paramValue) { $statsStmt->bindValue($paramName, $paramValue); }
-// $statsStmt->execute();
-
-$statsStmt = $db->query($statsQuery); // Para estatísticas globais
-$stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
-
+$activeMenu = 'payment';
 ?>
 
 <!DOCTYPE html>
@@ -164,503 +159,369 @@ $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
-    <title>Gerenciar Pagamentos - Klube Cash</title>
-    <link rel="stylesheet" href="../../assets/css/views/admin/dashboard.css">
+    <title>Realizar Pagamento - Klube Cash</title>
     <style>
+        /* CSS similar ao da página de transações pendentes, adaptado para pagamento */
+        :root {
+            --primary-color: #FF7A00;
+            --primary-dark: #E06E00;
+            --primary-light: #FFF0E6;
+            --secondary-color: #2A3F54;
+            --success-color: #28A745;
+            --danger-color: #DC3545;
+            --white: #FFFFFF;
+            --light-gray: #F8F9FA;
+            --medium-gray: #6C757D;
+            --dark-gray: #343A40;
+            --border-radius: 12px;
+            --shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #F5F7FA;
+            margin: 0;
+            padding: 0;
+            color: var(--dark-gray);
+        }
+        
+        .main-content {
+            margin-left: 250px;
+            padding: 1.5rem;
+            min-height: 100vh;
+        }
+        
+        .dashboard-header {
+            margin-bottom: 2rem;
+        }
+        
+        .dashboard-header h1 {
+            font-size: 1.75rem;
+            color: var(--secondary-color);
+            margin-bottom: 0.5rem;
+        }
+        
+        .subtitle {
+            color: var(--medium-gray);
+            font-size: 1rem;
+        }
+        
         .alert {
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
+            padding: 1rem 1.5rem;
+            border-radius: var(--border-radius);
+            margin-bottom: 1.5rem;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 0.75rem;
         }
+        
         .alert.success {
-            background-color: #E6F7E6;
-            color: #4CAF50;
-            border: 1px solid #4CAF50;
-        }
-        .alert.error {
-            background-color: #FFEAE6;
-            color: #F44336;
-            border: 1px solid #F44336;
-        }
-        .filter-container {
-            background: white;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
-        }
-        .filter-form {
-            display: flex;
-            gap: 15px;
-            align-items: end;
-            flex-wrap: wrap;
-        }
-        .form-group {
-            flex: 1;
-            min-width: 150px;
-        }
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: 600;
-        }
-        .form-group input, .form-group select {
-            width: 100%;
-            padding: 8px 12px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-        }
-        .status-badge {
-            padding: 5px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-        .status-pendente {
-            background-color: #FFF3CD;
-            color: #856404;
-        }
-        .status-aprovado {
             background-color: #D4EDDA;
             color: #155724;
+            border: 1px solid #C3E6CB;
         }
-        .status-rejeitado {
+        
+        .alert.error {
             background-color: #F8D7DA;
             color: #721C24;
+            border: 1px solid #F5C6CB;
         }
-        .btn-action {
-            padding: 6px 12px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 12px;
-            margin: 2px;
+        
+        .card {
+            background: var(--white);
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
         }
-        .btn-approve {
-            background-color: #28a745;
-            color: white;
+        
+        .card-header {
+            border-bottom: 1px solid #E1E5E9;
+            padding-bottom: 1rem;
+            margin-bottom: 1.5rem;
         }
-        .btn-reject {
-            background-color: #dc3545;
-            color: white;
+        
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--secondary-color);
+            margin: 0;
         }
-        .btn-view {
-            background-color: #007bff;
-            color: white;
+        
+        .form-group {
+            margin-bottom: 1.5rem;
         }
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: var(--dark-gray);
+        }
+        
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
             width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.5);
+            padding: 0.75rem 1rem;
+            border: 1px solid #D1D5DB;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s;
         }
-        .modal-content {
-            background-color: white;
-            margin: 5% auto;
-            padding: 20px;
-            border-radius: 12px;
-            width: 80%;
-            max-width: 600px;
-            max-height: 80%;
-            overflow-y: auto;
+        
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(255, 122, 0, 0.1);
         }
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid #eee;
-        }
-        .close {
-            font-size: 28px;
-            font-weight: bold;
-            cursor: pointer;
-            color: #aaa;
-        }
-        .close:hover {
-            color: #000;
-        }
-        .stats-container {
+        
+        .form-row {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
         }
-        .pagination {
+        
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: var(--border-radius);
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background-color: var(--primary-color);
+            color: var(--white);
+        }
+        
+        .btn-primary:hover {
+            background-color: var(--primary-dark);
+            transform: translateY(-2px);
+        }
+        
+        .btn-secondary {
+            background-color: var(--medium-gray);
+            color: var(--white);
+        }
+        
+        .btn-secondary:hover {
+            background-color: #5A6C7D;
+        }
+        
+        .payment-summary {
+            background: var(--primary-light);
+            border-radius: var(--border-radius);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .summary-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-top: 20px;
+            margin-bottom: 0.75rem;
         }
-        .pagination-links {
+        
+        .summary-item:last-child {
+            margin-bottom: 0;
+            font-weight: 700;
+            font-size: 1.1rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid #FFB366;
+        }
+        
+        .table-responsive {
+            overflow-x: auto;
+        }
+        
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        
+        .table th,
+        .table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid #E1E5E9;
+        }
+        
+        .table th {
+            background-color: var(--light-gray);
+            font-weight: 600;
+            color: var(--secondary-color);
+        }
+        
+        .form-actions {
             display: flex;
-            gap: 10px;
+            gap: 1rem;
+            margin-top: 2rem;
         }
-        .page-link {
-            padding: 8px 16px;
-            background-color: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 4px;
-            text-decoration: none;
-            color: #495057;
-        }
-        .page-link:hover {
-            background-color: #e9ecef;
+        
+        @media (max-width: 991.98px) {
+            .main-content {
+                margin-left: 0;
+            }
+            
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+            
+            .form-actions {
+                flex-direction: column;
+            }
         }
     </style>
 </head>
 <body>
-    <?php include_once '../components/sidebar.php'; ?>
+    <?php include_once '../components/sidebar-store.php'; ?>
     
     <div class="main-content" id="mainContent">
-        <div class="dashboard-wrapper">
-            <div class="dashboard-header">
-                <h1>Gerenciar Pagamentos</h1>
-                <p class="subtitle">Aprovar ou rejeitar pagamentos de comissões das lojas</p>
-            </div>
-            
-            <?php if (!empty($success)): ?>
-                <div class="alert success">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
-                    </svg>
-                    <?php echo htmlspecialchars($success); ?>
-                </div>
-            <?php endif; ?>
-            
-            <?php if (!empty($error)): ?>
-                <div class="alert error">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <line x1="12" y1="8" x2="12" y2="12"></line>
-                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                    </svg>
-                    <?php echo htmlspecialchars($error); ?>
-                </div>
-            <?php endif; ?>
-            
-            <div class="stats-container">
-                <div class="stat-card">
-                    <div class="stat-card-title">Total de Pagamentos</div>
-                    <div class="stat-card-value"><?php echo number_format($stats['total_pagamentos']); ?></div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-card-title">Pendentes</div>
-                    <div class="stat-card-value"><?php echo number_format($stats['count_pendente']); ?></div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-card-title">Valor Pendente</div>
-                    <div class="stat-card-value">R$ <?php echo number_format($stats['valor_pendente'], 2, ',', '.'); ?></div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-card-title">Valor Total Aprovado</div>
-                    <div class="stat-card-value">R$ <?php echo number_format($stats['valor_aprovado'], 2, ',', '.'); ?></div>
+        <div class="dashboard-header">
+            <h1>Realizar Pagamento</h1>
+            <p class="subtitle">Pague as comissões devidas para liberar o cashback aos seus clientes</p>
+        </div>
+        
+        <?php if (!empty($success)): ?>
+            <div class="alert success">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
+                <?php echo htmlspecialchars($success); ?>
+                <div style="margin-left: auto;">
+                    <a href="<?php echo STORE_PAYMENT_HISTORY_URL; ?>" class="btn btn-secondary">Ver Histórico</a>
                 </div>
             </div>
+        <?php endif; ?>
+        
+        <?php if (!empty($error)): ?>
+            <div class="alert error">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                <?php echo htmlspecialchars($error); ?>
+            </div>
+        <?php endif; ?>
+        
+        <?php if (!empty($transactions)): ?>
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Transações Selecionadas</h2>
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Código</th>
+                                <th>Cliente</th>
+                                <th>Data</th>
+                                <th>Valor Venda</th>
+                                <th>Comissão</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($transactions as $transaction): ?>
+                                <tr>
+                                    <td><?php echo htmlspecialchars($transaction['codigo_transacao'] ?? 'N/A'); ?></td>
+                                    <td><?php echo htmlspecialchars($transaction['cliente_nome']); ?></td>
+                                    <td><?php echo date('d/m/Y H:i', strtotime($transaction['data_transacao'])); ?></td>
+                                    <td>R$ <?php echo number_format($transaction['valor_total'], 2, ',', '.'); ?></td>
+                                    <td>R$ <?php echo number_format($transaction['valor_cashback'], 2, ',', '.'); ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="payment-summary">
+                    <div class="summary-item">
+                        <span>Transações selecionadas:</span>
+                        <span><?php echo count($transactions); ?></span>
+                    </div>
+                    <div class="summary-item">
+                        <span>Valor total a pagar:</span>
+                        <span>R$ <?php echo number_format($totalValue, 2, ',', '.'); ?></span>
+                    </div>
+                </div>
+            </div>
             
-            <div class="filter-container">
-                <form method="GET" action="" class="filter-form">
-                    <div class="form-group">
-                        <label for="status">Status</label>
-                        <select id="status" name="status">
-                            <option value="">Todos</option>
-                            <option value="pendente" <?php echo (isset($filters['status']) && $filters['status'] === 'pendente') ? 'selected' : ''; ?>>Pendente</option>
-                            <option value="aprovado" <?php echo (isset($filters['status']) && $filters['status'] === 'aprovado') ? 'selected' : ''; ?>>Aprovado</option>
-                            <option value="rejeitado" <?php echo (isset($filters['status']) && $filters['status'] === 'rejeitado') ? 'selected' : ''; ?>>Rejeitado</option>
-                        </select>
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Dados do Pagamento</h2>
+                </div>
+                
+                <form method="POST" action="" enctype="multipart/form-data">
+                    <input type="hidden" name="action" value="process_payment">
+                    <input type="hidden" name="transaction_ids" value="<?php echo implode(',', $selectedTransactions); ?>">
+                    <input type="hidden" name="valor_total" value="<?php echo $totalValue; ?>">
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="metodo_pagamento">Método de Pagamento *</label>
+                            <select id="metodo_pagamento" name="metodo_pagamento" required>
+                                <option value="">Selecione o método</option>
+                                <option value="pix">PIX</option>
+                                <option value="transferencia">Transferência Bancária</option>
+                                <option value="ted">TED</option>
+                                <option value="boleto">Boleto</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="numero_referencia">Número de Referência</label>
+                            <input type="text" id="numero_referencia" name="numero_referencia" 
+                                   placeholder="Número da transação, ID do PIX, etc.">
+                        </div>
                     </div>
+                    
                     <div class="form-group">
-                        <label for="data_inicio">Data Início</label>
-                        <input type="date" id="data_inicio" name="data_inicio" value="<?php echo isset($filters['data_inicio']) ? htmlspecialchars($filters['data_inicio']) : ''; ?>">
+                        <label for="comprovante">Comprovante de Pagamento *</label>
+                        <input type="file" id="comprovante" name="comprovante" accept="image/*,.pdf" required>
+                        <small style="display: block; margin-top: 0.5rem; color: var(--medium-gray);">
+                            Formatos aceitos: JPG, PNG, PDF (máx. 5MB)
+                        </small>
                     </div>
+                    
                     <div class="form-group">
-                        <label for="data_fim">Data Fim</label>
-                        <input type="date" id="data_fim" name="data_fim" value="<?php echo isset($filters['data_fim']) ? htmlspecialchars($filters['data_fim']) : ''; ?>">
+                        <label for="observacao">Observações</label>
+                        <textarea id="observacao" name="observacao" rows="3" 
+                                  placeholder="Informações adicionais sobre o pagamento..."></textarea>
                     </div>
-                    <div class="form-group">
-                        <button type="submit" class="btn btn-primary">Filtrar</button>
-                        <a href="<?php echo ADMIN_PAYMENTS_URL; ?>" class="btn btn-secondary">Limpar</a>
+                    
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Confirmar Pagamento</button>
+                        <a href="<?php echo STORE_PENDING_TRANSACTIONS_URL; ?>" class="btn btn-secondary">Voltar</a>
                     </div>
                 </form>
             </div>
             
             <div class="card">
                 <div class="card-header">
-                    <div class="card-title">Lista de Pagamentos</div>
+                    <h2 class="card-title">Informações Importantes</h2>
                 </div>
-                
-                <?php if (count($payments) > 0): ?>
-                    <div class="table-responsive">
-                        <table class="table">
-                            <thead>
-                                <tr>
-                                    <th>#ID</th>
-                                    <th>Loja</th>
-                                    <th>Valor</th>
-                                    <th>Método</th>
-                                    <th>Data</th>
-                                    <th>Transações</th>
-                                    <th>Status</th>
-                                    <th>Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($payments as $payment): ?>
-                                    <tr>
-                                        <td><?php echo $payment['id']; ?></td>
-                                        <td><?php echo htmlspecialchars($payment['nome_fantasia']); ?></td>
-                                        <td>R$ <?php echo number_format($payment['valor_total'], 2, ',', '.'); ?></td>
-                                        <td><?php echo ucfirst($payment['metodo_pagamento']); ?></td>
-                                        <td><?php echo date('d/m/Y H:i', strtotime($payment['data_registro'])); ?></td>
-                                        <td><?php echo $payment['total_transacoes']; ?></td>
-                                        <td>
-                                            <span class="status-badge status-<?php echo $payment['status']; ?>">
-                                                <?php echo ucfirst($payment['status']); ?>
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <button class="btn-action btn-view" onclick="viewPaymentDetails(<?php echo $payment['id']; ?>)">
-                                                Ver Detalhes
-                                            </button>
-                                            <?php if ($payment['status'] === 'pendente'): ?>
-                                                <button class="btn-action btn-approve" onclick="showApproveModal(<?php echo $payment['id']; ?>)">
-                                                    Aprovar
-                                                </button>
-                                                <button class="btn-action btn-reject" onclick="showRejectModal(<?php echo $payment['id']; ?>)">
-                                                    Rejeitar
-                                                </button>
-                                            <?php endif; ?>
-                                            <?php if (!empty($payment['comprovante'])): ?>
-                                                <button class="btn-action btn-view" onclick="viewReceipt('<?php echo htmlspecialchars($payment['comprovante']); ?>')">
-                                                    Comprovante
-                                                </button>
-                                            <?php endif; ?>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                    
-                    <?php if ($totalPages > 1): ?>
-                        <div class="pagination">
-                            <div class="pagination-info">
-                                Página <?php echo $page; ?> de <?php echo $totalPages; ?> (<?php echo $totalCount; ?> itens)
-                            </div>
-                            <div class="pagination-links">
-                                <?php if ($page > 1): ?>
-                                    <a href="?page=1<?php echo !empty($filters['status']) ? '&status=' . urlencode($filters['status']) : ''; ?><?php echo !empty($filters['data_inicio']) ? '&data_inicio=' . urlencode($filters['data_inicio']) : ''; ?><?php echo !empty($filters['data_fim']) ? '&data_fim=' . urlencode($filters['data_fim']) : ''; ?>" class="page-link">
-                                        Primeira
-                                    </a>
-                                    <a href="?page=<?php echo $page - 1; ?><?php echo !empty($filters['status']) ? '&status=' . urlencode($filters['status']) : ''; ?><?php echo !empty($filters['data_inicio']) ? '&data_inicio=' . urlencode($filters['data_inicio']) : ''; ?><?php echo !empty($filters['data_fim']) ? '&data_fim=' . urlencode($filters['data_fim']) : ''; ?>" class="page-link">
-                                        Anterior
-                                    </a>
-                                <?php endif; ?>
-                                
-                                <?php if ($page < $totalPages): ?>
-                                    <a href="?page=<?php echo $page + 1; ?><?php echo !empty($filters['status']) ? '&status=' . urlencode($filters['status']) : ''; ?><?php echo !empty($filters['data_inicio']) ? '&data_inicio=' . urlencode($filters['data_inicio']) : ''; ?><?php echo !empty($filters['data_fim']) ? '&data_fim=' . urlencode($filters['data_fim']) : ''; ?>" class="page-link">
-                                        Próxima
-                                    </a>
-                                    <a href="?page=<?php echo $totalPages; ?><?php echo !empty($filters['status']) ? '&status=' . urlencode($filters['status']) : ''; ?><?php echo !empty($filters['data_inicio']) ? '&data_inicio=' . urlencode($filters['data_inicio']) : ''; ?><?php echo !empty($filters['data_fim']) ? '&data_fim=' . urlencode($filters['data_fim']) : ''; ?>" class="page-link">
-                                        Última
-                                    </a>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-                    <?php endif; ?>
-                    
-                <?php else: ?>
-                    <div class="empty-state">
-                        <div class="empty-icon">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <rect x="3" y="4" width="18" height="16" rx="2"></rect>
-                                <line x1="2" y1="9" x2="22" y2="9"></line>
-                            </svg>
-                        </div>
-                        <h3>Nenhum pagamento encontrado</h3>
-                        <p>Não foram encontrados pagamentos com os filtros aplicados.</p>
-                    </div>
-                <?php endif; ?>
+                <div style="color: var(--medium-gray); line-height: 1.6;">
+                    <p>• O pagamento será analisado pela nossa equipe em até 24 horas após o envio.</p>
+                    <p>• Após a aprovação, o cashback será automaticamente liberado para os clientes.</p>
+                    <p>• Em caso de rejeição, você receberá uma notificação com o motivo e poderá enviar um novo comprovante.</p>
+                    <p>• Mantenha o comprovante original até a confirmação da aprovação.</p>
+                </div>
             </div>
-        </div>
+        <?php endif; ?>
     </div>
-    
-    <div id="detailsModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Detalhes do Pagamento</h2>
-                <span class="close" onclick="closeModal('detailsModal')">&times;</span>
-            </div>
-            <div id="detailsContent">
-                <p>Carregando...</p>
-            </div>
-        </div>
-    </div>
-    
-    <div id="approveModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Aprovar Pagamento</h2>
-                <span class="close" onclick="closeModal('approveModal')">&times;</span>
-            </div>
-            <form method="POST" action="">
-                <input type="hidden" name="action" value="approve">
-                <input type="hidden" name="payment_id" id="approve_payment_id">
-                <div class="form-group">
-                    <label for="observacao">Observação (opcional)</label>
-                    <textarea id="observacao" name="observacao" rows="3" placeholder="Adicione uma observação se necessário..."></textarea>
-                </div>
-                <div style="margin-top: 20px; text-align: right;">
-                    <button type="button" class="btn btn-secondary" onclick="closeModal('approveModal')">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Confirmar Aprovação</button>
-                </div>
-            </form>
-        </div>
-    </div>
-    
-    <div id="rejectModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Rejeitar Pagamento</h2>
-                <span class="close" onclick="closeModal('rejectModal')">&times;</span>
-            </div>
-            <form method="POST" action="">
-                <input type="hidden" name="action" value="reject">
-                <input type="hidden" name="payment_id" id="reject_payment_id">
-                <div class="form-group">
-                    <label for="motivo">Motivo da rejeição *</label>
-                    <textarea id="motivo" name="motivo" rows="3" placeholder="Informe o motivo da rejeição..." required></textarea>
-                </div>
-                <div style="margin-top: 20px; text-align: right;">
-                    <button type="button" class="btn btn-secondary" onclick="closeModal('rejectModal')">Cancelar</button>
-                    <button type="submit" class="btn btn-danger">Confirmar Rejeição</button>
-                </div>
-            </form>
-        </div>
-    </div>
-    
-    <div id="receiptModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Comprovante de Pagamento</h2>
-                <span class="close" onclick="closeModal('receiptModal')">&times;</span>
-            </div>
-            <div id="receiptContent">
-                <img id="receiptImage" src="" alt="Comprovante" style="max-width: 100%; height: auto;">
-            </div>
-        </div>
-    </div>
-    
-    <script>
-        function closeModal(modalId) {
-            document.getElementById(modalId).style.display = 'none';
-        }
-        
-        function showApproveModal(paymentId) {
-            document.getElementById('approve_payment_id').value = paymentId;
-            document.getElementById('approveModal').style.display = 'block';
-        }
-        
-        function showRejectModal(paymentId) {
-            document.getElementById('reject_payment_id').value = paymentId;
-            document.getElementById('rejectModal').style.display = 'block';
-        }
-        
-        function viewPaymentDetails(paymentId) {
-            const modal = document.getElementById('detailsModal');
-            const content = document.getElementById('detailsContent');
-            modal.style.display = 'block';
-            content.innerHTML = '<p>Carregando detalhes...</p>';
-            
-            fetch('../../controllers/TransactionController.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: 'action=payment_details&payment_id=' + paymentId
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status) {
-                    renderPaymentDetails(data.data, content);
-                } else {
-                    content.innerHTML = '<p class="error">Erro ao carregar detalhes: ' + (data.message || 'Erro desconhecido.') + '</p>';
-                }
-            })
-            .catch(error => {
-                console.error('Erro na requisição:', error);
-                content.innerHTML = '<p class="error">Erro de conexão. Tente novamente.</p>';
-            });
-        }
-        
-        function renderPaymentDetails(data, contentElement) {
-            const payment = data.pagamento;
-            const transactions = data.transacoes;
-            
-            let html = `
-                <div style="margin-bottom: 20px;">
-                    <h3>Informações do Pagamento</h3>
-                    <p><strong>ID:</strong> ${payment.id}</p>
-                    <p><strong>Loja:</strong> ${payment.loja_nome || 'N/A'}</p>
-                    <p><strong>Valor Total:</strong> R$ ${parseFloat(payment.valor_total).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
-                    <p><strong>Método:</strong> ${payment.metodo_pagamento || 'N/A'}</p>
-                    <p><strong>Data:</strong> ${payment.data_registro ? new Date(payment.data_registro).toLocaleString('pt-BR') : 'N/A'}</p>
-                    ${payment.numero_referencia ? `<p><strong>Referência:</strong> ${payment.numero_referencia}</p>` : ''}
-                    ${payment.observacao ? `<p><strong>Observação (Loja):</strong> ${payment.observacao}</p>` : ''}
-                    ${payment.observacao_admin ? `<p><strong>Observação (Admin):</strong> ${payment.observacao_admin}</p>` : ''}
-                </div>
-                
-                <div>
-                    <h3>Transações Incluídas (${transactions.length})</h3>`;
-            
-            if (transactions.length > 0) {
-                html += `<div style="max-height: 300px; overflow-y: auto;">
-                            <table class="table" style="width: 100%;">
-                                <thead>
-                                    <tr>
-                                        <th>Cliente</th>
-                                        <th>Data Trans.</th>
-                                        <th>Valor Compra</th>
-                                        <th>Cashback Cliente</th>
-                                    </tr>
-                                </thead>
-                                <tbody>`;
-                transactions.forEach(transaction => {
-                    html += `
-                        <tr>
-                            <td>${transaction.cliente_nome || 'N/A'}</td>
-                            <td>${transaction.data_transacao ? new Date(transaction.data_transacao).toLocaleDateString('pt-BR') : 'N/A'}</td>
-                            <td>R$ ${parseFloat(transaction.valor_total).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
-                            <td>R$ ${parseFloat(transaction.valor_cliente).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
-                        </tr>
-                    `;
-                });
-                html += `       </tbody>
-                            </table>
-                        </div>`;
-            } else {
-                html += '<p>Nenhuma transação associada a este pagamento.</p>';
-            }
-            html += `</div>`;
-            
-            contentElement.innerHTML = html;
-        }
-        
-        function viewReceipt(filename) {
-            if (!filename) return;
-            document.getElementById('receiptImage').src = '../../uploads/comprovantes/' + filename;
-            document.getElementById('receiptModal').style.display = 'block';
-        }
-    </script>
 </body>
 </html>
