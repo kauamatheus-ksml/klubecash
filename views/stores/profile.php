@@ -56,58 +56,75 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     switch ($action) {
         case 'update_store_info':
             // Atualizar informações da loja
-            $email = Validator::sanitizeEmail($_POST['email']);
-            $telefone = Validator::sanitizaString($_POST['telefone']);
-            $website = Validator::sanitizaString($_POST['website'] ?? '');
-            $descricao = Validator::sanitizaString($_POST['descricao'] ?? '');
-            
-            // Validações
-            if (!Validator::validaEmail($email)) {
-                $error = 'Email inválido.';
-            } elseif (!Validator::validaTelefone($telefone)) {
-                $error = 'Telefone inválido.';
-            } else {
-                try {
-                    $updateStmt = $db->prepare("
-                        UPDATE lojas 
-                        SET email = :email, telefone = :telefone, website = :website, descricao = :descricao
-                        WHERE id = :id
-                    ");
-                    $updateStmt->bindParam(':email', $email);
-                    $updateStmt->bindParam(':telefone', $telefone);
-                    $updateStmt->bindParam(':website', $website);
-                    $updateStmt->bindParam(':descricao', $descricao);
-                    $updateStmt->bindParam(':id', $storeId);
-                    $updateStmt->execute();
+            try {
+                $email = trim($_POST['email']);
+                $telefone = preg_replace('/\D/', '', $_POST['telefone']); // Remover caracteres não numéricos
+                $website = trim($_POST['website'] ?? '');
+                $descricao = trim($_POST['descricao'] ?? '');
+                
+                // Validações
+                if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                    $error = 'Email inválido.';
+                } elseif (strlen($telefone) < 10 || strlen($telefone) > 11) {
+                    $error = 'Telefone inválido. Digite um telefone com DDD.';
+                } else {
+                    // Verificar se email já existe em outra loja
+                    $checkEmailStmt = $db->prepare("SELECT id FROM lojas WHERE email = :email AND id != :loja_id");
+                    $checkEmailStmt->bindParam(':email', $email);
+                    $checkEmailStmt->bindParam(':loja_id', $storeId);
+                    $checkEmailStmt->execute();
                     
-                    // Atualizar dados em memória
-                    $store['email'] = $email;
-                    $store['telefone'] = $telefone;
-                    $store['website'] = $website;
-                    $store['descricao'] = $descricao;
-                    
-                    $success = 'Informações da loja atualizadas com sucesso!';
-                } catch (PDOException $e) {
-                    $error = 'Erro ao atualizar informações. Tente novamente.';
-                    error_log('Erro ao atualizar loja: ' . $e->getMessage());
+                    if ($checkEmailStmt->rowCount() > 0) {
+                        $error = 'Este email já está sendo usado por outra loja.';
+                    } else {
+                        // Atualizar informações
+                        $updateStmt = $db->prepare("
+                            UPDATE lojas 
+                            SET email = :email, telefone = :telefone, website = :website, descricao = :descricao
+                            WHERE id = :id
+                        ");
+                        $updateStmt->bindParam(':email', $email);
+                        $updateStmt->bindParam(':telefone', $telefone);
+                        $updateStmt->bindParam(':website', $website);
+                        $updateStmt->bindParam(':descricao', $descricao);
+                        $updateStmt->bindParam(':id', $storeId);
+                        
+                        if ($updateStmt->execute()) {
+                            // Atualizar dados em memória
+                            $store['email'] = $email;
+                            $store['telefone'] = $telefone;
+                            $store['website'] = $website;
+                            $store['descricao'] = $descricao;
+                            
+                            $success = 'Informações da loja atualizadas com sucesso!';
+                        } else {
+                            $error = 'Erro ao atualizar informações. Tente novamente.';
+                        }
+                    }
                 }
+            } catch (PDOException $e) {
+                $error = 'Erro ao atualizar informações. Tente novamente.';
+                error_log('Erro ao atualizar loja: ' . $e->getMessage());
             }
             break;
             
         case 'update_address':
             // Atualizar endereço
-            $cep = preg_replace('/\D/', '', $_POST['cep']);
-            $logradouro = Validator::sanitizaString($_POST['logradouro']);
-            $numero = Validator::sanitizaString($_POST['numero']);
-            $complemento = Validator::sanitizaString($_POST['complemento'] ?? '');
-            $bairro = Validator::sanitizaString($_POST['bairro']);
-            $cidade = Validator::sanitizaString($_POST['cidade']);
-            $estado = Validator::sanitizaString($_POST['estado']);
-            
-            if (empty($cep) || empty($logradouro) || empty($numero) || empty($bairro) || empty($cidade) || empty($estado)) {
-                $error = 'Todos os campos de endereço são obrigatórios.';
-            } else {
-                try {
+            try {
+                $cep = preg_replace('/\D/', '', $_POST['cep']);
+                $logradouro = trim($_POST['logradouro']);
+                $numero = trim($_POST['numero']);
+                $complemento = trim($_POST['complemento'] ?? '');
+                $bairro = trim($_POST['bairro']);
+                $cidade = trim($_POST['cidade']);
+                $estado = trim($_POST['estado']);
+                
+                // Validações
+                if (strlen($cep) != 8) {
+                    $error = 'CEP deve ter 8 dígitos.';
+                } elseif (empty($logradouro) || empty($numero) || empty($bairro) || empty($cidade) || empty($estado)) {
+                    $error = 'Todos os campos de endereço são obrigatórios.';
+                } else {
                     // Verificar se já existe endereço
                     $checkAddressStmt = $db->prepare("SELECT id FROM lojas_endereco WHERE loja_id = :loja_id");
                     $checkAddressStmt->bindParam(':loja_id', $storeId);
@@ -137,57 +154,81 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $updateAddressStmt->bindParam(':bairro', $bairro);
                     $updateAddressStmt->bindParam(':cidade', $cidade);
                     $updateAddressStmt->bindParam(':estado', $estado);
-                    $updateAddressStmt->execute();
                     
-                    // Atualizar dados em memória
-                    $store['cep'] = $cep;
-                    $store['logradouro'] = $logradouro;
-                    $store['numero'] = $numero;
-                    $store['complemento'] = $complemento;
-                    $store['bairro'] = $bairro;
-                    $store['cidade'] = $cidade;
-                    $store['estado'] = $estado;
-                    
-                    $success = 'Endereço atualizado com sucesso!';
-                } catch (PDOException $e) {
-                    $error = 'Erro ao atualizar endereço. Tente novamente.';
-                    error_log('Erro ao atualizar endereço: ' . $e->getMessage());
+                    if ($updateAddressStmt->execute()) {
+                        // Atualizar dados em memória
+                        $store['cep'] = $cep;
+                        $store['logradouro'] = $logradouro;
+                        $store['numero'] = $numero;
+                        $store['complemento'] = $complemento;
+                        $store['bairro'] = $bairro;
+                        $store['cidade'] = $cidade;
+                        $store['estado'] = $estado;
+                        
+                        $success = 'Endereço atualizado com sucesso!';
+                    } else {
+                        $error = 'Erro ao atualizar endereço. Tente novamente.';
+                    }
                 }
+            } catch (PDOException $e) {
+                $error = 'Erro ao atualizar endereço. Tente novamente.';
+                error_log('Erro ao atualizar endereço: ' . $e->getMessage());
             }
             break;
             
         case 'change_password':
             // Alterar senha
-            $senhaAtual = $_POST['senha_atual'];
-            $novaSenha = $_POST['nova_senha'];
-            $confirmarSenha = $_POST['confirmar_senha'];
-            
-            // Verificar senha atual
-            $checkPasswordStmt = $db->prepare("SELECT senha FROM usuarios WHERE id = :id");
-            $checkPasswordStmt->bindParam(':id', $userId);
-            $checkPasswordStmt->execute();
-            $currentPassword = $checkPasswordStmt->fetchColumn();
-            
-            if (!Security::verifyPassword($senhaAtual, $currentPassword)) {
-                $error = 'Senha atual incorreta.';
-            } elseif ($novaSenha !== $confirmarSenha) {
-                $error = 'A confirmação de senha não confere.';
-            } elseif (!Validator::validaSenha($novaSenha)) {
-                $error = 'Nova senha deve ter pelo menos 8 caracteres.';
-            } else {
-                try {
-                    $hashedPassword = Security::hashPassword($novaSenha);
-                    $updatePasswordStmt = $db->prepare("UPDATE usuarios SET senha = :senha WHERE id = :id");
-                    $updatePasswordStmt->bindParam(':senha', $hashedPassword);
-                    $updatePasswordStmt->bindParam(':id', $userId);
-                    $updatePasswordStmt->execute();
+            try {
+                $senhaAtual = $_POST['senha_atual'];
+                $novaSenha = $_POST['nova_senha'];
+                $confirmarSenha = $_POST['confirmar_senha'];
+                
+                // Validações básicas
+                if (empty($senhaAtual) || empty($novaSenha) || empty($confirmarSenha)) {
+                    $error = 'Todos os campos de senha são obrigatórios.';
+                } elseif ($novaSenha !== $confirmarSenha) {
+                    $error = 'A confirmação de senha não confere.';
+                } elseif (strlen($novaSenha) < 8) {
+                    $error = 'Nova senha deve ter pelo menos 8 caracteres.';
+                } else {
+                    // Verificar senha atual
+                    $checkPasswordStmt = $db->prepare("SELECT senha_hash FROM usuarios WHERE id = :id");
+                    $checkPasswordStmt->bindParam(':id', $userId);
+                    $checkPasswordStmt->execute();
                     
-                    $success = 'Senha alterada com sucesso!';
-                } catch (PDOException $e) {
-                    $error = 'Erro ao alterar senha. Tente novamente.';
-                    error_log('Erro ao alterar senha: ' . $e->getMessage());
+                    if ($checkPasswordStmt->rowCount() > 0) {
+                        $currentPasswordHash = $checkPasswordStmt->fetchColumn();
+                        
+                        // Verificar se a senha atual está correta
+                        if (password_verify($senhaAtual, $currentPasswordHash)) {
+                            // Gerar hash da nova senha
+                            $newPasswordHash = password_hash($novaSenha, PASSWORD_DEFAULT, ['cost' => 12]);
+                            
+                            // Atualizar senha
+                            $updatePasswordStmt = $db->prepare("UPDATE usuarios SET senha_hash = :senha_hash WHERE id = :id");
+                            $updatePasswordStmt->bindParam(':senha_hash', $newPasswordHash);
+                            $updatePasswordStmt->bindParam(':id', $userId);
+                            
+                            if ($updatePasswordStmt->execute()) {
+                                $success = 'Senha alterada com sucesso!';
+                            } else {
+                                $error = 'Erro ao alterar senha. Tente novamente.';
+                            }
+                        } else {
+                            $error = 'Senha atual incorreta.';
+                        }
+                    } else {
+                        $error = 'Usuário não encontrado.';
+                    }
                 }
+            } catch (PDOException $e) {
+                $error = 'Erro ao alterar senha. Tente novamente.';
+                error_log('Erro ao alterar senha: ' . $e->getMessage());
             }
+            break;
+            
+        default:
+            $error = 'Ação inválida.';
             break;
     }
 }
@@ -750,9 +791,9 @@ $activeMenu = 'profile';
             }
             
             // Validação de confirmação de senha
-            const form = document.querySelector('form[action=""] input[name="action"][value="change_password"]').closest('form');
-            if (form) {
-                form.addEventListener('submit', function(e) {
+            const passwordForm = document.querySelector('input[name="action"][value="change_password"]').closest('form');
+            if (passwordForm) {
+                passwordForm.addEventListener('submit', function(e) {
                     const novaSenha = document.getElementById('nova_senha').value;
                     const confirmarSenha = document.getElementById('confirmar_senha').value;
                     
