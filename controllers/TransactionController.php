@@ -981,11 +981,11 @@ class TransactionController {
     }
     
     /**
-     * Obtém detalhes de um pagamento
-     * 
-     * @param int $paymentId ID do pagamento
-     * @return array Detalhes do pagamento
-     */
+    * Obtém detalhes de um pagamento
+    * 
+    * @param int $paymentId ID do pagamento
+    * @return array Detalhes do pagamento
+    */
     public static function getPaymentDetails($paymentId) {
         try {
             // Verificar se o usuário está autenticado
@@ -995,9 +995,10 @@ class TransactionController {
             
             $db = Database::getConnection();
             
-            // Obter dados do pagamento
+            // Obter dados do pagamento com mais informações
             $paymentStmt = $db->prepare("
-                SELECT p.*, l.nome_fantasia as loja_nome
+                SELECT p.*, l.nome_fantasia as loja_nome, l.email as loja_email,
+                    (SELECT COUNT(*) FROM pagamentos_transacoes pt WHERE pt.pagamento_id = p.id) as total_transacoes
                 FROM pagamentos_comissao p
                 JOIN lojas l ON p.loja_id = l.id
                 WHERE p.id = :payment_id
@@ -1010,12 +1011,25 @@ class TransactionController {
                 return ['status' => false, 'message' => 'Pagamento não encontrado.'];
             }
             
-            // Verificar permissões - apenas admin ou a própria loja podem ver
-            if (!AuthController::isAdmin() && AuthController::isStore() && AuthController::getCurrentUserId() != $payment['loja_id']) {
-                return ['status' => false, 'message' => 'Acesso não autorizado.'];
+            // Verificar permissões - admin ou a própria loja
+            $currentUserId = AuthController::getCurrentUserId();
+            if (!AuthController::isAdmin()) {
+                if (AuthController::isStore()) {
+                    // Verificar se é a loja dona do pagamento
+                    $storeCheckStmt = $db->prepare("SELECT usuario_id FROM lojas WHERE id = :loja_id");
+                    $storeCheckStmt->bindParam(':loja_id', $payment['loja_id']);
+                    $storeCheckStmt->execute();
+                    $storeCheck = $storeCheckStmt->fetch(PDO::FETCH_ASSOC);
+                    
+                    if (!$storeCheck || $storeCheck['usuario_id'] != $currentUserId) {
+                        return ['status' => false, 'message' => 'Acesso não autorizado.'];
+                    }
+                } else {
+                    return ['status' => false, 'message' => 'Acesso não autorizado.'];
+                }
             }
             
-            // Obter transações associadas
+            // Obter transações associadas com mais detalhes
             $transStmt = $db->prepare("
                 SELECT t.*, u.nome as cliente_nome, u.email as cliente_email
                 FROM pagamentos_transacoes pt
@@ -1028,7 +1042,7 @@ class TransactionController {
             $transStmt->execute();
             $transactions = $transStmt->fetchAll(PDO::FETCH_ASSOC);
             
-            // Calcular totais
+            // Calcular totais detalhados
             $totalValorCompras = 0;
             $totalValorComissoes = 0;
             $totalCashbackClientes = 0;
@@ -1055,10 +1069,9 @@ class TransactionController {
             
         } catch (PDOException $e) {
             error_log('Erro ao obter detalhes do pagamento: ' . $e->getMessage());
-            return ['status' => false, 'message' => 'Erro ao obter detalhes do pagamento. Tente novamente.'];
+            return ['status' => false, 'message' => 'Erro interno do servidor. Tente novamente.'];
         }
     }
-    
     /**
      * Cria uma notificação para um usuário
      * 

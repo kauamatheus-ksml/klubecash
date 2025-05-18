@@ -330,228 +330,304 @@ $metodosPagamento = [
     </div>
     
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Modais
-            const paymentDetailsModal = document.getElementById('paymentDetailsModal');
-            const receiptModal = document.getElementById('receiptModal');
-            const paymentDetailsContent = document.getElementById('paymentDetailsContent');
-            const receiptImage = document.getElementById('receiptImage');
-            
-            // Botões de fechar modais
-            const closeButtons = document.getElementsByClassName('close');
-            for (let i = 0; i < closeButtons.length; i++) {
-                closeButtons[i].addEventListener('click', function() {
-                    paymentDetailsModal.style.display = 'none';
-                    receiptModal.style.display = 'none';
-                });
+document.addEventListener('DOMContentLoaded', function() {
+    // Elementos dos modais - obtendo referências dos elementos DOM
+    const paymentDetailsModal = document.getElementById('paymentDetailsModal');
+    const receiptModal = document.getElementById('receiptModal');
+    const paymentDetailsContent = document.getElementById('paymentDetailsContent');
+    const receiptImage = document.getElementById('receiptImage');
+    
+    // Configuração dos botões de fechar modais
+    // Este código adiciona event listeners para todos os elementos com classe 'close'
+    const closeButtons = document.getElementsByClassName('close');
+    for (let i = 0; i < closeButtons.length; i++) {
+        closeButtons[i].addEventListener('click', function() {
+            paymentDetailsModal.style.display = 'none';
+            receiptModal.style.display = 'none';
+        });
+    }
+    
+    // Fechar modal quando clicar fora dela (no backdrop)
+    // Esta funcionalidade melhora a experiência do usuário
+    window.addEventListener('click', function(event) {
+        if (event.target === paymentDetailsModal) {
+            paymentDetailsModal.style.display = 'none';
+        }
+        if (event.target === receiptModal) {
+            receiptModal.style.display = 'none';
+        }
+    });
+    
+    // Função principal para visualizar detalhes do pagamento
+    // CORREÇÃO PRINCIPAL: Mudança da API para o TransactionController
+    window.viewPaymentDetails = function(paymentId) {
+        // Validação básica do ID do pagamento
+        if (!paymentId || paymentId <= 0) {
+            alert('ID do pagamento inválido');
+            return;
+        }
+        
+        // Abrir modal e mostrar loading
+        paymentDetailsModal.style.display = 'block';
+        paymentDetailsContent.innerHTML = '<p>Carregando detalhes...</p>';
+        
+        // CORREÇÃO: Usar TransactionController ao invés da API separada
+        // Mudando de GET para POST conforme esperado pelo controller
+        fetch('../../controllers/TransactionController.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            // Enviando dados no formato correto para o controller
+            body: 'action=payment_details&payment_id=' + encodeURIComponent(paymentId)
+        })
+        .then(response => {
+            // Verificar se a resposta HTTP foi bem-sucedida
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
-            
-            // Fechar modal quando clicar fora dela
-            window.addEventListener('click', function(event) {
-                if (event.target === paymentDetailsModal) {
-                    paymentDetailsModal.style.display = 'none';
-                }
-                if (event.target === receiptModal) {
-                    receiptModal.style.display = 'none';
-                }
-            });
-            
-            // Definir funções globais
-            window.viewPaymentDetails = function(paymentId) {
-                // Abrir modal
-                paymentDetailsModal.style.display = 'block';
-                paymentDetailsContent.innerHTML = '<p>Carregando detalhes...</p>';
-                
-                // Realizar requisição AJAX para obter detalhes
-                fetch('../../api/payments.php?id=' + paymentId, {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': 'Bearer ' + getToken(),
-                        'Content-Type': 'application/json'
-                    }
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status) {
-                        renderPaymentDetails(data.data);
-                    } else {
-                        paymentDetailsContent.innerHTML = '<p class="error">Erro ao carregar detalhes: ' + data.message + '</p>';
-                    }
-                })
-                .catch(error => {
-                    paymentDetailsContent.innerHTML = '<p class="error">Erro de conexão. Tente novamente.</p>';
-                    console.error('Erro:', error);
-                });
-            };
-            
-            window.viewReceipt = function(receiptUrl) {
-                // Configurar a URL do comprovante
-                receiptImage.src = '../../uploads/comprovantes/' + receiptUrl;
-                receiptModal.style.display = 'block';
-                
-                // Ajustar imagem quando carregada
-                receiptImage.onload = function() {
-                    if (receiptImage.height > 600) {
-                        receiptImage.style.height = '600px';
-                        receiptImage.style.width = 'auto';
-                    }
-                };
-            };
-            
-            // Função auxiliar para obter token de autenticação
-            function getToken() {
-                // Implementar lógica para obter token JWT se necessário
-                // Por enquanto, vamos apenas retornar um token fictício
-                return 'token-exemplo';
+            return response.json();
+        })
+        .then(data => {
+            // Processar resposta do servidor
+            if (data && data.status) {
+                renderPaymentDetails(data.data);
+            } else {
+                // Mostrar mensagem de erro específica retornada pelo servidor
+                const errorMessage = data && data.message ? data.message : 'Erro desconhecido ao carregar detalhes';
+                paymentDetailsContent.innerHTML = `<p class="error">Erro: ${errorMessage}</p>`;
             }
-            
-            // Renderizar detalhes do pagamento
-            function renderPaymentDetails(data) {
-                const payment = data.pagamento;
-                const transactions = data.transacoes;
-                
-                let html = `
-                    <div class="payment-summary">
-                        <div class="summary-row">
-                            <span class="summary-label">ID do Pagamento:</span>
-                            <span class="summary-value">#${payment.id}</span>
+        })
+        .catch(error => {
+            // Tratamento de erros de conexão ou processamento
+            console.error('Erro na requisição:', error);
+            paymentDetailsContent.innerHTML = `
+                <p class="error">
+                    Erro de conexão. Verifique sua internet e tente novamente.
+                    <br><small>Detalhes técnicos: ${error.message}</small>
+                </p>
+            `;
+        });
+    };
+    
+    // Função para visualizar comprovante de pagamento
+    window.viewReceipt = function(receiptUrl) {
+        // Validação da URL do comprovante
+        if (!receiptUrl) {
+            alert('Comprovante não disponível');
+            return;
+        }
+        
+        // Configurar a URL do comprovante e abrir modal
+        receiptImage.src = '../../uploads/comprovantes/' + encodeURIComponent(receiptUrl);
+        receiptModal.style.display = 'block';
+        
+        // Ajustar tamanho da imagem quando carregada
+        receiptImage.onload = function() {
+            if (receiptImage.height > 600) {
+                receiptImage.style.height = '600px';
+                receiptImage.style.width = 'auto';
+            }
+        };
+        
+        // Tratamento de erro no carregamento da imagem
+        receiptImage.onerror = function() {
+            alert('Erro ao carregar o comprovante. Arquivo pode estar corrompido ou não encontrado.');
+            receiptModal.style.display = 'none';
+        };
+    };
+    
+    // Função para renderizar os detalhes do pagamento no modal
+    // MELHORIAS: Adicionadas verificações de segurança e tratamento de dados nulos
+    function renderPaymentDetails(data) {
+        // Verificação de segurança - garantir que os dados existem
+        if (!data || !data.pagamento) {
+            paymentDetailsContent.innerHTML = '<p class="error">Dados do pagamento não encontrados.</p>';
+            return;
+        }
+        
+        const payment = data.pagamento;
+        const transactions = data.transacoes || [];
+        
+        // Construção do HTML de forma segura com verificações
+        let html = `
+            <div class="payment-summary">
+                <div class="summary-row">
+                    <span class="summary-label">ID do Pagamento:</span>
+                    <span class="summary-value">#${escapeHtml(payment.id || 'N/A')}</span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">Data do Registro:</span>
+                    <span class="summary-value">${formatDate(payment.data_registro)}</span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">Valor Total:</span>
+                    <span class="summary-value">R$ ${formatCurrency(payment.valor_total)}</span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">Método de Pagamento:</span>
+                    <span class="summary-value">${getPaymentMethodName(payment.metodo_pagamento)}</span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">Status:</span>
+                    <span class="summary-value status-badge status-${payment.status}">${getStatusName(payment.status)}</span>
+                </div>
+                ${payment.numero_referencia ? `
+                <div class="summary-row">
+                    <span class="summary-label">Número de Referência:</span>
+                    <span class="summary-value">${escapeHtml(payment.numero_referencia)}</span>
+                </div>
+                ` : ''}
+            </div>
+        `;
+        
+        // Seção de informações de aprovação/rejeição
+        if (payment.status && payment.status !== 'pendente') {
+            html += `
+                <div class="approval-info">
+                    <h3>${payment.status === 'aprovado' ? 'Informações de Aprovação' : 'Motivo da Rejeição'}</h3>
+                    <div class="approval-details">
+                        ${payment.data_aprovacao ? `
+                        <div class="approval-row">
+                            <span class="approval-label">Data:</span>
+                            <span class="approval-value">${formatDate(payment.data_aprovacao)}</span>
                         </div>
-                        <div class="summary-row">
-                            <span class="summary-label">Data do Registro:</span>
-                            <span class="summary-value">${formatDate(payment.data_registro)}</span>
-                        </div>
-                        <div class="summary-row">
-                            <span class="summary-label">Valor Total:</span>
-                            <span class="summary-value">R$ ${formatCurrency(payment.valor_total)}</span>
-                        </div>
-                        <div class="summary-row">
-                            <span class="summary-label">Método de Pagamento:</span>
-                            <span class="summary-value">${getPaymentMethodName(payment.metodo_pagamento)}</span>
-                        </div>
-                        <div class="summary-row">
-                            <span class="summary-label">Status:</span>
-                            <span class="summary-value status-badge status-${payment.status}">${getStatusName(payment.status)}</span>
-                        </div>
-                        ${payment.numero_referencia ? `
-                        <div class="summary-row">
-                            <span class="summary-label">Número de Referência:</span>
-                            <span class="summary-value">${payment.numero_referencia}</span>
+                        ` : ''}
+                        ${payment.observacao_admin ? `
+                        <div class="approval-row">
+                            <span class="approval-label">Observação:</span>
+                            <span class="approval-value">${escapeHtml(payment.observacao_admin)}</span>
                         </div>
                         ` : ''}
                     </div>
-                `;
-                
-                // Adicionar informações de aprovação/rejeição
-                if (payment.status !== 'pendente') {
-                    html += `
-                        <div class="approval-info">
-                            <h3>${payment.status === 'aprovado' ? 'Informações de Aprovação' : 'Motivo da Rejeição'}</h3>
-                            <div class="approval-details">
-                                ${payment.data_aprovacao ? `
-                                <div class="approval-row">
-                                    <span class="approval-label">Data:</span>
-                                    <span class="approval-value">${formatDate(payment.data_aprovacao)}</span>
-                                </div>
-                                ` : ''}
-                                ${payment.observacao_admin ? `
-                                <div class="approval-row">
-                                    <span class="approval-label">Observação:</span>
-                                    <span class="approval-value">${payment.observacao_admin}</span>
-                                </div>
-                                ` : ''}
-                            </div>
-                        </div>
-                    `;
-                }
-                
-                // Adicionar lista de transações
-                html += `
-                    <div class="transactions-list">
-                        <h3>Transações Incluídas (${transactions.length})</h3>
-                        ${transactions.length > 0 ? `
-                        <div class="table-responsive">
-                            <table class="table">
-                                <thead>
-                                    <tr>
-                                        <th>Código</th>
-                                        <th>Cliente</th>
-                                        <th>Data</th>
-                                        <th>Valor</th>
-                                        <th>Cashback</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${transactions.map(transaction => `
-                                        <tr>
-                                            <td>${transaction.codigo_transacao || 'N/A'}</td>
-                                            <td>${transaction.cliente_nome}</td>
-                                            <td>${formatDate(transaction.data_transacao)}</td>
-                                            <td>R$ ${formatCurrency(transaction.valor_total)}</td>
-                                            <td>R$ ${formatCurrency(transaction.valor_cliente)}</td>
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
-                        </div>
-                        ` : '<p>Nenhuma transação encontrada</p>'}
-                    </div>
-                `;
-                
-                // Observações do pagamento
-                if (payment.observacao) {
-                    html += `
-                        <div class="payment-notes">
-                            <h3>Suas Observações</h3>
-                            <p>${payment.observacao}</p>
-                        </div>
-                    `;
-                }
-                
-                // Opções de ação para pagamentos rejeitados
-                if (payment.status === 'rejeitado') {
-                    html += `
-                        <div class="payment-actions">
-                            <a href="${STORE_PENDING_TRANSACTIONS_URL}" class="btn btn-primary">Realizar Novo Pagamento</a>
-                        </div>
-                    `;
-                }
-                
-                paymentDetailsContent.innerHTML = html;
-            }
+                </div>
+            `;
+        }
+        
+        // Lista de transações incluídas no pagamento
+        html += `
+            <div class="transactions-list">
+                <h3>Transações Incluídas (${transactions.length})</h3>
+                ${transactions.length > 0 ? `
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Código</th>
+                                <th>Cliente</th>
+                                <th>Data</th>
+                                <th>Valor</th>
+                                <th>Cashback</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${transactions.map(transaction => `
+                                <tr>
+                                    <td>${escapeHtml(transaction.codigo_transacao || 'N/A')}</td>
+                                    <td>${escapeHtml(transaction.cliente_nome || 'N/A')}</td>
+                                    <td>${formatDate(transaction.data_transacao)}</td>
+                                    <td>R$ ${formatCurrency(transaction.valor_total)}</td>
+                                    <td>R$ ${formatCurrency(transaction.valor_cliente)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+                ` : '<p>Nenhuma transação associada a este pagamento.</p>'}
+            </div>
+        `;
+        
+        // Observações da loja sobre o pagamento
+        if (payment.observacao) {
+            html += `
+                <div class="payment-notes">
+                    <h3>Suas Observações</h3>
+                    <p>${escapeHtml(payment.observacao)}</p>
+                </div>
+            `;
+        }
+        
+        // Ações disponíveis para pagamentos rejeitados
+        if (payment.status === 'rejeitado') {
+            html += `
+                <div class="payment-actions">
+                    <a href="../../store/transacoes-pendentes" class="btn btn-primary">Realizar Novo Pagamento</a>
+                </div>
+            `;
+        }
+        
+        // Inserir o HTML construído no modal
+        paymentDetailsContent.innerHTML = html;
+    }
+    
+    // Funções auxiliares para formatação e segurança
+    
+    // Formatar datas de forma segura
+    function formatDate(dateString) {
+        if (!dateString) return 'N/A';
+        
+        try {
+            const date = new Date(dateString);
+            // Verificar se a data é válida
+            if (isNaN(date.getTime())) return 'Data inválida';
             
-            // Funções auxiliares para formatação
-            function formatDate(dateString) {
-                const date = new Date(dateString);
-                return date.toLocaleDateString('pt-BR') + ' ' + date.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
-            }
-            
-            function formatCurrency(value) {
-                return Number(value).toLocaleString('pt-BR', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
-                });
-            }
-            
-            function getPaymentMethodName(method) {
-                const methods = {
-                    'pix': 'PIX',
-                    'transferencia': 'Transferência Bancária',
-                    'boleto': 'Boleto',
-                    'cartao': 'Cartão de Crédito',
-                    'outro': 'Outro'
-                };
-                return methods[method] || method;
-            }
-            
-            function getStatusName(status) {
-                switch(status) {
-                    case 'aprovado': return 'Aprovado';
-                    case 'pendente': return 'Pendente';
-                    case 'rejeitado': return 'Rejeitado';
-                    default: return status.charAt(0).toUpperCase() + status.slice(1);
-                }
-            }
+            return date.toLocaleDateString('pt-BR') + ' ' + 
+                   date.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
+        } catch (error) {
+            console.error('Erro ao formatar data:', error);
+            return 'Erro na data';
+        }
+    }
+    
+    // Formatar valores monetários de forma segura
+    function formatCurrency(value) {
+        // Converter para número e tratar valores inválidos
+        const numValue = parseFloat(value) || 0;
+        
+        return numValue.toLocaleString('pt-BR', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
         });
-    </script>
+    }
+    
+    // Obter nome do método de pagamento de forma legível
+    function getPaymentMethodName(method) {
+        const methods = {
+            'pix': 'PIX',
+            'transferencia': 'Transferência Bancária',
+            'ted': 'TED',
+            'boleto': 'Boleto',
+            'cartao': 'Cartão de Crédito',
+            'outro': 'Outro'
+        };
+        return methods[method] || 'Método não especificado';
+    }
+    
+    // Obter nome do status de forma legível
+    function getStatusName(status) {
+        switch(status) {
+            case 'aprovado': return 'Aprovado';
+            case 'pendente': return 'Pendente';
+            case 'rejeitado': return 'Rejeitado';
+            default: return status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Status desconhecido';
+        }
+    }
+    
+    // Função de segurança para escapar HTML e prevenir XSS
+    function escapeHtml(text) {
+        if (!text) return '';
+        
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        
+        return String(text).replace(/[&<>"']/g, function(m) { return map[m]; });
+    }
+});
+</script>
 </body>
 </html>
