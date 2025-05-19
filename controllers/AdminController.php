@@ -433,19 +433,12 @@ public static function getUserDetails($userId) {
     */
     public static function getStoreDetailsWithBalance($storeId) {
         try {
-            // Log para debug
-            error_log("getStoreDetailsWithBalance chamado para loja ID: $storeId");
-            
             // Verificar se é um administrador
-            if (!AuthController::isAdmin()) {
-                error_log("Acesso negado: usuário não é admin");
+            if (!self::validateAdmin()) {
                 return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
             }
             
             $db = Database::getConnection();
-            if (!$db) {
-                throw new Exception("Erro na conexão com banco de dados");
-            }
             
             // Buscar dados da loja
             $storeStmt = $db->prepare("SELECT * FROM lojas WHERE id = ?");
@@ -453,11 +446,8 @@ public static function getUserDetails($userId) {
             $store = $storeStmt->fetch(PDO::FETCH_ASSOC);
             
             if (!$store) {
-                error_log("Loja não encontrada: ID $storeId");
                 return ['status' => false, 'message' => 'Loja não encontrada.'];
             }
-            
-            error_log("Loja encontrada: " . $store['nome_fantasia']);
             
             // Buscar endereço da loja
             $addressStmt = $db->prepare("SELECT * FROM lojas_endereco WHERE loja_id = ?");
@@ -481,9 +471,7 @@ public static function getUserDetails($userId) {
             $statsStmt->execute([$storeId]);
             $statistics = $statsStmt->fetch(PDO::FETCH_ASSOC);
             
-            error_log("Estatísticas carregadas: " . json_encode($statistics));
-            
-            // Inicializar estatísticas de saldo com valores padrão
+            // Estatísticas de saldo (valores padrão por enquanto)
             $balanceStats = [
                 'total_saldo_clientes' => 0,
                 'clientes_com_saldo' => 0,
@@ -492,7 +480,7 @@ public static function getUserDetails($userId) {
                 'transacoes_com_saldo' => 0
             ];
             
-            // Buscar algumas transações recentes
+            // Buscar transações recentes
             $transStmt = $db->prepare("
                 SELECT t.*, u.nome as cliente_nome
                 FROM transacoes_cashback t
@@ -504,9 +492,7 @@ public static function getUserDetails($userId) {
             $transStmt->execute([$storeId]);
             $transactions = $transStmt->fetchAll(PDO::FETCH_ASSOC);
             
-            error_log("Transações carregadas: " . count($transactions));
-            
-            $result = [
+            return [
                 'status' => true,
                 'data' => [
                     'loja' => $store,
@@ -516,13 +502,9 @@ public static function getUserDetails($userId) {
                 ]
             ];
             
-            error_log("Resultado preparado com sucesso");
-            return $result;
-            
         } catch (Exception $e) {
             error_log('Erro ao obter detalhes da loja: ' . $e->getMessage());
-            error_log('Stack trace: ' . $e->getTraceAsString());
-            return ['status' => false, 'message' => 'Erro ao carregar detalhes da loja: ' . $e->getMessage()];
+            return ['status' => false, 'message' => 'Erro ao carregar detalhes da loja.'];
         }
     }
 
@@ -1701,34 +1683,30 @@ public static function getAvailableStores() {
             
             switch ($type) {
                 case 'create_store':
-                    try {
-                        $data = $_POST;
-                        unset($data['action']);
-                        
-                        // Validar dados obrigatórios
-                        $required = ['nome_fantasia', 'razao_social', 'cnpj', 'email', 'telefone'];
-                        foreach ($required as $field) {
-                            if (!isset($data[$field]) || empty(trim($data[$field]))) {
-                                self::sendJsonResponse(['status' => false, 'message' => "Campo '$field' é obrigatório"]);
-                            }
+                    header('Content-Type: application/json; charset=UTF-8');
+                    
+                    $data = $_POST;
+                    unset($data['action']);
+                    
+                    // Validar dados obrigatórios
+                    $required = ['nome_fantasia', 'razao_social', 'cnpj', 'email', 'telefone'];
+                    foreach ($required as $field) {
+                        if (!isset($data[$field]) || empty(trim($data[$field]))) {
+                            echo json_encode(['status' => false, 'message' => "Campo '$field' é obrigatório"]);
+                            exit;
                         }
-                        
+                    }
+                    
+                    try {
                         $db = Database::getConnection();
                         
-                        // Verificar se já existe loja com mesmo CNPJ
-                        $checkStmt = $db->prepare("SELECT id FROM lojas WHERE cnpj = ?");
-                        $checkStmt->execute([$data['cnpj']]);
+                        // Verificar duplicatas
+                        $checkStmt = $db->prepare("SELECT id FROM lojas WHERE cnpj = ? OR email = ?");
+                        $checkStmt->execute([$data['cnpj'], $data['email']]);
                         
                         if ($checkStmt->rowCount() > 0) {
-                            self::sendJsonResponse(['status' => false, 'message' => 'Já existe uma loja com este CNPJ']);
-                        }
-                        
-                        // Verificar se já existe loja com mesmo email
-                        $checkEmailStmt = $db->prepare("SELECT id FROM lojas WHERE email = ?");
-                        $checkEmailStmt->execute([$data['email']]);
-                        
-                        if ($checkEmailStmt->rowCount() > 0) {
-                            self::sendJsonResponse(['status' => false, 'message' => 'Já existe uma loja com este email']);
+                            echo json_encode(['status' => false, 'message' => 'Já existe uma loja com este CNPJ ou email']);
+                            exit;
                         }
                         
                         // Inserir nova loja
@@ -1739,61 +1717,42 @@ public static function getAvailableStores() {
                             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
                         ");
                         
-                        $categoria = isset($data['categoria']) ? $data['categoria'] : 'Outros';
-                        $porcentagem = isset($data['porcentagem_cashback']) ? $data['porcentagem_cashback'] : 5.00;
-                        $status = isset($data['status']) ? $data['status'] : 'pendente';
-                        
                         $success = $stmt->execute([
                             $data['nome_fantasia'],
                             $data['razao_social'],
                             $data['cnpj'],
                             $data['email'],
                             $data['telefone'],
-                            $categoria,
-                            $porcentagem,
-                            $status
+                            $data['categoria'] ?? 'Outros',
+                            $data['porcentagem_cashback'] ?? 5.00,
+                            $data['status'] ?? 'pendente'
                         ]);
                         
                         if ($success) {
-                            self::sendJsonResponse(['status' => true, 'message' => 'Loja criada com sucesso!']);
+                            echo json_encode(['status' => true, 'message' => 'Loja criada com sucesso!']);
                         } else {
-                            self::sendJsonResponse(['status' => false, 'message' => 'Erro ao criar loja']);
+                            echo json_encode(['status' => false, 'message' => 'Erro ao criar loja']);
                         }
                         
                     } catch (Exception $e) {
-                        error_log('Erro ao criar loja: ' . $e->getMessage());
-                        self::sendJsonResponse(['status' => false, 'message' => 'Erro no banco de dados']);
+                        echo json_encode(['status' => false, 'message' => 'Erro no banco de dados']);
                     }
+                    exit;
                     break;
 
 
                 case 'store_details_with_balance':
-                    // Limpar qualquer output anterior
-                    if (ob_get_level()) {
-                        ob_clean();
-                    }
-                    
-                    // Definir headers
                     header('Content-Type: application/json; charset=UTF-8');
-                    header('Cache-Control: no-cache, must-revalidate');
                     
-                    try {
-                        $storeId = isset($_POST['store_id']) ? intval($_POST['store_id']) : 0;
-                        
-                        error_log("Processando store_details_with_balance para ID: $storeId");
-                        
-                        if ($storeId <= 0) {
-                            echo json_encode(['status' => false, 'message' => 'ID da loja inválido']);
-                            exit;
-                        }
-                        
-                        $result = self::getStoreDetailsWithBalance($storeId);
-                        echo json_encode($result, JSON_UNESCAPED_UNICODE);
-                        
-                    } catch (Exception $e) {
-                        error_log('Erro na action store_details_with_balance: ' . $e->getMessage());
-                        echo json_encode(['status' => false, 'message' => 'Erro interno: ' . $e->getMessage()]);
+                    $storeId = isset($_POST['store_id']) ? intval($_POST['store_id']) : 0;
+                    
+                    if ($storeId <= 0) {
+                        echo json_encode(['status' => false, 'message' => 'ID da loja inválido']);
+                        exit;
                     }
+                    
+                    $result = self::getStoreDetailsWithBalance($storeId);
+                    echo json_encode($result, JSON_UNESCAPED_UNICODE);
                     exit;
                     break;
                 
