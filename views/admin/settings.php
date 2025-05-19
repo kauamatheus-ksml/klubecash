@@ -19,6 +19,62 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION[
     exit;
 }
 
+// Função para garantir que as tabelas de configuração existam
+function ensureConfigurationTables($db) {
+    try {
+        // Verificar e criar tabela de configurações de saldo
+        $checkSaldoTable = $db->query("SHOW TABLES LIKE 'configuracoes_saldo'");
+        if ($checkSaldoTable->rowCount() == 0) {
+            $createSaldoTable = "
+                CREATE TABLE configuracoes_saldo (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    permitir_uso_saldo TINYINT(1) DEFAULT 1,
+                    valor_minimo_uso DECIMAL(10,2) DEFAULT 1.00,
+                    percentual_maximo_uso DECIMAL(5,2) DEFAULT 100.00,
+                    tempo_expiracao_dias INT DEFAULT 0,
+                    notificar_saldo_baixo TINYINT(1) DEFAULT 1,
+                    limite_saldo_baixo DECIMAL(10,2) DEFAULT 10.00,
+                    permitir_transferencia TINYINT(1) DEFAULT 0,
+                    taxa_transferencia DECIMAL(5,2) DEFAULT 0.00,
+                    data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                )
+            ";
+            $db->exec($createSaldoTable);
+            
+            // Inserir configurações padrão
+            $db->exec("INSERT INTO configuracoes_saldo (permitir_uso_saldo) VALUES (1)");
+        }
+        
+        // Verificar e criar tabela de configurações de notificação
+        $checkNotificationTable = $db->query("SHOW TABLES LIKE 'configuracoes_notificacao'");
+        if ($checkNotificationTable->rowCount() == 0) {
+            $createNotificationTable = "
+                CREATE TABLE configuracoes_notificacao (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    email_nova_transacao TINYINT(1) DEFAULT 1,
+                    email_pagamento_aprovado TINYINT(1) DEFAULT 1,
+                    email_saldo_disponivel TINYINT(1) DEFAULT 1,
+                    email_saldo_baixo TINYINT(1) DEFAULT 1,
+                    email_saldo_expirado TINYINT(1) DEFAULT 1,
+                    push_nova_transacao TINYINT(1) DEFAULT 1,
+                    push_saldo_disponivel TINYINT(1) DEFAULT 1,
+                    push_promocoes TINYINT(1) DEFAULT 1,
+                    data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                )
+            ";
+            $db->exec($createNotificationTable);
+            
+            // Inserir configurações padrão
+            $db->exec("INSERT INTO configuracoes_notificacao (email_nova_transacao) VALUES (1)");
+        }
+        
+        return true;
+    } catch (Exception $e) {
+        error_log('Erro ao criar tabelas de configuração: ' . $e->getMessage());
+        return false;
+    }
+}
+
 // Inicializar variáveis
 $message = '';
 $messageType = '';
@@ -27,6 +83,10 @@ $messageType = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $action = $_POST['action'] ?? '';
+        $db = Database::getConnection();
+        
+        // Garantir que as tabelas existam antes de processar
+        ensureConfigurationTables($db);
         
         switch ($action) {
             case 'update_cashback':
@@ -58,33 +118,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
             case 'update_balance_settings':
                 // Atualizar configurações de saldo
-                $db = Database::getConnection();
-                
-                // Verificar se a tabela de configurações de saldo existe
-                $checkTable = $db->query("SHOW TABLES LIKE 'configuracoes_saldo'");
-                if ($checkTable->rowCount() == 0) {
-                    // Criar tabela se não existir
-                    $createTable = "
-                        CREATE TABLE configuracoes_saldo (
-                            id INT AUTO_INCREMENT PRIMARY KEY,
-                            permitir_uso_saldo TINYINT(1) DEFAULT 1,
-                            valor_minimo_uso DECIMAL(10,2) DEFAULT 1.00,
-                            percentual_maximo_uso DECIMAL(5,2) DEFAULT 100.00,
-                            tempo_expiracao_dias INT DEFAULT 0,
-                            notificar_saldo_baixo TINYINT(1) DEFAULT 1,
-                            limite_saldo_baixo DECIMAL(10,2) DEFAULT 10.00,
-                            permitir_transferencia TINYINT(1) DEFAULT 0,
-                            taxa_transferencia DECIMAL(5,2) DEFAULT 0.00,
-                            data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-                        )
-                    ";
-                    $db->exec($createTable);
-                    
-                    // Inserir configurações padrão
-                    $db->exec("INSERT INTO configuracoes_saldo (permitir_uso_saldo) VALUES (1)");
-                }
-                
-                // Atualizar configurações
                 $updateQuery = "
                     UPDATE configuracoes_saldo SET
                         permitir_uso_saldo = :permitir_uso_saldo,
@@ -116,33 +149,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
             case 'update_notification_settings':
                 // Atualizar configurações de notificação
-                $db = Database::getConnection();
-                
-                // Verificar se a tabela existe
-                $checkTable = $db->query("SHOW TABLES LIKE 'configuracoes_notificacao'");
-                if ($checkTable->rowCount() == 0) {
-                    // Criar tabela se não existir
-                    $createTable = "
-                        CREATE TABLE configuracoes_notificacao (
-                            id INT AUTO_INCREMENT PRIMARY KEY,
-                            email_nova_transacao TINYINT(1) DEFAULT 1,
-                            email_pagamento_aprovado TINYINT(1) DEFAULT 1,
-                            email_saldo_disponivel TINYINT(1) DEFAULT 1,
-                            email_saldo_baixo TINYINT(1) DEFAULT 1,
-                            email_saldo_expirado TINYINT(1) DEFAULT 1,
-                            push_nova_transacao TINYINT(1) DEFAULT 1,
-                            push_saldo_disponivel TINYINT(1) DEFAULT 1,
-                            push_promocoes TINYINT(1) DEFAULT 1,
-                            data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-                        )
-                    ";
-                    $db->exec($createTable);
-                    
-                    // Inserir configurações padrão
-                    $db->exec("INSERT INTO configuracoes_notificacao (email_nova_transacao) VALUES (1)");
-                }
-                
-                // Atualizar configurações
                 $updateQuery = "
                     UPDATE configuracoes_notificacao SET
                         email_nova_transacao = :email_nova_transacao,
@@ -181,6 +187,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // Obter configurações atuais
 try {
+    $db = Database::getConnection();
+    
+    // Garantir que as tabelas existam antes de consultar
+    ensureConfigurationTables($db);
+    
     // Configurações de cashback
     $settingsResult = AdminController::getSettings();
     
@@ -196,7 +207,6 @@ try {
     }
     
     // Configurações de saldo
-    $db = Database::getConnection();
     $balanceSettingsQuery = $db->query("SELECT * FROM configuracoes_saldo ORDER BY id DESC LIMIT 1");
     $balanceSettings = $balanceSettingsQuery->fetch(PDO::FETCH_ASSOC);
     
@@ -234,6 +244,36 @@ try {
     error_log('Erro ao carregar configurações: ' . $e->getMessage());
     $message = 'Erro ao carregar configurações: ' . $e->getMessage();
     $messageType = 'danger';
+    
+    // Definir valores padrão em caso de erro
+    $settings = [
+        'porcentagem_total' => DEFAULT_CASHBACK_TOTAL,
+        'porcentagem_cliente' => DEFAULT_CASHBACK_CLIENT,
+        'porcentagem_admin' => DEFAULT_CASHBACK_ADMIN,
+        'porcentagem_loja' => DEFAULT_CASHBACK_STORE
+    ];
+    
+    $balanceSettings = [
+        'permitir_uso_saldo' => 1,
+        'valor_minimo_uso' => 1.00,
+        'percentual_maximo_uso' => 100.00,
+        'tempo_expiracao_dias' => 0,
+        'notificar_saldo_baixo' => 1,
+        'limite_saldo_baixo' => 10.00,
+        'permitir_transferencia' => 0,
+        'taxa_transferencia' => 0.00
+    ];
+    
+    $notificationSettings = [
+        'email_nova_transacao' => 1,
+        'email_pagamento_aprovado' => 1,
+        'email_saldo_disponivel' => 1,
+        'email_saldo_baixo' => 1,
+        'email_saldo_expirado' => 1,
+        'push_nova_transacao' => 1,
+        'push_saldo_disponivel' => 1,
+        'push_promocoes' => 1
+    ];
 }
 ?>
 
