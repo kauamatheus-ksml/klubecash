@@ -150,8 +150,7 @@ try {
     // Dados para exibição
     $storesData = $hasError ? [] : $result['data'];
     
-    // Se não há erro, enriquecer dados com informações de saldo
-if (!$hasError && !empty($storesData['lojas'])) {
+    if (!$hasError && !empty($storesData['lojas'])) {
     foreach ($storesData['lojas'] as &$loja) {
         // Buscar saldo disponível do cliente nesta loja
         $saldoQuery = "
@@ -199,10 +198,9 @@ if (!$hasError && !empty($storesData['lojas'])) {
         $loja['cashback_pendente'] = $pendingInfo['cashback_pendente'] ?? 0;
     }
 }
-
-// Obter estatísticas gerais do cliente
-try {
-    $estatisticasQuery = "
+    
+    // Obter estatísticas gerais do cliente
+     $estatisticasQuery = "
         SELECT 
             COUNT(DISTINCT loja_id) as lojas_com_saldo,
             SUM(saldo_disponivel) as total_saldo_disponivel,
