@@ -1036,10 +1036,14 @@ class TransactionController {
                     ");
                     $updateCommissionStmt->execute($transactionIds);
                     
-                    // NOVO: Creditar saldo para cada transação
+                    // IMPORTANTE: Creditar saldo para cada transação
+                    $saldosCreditados = 0;
                     foreach ($transactions as $transaction) {
                         if ($transaction['valor_cliente'] > 0) {
                             $description = "Cashback da compra - Transação #{$transaction['id']} (Pagamento #{$paymentId} aprovado)";
+                            
+                            // Log antes de creditar
+                            error_log("APROVAÇÃO: Creditando saldo - Transação: {$transaction['id']}, Usuario: {$transaction['usuario_id']}, Loja: {$transaction['loja_id']}, Valor: {$transaction['valor_cliente']}");
                             
                             $creditResult = $balanceModel->addBalance(
                                 $transaction['usuario_id'],
@@ -1049,14 +1053,17 @@ class TransactionController {
                                 $transaction['id']
                             );
                             
-                            if (!$creditResult) {
-                                error_log("Erro ao creditar saldo - Transação: {$transaction['id']}, Usuario: {$transaction['usuario_id']}, Loja: {$transaction['loja_id']}, Valor: {$transaction['valor_cliente']}");
-                                // Continuamos o processo mesmo se falhar um crédito individual
+                            if ($creditResult) {
+                                $saldosCreditados++;
+                                error_log("APROVAÇÃO: Saldo creditado com sucesso - Transação: {$transaction['id']}");
+                            } else {
+                                error_log("APROVAÇÃO: ERRO ao creditar saldo - Transação: {$transaction['id']}");
+                                // Não falhar toda a operação por um erro de saldo
                             }
                         }
                     }
                     
-                    // 4. Notificar clientes (código existente mantido)
+                    // 4. Notificar clientes
                     $clienteNotificados = [];
                     foreach ($transactions as $transaction) {
                         if (!in_array($transaction['usuario_id'], $clienteNotificados)) {
@@ -1093,7 +1100,7 @@ class TransactionController {
                     }
                 }
                 
-                // 5. Notificar loja (código existente mantido)
+                // 5. Notificar loja
                 $storeUserStmt = $db->prepare("SELECT usuario_id FROM lojas WHERE id = ?");
                 $storeUserStmt->execute([$payment['loja_id']]);
                 $storeUser = $storeUserStmt->fetch(PDO::FETCH_ASSOC);
@@ -1115,17 +1122,19 @@ class TransactionController {
                     'message' => 'Pagamento aprovado com sucesso! Cashback liberado para os clientes.',
                     'data' => [
                         'payment_id' => $paymentId,
-                        'transacoes_atualizadas' => count($transactions)
+                        'transacoes_atualizadas' => count($transactions),
+                        'saldos_creditados' => $saldosCreditados
                     ]
                 ];
                 
             } catch (Exception $e) {
                 $db->rollBack();
+                error_log('APROVAÇÃO: Erro durante rollback: ' . $e->getMessage());
                 throw $e;
             }
             
         } catch (Exception $e) {
-            error_log('Erro ao aprovar pagamento: ' . $e->getMessage());
+            error_log('APROVAÇÃO: Erro ao aprovar pagamento: ' . $e->getMessage());
             return ['status' => false, 'message' => 'Erro ao aprovar pagamento: ' . $e->getMessage()];
         }
     }
