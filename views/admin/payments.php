@@ -8,14 +8,15 @@ require_once '../../config/database.php';
 require_once '../../config/constants.php';
 require_once '../../controllers/AuthController.php';
 require_once '../../controllers/TransactionController.php';
+require_once '../../models/CashbackBalance.php';
 
 // Iniciar sessão
 session_start();
 
 // Habilitar logs de erro e debug inicial
-ini_set('display_errors', 1); // Mostrar erros (útil para desenvolvimento, DESATIVE em produção)
-ini_set('log_errors', 1);     // Habilitar log de erros
-error_reporting(E_ALL);     // Reportar todos os tipos de erros
+ini_set('display_errors', 1);
+ini_set('log_errors', 1);
+error_reporting(E_ALL);
 
 error_log("payments.php - Início da execução. Method: " . $_SERVER['REQUEST_METHOD']);
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST)) {
@@ -61,7 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // Obter lista de pagamentos
 $filters = [];
 $page = isset($_GET['page']) ? intval($_GET['page']) : 1;
-if ($page < 1) $page = 1; // Garantir que a página não seja menor que 1
+if ($page < 1) $page = 1;
 
 // Aplicar filtros se fornecidos
 if (isset($_GET['status']) && !empty($_GET['status'])) {
@@ -76,12 +77,30 @@ if (isset($_GET['data_fim']) && !empty($_GET['data_fim'])) {
 
 $db = Database::getConnection();
 
-// --- Construção da Query ---
-$selectPart = "SELECT p.*, l.nome_fantasia, l.email as loja_email,
-                      COALESCE((SELECT COUNT(*) FROM pagamentos_transacoes pt WHERE pt.pagamento_id = p.id), 0) as total_transacoes";
-$fromPart = "FROM pagamentos_comissao p JOIN lojas l ON p.loja_id = l.id";
+// --- Construção da Query com informações de saldo ---
+$selectPart = "SELECT 
+    p.*, 
+    l.nome_fantasia, 
+    l.email as loja_email,
+    COALESCE((SELECT COUNT(*) FROM pagamentos_transacoes pt WHERE pt.pagamento_id = p.id), 0) as total_transacoes,
+    COALESCE(SUM(t_vendas.valor_total), 0) as valor_vendas_originais,
+    COALESCE(SUM(
+        (SELECT SUM(cm.valor) 
+         FROM cashback_movimentacoes cm 
+         WHERE cm.transacao_uso_id = t_vendas.id AND cm.tipo_operacao = 'uso')
+    ), 0) as total_saldo_usado,
+    COUNT(CASE WHEN EXISTS(
+        SELECT 1 FROM cashback_movimentacoes cm2 
+        WHERE cm2.transacao_uso_id = t_vendas.id AND cm2.tipo_operacao = 'uso'
+    ) THEN 1 END) as transacoes_com_saldo";
+
+$fromPart = "FROM pagamentos_comissao p 
+JOIN lojas l ON p.loja_id = l.id
+LEFT JOIN pagamentos_transacoes pt ON p.id = pt.pagamento_id
+LEFT JOIN transacoes_cashback t_vendas ON pt.transacao_id = t_vendas.id";
+
 $wherePart = "WHERE 1=1";
-$paramsForWhere = []; // Parâmetros apenas para a cláusula WHERE
+$paramsForWhere = [];
 
 // Aplicar filtros à cláusula WHERE
 if (!empty($filters['status'])) {
@@ -96,31 +115,35 @@ if (!empty($filters['data_fim'])) {
     $wherePart .= " AND p.data_registro <= :data_fim";
     $paramsForWhere[':data_fim'] = $filters['data_fim'] . ' 23:59:59';
 }
-// --- Fim da construção da Query para WHERE ---
+
+$groupPart = "GROUP BY p.id";
 
 // Contagem para paginação
-// A query de contagem deve usar as mesmas condições de filtro (FROM e WHERE)
-$countQuery = "SELECT COUNT(DISTINCT p.id) as total " . $fromPart . " " . $wherePart;
+$countQuery = "SELECT COUNT(DISTINCT p.id) as total 
+               FROM pagamentos_comissao p 
+               JOIN lojas l ON p.loja_id = l.id " . 
+               str_replace("WHERE 1=1", "WHERE 1=1", $wherePart);
+
 $countStmt = $db->prepare($countQuery);
 foreach ($paramsForWhere as $paramName => $paramValue) {
     $countStmt->bindValue($paramName, $paramValue);
 }
 $countStmt->execute();
 $resultCount = $countStmt->fetch(PDO::FETCH_ASSOC);
-$totalCount = $resultCount ? (int)$resultCount['total'] : 0; // Linha corrigida (era ~136)
+$totalCount = $resultCount ? (int)$resultCount['total'] : 0;
 
 // Paginação
 $perPage = defined('ITEMS_PER_PAGE') ? ITEMS_PER_PAGE : 10;
 $totalPages = ($totalCount > 0) ? ceil($totalCount / $perPage) : 1;
-$page = max(1, min($page, $totalPages)); // Garante que a página atual está dentro dos limites
+$page = max(1, min($page, $totalPages));
 $offset = ($page - 1) * $perPage;
 
 // Query principal para buscar dados
-$mainQuery = $selectPart . " " . $fromPart . " " . $wherePart . " ORDER BY p.data_registro DESC LIMIT :offset, :limit";
+$mainQuery = $selectPart . " " . $fromPart . " " . $wherePart . " " . $groupPart . " ORDER BY p.data_registro DESC LIMIT :offset, :limit";
 $stmt = $db->prepare($mainQuery);
 
 // Bind parâmetros para a query principal (filtros + paginação)
-$paramsForMainQuery = $paramsForWhere; // Começa com os filtros
+$paramsForMainQuery = $paramsForWhere;
 $paramsForMainQuery[':offset'] = $offset;
 $paramsForMainQuery[':limit'] = $perPage;
 
@@ -134,28 +157,36 @@ foreach ($paramsForMainQuery as $paramName => $paramValue) {
 $stmt->execute();
 $payments = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Estatísticas (globais ou filtradas, dependendo da necessidade)
-// Se quiser estatísticas filtradas, construa $statsQuery com $wherePart e $paramsForWhere
+// Estatísticas globais com informações de saldo
 $statsQuery = "
     SELECT 
         COUNT(*) as total_pagamentos,
-        SUM(valor_total) as valor_total,
-        SUM(CASE WHEN status = 'pendente' THEN valor_total ELSE 0 END) as valor_pendente,
-        SUM(CASE WHEN status = 'aprovado' THEN valor_total ELSE 0 END) as valor_aprovado,
-        COUNT(CASE WHEN status = 'pendente' THEN 1 END) as count_pendente,
-        COUNT(CASE WHEN status = 'aprovado' THEN 1 END) as count_aprovado,
-        COUNT(CASE WHEN status = 'rejeitado' THEN 1 END) as count_rejeitado
-    FROM pagamentos_comissao
+        SUM(p.valor_total) as valor_total_comissoes,
+        SUM(CASE WHEN p.status = 'pendente' THEN p.valor_total ELSE 0 END) as valor_pendente,
+        SUM(CASE WHEN p.status = 'aprovado' THEN p.valor_total ELSE 0 END) as valor_aprovado,
+        COUNT(CASE WHEN p.status = 'pendente' THEN 1 END) as count_pendente,
+        COUNT(CASE WHEN p.status = 'aprovado' THEN 1 END) as count_aprovado,
+        COUNT(CASE WHEN p.status = 'rejeitado' THEN 1 END) as count_rejeitado,
+        COALESCE(SUM(sub.valor_vendas_originais), 0) as total_vendas_originais,
+        COALESCE(SUM(sub.total_saldo_usado), 0) as total_saldo_usado_sistema
+    FROM pagamentos_comissao p
+    LEFT JOIN (
+        SELECT 
+            pt.pagamento_id,
+            SUM(t.valor_total) as valor_vendas_originais,
+            SUM(COALESCE(
+                (SELECT SUM(cm.valor) 
+                 FROM cashback_movimentacoes cm 
+                 WHERE cm.transacao_uso_id = t.id AND cm.tipo_operacao = 'uso'), 0
+            )) as total_saldo_usado
+        FROM pagamentos_transacoes pt
+        JOIN transacoes_cashback t ON pt.transacao_id = t.id
+        GROUP BY pt.pagamento_id
+    ) sub ON p.id = sub.pagamento_id
 ";
-// Para estatísticas filtradas, adicione a cláusula WHERE:
-// $statsQuery .= " " . $wherePart;
-// $statsStmt = $db->prepare($statsQuery);
-// foreach ($paramsForWhere as $paramName => $paramValue) { $statsStmt->bindValue($paramName, $paramValue); }
-// $statsStmt->execute();
 
-$statsStmt = $db->query($statsQuery); // Para estatísticas globais
+$statsStmt = $db->query($statsQuery);
 $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
-
 ?>
 
 <!DOCTYPE html>
@@ -316,6 +347,57 @@ $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
         .page-link:hover {
             background-color: #e9ecef;
         }
+
+        /* Estilos para informações de saldo */
+        .saldo-info {
+            background-color: #f8fff8;
+            border-left: 4px solid #28a745;
+            padding: 10px 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+        }
+        
+        .saldo-usado {
+            color: #28a745;
+            font-weight: 600;
+        }
+        
+        .valor-original {
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+        
+        .valor-liquido {
+            color: #2d3748;
+            font-weight: 600;
+        }
+        
+        .balance-indicator {
+            margin-left: 5px;
+            font-size: 0.8rem;
+        }
+        
+        .sem-saldo {
+            color: #6c757d;
+            font-style: italic;
+        }
+        
+        .economia-badge {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+        
+        .stat-card-balance {
+            border-left: 4px solid #28a745;
+        }
+        
+        .stat-card-balance .stat-card-value {
+            color: #28a745;
+        }
     </style>
 </head>
 <body>
@@ -366,6 +448,16 @@ $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
                     <div class="stat-card-title">Valor Total Aprovado</div>
                     <div class="stat-card-value">R$ <?php echo number_format($stats['valor_aprovado'], 2, ',', '.'); ?></div>
                 </div>
+                <div class="stat-card stat-card-balance">
+                    <div class="stat-card-title">Vendas Originais</div>
+                    <div class="stat-card-value">R$ <?php echo number_format($stats['total_vendas_originais'], 2, ',', '.'); ?></div>
+                    <div class="stat-card-subtitle">Valor total das vendas</div>
+                </div>
+                <div class="stat-card stat-card-balance">
+                    <div class="stat-card-title">Economia Clientes</div>
+                    <div class="stat-card-value">R$ <?php echo number_format($stats['total_saldo_usado_sistema'], 2, ',', '.'); ?></div>
+                    <div class="stat-card-subtitle">Saldo usado em compras</div>
+                </div>
             </div>
             
             <div class="filter-container">
@@ -406,7 +498,9 @@ $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
                                 <tr>
                                     <th>#ID</th>
                                     <th>Loja</th>
-                                    <th>Valor</th>
+                                    <th>Valor Original</th>
+                                    <th>Saldo Usado</th>
+                                    <th>Comissão</th>
                                     <th>Método</th>
                                     <th>Data</th>
                                     <th>Transações</th>
@@ -418,11 +512,47 @@ $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
                                 <?php foreach ($payments as $payment): ?>
                                     <tr>
                                         <td><?php echo $payment['id']; ?></td>
-                                        <td><?php echo htmlspecialchars($payment['nome_fantasia']); ?></td>
-                                        <td>R$ <?php echo number_format($payment['valor_total'], 2, ',', '.'); ?></td>
+                                        <td>
+                                            <?php echo htmlspecialchars($payment['nome_fantasia']); ?>
+                                            <?php if ($payment['total_saldo_usado'] > 0): ?>
+                                                <span class="balance-indicator" title="Clientes usaram saldo">💰</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td>
+                                            <div>
+                                                <span class="valor-original">R$ <?php echo number_format($payment['valor_vendas_originais'], 2, ',', '.'); ?></span>
+                                                <small class="valor-detail">Vendas</small>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <?php if ($payment['total_saldo_usado'] > 0): ?>
+                                                <span class="saldo-usado">R$ <?php echo number_format($payment['total_saldo_usado'], 2, ',', '.'); ?></span>
+                                                <?php if ($payment['transacoes_com_saldo'] > 0): ?>
+                                                    <small class="economia-badge"><?php echo $payment['transacoes_com_saldo']; ?> uso<?php echo $payment['transacoes_com_saldo'] > 1 ? 's' : ''; ?></small>
+                                                <?php endif; ?>
+                                            <?php else: ?>
+                                                <span class="sem-saldo">-</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td>
+                                            <div>
+                                                <span class="valor-liquido">R$ <?php echo number_format($payment['valor_total'], 2, ',', '.'); ?></span>
+                                                <small class="valor-detail">Paga</small>
+                                                <?php if ($payment['total_saldo_usado'] > 0): ?>
+                                                    <div class="saldo-info">
+                                                        <small>Economia: R$ <?php echo number_format($payment['total_saldo_usado'], 2, ',', '.'); ?></small>
+                                                    </div>
+                                                <?php endif; ?>
+                                            </div>
+                                        </td>
                                         <td><?php echo ucfirst($payment['metodo_pagamento']); ?></td>
                                         <td><?php echo date('d/m/Y H:i', strtotime($payment['data_registro'])); ?></td>
-                                        <td><?php echo $payment['total_transacoes']; ?></td>
+                                        <td>
+                                            <?php echo $payment['total_transacoes']; ?> vendas
+                                            <?php if ($payment['transacoes_com_saldo'] > 0): ?>
+                                                <br><small class="economia-badge"><?php echo $payment['transacoes_com_saldo']; ?> c/ saldo</small>
+                                            <?php endif; ?>
+                                        </td>
                                         <td>
                                             <span class="status-badge status-<?php echo $payment['status']; ?>">
                                                 <?php echo ucfirst($payment['status']); ?>
@@ -587,12 +717,12 @@ $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
                 },
-                body: 'action=payment_details&payment_id=' + paymentId
+                body: 'action=payment_details_with_balance&payment_id=' + paymentId
             })
             .then(response => response.json())
             .then(data => {
                 if (data.status) {
-                    renderPaymentDetails(data.data, content);
+                    renderPaymentDetailsWithBalance(data.data, content);
                 } else {
                     content.innerHTML = '<p class="error">Erro ao carregar detalhes: ' + (data.message || 'Erro desconhecido.') + '</p>';
                 }
@@ -603,7 +733,7 @@ $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
             });
         }
         
-        function renderPaymentDetails(data, contentElement) {
+        function renderPaymentDetailsWithBalance(data, contentElement) {
             const payment = data.pagamento;
             const transactions = data.transacoes;
             
@@ -612,7 +742,9 @@ $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
                     <h3>Informações do Pagamento</h3>
                     <p><strong>ID:</strong> ${payment.id}</p>
                     <p><strong>Loja:</strong> ${payment.loja_nome || 'N/A'}</p>
-                    <p><strong>Valor Total:</strong> R$ ${parseFloat(payment.valor_total).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
+                    <p><strong>Valor Original das Vendas:</strong> R$ ${parseFloat(payment.valor_vendas_originais || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
+                    <p><strong>Total Saldo Usado:</strong> <span style="color: #28a745; font-weight: 600;">R$ ${parseFloat(payment.total_saldo_usado || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span></p>
+                    <p><strong>Comissão Paga:</strong> R$ ${parseFloat(payment.valor_total).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
                     <p><strong>Método:</strong> ${payment.metodo_pagamento || 'N/A'}</p>
                     <p><strong>Data:</strong> ${payment.data_registro ? new Date(payment.data_registro).toLocaleString('pt-BR') : 'N/A'}</p>
                     ${payment.numero_referencia ? `<p><strong>Referência:</strong> ${payment.numero_referencia}</p>` : ''}
@@ -630,17 +762,24 @@ $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
                                     <tr>
                                         <th>Cliente</th>
                                         <th>Data Trans.</th>
-                                        <th>Valor Compra</th>
+                                        <th>Valor Original</th>
+                                        <th>Saldo Usado</th>
+                                        <th>Valor Pago</th>
                                         <th>Cashback Cliente</th>
                                     </tr>
                                 </thead>
                                 <tbody>`;
                 transactions.forEach(transaction => {
+                    const saldoUsado = parseFloat(transaction.saldo_usado || 0);
+                    const valorPago = parseFloat(transaction.valor_total) - saldoUsado;
+                    
                     html += `
                         <tr>
-                            <td>${transaction.cliente_nome || 'N/A'}</td>
+                            <td>${transaction.cliente_nome || 'N/A'} ${saldoUsado > 0 ? '💰' : ''}</td>
                             <td>${transaction.data_transacao ? new Date(transaction.data_transacao).toLocaleDateString('pt-BR') : 'N/A'}</td>
                             <td>R$ ${parseFloat(transaction.valor_total).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                            <td>${saldoUsado > 0 ? 'R$ ' + saldoUsado.toLocaleString('pt-BR', {minimumFractionDigits: 2}) : '-'}</td>
+                            <td>R$ ${valorPago.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
                             <td>R$ ${parseFloat(transaction.valor_cliente).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
                         </tr>
                     `;
@@ -651,6 +790,19 @@ $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
             } else {
                 html += '<p>Nenhuma transação associada a este pagamento.</p>';
             }
+            
+            // Resumo do impacto do saldo
+            if (payment.total_saldo_usado > 0) {
+                html += `
+                    <div style="background: #f8fff8; padding: 15px; border-radius: 8px; margin-top: 15px; border-left: 4px solid #28a745;">
+                        <h4 style="margin-top: 0; color: #28a745;">💰 Impacto do Saldo</h4>
+                        <p><strong>Economia gerada aos clientes:</strong> R$ ${parseFloat(payment.total_saldo_usado).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
+                        <p><strong>Redução na comissão:</strong> R$ ${(parseFloat(payment.total_saldo_usado) * 0.1).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
+                        <p><small>A comissão foi calculada sobre o valor efetivamente pago pelos clientes (original - saldo usado)</small></p>
+                    </div>
+                `;
+            }
+            
             html += `</div>`;
             
             contentElement.innerHTML = html;
