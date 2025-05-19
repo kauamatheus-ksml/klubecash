@@ -203,48 +203,89 @@ class CashbackBalance {
      * @param int|null $transactionId ID da transação de uso
      * @return bool Sucesso da operação
      */
-    public function useBalance($userId, $storeId, $amount, $description = '', $transactionId = null) {
+    public function useBalance($userId, $storeId, $amount, $description = '', $useTransactionId = null) {
         if ($amount <= 0) {
+            error_log("CASHBACK USE: Valor inválido: {$amount}");
             return false;
         }
         
+        error_log("CASHBACK USE: Iniciando useBalance - User: {$userId}, Store: {$storeId}, Amount: {$amount}");
+        
         try {
-            $this->db->beginTransaction();
-            
-            // Verificar saldo disponível
+            // Verificar saldo disponível ANTES de iniciar transação
             $currentBalance = $this->getStoreBalance($userId, $storeId);
             
             if ($currentBalance < $amount) {
-                throw new Exception('Saldo insuficiente');
+                error_log("CASHBACK USE: Saldo insuficiente - Disponível: {$currentBalance}, Solicitado: {$amount}");
+                return false;
             }
             
             $newBalance = $currentBalance - $amount;
+            error_log("CASHBACK USE: Saldo atual: {$currentBalance}, Novo saldo: {$newBalance}");
             
-            // Atualizar saldo
-            $stmt = $this->db->prepare("
+            // Iniciar transação
+            $this->db->beginTransaction();
+            
+            // 1. Debitar saldo
+            $updateStmt = $this->db->prepare("
                 UPDATE cashback_saldos 
-                SET saldo_disponivel = saldo_disponivel - :amount,
-                    total_usado = total_usado + :amount,
+                SET saldo_disponivel = saldo_disponivel - ?,
+                    total_usado = total_usado + ?,
                     ultima_atualizacao = CURRENT_TIMESTAMP
-                WHERE usuario_id = :user_id AND loja_id = :store_id
+                WHERE usuario_id = ? AND loja_id = ?
             ");
-            $stmt->bindParam(':user_id', $userId);
-            $stmt->bindParam(':store_id', $storeId);
-            $stmt->bindParam(':amount', $amount);
             
-            if (!$stmt->execute()) {
-                throw new Exception('Erro ao atualizar saldo');
+            $updateResult = $updateStmt->execute([$amount, $amount, $userId, $storeId]);
+            
+            if (!$updateResult) {
+                $this->db->rollBack();
+                error_log("CASHBACK USE: Erro no UPDATE do saldo");
+                return false;
             }
             
-            // Registrar movimentação
-            $this->recordMovement($userId, $storeId, 'uso', $amount, $currentBalance, $newBalance, $description, null, $transactionId);
+            $rowsAffected = $updateStmt->rowCount();
+            if ($rowsAffected == 0) {
+                $this->db->rollBack();
+                error_log("CASHBACK USE: Nenhuma linha foi atualizada");
+                return false;
+            }
             
+            // 2. Registrar movimentação
+            $movStmt = $this->db->prepare("
+                INSERT INTO cashback_movimentacoes (
+                    usuario_id, loja_id, tipo_operacao, valor,
+                    saldo_anterior, saldo_atual, descricao,
+                    transacao_uso_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            
+            $movResult = $movStmt->execute([
+                $userId,
+                $storeId,
+                'uso',
+                $amount,
+                $currentBalance,
+                $newBalance,
+                $description,
+                $useTransactionId
+            ]);
+            
+            if (!$movResult) {
+                $this->db->rollBack();
+                error_log("CASHBACK USE: Erro ao registrar movimentação");
+                return false;
+            }
+            
+            // Commit da transação
             $this->db->commit();
+            error_log("CASHBACK USE: Saldo debitado com sucesso - Novo saldo: {$newBalance}");
             return true;
             
         } catch (Exception $e) {
-            $this->db->rollBack();
-            error_log('Erro ao usar saldo: ' . $e->getMessage());
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            error_log('CASHBACK USE: Erro ao debitar saldo: ' . $e->getMessage());
             return false;
         }
     }
