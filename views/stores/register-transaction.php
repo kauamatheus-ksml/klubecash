@@ -1193,19 +1193,24 @@ $activeMenu = 'register-transaction';
             const usarSaldoCheck = document.getElementById('usarSaldoCheck');
             const saldoControls = document.getElementById('saldoControls');
             const usarSaldoHidden = document.getElementById('usar_saldo');
+            const valorSaldoUsadoHidden = document.getElementById('valor_saldo_usado_hidden');
+            
+            console.log('Toggle saldo:', usarSaldoCheck.checked); // Debug
             
             if (usarSaldoCheck.checked) {
                 saldoControls.style.display = 'block';
-                usarSaldoHidden.value = 'sim';
-                calcularAutomatico(); // Calcular automaticamente quando ativar
+                usarSaldoHidden.value = 'sim'; // IMPORTANTE: deve ser 'sim'
+                calcularAutomatico();
             } else {
                 saldoControls.style.display = 'none';
                 usarSaldoHidden.value = 'nao';
                 document.getElementById('valorSaldoUsado').value = 0;
-                document.getElementById('valor_saldo_usado_hidden').value = '0';
+                valorSaldoUsadoHidden.value = '0';
                 calcularPreview();
                 atualizarSimulacao();
             }
+            
+            console.log('usar_saldo hidden value:', usarSaldoHidden.value); // Debug
         }
         
         // Função para calcular automaticamente quando sair do campo de valor total
@@ -1229,13 +1234,17 @@ $activeMenu = 'register-transaction';
             const valorSaldoUsado = parseFloat(document.getElementById('valorSaldoUsado').value) || 0;
             const valorFinal = Math.max(0, valorTotal - valorSaldoUsado);
             
-            // Atualizar preview
+            // Atualizar preview visual
             document.getElementById('valorOriginal').textContent = 'R$ ' + formatCurrency(valorTotal);
             document.getElementById('valorSaldoUsadoPreview').textContent = 'R$ ' + formatCurrency(valorSaldoUsado);
             document.getElementById('valorFinal').textContent = 'R$ ' + formatCurrency(valorFinal);
             
-            // Atualizar campo hidden
-            document.getElementById('valor_saldo_usado_hidden').value = valorSaldoUsado;
+            // IMPORTANTE: Atualizar o campo hidden que será enviado
+            const valorSaldoUsadoHidden = document.getElementById('valor_saldo_usado_hidden');
+            if (valorSaldoUsadoHidden) {
+                valorSaldoUsadoHidden.value = valorSaldoUsado;
+                console.log('Valor saldo usado hidden atualizado:', valorSaldoUsado); // Debug
+            }
             
             // Validações
             const valorSaldoUsadoInput = document.getElementById('valorSaldoUsado');
