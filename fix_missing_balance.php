@@ -1,82 +1,105 @@
 <?php
-// fix_missing_balance.php - Script temporário para corrigir saldos
+// fix_missing_balance.php - Versão atualizada com mais debug
 
 require_once 'config/database.php';
 require_once 'config/constants.php';
 require_once 'models/CashbackBalance.php';
 
+// Habilitar exibição de erros para debug
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
+
+echo "<pre>";
+echo "=== DEBUGANDO SISTEMA DE SALDO ===\n\n";
+
 try {
     $db = Database::getConnection();
     
-    // Buscar transações aprovadas que não tem saldo creditado
-    $stmt = $db->prepare("
-        SELECT t.*, u.nome as cliente_nome, l.nome_fantasia as loja_nome
-        FROM transacoes_cashback t
-        JOIN usuarios u ON t.usuario_id = u.id
-        JOIN lojas l ON t.loja_id = l.id
-        WHERE t.status = 'aprovado'
-        AND t.valor_cliente > 0
-        AND NOT EXISTS (
-            SELECT 1 FROM cashback_saldos cs 
-            WHERE cs.usuario_id = t.usuario_id 
-            AND cs.loja_id = t.loja_id
-        )
-        ORDER BY t.data_transacao
-    ");
+    // Primeiro, vamos verificar se as tabelas existem
+    echo "1. Verificando estrutura do banco...\n";
     
-    $stmt->execute();
-    $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    echo "Encontradas " . count($transactions) . " transações aprovadas sem saldo creditado:\n\n";
-    
-    if (count($transactions) > 0) {
-        $balanceModel = new CashbackBalance();
-        
-        foreach ($transactions as $transaction) {
-            echo "Processando transação #{$transaction['id']}:\n";
-            echo "- Cliente: {$transaction['cliente_nome']}\n";
-            echo "- Loja: {$transaction['loja_nome']}\n";
-            echo "- Valor do cashback: R$ " . number_format($transaction['valor_cliente'], 2, ',', '.') . "\n";
+    $tables = ['cashback_saldos', 'cashback_movimentacoes', 'transacoes_cashback'];
+    foreach ($tables as $table) {
+        $stmt = $db->prepare("SHOW TABLES LIKE ?");
+        $stmt->execute([$table]);
+        if ($stmt->rowCount() > 0) {
+            echo "✓ Tabela $table existe\n";
             
-            $description = "Correção: Cashback da compra - Transação #{$transaction['id']}";
-            
-            $result = $balanceModel->addBalance(
-                $transaction['usuario_id'],
-                $transaction['loja_id'],
-                $transaction['valor_cliente'],
-                $description,
-                $transaction['id']
-            );
-            
-            if ($result) {
-                echo "✓ Saldo creditado com sucesso!\n";
-            } else {
-                echo "✗ Erro ao creditar saldo!\n";
-            }
-            echo "\n";
+            // Verificar estrutura
+            $descStmt = $db->prepare("DESCRIBE $table");
+            $descStmt->execute();
+            $columns = $descStmt->fetchAll(PDO::FETCH_COLUMN);
+            echo "  Colunas: " . implode(', ', $columns) . "\n";
+        } else {
+            echo "✗ Tabela $table NÃO existe\n";
         }
     }
     
-    // Verificar saldos atuais
-    echo "\n=== SALDOS ATUAIS ===\n";
-    $balanceStmt = $db->prepare("
-        SELECT cs.*, u.nome as cliente_nome, l.nome_fantasia as loja_nome
-        FROM cashback_saldos cs
-        JOIN usuarios u ON cs.usuario_id = u.id
-        JOIN lojas l ON cs.loja_id = l.id
-        ORDER BY cs.saldo_disponivel DESC
+    echo "\n2. Testando transação específica...\n";
+    
+    // Buscar a transação problema
+    $stmt = $db->prepare("
+        SELECT * FROM transacoes_cashback 
+        WHERE id = 33
     ");
+    $stmt->execute();
+    $transaction = $stmt->fetch(PDO::FETCH_ASSOC);
     
-    $balanceStmt->execute();
-    $balances = $balanceStmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    foreach ($balances as $balance) {
-        echo "Cliente: {$balance['cliente_nome']} | ";
-        echo "Loja: {$balance['loja_nome']} | ";
-        echo "Saldo: R$ " . number_format($balance['saldo_disponivel'], 2, ',', '.') . "\n";
+    if ($transaction) {
+        echo "Transação encontrada:\n";
+        echo "- ID: {$transaction['id']}\n";
+        echo "- Usuario ID: {$transaction['usuario_id']}\n";
+        echo "- Loja ID: {$transaction['loja_id']}\n";
+        echo "- Valor Cliente: {$transaction['valor_cliente']}\n";
+        echo "- Status: {$transaction['status']}\n";
+        
+        // Verificar se já existe saldo
+        $balanceStmt = $db->prepare("
+            SELECT * FROM cashback_saldos 
+            WHERE usuario_id = ? AND loja_id = ?
+        ");
+        $balanceStmt->execute([$transaction['usuario_id'], $transaction['loja_id']]);
+        $existingBalance = $balanceStmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($existingBalance) {
+            echo "Saldo já existe: R$ " . number_format($existingBalance['saldo_disponivel'], 2, ',', '.') . "\n";
+        } else {
+            echo "Nenhum saldo encontrado para este usuário/loja\n";
+        }
+        
+        echo "\n3. Tentando creditar saldo...\n";
+        
+        $balanceModel = new CashbackBalance();
+        $result = $balanceModel->addBalance(
+            $transaction['usuario_id'],
+            $transaction['loja_id'],
+            $transaction['valor_cliente'],
+            "Teste de correção",
+            $transaction['id']
+        );
+        
+        if ($result) {
+            echo "✓ Saldo creditado com sucesso!\n";
+        } else {
+            echo "✗ Erro ao creditar saldo!\n";
+        }
+        
+        // Verificar resultado
+        $balanceStmt->execute([$transaction['usuario_id'], $transaction['loja_id']]);
+        $newBalance = $balanceStmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($newBalance) {
+            echo "Saldo atual: R$ " . number_format($newBalance['saldo_disponivel'], 2, ',', '.') . "\n";
+        }
+        
+    } else {
+        echo "Transação #33 não encontrada!\n";
     }
     
 } catch (Exception $e) {
-    echo "Erro: " . $e->getMessage();
+    echo "Erro: " . $e->getMessage() . "\n";
+    echo "Stack trace: " . $e->getTraceAsString() . "\n";
 }
+
+echo "</pre>";
 ?>
