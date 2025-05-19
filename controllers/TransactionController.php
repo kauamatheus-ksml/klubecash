@@ -370,7 +370,7 @@ class TransactionController {
      * @param array $data Dados da transação
      * @return array Resultado da operação
      */
-    public static function registerTransaction($data) {
+        public static function registerTransaction($data) {
         try {
             // Validar dados obrigatórios
             $requiredFields = ['loja_id', 'usuario_id', 'valor_total', 'codigo_transacao'];
@@ -422,16 +422,18 @@ class TransactionController {
                 return ['status' => false, 'message' => 'Valor da transação inválido.'];
             }
             
-            // Verificar se vai usar saldo do cliente
-            $usarSaldo = isset($data['usar_saldo']) && $data['usar_saldo'] === 'sim';
+            // CORREÇÃO 1: Verificar se vai usar saldo do cliente (aceita tanto string 'sim' quanto boolean true)
+            $usarSaldo = (isset($data['usar_saldo']) && ($data['usar_saldo'] === 'sim' || $data['usar_saldo'] === true));
             $valorSaldoUsado = floatval($data['valor_saldo_usado'] ?? 0);
             $valorOriginal = $data['valor_total']; // Guardar valor original para referência
+            
+            // CORREÇÃO 2: Definir $balanceModel ANTES de usar
+            require_once __DIR__ . '/../models/CashbackBalance.php';
+            $balanceModel = new CashbackBalance();
             
             // Validações de saldo
             if ($usarSaldo && $valorSaldoUsado > 0) {
                 // Verificar se o cliente tem saldo suficiente
-                require_once __DIR__ . '/../models/CashbackBalance.php';
-                $balanceModel = new CashbackBalance();
                 $saldoDisponivel = $balanceModel->getStoreBalance($data['usuario_id'], $data['loja_id']);
                 
                 if ($saldoDisponivel < $valorSaldoUsado) {
@@ -448,18 +450,18 @@ class TransactionController {
                         'message' => 'O valor do saldo usado não pode ser maior que o valor total da venda.'
                     ];
                 }
-                
-                // Ajustar o valor da transação subtraindo o saldo usado
-                $data['valor_total'] = $data['valor_total'] - $valorSaldoUsado;
             }
             
+            // CORREÇÃO 3: Calcular valor efetivo SEM alterar $data['valor_total']
+            $valorEfetivamentePago = $data['valor_total'] - $valorSaldoUsado;
+            
             // Verificar valor mínimo após desconto do saldo
-            if ($data['valor_total'] < 0) {
+            if ($valorEfetivamentePago < 0) {
                 return ['status' => false, 'message' => 'Valor da transação após desconto do saldo não pode ser negativo.'];
             }
             
             // Se sobrou algum valor após usar saldo, verificar valor mínimo
-            if ($data['valor_total'] > 0 && $data['valor_total'] < MIN_TRANSACTION_VALUE) {
+            if ($valorEfetivamentePago > 0 && $valorEfetivamentePago < MIN_TRANSACTION_VALUE) {
                 return ['status' => false, 'message' => 'Valor mínimo para transação (após desconto do saldo) é R$ ' . number_format(MIN_TRANSACTION_VALUE, 2, ',', '.')];
             }
             
@@ -481,7 +483,7 @@ class TransactionController {
             $configStmt->execute();
             $config = $configStmt->fetch(PDO::FETCH_ASSOC);
             
-            // Calcular valores de cashback (apenas sobre o valor pago, não sobre o saldo usado)
+            // CORREÇÃO 4: Calcular valores de cashback sobre o valor EFETIVAMENTE PAGO
             $porcentagemTotal = isset($config['porcentagem_total']) ? $config['porcentagem_total'] : 10.00;
             $porcentagemCliente = isset($config['porcentagem_cliente']) ? $config['porcentagem_cliente'] : 5.00;
             $porcentagemAdmin = isset($config['porcentagem_admin']) ? $config['porcentagem_admin'] : 5.00;
@@ -495,149 +497,177 @@ class TransactionController {
                 $porcentagemAdmin = 5.00 * $fator;
             }
             
-            // Calcular valores de cashback (sobre o valor efetivamente pago, não sobre o saldo usado)
-            $valorCashbackTotal = ($data['valor_total'] * $porcentagemTotal) / 100;
-            $valorCashbackCliente = ($data['valor_total'] * $porcentagemCliente) / 100;
-            $valorCashbackAdmin = ($data['valor_total'] * $porcentagemAdmin) / 100;
+            // Calcular valores de cashback sobre o valor EFETIVAMENTE PAGO
+            $valorCashbackTotal = ($valorEfetivamentePago * $porcentagemTotal) / 100;
+            $valorCashbackCliente = ($valorEfetivamentePago * $porcentagemCliente) / 100;
+            $valorCashbackAdmin = ($valorEfetivamentePago * $porcentagemAdmin) / 100;
             
             // Iniciar transação no banco de dados
             $db->beginTransaction();
             
-            // Definir o status da transação (pendente por padrão)
-            $transactionStatus = isset($data['status']) ? $data['status'] : TRANSACTION_PENDING;
-            
-            // Preparar descrição da transação
-            $descricao = isset($data['descricao']) ? $data['descricao'] : 'Compra na ' . $store['nome_fantasia'];
-            if ($usarSaldo && $valorSaldoUsado > 0) {
-                $descricao .= " (Usado R$ " . number_format($valorSaldoUsado, 2, ',', '.') . " do saldo)";
-            }
-            
-            // Registrar transação principal (com valor original para histórico)
-            $stmt = $db->prepare("
-                INSERT INTO transacoes_cashback (
-                    usuario_id, loja_id, valor_total, valor_cashback,
-                    valor_cliente, valor_admin, valor_loja, codigo_transacao, 
-                    data_transacao, status, descricao
-                ) VALUES (
-                    :usuario_id, :loja_id, :valor_original, :valor_cashback,
-                    :valor_cliente, :valor_admin, :valor_loja, :codigo_transacao, 
-                    :data_transacao, :status, :descricao
-                )
-            ");
-            
-            $stmt->bindParam(':usuario_id', $data['usuario_id']);
-            $stmt->bindParam(':loja_id', $data['loja_id']);
-            $stmt->bindParam(':valor_original', $valorOriginal); // Valor original da compra
-            $stmt->bindParam(':valor_cashback', $valorCashbackTotal);
-            $stmt->bindParam(':valor_cliente', $valorCashbackCliente);
-            $stmt->bindParam(':valor_admin', $valorCashbackAdmin);
-            $valorLoja = 0; // Loja não recebe percentual por padrão
-            $stmt->bindParam(':valor_loja', $valorLoja);
-            $stmt->bindParam(':codigo_transacao', $data['codigo_transacao']);
-            
-            $dataTransacao = isset($data['data_transacao']) ? $data['data_transacao'] : date('Y-m-d H:i:s');
-            $stmt->bindParam(':data_transacao', $dataTransacao);
-            $stmt->bindParam(':status', $transactionStatus);
-            $stmt->bindParam(':descricao', $descricao);
-            
-            $stmt->execute();
-            $transactionId = $db->lastInsertId();
-            
-            // Se usou saldo, debitar do saldo do cliente
-            if ($usarSaldo && $valorSaldoUsado > 0) {
-                $descricaoUso = "Uso do saldo na compra - Código: " . $data['codigo_transacao'];
-                if (!$balanceModel->useBalance($data['usuario_id'], $data['loja_id'], $valorSaldoUsado, $descricaoUso, $transactionId)) {
-                    // Se falhou ao debitar saldo, reverter transação
-                    $db->rollBack();
-                    return ['status' => false, 'message' => 'Erro ao debitar saldo do cliente. Transação cancelada.'];
+            try {
+                // Definir o status da transação (pendente por padrão)
+                $transactionStatus = isset($data['status']) ? $data['status'] : TRANSACTION_PENDING;
+                
+                // Preparar descrição da transação
+                $descricao = isset($data['descricao']) ? $data['descricao'] : 'Compra na ' . $store['nome_fantasia'];
+                if ($usarSaldo && $valorSaldoUsado > 0) {
+                    $descricao .= " (Usado R$ " . number_format($valorSaldoUsado, 2, ',', '.') . " do saldo)";
                 }
-            }
-            
-            // Registrar comissão para o administrador (apenas sobre valor pago, não sobre saldo usado)
-            if ($valorCashbackAdmin > 0) {
-                $comissionAdminStmt = $db->prepare("
-                    INSERT INTO transacoes_comissao (
-                        tipo_usuario, usuario_id, loja_id, transacao_id,
-                        valor_total, valor_comissao, data_transacao, status
+                
+                // Registrar transação principal (com valor original para histórico)
+                $stmt = $db->prepare("
+                    INSERT INTO transacoes_cashback (
+                        usuario_id, loja_id, valor_total, valor_cashback,
+                        valor_cliente, valor_admin, valor_loja, codigo_transacao, 
+                        data_transacao, status, descricao
                     ) VALUES (
-                        :tipo_usuario, :usuario_id, :loja_id, :transacao_id,
-                        :valor_total, :valor_comissao, :data_transacao, :status
+                        :usuario_id, :loja_id, :valor_original, :valor_cashback,
+                        :valor_cliente, :valor_admin, :valor_loja, :codigo_transacao, 
+                        :data_transacao, :status, :descricao
                     )
                 ");
                 
-                $tipoAdmin = USER_TYPE_ADMIN;
-                $adminId = 1; // Administrador padrão, pode ser ajustado
+                $stmt->bindParam(':usuario_id', $data['usuario_id']);
+                $stmt->bindParam(':loja_id', $data['loja_id']);
+                $stmt->bindParam(':valor_original', $valorOriginal); // Valor original da compra
+                $stmt->bindParam(':valor_cashback', $valorCashbackTotal);
+                $stmt->bindParam(':valor_cliente', $valorCashbackCliente);
+                $stmt->bindParam(':valor_admin', $valorCashbackAdmin);
+                $valorLoja = 0; // Loja não recebe percentual por padrão
+                $stmt->bindParam(':valor_loja', $valorLoja);
+                $stmt->bindParam(':codigo_transacao', $data['codigo_transacao']);
                 
-                $comissionAdminStmt->bindParam(':tipo_usuario', $tipoAdmin);
-                $comissionAdminStmt->bindParam(':usuario_id', $adminId);
-                $comissionAdminStmt->bindParam(':loja_id', $data['loja_id']);
-                $comissionAdminStmt->bindParam(':transacao_id', $transactionId);
-                $comissionAdminStmt->bindParam(':valor_total', $data['valor_total']); // Valor efetivamente pago
-                $comissionAdminStmt->bindParam(':valor_comissao', $valorCashbackAdmin);
-                $comissionAdminStmt->bindParam(':data_transacao', $dataTransacao);
-                $comissionAdminStmt->bindParam(':status', $transactionStatus);
+                $dataTransacao = isset($data['data_transacao']) ? $data['data_transacao'] : date('Y-m-d H:i:s');
+                $stmt->bindParam(':data_transacao', $dataTransacao);
+                $stmt->bindParam(':status', $transactionStatus);
+                $stmt->bindParam(':descricao', $descricao);
                 
-                $comissionAdminStmt->execute();
-            }
-            
-            // Preparar mensagem de sucesso
-            $successMessage = 'Transação registrada com sucesso!';
-            if ($usarSaldo && $valorSaldoUsado > 0) {
-                $successMessage .= ' Saldo de R$ ' . number_format($valorSaldoUsado, 2, ',', '.') . ' foi usado na compra.';
-            }
-            
-            // Criar notificação para o cliente
-            $notificationMessage = 'Você tem um novo cashback de R$ ' . number_format($valorCashbackCliente, 2, ',', '.') . ' pendente da loja ' . $store['nome_fantasia'];
-            if ($usarSaldo && $valorSaldoUsado > 0) {
-                $notificationMessage .= '. Você usou R$ ' . number_format($valorSaldoUsado, 2, ',', '.') . ' do seu saldo nesta compra.';
-            }
-            
-            self::createNotification(
-                $data['usuario_id'],
-                'Nova transação registrada',
-                $notificationMessage,
-                'info'
-            );
-            
-            // Enviar email para o cliente
-            if (!empty($user['email'])) {
-                $subject = 'Novo Cashback Pendente - Klube Cash';
-                $emailMessage = "
-                    <h3>Olá, {$user['nome']}!</h3>
-                    <p>Uma nova transação foi registrada em sua conta no Klube Cash.</p>
-                    <p><strong>Loja:</strong> {$store['nome_fantasia']}</p>
-                    <p><strong>Valor total da compra:</strong> R$ " . number_format($valorOriginal, 2, ',', '.') . "</p>";
+                $stmt->execute();
+                $transactionId = $db->lastInsertId();
                 
+                // CORREÇÃO 5: Se usou saldo, debitar do saldo do cliente IMEDIATAMENTE
                 if ($usarSaldo && $valorSaldoUsado > 0) {
-                    $emailMessage .= "<p><strong>Saldo usado:</strong> R$ " . number_format($valorSaldoUsado, 2, ',', '.') . "</p>";
-                    $emailMessage .= "<p><strong>Valor pago:</strong> R$ " . number_format($data['valor_total'], 2, ',', '.') . "</p>";
+                    $descricaoUso = "Uso do saldo na compra - Código: " . $data['codigo_transacao'] . " - Transação #" . $transactionId;
+                    
+                    error_log("REGISTRO: Tentando debitar saldo - Usuario: {$data['usuario_id']}, Loja: {$data['loja_id']}, Valor: {$valorSaldoUsado}");
+                    
+                    $debitResult = $balanceModel->useBalance($data['usuario_id'], $data['loja_id'], $valorSaldoUsado, $descricaoUso, $transactionId);
+                    
+                    if (!$debitResult) {
+                        // Se falhou ao debitar saldo, reverter transação
+                        $db->rollBack();
+                        error_log("REGISTRO: FALHA ao debitar saldo - revertendo transação");
+                        return ['status' => false, 'message' => 'Erro ao debitar saldo do cliente. Transação cancelada.'];
+                    }
+                    
+                    error_log("REGISTRO: Saldo debitado com sucesso");
+                    
+                    // Registrar uso de saldo na tabela auxiliar
+                    $useSaldoStmt = $db->prepare("
+                        INSERT INTO transacoes_saldo_usado (transacao_id, usuario_id, loja_id, valor_usado)
+                        VALUES (:transacao_id, :usuario_id, :loja_id, :valor_usado)
+                    ");
+                    $useSaldoStmt->bindParam(':transacao_id', $transactionId);
+                    $useSaldoStmt->bindParam(':usuario_id', $data['usuario_id']);
+                    $useSaldoStmt->bindParam(':loja_id', $data['loja_id']);
+                    $useSaldoStmt->bindParam(':valor_usado', $valorSaldoUsado);
+                    $useSaldoStmt->execute();
                 }
                 
-                $emailMessage .= "
-                    <p><strong>Cashback (pendente):</strong> R$ " . number_format($valorCashbackCliente, 2, ',', '.') . "</p>
-                    <p><strong>Data:</strong> " . date('d/m/Y H:i', strtotime($dataTransacao)) . "</p>
-                    <p>O cashback será disponibilizado assim que a loja confirmar o pagamento da comissão.</p>
-                    <p>Atenciosamente,<br>Equipe Klube Cash</p>
-                ";
+                // Registrar comissão para o administrador (sobre valor efetivamente pago)
+                if ($valorCashbackAdmin > 0) {
+                    $comissionAdminStmt = $db->prepare("
+                        INSERT INTO transacoes_comissao (
+                            tipo_usuario, usuario_id, loja_id, transacao_id,
+                            valor_total, valor_comissao, data_transacao, status
+                        ) VALUES (
+                            :tipo_usuario, :usuario_id, :loja_id, :transacao_id,
+                            :valor_total, :valor_comissao, :data_transacao, :status
+                        )
+                    ");
+                    
+                    $tipoAdmin = USER_TYPE_ADMIN;
+                    $adminId = 1; // Administrador padrão
+                    
+                    $comissionAdminStmt->bindParam(':tipo_usuario', $tipoAdmin);
+                    $comissionAdminStmt->bindParam(':usuario_id', $adminId);
+                    $comissionAdminStmt->bindParam(':loja_id', $data['loja_id']);
+                    $comissionAdminStmt->bindParam(':transacao_id', $transactionId);
+                    $comissionAdminStmt->bindParam(':valor_total', $valorEfetivamentePago); // Valor efetivamente pago
+                    $comissionAdminStmt->bindParam(':valor_comissao', $valorCashbackAdmin);
+                    $comissionAdminStmt->bindParam(':data_transacao', $dataTransacao);
+                    $comissionAdminStmt->bindParam(':status', $transactionStatus);
+                    
+                    $comissionAdminStmt->execute();
+                }
                 
-                Email::send($user['email'], $subject, $emailMessage, $user['nome']);
+                // Preparar mensagem de sucesso
+                $successMessage = 'Transação registrada com sucesso!';
+                if ($usarSaldo && $valorSaldoUsado > 0) {
+                    $successMessage .= ' Saldo de R$ ' . number_format($valorSaldoUsado, 2, ',', '.') . ' foi usado na compra.';
+                }
+                
+                // Criar notificação para o cliente
+                $notificationMessage = 'Você tem um novo cashback de R$ ' . number_format($valorCashbackCliente, 2, ',', '.') . ' pendente da loja ' . $store['nome_fantasia'];
+                if ($usarSaldo && $valorSaldoUsado > 0) {
+                    $notificationMessage .= '. Você usou R$ ' . number_format($valorSaldoUsado, 2, ',', '.') . ' do seu saldo nesta compra.';
+                }
+                
+                self::createNotification(
+                    $data['usuario_id'],
+                    'Nova transação registrada',
+                    $notificationMessage,
+                    'info'
+                );
+                
+                // Enviar email para o cliente (opcional, pode remover se não quiser)
+                if (!empty($user['email'])) {
+                    $subject = 'Novo Cashback Pendente - Klube Cash';
+                    $emailMessage = "
+                        <h3>Olá, {$user['nome']}!</h3>
+                        <p>Uma nova transação foi registrada em sua conta no Klube Cash.</p>
+                        <p><strong>Loja:</strong> {$store['nome_fantasia']}</p>
+                        <p><strong>Valor total da compra:</strong> R$ " . number_format($valorOriginal, 2, ',', '.') . "</p>";
+                    
+                    if ($usarSaldo && $valorSaldoUsado > 0) {
+                        $emailMessage .= "<p><strong>Saldo usado:</strong> R$ " . number_format($valorSaldoUsado, 2, ',', '.') . "</p>";
+                        $emailMessage .= "<p><strong>Valor pago:</strong> R$ " . number_format($valorEfetivamentePago, 2, ',', '.') . "</p>";
+                    }
+                    
+                    $emailMessage .= "
+                        <p><strong>Cashback (pendente):</strong> R$ " . number_format($valorCashbackCliente, 2, ',', '.') . "</p>
+                        <p><strong>Data:</strong> " . date('d/m/Y H:i', strtotime($dataTransacao)) . "</p>
+                        <p>O cashback será disponibilizado assim que a loja confirmar o pagamento da comissão.</p>
+                        <p>Atenciosamente,<br>Equipe Klube Cash</p>
+                    ";
+                    
+                    // Email::send($user['email'], $subject, $emailMessage, $user['nome']); // Descomente se quiser enviar email
+                }
+                
+                // Confirmar transação
+                $db->commit();
+                
+                return [
+                    'status' => true, 
+                    'message' => $successMessage,
+                    'data' => [
+                        'transaction_id' => $transactionId,
+                        'valor_original' => $valorOriginal,
+                        'valor_efetivamente_pago' => $valorEfetivamentePago,
+                        'valor_saldo_usado' => $valorSaldoUsado,
+                        'valor_cashback' => $valorCashbackCliente,
+                        'valor_comissao' => $valorCashbackTotal
+                    ]
+                ];
+                
+            } catch (Exception $e) {
+                // Reverter transação em caso de erro
+                if ($db->inTransaction()) {
+                    $db->rollBack();
+                }
+                throw $e;
             }
-            
-            // Confirmar transação
-            $db->commit();
-            
-            return [
-                'status' => true, 
-                'message' => $successMessage,
-                'data' => [
-                    'transaction_id' => $transactionId,
-                    'valor_original' => $valorOriginal,
-                    'valor_pago' => $data['valor_total'],
-                    'valor_saldo_usado' => $valorSaldoUsado,
-                    'valor_cashback' => $valorCashbackCliente,
-                    'valor_comissao' => $valorCashbackTotal
-                ]
-            ];
             
         } catch (PDOException $e) {
             // Reverter transação em caso de erro
