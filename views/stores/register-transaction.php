@@ -54,6 +54,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $codigoTransacao = $_POST['codigo_transacao'] ?? '';
     $descricao = $_POST['descricao'] ?? '';
     $dataTransacao = $_POST['data_transacao'] ?? date('Y-m-d H:i:s');
+    $usarSaldo = isset($_POST['usar_saldo']) && $_POST['usar_saldo'] === 'sim';
+    $valorSaldoUsado = floatval($_POST['valor_saldo_usado'] ?? 0);
     
     // Buscar usuário pelo email
     $userQuery = $db->prepare("SELECT id, nome FROM usuarios WHERE email = :email AND tipo = :tipo AND status = :status");
@@ -69,24 +71,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         $client = $userQuery->fetch(PDO::FETCH_ASSOC);
         
-        // Preparar dados da transação
-        $transactionData = [
-            'usuario_id' => $client['id'],
-            'loja_id' => $storeId,
-            'valor_total' => $valorTotal,
-            'codigo_transacao' => $codigoTransacao,
-            'descricao' => $descricao,
-            'data_transacao' => $dataTransacao
-        ];
+        // Se vai usar saldo, verificar se tem saldo suficiente
+        if ($usarSaldo && $valorSaldoUsado > 0) {
+            require_once '../../models/CashbackBalance.php';
+            $balanceModel = new CashbackBalance();
+            $saldoDisponivel = $balanceModel->getStoreBalance($client['id'], $storeId);
+            
+            if ($saldoDisponivel < $valorSaldoUsado) {
+                $error = 'Saldo insuficiente. Cliente possui R$ ' . number_format($saldoDisponivel, 2, ',', '.') . ' disponível.';
+            } else {
+                // Ajustar o valor total da transação descontando o saldo usado
+                $valorTotal = $valorTotal - $valorSaldoUsado;
+                
+                if ($valorTotal < 0) {
+                    $error = 'O valor do saldo usado não pode ser maior que o valor total da venda.';
+                }
+            }
+        }
         
-        // Registrar transação
-        $result = TransactionController::registerTransaction($transactionData);
-        
-        if ($result['status']) {
-            $success = true;
-            $transactionData = [];
-        } else {
-            $error = $result['message'];
+        if (empty($error)) {
+            // Preparar dados da transação
+            $transactionData = [
+                'usuario_id' => $client['id'],
+                'loja_id' => $storeId,
+                'valor_total' => $valorTotal,
+                'codigo_transacao' => $codigoTransacao,
+                'descricao' => $descricao,
+                'data_transacao' => $dataTransacao,
+                'usar_saldo' => $usarSaldo,
+                'valor_saldo_usado' => $valorSaldoUsado
+            ];
+            
+            // Registrar transação
+            $result = TransactionController::registerTransaction($transactionData);
+            
+            if ($result['status']) {
+                // Se usou saldo, debitar do saldo do cliente
+                if ($usarSaldo && $valorSaldoUsado > 0) {
+                    $balanceModel = new CashbackBalance();
+                    $descricaoUso = "Uso do saldo na compra - Código: " . $codigoTransacao;
+                    $balanceModel->useBalance($client['id'], $storeId, $valorSaldoUsado, $descricaoUso, $result['data']['transaction_id']);
+                }
+                
+                $success = true;
+                $transactionData = [];
+            } else {
+                $error = $result['message'];
+            }
         }
     }
 }
@@ -104,28 +135,28 @@ $activeMenu = 'register-transaction';
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
     
     <style>
-        /* Variáveis e configurações globais */
-:root {
-    --primary-color: #FF7A00;
-    --primary-dark: #E06E00;
-    --primary-light: #FFF0E6;
-    --secondary-color: #2A3F54;
-    --success-color: #28A745;
-    --warning-color: #FFC107; 
-    --danger-color: #DC3545;
-    --info-color: #17A2B8;
-    --light-gray: #F8F9FA;
-    --medium-gray: #6C757D;
-    --dark-gray: #343A40;
-    --white: #FFFFFF;
-    --shadow-sm: 0 2px 8px rgba(0,0,0,0.04);
-    --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
-    --shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
-    --border-radius: 12px;
-    --transition: all 0.3s ease;
-}
+        /* Estilos existentes + novos estilos para busca de cliente */
+        :root {
+            --primary-color: #FF7A00;
+            --primary-dark: #E06E00;
+            --primary-light: #FFF0E6;
+            --secondary-color: #2A3F54;
+            --success-color: #28A745;
+            --warning-color: #FFC107; 
+            --danger-color: #DC3545;
+            --info-color: #17A2B8;
+            --light-gray: #F8F9FA;
+            --medium-gray: #6C757D;
+            --dark-gray: #343A40;
+            --white: #FFFFFF;
+            --shadow-sm: 0 2px 8px rgba(0,0,0,0.04);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+            --shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
+            --border-radius: 12px;
+            --transition: all 0.3s ease;
+        }
 
-body {
+        body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background-color: #F5F7FA;
     color: var(--dark-gray);
@@ -519,6 +550,218 @@ body {
         padding: 0.75rem 1rem;
     }
 }
+
+        /* Busca de cliente */
+        .client-search-container {
+            position: relative;
+        }
+
+        .email-input-group {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+        }
+
+        .email-input-wrapper {
+            flex: 1;
+        }
+
+        .search-client-btn {
+            padding: 0.75rem 1rem;
+            background-color: var(--info-color);
+            color: var(--white);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: var(--transition);
+            white-space: nowrap;
+            min-width: 120px;
+        }
+
+        .search-client-btn:hover {
+            background-color: #138496;
+        }
+
+        .search-client-btn:disabled {
+            background-color: var(--medium-gray);
+            cursor: not-allowed;
+        }
+
+        .client-info-card {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background-color: var(--white);
+            display: none;
+        }
+
+        .client-info-card.success {
+            border-color: var(--success-color);
+            background-color: #f0fff4;
+        }
+
+        .client-info-card.warning {
+            border-color: var(--warning-color);
+            background-color: #fffbf0;
+        }
+
+        .client-info-card.error {
+            border-color: var(--danger-color);
+            background-color: #fff5f5;
+        }
+
+        .client-info-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .client-info-icon {
+            width: 20px;
+            height: 20px;
+        }
+
+        .client-info-title {
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .client-info-details {
+            margin-left: 30px;
+        }
+
+        .client-info-item {
+            margin-bottom: 5px;
+            font-size: 0.9rem;
+        }
+
+        .client-info-label {
+            font-weight: 500;
+            color: var(--medium-gray);
+        }
+
+        .client-info-value {
+            color: var(--dark-gray);
+        }
+
+        .balance-info {
+            margin-top: 15px;
+            padding: 15px;
+            background-color: var(--light-gray);
+            border-radius: 8px;
+        }
+
+        .balance-amount {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--success-color);
+        }
+
+        .use-balance-section {
+            margin-top: 15px;
+            padding: 15px;
+            border: 2px dashed var(--info-color);
+            border-radius: 8px;
+            background-color: #f8fffe;
+        }
+
+        .use-balance-toggle {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .use-balance-toggle input[type="checkbox"] {
+            width: auto;
+            margin: 0;
+        }
+
+        .use-balance-inputs {
+            display: none;
+            margin-top: 10px;
+        }
+
+        .use-balance-inputs.active {
+            display: block;
+        }
+
+        .balance-slider-container {
+            margin-top: 10px;
+        }
+
+        .balance-slider {
+            width: 100%;
+            -webkit-appearance: none;
+            height: 5px;
+            border-radius: 5px;
+            background: #d3d3d3;
+            outline: none;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+        }
+
+        .balance-slider:hover {
+            opacity: 1;
+        }
+
+        .balance-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--info-color);
+            cursor: pointer;
+        }
+
+        .balance-slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--info-color);
+            cursor: pointer;
+            border: none;
+        }
+
+        .balance-values {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            color: var(--medium-gray);
+            margin-top: 5px;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Responsividade para mobile */
+        @media (max-width: 768px) {
+            .email-input-group {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .search-client-btn {
+                width: 100%;
+                margin-top: 10px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -568,9 +811,34 @@ body {
                         <div class="form-row">
                             <div class="form-group">
                                 <label for="cliente_email">Email do Cliente*</label>
-                                <input type="email" id="cliente_email" name="cliente_email" placeholder="Email do cliente cadastrado no Klube Cash" required
-                                value="<?php echo isset($transactionData['cliente_email']) ? htmlspecialchars($transactionData['cliente_email']) : ''; ?>">
-                                <small>O cliente deve estar cadastrado no Klube Cash</small>
+                                <div class="client-search-container">
+                                    <div class="email-input-group">
+                                        <div class="email-input-wrapper">
+                                            <input type="email" id="cliente_email" name="cliente_email" 
+                                                   placeholder="Email do cliente cadastrado no Klube Cash" required
+                                                   value="<?php echo isset($transactionData['cliente_email']) ? htmlspecialchars($transactionData['cliente_email']) : ''; ?>">
+                                            <small>O cliente deve estar cadastrado no Klube Cash</small>
+                                        </div>
+                                        <button type="button" id="searchClientBtn" class="search-client-btn">
+                                            <span class="btn-text">Buscar Cliente</span>
+                                            <span class="loading-spinner" style="display: none;"></span>
+                                        </button>
+                                    </div>
+                                    
+                                    <!-- Card de informações do cliente -->
+                                    <div id="clientInfoCard" class="client-info-card">
+                                        <div class="client-info-header">
+                                            <svg class="client-info-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                                <circle cx="12" cy="7" r="4"></circle>
+                                            </svg>
+                                            <h4 class="client-info-title" id="clientInfoTitle">Informações do Cliente</h4>
+                                        </div>
+                                        <div class="client-info-details" id="clientInfoDetails">
+                                            <!-- Será preenchido dinamicamente -->
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         
@@ -608,6 +876,10 @@ body {
                             </div>
                         </div>
                         
+                        <!-- Campos ocultos para uso de saldo -->
+                        <input type="hidden" id="usar_saldo" name="usar_saldo" value="nao">
+                        <input type="hidden" id="valor_saldo_usado" name="valor_saldo_usado" value="0">
+                        
                         <div class="cashback-calculator">
                             <h3>Simulação de Cashback</h3>
                             <div class="cashback-details">
@@ -641,6 +913,7 @@ body {
                 </div>
             </div>
             
+            <!-- Seção de ajuda existente -->
             <div class="help-section">
                 <h3>Dúvidas Frequentes</h3>
                 <div class="accordion">
@@ -656,21 +929,21 @@ body {
                     
                     <div class="accordion-item">
                         <button class="accordion-header">
-                            <span>E se o cliente não estiver cadastrado?</span>
+                            <span>Posso usar o saldo do cliente na venda?</span>
                             <span class="accordion-icon">+</span>
                         </button>
                         <div class="accordion-content">
-                            <p>Apenas clientes já cadastrados no Klube Cash podem receber cashback. Você pode convidar seus clientes a se cadastrarem em nossa plataforma para começarem a ganhar cashback em suas compras.</p>
+                            <p>Sim! Se o cliente possui saldo de cashback em sua loja, você pode usar parte ou todo o saldo na nova venda. Basta buscar o cliente pelo email e escolher o valor a ser usado.</p>
                         </div>
                     </div>
                     
                     <div class="accordion-item">
                         <button class="accordion-header">
-                            <span>Como pagar as comissões?</span>
+                            <span>E se o cliente não estiver cadastrado?</span>
                             <span class="accordion-icon">+</span>
                         </button>
                         <div class="accordion-content">
-                            <p>Você pode pagar as comissões através da página "Comissões Pendentes", onde verá todas as vendas registradas que ainda não foram pagas. Selecione as transações desejadas e clique em "Pagar Comissões" para gerar um pagamento.</p>
+                            <p>Apenas clientes já cadastrados no Klube Cash podem receber cashback. Você pode convidar seus clientes a se cadastrarem em nossa plataforma para começarem a ganhar cashback em suas compras.</p>
                         </div>
                     </div>
                 </div>
@@ -679,48 +952,282 @@ body {
     </div>
     
     <script>
-        // Calculadora de Cashback
+        // Variáveis globais
+        let clientData = null;
+        let clientBalance = 0;
+        const storeId = <?php echo $storeId; ?>;
+        
+        // Inicialização
         document.addEventListener('DOMContentLoaded', function() {
+            const valorInput = document.getElementById('valor_total');
+            const emailInput = document.getElementById('cliente_email');
+            const searchBtn = document.getElementById('searchClientBtn');
+            
+            // Event listeners
+            valorInput.addEventListener('input', atualizarSimulacao);
+            searchBtn.addEventListener('click', buscarCliente);
+            emailInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    buscarCliente();
+                }
+            });
+            
+            // Accordion para ajuda
+            setupAccordion();
+            
+            // Inicializar simulação
+            atualizarSimulacao();
+        });
+        
+        // Função para buscar cliente
+        async function buscarCliente() {
+            const email = document.getElementById('cliente_email').value.trim();
+            const searchBtn = document.getElementById('searchClientBtn');
+            const clientInfoCard = document.getElementById('clientInfoCard');
+            
+            if (!email) {
+                alert('Por favor, digite um email válido');
+                return;
+            }
+            
+            // Mostrar loading
+            searchBtn.disabled = true;
+            searchBtn.querySelector('.btn-text').textContent = 'Buscando...';
+            searchBtn.querySelector('.loading-spinner').style.display = 'inline-block';
+            
+            try {
+                const response = await fetch('../../api/store-client-search.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        action: 'search_client',
+                        email: email,
+                        store_id: storeId
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.status) {
+                    clientData = data.data;
+                    clientBalance = data.data.saldo || 0;
+                    mostrarInfoCliente(data.data);
+                } else {
+                    mostrarErroCliente(data.message);
+                }
+            } catch (error) {
+                console.error('Erro ao buscar cliente:', error);
+                mostrarErroCliente('Erro ao buscar cliente. Tente novamente.');
+            } finally {
+                // Esconder loading
+                searchBtn.disabled = false;
+                searchBtn.querySelector('.btn-text').textContent = 'Buscar Cliente';
+                searchBtn.querySelector('.loading-spinner').style.display = 'none';
+            }
+        }
+        
+        // Função para mostrar informações do cliente
+        function mostrarInfoCliente(client) {
+            const clientInfoCard = document.getElementById('clientInfoCard');
+            const clientInfoTitle = document.getElementById('clientInfoTitle');
+            const clientInfoDetails = document.getElementById('clientInfoDetails');
+            
+            // Remover classes de erro
+            clientInfoCard.className = 'client-info-card success';
+            clientInfoCard.style.display = 'block';
+            
+            clientInfoTitle.textContent = 'Cliente Encontrado';
+            
+            let detailsHTML = `
+                <div class="client-info-item">
+                    <span class="client-info-label">Nome:</span>
+                    <span class="client-info-value">${client.nome}</span>
+                </div>
+                <div class="client-info-item">
+                    <span class="client-info-label">Email:</span>
+                    <span class="client-info-value">${client.email}</span>
+                </div>
+                <div class="client-info-item">
+                    <span class="client-info-label">Status:</span>
+                    <span class="client-info-value">Cliente ativo</span>
+                </div>
+            `;
+            
+            if (client.saldo > 0) {
+                detailsHTML += `
+                    <div class="balance-info">
+                        <div class="client-info-item">
+                            <span class="client-info-label">Saldo disponível nesta loja:</span>
+                            <span class="balance-amount">R$ ${formatCurrency(client.saldo)}</span>
+                        </div>
+                        <div class="use-balance-section">
+                            <div class="use-balance-toggle">
+                                <input type="checkbox" id="useBalanceCheck" onchange="toggleUseBalance()">
+                                <label for="useBalanceCheck">Usar saldo do cliente nesta venda</label>
+                            </div>
+                            <div class="use-balance-inputs" id="useBalanceInputs">
+                                <div class="form-group">
+                                    <label for="balanceAmountInput">Valor a usar do saldo</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">R$</span>
+                                        <input type="number" id="balanceAmountInput" 
+                                               step="0.01" min="0" max="${client.saldo}"
+                                               placeholder="0,00" onchange="updateBalanceSlider()">
+                                    </div>
+                                </div>
+                                <div class="balance-slider-container">
+                                    <input type="range" id="balanceSlider" class="balance-slider"
+                                           min="0" max="${client.saldo}" step="0.01" value="0"
+                                           oninput="updateBalanceInput()">
+                                    <div class="balance-values">
+                                        <span>R$ 0,00</span>
+                                        <span>R$ ${formatCurrency(client.saldo)}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                detailsHTML += `
+                    <div class="client-info-item">
+                        <span class="client-info-label">Saldo:</span>
+                        <span class="client-info-value">Nenhum saldo disponível nesta loja</span>
+                    </div>
+                `;
+            }
+            
+            clientInfoDetails.innerHTML = detailsHTML;
+        }
+        
+        // Função para mostrar erro na busca do cliente
+        function mostrarErroCliente(message) {
+            const clientInfoCard = document.getElementById('clientInfoCard');
+            const clientInfoTitle = document.getElementById('clientInfoTitle');
+            const clientInfoDetails = document.getElementById('clientInfoDetails');
+            
+            clientInfoCard.className = 'client-info-card error';
+            clientInfoCard.style.display = 'block';
+            
+            clientInfoTitle.textContent = 'Cliente Não Encontrado';
+            clientInfoDetails.innerHTML = `
+                <div class="client-info-item">
+                    <span class="client-info-value">${message}</span>
+                </div>
+                <div class="client-info-item">
+                    <span class="client-info-value">Verifique se o email está correto e se o cliente está cadastrado no Klube Cash.</span>
+                </div>
+            `;
+            
+            // Limpar dados do cliente
+            clientData = null;
+            clientBalance = 0;
+        }
+        
+        // Função para alternar uso de saldo
+        function toggleUseBalance() {
+            const useBalanceCheck = document.getElementById('useBalanceCheck');
+            const useBalanceInputs = document.getElementById('useBalanceInputs');
+            const usarSaldoHidden = document.getElementById('usar_saldo');
+            
+            if (useBalanceCheck.checked) {
+                useBalanceInputs.classList.add('active');
+                usarSaldoHidden.value = 'sim';
+            } else {
+                useBalanceInputs.classList.remove('active');
+                usarSaldoHidden.value = 'nao';
+                document.getElementById('valor_saldo_usado').value = '0';
+                document.getElementById('balanceAmountInput').value = '';
+                document.getElementById('balanceSlider').value = '0';
+                atualizarSimulacao();
+            }
+        }
+        
+        // Função para atualizar slider baseado no input
+        function updateBalanceSlider() {
+            const balanceInput = document.getElementById('balanceAmountInput');
+            const balanceSlider = document.getElementById('balanceSlider');
+            const valorSaldoUsado = document.getElementById('valor_saldo_usado');
+            
+            let value = parseFloat(balanceInput.value) || 0;
+            
+            // Limitar ao máximo permitido
+            if (value > clientBalance) {
+                value = clientBalance;
+                balanceInput.value = value.toFixed(2);
+            }
+            
+            balanceSlider.value = value;
+            valorSaldoUsado.value = value;
+            
+            atualizarSimulacao();
+        }
+        
+        // Função para atualizar input baseado no slider
+        function updateBalanceInput() {
+            const balanceInput = document.getElementById('balanceAmountInput');
+            const balanceSlider = document.getElementById('balanceSlider');
+            const valorSaldoUsado = document.getElementById('valor_saldo_usado');
+            
+            const value = parseFloat(balanceSlider.value);
+            balanceInput.value = value.toFixed(2);
+            valorSaldoUsado.value = value;
+            
+            atualizarSimulacao();
+        }
+        
+        // Função para formatar valores como moeda
+        function formatCurrency(value) {
+            return parseFloat(value).toLocaleString('pt-BR', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+        
+        // Função para calcular e atualizar a simulação
+        function atualizarSimulacao() {
             const valorInput = document.getElementById('valor_total');
             const displayValorVenda = document.getElementById('display-valor-venda');
             const displayValorCliente = document.getElementById('display-valor-cliente');
             const displayValorAdmin = document.getElementById('display-valor-admin');
             const displayValorTotal = document.getElementById('display-valor-total');
             
-            // Porcentagens de cashback (do PHP para JavaScript)
+            let valor = parseFloat(valorInput.value) || 0;
+            
+            // Subtrair saldo usado se aplicável
+            const usarSaldo = document.getElementById('usar_saldo').value === 'sim';
+            const valorSaldoUsado = parseFloat(document.getElementById('valor_saldo_usado').value) || 0;
+            
+            if (usarSaldo && valorSaldoUsado > 0) {
+                valor = Math.max(0, valor - valorSaldoUsado);
+            }
+            
+            // Porcentagens de cashback
             const porcentagemCliente = <?php echo DEFAULT_CASHBACK_CLIENT; ?>;
             const porcentagemAdmin = <?php echo DEFAULT_CASHBACK_ADMIN; ?>;
             const porcentagemTotal = <?php echo DEFAULT_CASHBACK_TOTAL; ?>;
             
-            // Função para formatar valores como moeda
-            function formatCurrency(value) {
-                return value.toLocaleString('pt-BR', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
-                });
+            const valorCliente = valor * porcentagemCliente / 100;
+            const valorAdmin = valor * porcentagemAdmin / 100;
+            const valorTotal = valor * porcentagemTotal / 100;
+            
+            // Mostrar valor original da venda
+            displayValorVenda.textContent = `R$ ${formatCurrency(parseFloat(valorInput.value) || 0)}`;
+            displayValorCliente.textContent = `R$ ${formatCurrency(valorCliente)}`;
+            displayValorAdmin.textContent = `R$ ${formatCurrency(valorAdmin)}`;
+            displayValorTotal.textContent = `R$ ${formatCurrency(valorTotal)}`;
+            
+            // Mostrar informação sobre saldo usado
+            if (usarSaldo && valorSaldoUsado > 0) {
+                displayValorVenda.textContent += ` (- R$ ${formatCurrency(valorSaldoUsado)} saldo)`;
             }
-            
-            // Função para calcular e atualizar a simulação
-            function atualizarSimulacao() {
-                const valor = parseFloat(valorInput.value) || 0;
-                
-                const valorCliente = valor * porcentagemCliente / 100;
-                const valorAdmin = valor * porcentagemAdmin / 100;
-                const valorTotal = valor * porcentagemTotal / 100;
-                
-                displayValorVenda.textContent = `R$ ${formatCurrency(valor)}`;
-                displayValorCliente.textContent = `R$ ${formatCurrency(valorCliente)}`;
-                displayValorAdmin.textContent = `R$ ${formatCurrency(valorAdmin)}`;
-                displayValorTotal.textContent = `R$ ${formatCurrency(valorTotal)}`;
-            }
-            
-            // Atualizar quando o valor mudar
-            valorInput.addEventListener('input', atualizarSimulacao);
-            
-            // Executa uma vez ao carregar para inicializar os valores
-            atualizarSimulacao();
-            
-            // Accordion para a seção de ajuda
+        }
+        
+        // Função para setup do accordion
+        function setupAccordion() {
             const accordionItems = document.querySelectorAll('.accordion-item');
             
             accordionItems.forEach(item => {
@@ -729,7 +1236,6 @@ body {
                 const icon = item.querySelector('.accordion-icon');
                 
                 header.addEventListener('click', () => {
-                    // Toggle active class
                     const isActive = item.classList.contains('active');
                     
                     // Fechar todos os itens
@@ -747,20 +1253,32 @@ body {
                     }
                 });
             });
+        }
+        
+        // Validação de formulário
+        document.getElementById('transactionForm').addEventListener('submit', function(e) {
+            const valorTotal = parseFloat(document.getElementById('valor_total').value) || 0;
+            const valorSaldoUsado = parseFloat(document.getElementById('valor_saldo_usado').value) || 0;
+            const minValue = <?php echo MIN_TRANSACTION_VALUE; ?>;
             
-            // Validação de formulário
-            const form = document.getElementById('transactionForm');
+            if ((valorTotal - valorSaldoUsado) < 0) {
+                e.preventDefault();
+                alert('O valor do saldo usado não pode ser maior que o valor total da venda');
+                return;
+            }
             
-            form.addEventListener('submit', function(e) {
-                const valorTotal = parseFloat(valorInput.value) || 0;
-                const minValue = <?php echo MIN_TRANSACTION_VALUE; ?>;
-                
-                if (valorTotal < minValue) {
-                    e.preventDefault();
-                    alert(`O valor mínimo para transação é R$ ${minValue.toFixed(2).replace('.', ',')}`);
-                    valorInput.focus();
-                }
-            });
+            if (valorTotal < minValue) {
+                e.preventDefault();
+                alert(`O valor mínimo para transação é R$ ${minValue.toFixed(2).replace('.', ',')}`);
+                document.getElementById('valor_total').focus();
+                return;
+            }
+            
+            if (!clientData) {
+                e.preventDefault();
+                alert('Por favor, busque o cliente antes de registrar a venda');
+                return;
+            }
         });
     </script>
 </body>
