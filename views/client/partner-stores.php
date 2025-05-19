@@ -59,7 +59,7 @@ if ($debug) {
         echo "👤 User Name: " . ($_SESSION['user_name'] ?? 'Não definido') . "<br>";
         
         // Verificar se o usuário existe no banco
-        $checkUserQuery = "SELECT id, nome, email, user_type FROM usuarios WHERE id = :user_id";
+        $checkUserQuery = "SELECT id, nome, email, tipo_usuario FROM usuarios WHERE id = :user_id";
         $checkUserStmt = $db->prepare($checkUserQuery);
         $checkUserStmt->bindParam(':user_id', $userId);
         $checkUserStmt->execute();
@@ -151,89 +151,81 @@ try {
     $storesData = $hasError ? [] : $result['data'];
     
     // Se não há erro, enriquecer dados com informações de saldo
-    if (!$hasError && !empty($storesData['lojas'])) {
-        $db = Database::getConnection();
-        foreach ($storesData['lojas'] as &$loja) {
-            // Buscar saldo disponível do cliente nesta loja
-            $saldoQuery = "
-                SELECT 
-                    saldo_disponivel,
-                    total_creditado,
-                    total_usado,
-                    (SELECT COUNT(*) FROM cashback_movimentacoes cm 
-                     WHERE cm.usuario_id = :user_id AND cm.loja_id = :loja_id AND cm.tipo_operacao = 'uso') as total_usos,
-                    (SELECT data_operacao FROM cashback_movimentacoes cm 
-                     WHERE cm.usuario_id = :user_id AND cm.loja_id = :loja_id 
-                     ORDER BY cm.data_operacao DESC LIMIT 1) as ultimo_uso
-                FROM cashback_saldos 
-                WHERE usuario_id = :user_id AND loja_id = :loja_id
-            ";
-            $saldoStmt = $db->prepare($saldoQuery);
-            $saldoStmt->bindParam(':user_id', $userId);
-            $saldoStmt->bindParam(':loja_id', $loja['id']);
-            $saldoStmt->execute();
-            $saldoInfo = $saldoStmt->fetch(PDO::FETCH_ASSOC);
-            
-            if ($saldoInfo) {
-                $loja['saldo_disponivel'] = $saldoInfo['saldo_disponivel'];
-                $loja['total_creditado'] = $saldoInfo['total_creditado'];
-                $loja['total_usado'] = $saldoInfo['total_usado'];
-                $loja['total_usos'] = $saldoInfo['total_usos'];
-                $loja['ultimo_uso'] = $saldoInfo['ultimo_uso'];
-            } else {
-                $loja['saldo_disponivel'] = 0;
-                $loja['total_creditado'] = 0;
-                $loja['total_usado'] = 0;
-                $loja['total_usos'] = 0;
-                $loja['ultimo_uso'] = null;
-            }
-            
-            // Buscar cashback pendente
-            $pendingQuery = "
-                SELECT SUM(valor_cliente) as cashback_pendente
-                FROM transacoes_cashback 
-                WHERE usuario_id = :user_id AND loja_id = :loja_id AND status = 'pendente'
-            ";
-            $pendingStmt = $db->prepare($pendingQuery);
-            $pendingStmt->bindParam(':user_id', $userId);
-            $pendingStmt->bindParam(':loja_id', $loja['id']);
-            $pendingStmt->execute();
-            $pendingInfo = $pendingStmt->fetch(PDO::FETCH_ASSOC);
-            
-            $loja['cashback_pendente'] = $pendingInfo['cashback_pendente'] ?? 0;
+if (!$hasError && !empty($storesData['lojas'])) {
+    foreach ($storesData['lojas'] as &$loja) {
+        // Buscar saldo disponível do cliente nesta loja
+        $saldoQuery = "
+            SELECT 
+                saldo_disponivel,
+                total_creditado,
+                total_usado
+            FROM cashback_saldos 
+            WHERE usuario_id = ? AND loja_id = ?
+        ";
+        
+        $saldoStmt = $db->prepare($saldoQuery);
+        $saldoStmt->execute([$userId, $loja['id']]);
+        $saldoInfo = $saldoStmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($saldoInfo) {
+            $loja['saldo_disponivel'] = $saldoInfo['saldo_disponivel'];
+            $loja['total_creditado'] = $saldoInfo['total_creditado'];
+            $loja['total_usado'] = $saldoInfo['total_usado'];
+        } else {
+            $loja['saldo_disponivel'] = 0;
+            $loja['total_creditado'] = 0;
+            $loja['total_usado'] = 0;
         }
+        
+        // Buscar contagem de usos
+        $usosQuery = "SELECT COUNT(*) as total_usos FROM cashback_movimentacoes WHERE usuario_id = ? AND loja_id = ? AND tipo_operacao = 'uso'";
+        $usosStmt = $db->prepare($usosQuery);
+        $usosStmt->execute([$userId, $loja['id']]);
+        $usosInfo = $usosStmt->fetch(PDO::FETCH_ASSOC);
+        $loja['total_usos'] = $usosInfo['total_usos'] ?? 0;
+        
+        // Buscar último uso
+        $ultimoUsoQuery = "SELECT data_operacao FROM cashback_movimentacoes WHERE usuario_id = ? AND loja_id = ? ORDER BY data_operacao DESC LIMIT 1";
+        $ultimoUsoStmt = $db->prepare($ultimoUsoQuery);
+        $ultimoUsoStmt->execute([$userId, $loja['id']]);
+        $ultimoUsoInfo = $ultimoUsoStmt->fetch(PDO::FETCH_ASSOC);
+        $loja['ultimo_uso'] = $ultimoUsoInfo['data_operacao'] ?? null;
+        
+        // Buscar cashback pendente
+        $pendingQuery = "SELECT SUM(valor_cliente) as cashback_pendente FROM transacoes_cashback WHERE usuario_id = ? AND loja_id = ? AND status = 'pendente'";
+        $pendingStmt = $db->prepare($pendingQuery);
+        $pendingStmt->execute([$userId, $loja['id']]);
+        $pendingInfo = $pendingStmt->fetch(PDO::FETCH_ASSOC);
+        $loja['cashback_pendente'] = $pendingInfo['cashback_pendente'] ?? 0;
     }
-    
-    // Obter estatísticas gerais do cliente
+}
+
+// Obter estatísticas gerais do cliente
+try {
     $estatisticasQuery = "
         SELECT 
-            COUNT(DISTINCT cs.loja_id) as lojas_com_saldo,
-            SUM(cs.saldo_disponivel) as total_saldo_disponivel,
-            SUM(cs.total_usado) as total_usado_geral,
-            COUNT(DISTINCT CASE WHEN cs.saldo_disponivel > 0 THEN cs.loja_id END) as lojas_saldo_disponivel
-        FROM cashback_saldos cs
-        WHERE cs.usuario_id = :user_id
+            COUNT(DISTINCT loja_id) as lojas_com_saldo,
+            SUM(saldo_disponivel) as total_saldo_disponivel,
+            SUM(total_usado) as total_usado_geral,
+            COUNT(DISTINCT CASE WHEN saldo_disponivel > 0 THEN loja_id END) as lojas_saldo_disponivel
+        FROM cashback_saldos
+        WHERE usuario_id = ?
     ";
     $estatisticasStmt = $db->prepare($estatisticasQuery);
-    $estatisticasStmt->bindParam(':user_id', $userId);
-    $estatisticasStmt->execute();
+    $estatisticasStmt->execute([$userId]);
     $estatisticasGerais = $estatisticasStmt->fetch(PDO::FETCH_ASSOC);
     
-} catch (Exception $e) {
-    if ($debug) {
-        echo "<div style='background: #f8d7da; padding: 10px; margin: 10px; border: 1px solid #f5c6cb;'>";
-        echo "<h4>❌ DEBUG - Erro na Execução</h4>";
-        echo "Erro: " . $e->getMessage() . "<br>";
-        echo "Arquivo: " . $e->getFile() . "<br>";
-        echo "Linha: " . $e->getLine() . "<br>";
-        echo "Stack trace: " . $e->getTraceAsString();
-        echo "</div>";
+    // Se não houver dados, definir valores padrão
+    if (!$estatisticasGerais) {
+        $estatisticasGerais = [
+            'lojas_com_saldo' => 0,
+            'total_saldo_disponivel' => 0,
+            'total_usado_geral' => 0,
+            'lojas_saldo_disponivel' => 0
+        ];
     }
-    
-    error_log('Erro ao carregar lojas parceiras: ' . $e->getMessage());
-    $hasError = true;
-    $errorMessage = 'Erro ao carregar dados das lojas parceiras.';
-    $storesData = [];
+} catch (Exception $e) {
+    // Em caso de erro, usar valores padrão
     $estatisticasGerais = [
         'lojas_com_saldo' => 0,
         'total_saldo_disponivel' => 0,
