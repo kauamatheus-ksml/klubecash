@@ -23,10 +23,10 @@ define('UPLOADS_DIR', ROOT_DIR . '/uploads');
 define('LOGS_DIR', ROOT_DIR . '/logs');
 
 // Configurações de cashback padrão (em porcentagem)
-define('DEFAULT_CASHBACK_TOTAL', 5.00);  // 5% de cashback total
-define('DEFAULT_CASHBACK_CLIENT', 3.00); // 3% para o cliente
-define('DEFAULT_CASHBACK_ADMIN', 1.00);  // 1% para o administrador
-define('DEFAULT_CASHBACK_STORE', 1.00);  // 1% para a loja
+define('DEFAULT_CASHBACK_TOTAL', 10.00);  // 5% de cashback total
+define('DEFAULT_CASHBACK_CLIENT', 5.00); // 5% para o cliente
+define('DEFAULT_CASHBACK_ADMIN', 5.00);  // 5% para o administrador
+define('DEFAULT_CASHBACK_STORE', 0.00);  // 1% para a loja
 
 // Status de transação
 define('TRANSACTION_PENDING', 'pendente');
