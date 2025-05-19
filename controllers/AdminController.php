@@ -2570,14 +2570,54 @@ if (basename($_SERVER['PHP_SELF']) === 'AdminController.php') {
             break;
             
         case 'store_details':
+            header('Content-Type: application/json; charset=UTF-8');
+            
             try {
+                if (!AuthController::isAdmin()) {
+                    echo json_encode(['status' => false, 'message' => 'Acesso restrito a administradores']);
+                    exit;
+                }
+                
                 $storeId = isset($_POST['store_id']) ? intval($_POST['store_id']) : 0;
-                $result = self::getStoreDetails($storeId);
-                self::sendJsonResponse($result);
+                
+                if ($storeId <= 0) {
+                    echo json_encode(['status' => false, 'message' => 'ID da loja inválido']);
+                    exit;
+                }
+                
+                $db = Database::getConnection();
+                
+                // Buscar dados da loja
+                $stmt = $db->prepare("SELECT * FROM lojas WHERE id = ?");
+                $stmt->execute([$storeId]);
+                $store = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if (!$store) {
+                    echo json_encode(['status' => false, 'message' => 'Loja não encontrada']);
+                    exit;
+                }
+                
+                // Buscar endereço se existir
+                $addrStmt = $db->prepare("SELECT * FROM lojas_endereco WHERE loja_id = ?");
+                $addrStmt->execute([$storeId]);
+                $address = $addrStmt->fetch(PDO::FETCH_ASSOC);
+                
+                if ($address) {
+                    $store['endereco'] = $address;
+                }
+                
+                echo json_encode([
+                    'status' => true,
+                    'data' => ['loja' => $store]
+                ]);
+                
             } catch (Exception $e) {
-                error_log('Erro na action store_details: ' . $e->getMessage());
-                self::sendJsonResponse(['status' => false, 'message' => 'Erro interno do servidor']);
+                echo json_encode([
+                    'status' => false,
+                    'message' => 'Erro ao carregar dados: ' . $e->getMessage()
+                ]);
             }
+            exit;
             break;
             
         case 'update_store_status':

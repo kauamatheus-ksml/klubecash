@@ -428,269 +428,9 @@ try {
         </div>
     </div>
 
-    <!-- Script JavaScript existente -->
-    javascript<script>
+    <script>
 // Variáveis globais
 let currentStoreId = null;
-
-// Teste básico primeiro
-function testBasicConnection() {
-    fetch('test_store.php')
-    .then(response => response.text())
-    .then(text => {
-        console.log('Teste básico - resposta:', text);
-        try {
-            const data = JSON.parse(text);
-            console.log('Teste básico - dados:', data);
-            
-            if (data.status) {
-                console.log('✓ Teste básico passou!');
-                // Se o teste básico passar, podemos usar a função principal
-            } else {
-                console.log('✗ Erro no teste básico:', data.message);
-            }
-        } catch (e) {
-            console.log('✗ Erro ao parsear teste básico:', e);
-            console.log('Resposta bruta:', text);
-        }
-    })
-    .catch(error => {
-        console.log('✗ Erro na requisição do teste:', error);
-    });
-}
-
-// Executar teste ao carregar a página
-document.addEventListener('DOMContentLoaded', function() {
-    testBasicConnection();
-});
-
-// Função simplificada para ver detalhes
-function viewStoreDetails(storeId) {
-    console.log('=== viewStoreDetails chamada ===');
-    console.log('Store ID:', storeId);
-    
-    currentStoreId = storeId;
-    
-    // Mostrar modal
-    document.getElementById('storeDetailsTitle').textContent = 'Carregando...';
-    document.getElementById('storeDetailsContent').innerHTML = '<div class="alert alert-info">Carregando...</div>';
-    document.getElementById('storeDetailsModal').style.display = 'block';
-    
-    // Primeiro tentar o teste básico com ID específico
-    fetch('test_store.php')
-    .then(response => {
-        console.log('Resposta recebida:', response);
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-        return response.text();
-    })
-    .then(text => {
-        console.log('Texto da resposta:', text);
-        
-        try {
-            const data = JSON.parse(text);
-            console.log('Dados parseados:', data);
-            
-            if (data.status && data.data && data.data.loja) {
-                // Renderizar com os dados do teste
-                renderSimpleStoreDetails(data.data.loja);
-            } else {
-                throw new Error(data.message || 'Dados inválidos');
-            }
-        } catch (e) {
-            console.error('Erro ao processar JSON:', e);
-            document.getElementById('storeDetailsContent').innerHTML = `
-                <div class="alert alert-danger">
-                    <h5>Erro ao processar resposta:</h5>
-                    <p>${e.message}</p>
-                    <details>
-                        <summary>Ver resposta completa</summary>
-                        <pre style="white-space: pre-wrap; max-height: 200px; overflow-y: auto;">${text}</pre>
-                    </details>
-                </div>
-            `;
-        }
-    })
-    .catch(error => {
-        console.error('Erro na requisição:', error);
-        document.getElementById('storeDetailsContent').innerHTML = `
-            <div class="alert alert-danger">
-                <h5>Erro na requisição:</h5>
-                <p>${error.message}</p>
-                <p>Verifique o console para mais detalhes.</p>
-            </div>
-        `;
-    });
-}
-
-// Função simplificada para renderizar detalhes
-function renderSimpleStoreDetails(store) {
-    console.log('Renderizando loja:', store);
-    
-    document.getElementById('storeDetailsTitle').textContent = store.nome_fantasia;
-    
-    const html = `
-        <div class="store-details">
-            <h4>Informações da Loja</h4>
-            <table class="details-table">
-                <tr><td><strong>Nome Fantasia:</strong></td><td>${store.nome_fantasia}</td></tr>
-                <tr><td><strong>Razão Social:</strong></td><td>${store.razao_social}</td></tr>
-                <tr><td><strong>CNPJ:</strong></td><td>${store.cnpj}</td></tr>
-                <tr><td><strong>Email:</strong></td><td>${store.email}</td></tr>
-                <tr><td><strong>Telefone:</strong></td><td>${store.telefone}</td></tr>
-                <tr><td><strong>Categoria:</strong></td><td>${store.categoria || 'N/A'}</td></tr>
-                <tr><td><strong>Cashback:</strong></td><td>${store.porcentagem_cashback}%</td></tr>
-                <tr><td><strong>Status:</strong></td><td><span class="badge badge-${store.status === 'aprovado' ? 'success' : store.status === 'pendente' ? 'warning' : 'danger'}">${store.status}</span></td></tr>
-                <tr><td><strong>Data Cadastro:</strong></td><td>${new Date(store.data_cadastro).toLocaleDateString('pt-BR')}</td></tr>
-            </table>
-        </div>
-    `;
-    
-    document.getElementById('storeDetailsContent').innerHTML = html;
-}
-
-// Outras funções existentes...
-function showStoreModal(storeId = null) {
-    document.getElementById('storeModal').style.display = 'block';
-}
-
-function hideStoreModal() {
-    document.getElementById('storeModal').style.display = 'none';
-}
-
-function hideStoreDetailsModal() {
-    document.getElementById('storeDetailsModal').style.display = 'none';
-}
-
-function approveStore(storeId) {
-    if (confirm('Aprovar esta loja?')) {
-        updateStoreStatus(storeId, 'aprovado');
-    }
-}
-
-function updateStoreStatus(storeId, status) {
-    fetch('../../controllers/AdminController.php', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: `action=update_store_status&store_id=${storeId}&status=${status}`
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.status) {
-            alert('Status atualizado!');
-            location.reload();
-        } else {
-            alert('Erro: ' + data.message);
-        }
-    })
-    .catch(error => {
-        alert('Erro na atualização');
-    });
-}
-
-function toggleSelectAll() {
-    const selectAll = document.getElementById('selectAll');
-    const checkboxes = document.querySelectorAll('.store-checkbox');
-    
-    checkboxes.forEach(checkbox => {
-        checkbox.checked = selectAll.checked;
-    });
-}
-
-// Fechar modais
-window.onclick = function(event) {
-    const storeModal = document.getElementById('storeModal');
-    const detailsModal = document.getElementById('storeDetailsModal');
-    
-    if (event.target === storeModal) {
-        hideStoreModal();
-    }
-    
-    if (event.target === detailsModal) {
-        hideStoreDetailsModal();
-    }
-}
-</script>
-
-<style>
-.details-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 15px;
-}
-
-.details-table td {
-    padding: 8px 12px;
-    border-bottom: 1px solid #eee;
-    vertical-align: top;
-}
-
-.details-table td:first-child {
-    width: 30%;
-    background-color: #f8f9fa;
-    font-weight: 500;
-}
-
-.store-details {
-    padding: 20px;
-}
-
-.badge {
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 0.8rem;
-    text-transform: uppercase;
-}
-
-.badge-success { background: #d4edda; color: #155724; }
-.badge-warning { background: #fff3cd; color: #856404; }
-.badge-danger { background: #f8d7da; color: #721c24; }
-</style>
-3. Teste primeiro acessando diretamente:
-Acesse https://seu-dominio.com/views/admin/test_store.php diretamente no navegador para ver se retorna dados JSON válidos.
-4. Se o teste funcionar, volte para a página de lojas e:
-
-Abra o console do navegador (F12 → Console)
-Clique em "Ver Detalhes" de uma loja
-Veja as mensagens que aparecem no console
-
-Me informe:
-
-O que aparece quando você acessa o test_store.php diretamente
-Quais mensagens aparecem no console do navegador
-
-Isso nos ajudará a identificar exatamente onde está o problema!Kenvie o script completoPreparou script completo para solicitação do usuário.1 sO usuário está pedindo o script completo. Vou fornecer a versão completa e funcional do JavaScript para a página de stores.php que inclui todas as funcionalidades necessárias de forma organizada e limpa.Aqui está o script JavaScript completo para o admin/stores.php:
-javascript<script>
-// Variáveis globais
-let currentStoreId = null;
-
-// ========== FUNÇÕES DE TESTE E DEBUG ==========
-function testBasicConnection() {
-    fetch('test_store.php')
-    .then(response => response.text())
-    .then(text => {
-        console.log('Teste básico - resposta:', text);
-        try {
-            const data = JSON.parse(text);
-            console.log('Teste básico - dados:', data);
-            
-            if (data.status) {
-                console.log('✓ Teste básico passou!');
-            } else {
-                console.log('✗ Erro no teste básico:', data.message);
-            }
-        } catch (e) {
-            console.log('✗ Erro ao parsear teste básico:', e);
-            console.log('Resposta bruta:', text);
-        }
-    })
-    .catch(error => {
-        console.log('✗ Erro na requisição do teste:', error);
-    });
-}
 
 // ========== FUNÇÕES DO MODAL DE ADICIONAR/EDITAR LOJA ==========
 function showStoreModal(storeId = null) {
@@ -738,7 +478,7 @@ function loadStoreData(storeId) {
             document.getElementById('cnpj').value = store.cnpj;
             document.getElementById('email').value = store.email;
             document.getElementById('telefone').value = store.telefone;
-            document.getElementById('categoria').value = store.categoria;
+            document.getElementById('categoria').value = store.categoria || 'Outros';
             document.getElementById('porcentagemCashback').value = store.porcentagem_cashback;
             document.getElementById('status').value = store.status;
         } else {
@@ -786,9 +526,7 @@ function submitStoreForm(event) {
 
 // ========== FUNÇÕES DO MODAL DE DETALHES ==========
 function viewStoreDetails(storeId) {
-    console.log('=== viewStoreDetails chamada ===');
-    console.log('Store ID:', storeId);
-    
+    console.log('viewStoreDetails chamada para ID:', storeId);
     currentStoreId = storeId;
     
     // Mostrar modal de carregamento
@@ -796,29 +534,35 @@ function viewStoreDetails(storeId) {
     document.getElementById('storeDetailsContent').innerHTML = '<div class="alert alert-info">Carregando detalhes da loja...</div>';
     document.getElementById('storeDetailsModal').style.display = 'block';
     
-    // Tentar usar o arquivo de teste primeiro
-    fetch('test_store.php')
+    // Usar diretamente o AdminController
+    fetch('../../controllers/AdminController.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'action=store_details&store_id=' + storeId
+    })
     .then(response => {
-        console.log('Resposta do teste:', response);
+        console.log('Response status:', response.status);
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
         return response.text();
     })
     .then(text => {
-        console.log('Texto da resposta:', text);
+        console.log('Response text:', text);
         
         try {
             const data = JSON.parse(text);
-            console.log('Dados parseados:', data);
+            console.log('Parsed data:', data);
             
             if (data.status && data.data && data.data.loja) {
-                renderSimpleStoreDetails(data.data.loja);
+                renderStoreDetails(data.data.loja);
             } else {
                 throw new Error(data.message || 'Dados inválidos');
             }
         } catch (e) {
-            console.error('Erro ao processar JSON:', e);
+            console.error('JSON parse error:', e);
             document.getElementById('storeDetailsContent').innerHTML = `
                 <div class="alert alert-danger">
                     <h5>Erro ao processar resposta:</h5>
@@ -832,61 +576,12 @@ function viewStoreDetails(storeId) {
         }
     })
     .catch(error => {
-        console.error('Erro na requisição:', error);
-        
-        // Se falhar o teste, tenta o método original
-        console.log('Tentando método original...');
-        tryOriginalMethod(storeId);
-    });
-}
-
-function tryOriginalMethod(storeId) {
-    fetch('../../controllers/AdminController.php', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: 'action=store_details_with_balance&store_id=' + storeId
-    })
-    .then(response => {
-        console.log('Método original - status:', response.status);
-        return response.text();
-    })
-    .then(text => {
-        console.log('Método original - resposta:', text);
-        
-        try {
-            const data = JSON.parse(text);
-            console.log('Método original - dados:', data);
-            
-            if (data.status) {
-                renderStoreDetailsWithBalance(data.data);
-            } else {
-                document.getElementById('storeDetailsContent').innerHTML = `
-                    <div class="alert alert-danger">
-                        <strong>Erro:</strong> ${data.message}
-                    </div>
-                `;
-            }
-        } catch (e) {
-            console.error('Método original - erro JSON:', e);
-            document.getElementById('storeDetailsContent').innerHTML = `
-                <div class="alert alert-danger">
-                    <strong>Erro de formato:</strong> Resposta inválida do servidor<br>
-                    <details style="margin-top: 10px;">
-                        <summary>Ver resposta bruta</summary>
-                        <pre style="white-space: pre-wrap; max-height: 200px; overflow-y: auto; font-size: 12px;">${text}</pre>
-                    </details>
-                </div>
-            `;
-        }
-    })
-    .catch(error => {
-        console.error('Método original - erro:', error);
+        console.error('Fetch error:', error);
         document.getElementById('storeDetailsContent').innerHTML = `
             <div class="alert alert-danger">
-                <strong>Erro na conexão:</strong> ${error.message}
-                <br><small>Verifique o console para mais detalhes</small>
+                <h5>Erro na requisição:</h5>
+                <p>${error.message}</p>
+                <p>Verifique se o arquivo AdminController.php existe e as permissões estão corretas.</p>
             </div>
         `;
     });
@@ -896,9 +591,9 @@ function hideStoreDetailsModal() {
     document.getElementById('storeDetailsModal').style.display = 'none';
 }
 
-// ========== FUNÇÕES DE RENDERIZAÇÃO ==========
-function renderSimpleStoreDetails(store) {
-    console.log('Renderizando loja (simples):', store);
+// ========== FUNÇÃO DE RENDERIZAÇÃO ==========
+function renderStoreDetails(store) {
+    console.log('Renderizando loja:', store);
     
     document.getElementById('storeDetailsTitle').textContent = store.nome_fantasia;
     
@@ -918,6 +613,9 @@ function renderSimpleStoreDetails(store) {
             statusClass = 'badge-danger';
             statusText = 'Rejeitado';
             break;
+        default:
+            statusClass = 'badge-secondary';
+            statusText = store.status || 'Desconhecido';
     }
     
     const html = `
@@ -929,11 +627,12 @@ function renderSimpleStoreDetails(store) {
                 <tr><td><strong>CNPJ:</strong></td><td>${store.cnpj}</td></tr>
                 <tr><td><strong>Email:</strong></td><td>${store.email}</td></tr>
                 <tr><td><strong>Telefone:</strong></td><td>${store.telefone}</td></tr>
-                <tr><td><strong>Categoria:</strong></td><td>${store.categoria || 'N/A'}</td></tr>
+                <tr><td><strong>Categoria:</strong></td><td>${store.categoria || 'Não definida'}</td></tr>
                 <tr><td><strong>Porcentagem Cashback:</strong></td><td>${store.porcentagem_cashback}%</td></tr>
                 <tr><td><strong>Status:</strong></td><td><span class="badge ${statusClass}">${statusText}</span></td></tr>
                 <tr><td><strong>Data Cadastro:</strong></td><td>${formatDate(store.data_cadastro)}</td></tr>
                 ${store.data_aprovacao ? `<tr><td><strong>Data Aprovação:</strong></td><td>${formatDate(store.data_aprovacao)}</td></tr>` : ''}
+                ${store.observacao ? `<tr><td><strong>Observação:</strong></td><td>${store.observacao}</td></tr>` : ''}
             </table>
             
             ${store.status === 'pendente' ? `
@@ -946,6 +645,13 @@ function renderSimpleStoreDetails(store) {
                         Rejeitar Loja
                     </button>
                 </div>
+            ` : store.status === 'rejeitado' ? `
+                <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee;">
+                    <h5>Ações</h5>
+                    <button class="btn btn-primary" onclick="updateStoreStatus(${store.id}, 'aprovado')">
+                        Aprovar Loja
+                    </button>
+                </div>
             ` : ''}
         </div>
     `;
@@ -953,138 +659,6 @@ function renderSimpleStoreDetails(store) {
     document.getElementById('storeDetailsContent').innerHTML = html;
     
     // Configurar botão de edição
-    document.getElementById('editStoreBtn').onclick = function() {
-        hideStoreDetailsModal();
-        showStoreModal(store.id);
-    };
-}
-
-function renderStoreDetailsWithBalance(data) {
-    const store = data.loja;
-    const statistics = data.estatisticas;
-    const balanceStats = data.estatisticas_saldo;
-    
-    document.getElementById('storeDetailsTitle').textContent = store.nome_fantasia;
-    
-    let html = `
-        <div style="margin-bottom: 20px;">
-            <h4 style="margin-bottom: 15px; color: #FF7A00;">Informações Básicas</h4>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                <div>
-                    <p><strong>Razão Social:</strong> ${store.razao_social}</p>
-                    <p><strong>CNPJ:</strong> ${store.cnpj}</p>
-                    <p><strong>E-mail:</strong> ${store.email}</p>
-                </div>
-                <div>
-                    <p><strong>Telefone:</strong> ${store.telefone}</p>
-                    <p><strong>Categoria:</strong> ${store.categoria || 'Não definida'}</p>
-                    <p><strong>Cashback:</strong> ${store.porcentagem_cashback}%</p>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    if (statistics) {
-        html += `
-            <div style="margin-bottom: 20px;">
-                <h4 style="margin-bottom: 15px; color: #FF7A00;">Estatísticas de Transações</h4>
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
-                    <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; text-align: center;">
-                        <h5 style="margin: 0; color: #333;">Transações</h5>
-                        <p style="font-size: 18px; font-weight: bold; margin: 10px 0;">${statistics.total_transacoes || 0}</p>
-                    </div>
-                    <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; text-align: center;">
-                        <h5 style="margin: 0; color: #333;">Vendas</h5>
-                        <p style="font-size: 18px; font-weight: bold; margin: 10px 0;">R$ ${formatMoney(statistics.total_vendas || 0)}</p>
-                    </div>
-                    <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; text-align: center;">
-                        <h5 style="margin: 0; color: #333;">Cashback</h5>
-                        <p style="font-size: 18px; font-weight: bold; margin: 10px 0;">R$ ${formatMoney(statistics.total_cashback || 0)}</p>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-    
-    if (balanceStats) {
-        const totalTransacoes = parseInt(balanceStats.total_transacoes) || 0;
-        const transacoesComSaldo = parseInt(balanceStats.transacoes_com_saldo) || 0;
-        const percentualUso = totalTransacoes > 0 ? (transacoesComSaldo / totalTransacoes) * 100 : 0;
-        
-        html += `
-            <div style="margin-bottom: 20px;">
-                <h4 style="margin-bottom: 15px; color: #28a745;">💰 Estatísticas de Saldo</h4>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                    <div style="background: #f8fff8; padding: 15px; border-radius: 8px; border-left: 4px solid #28a745;">
-                        <p style="margin: 0; font-size: 14px; color: #666;">Saldo Total dos Clientes</p>
-                        <p style="font-size: 20px; font-weight: bold; margin: 5px 0; color: #28a745;">R$ ${formatMoney(balanceStats.total_saldo_clientes || 0)}</p>
-                        <p style="margin: 0; font-size: 12px; color: #666;">${balanceStats.clientes_com_saldo || 0} clientes com saldo</p>
-                    </div>
-                    <div style="background: #fff8f0; padding: 15px; border-radius: 8px; border-left: 4px solid #FF7A00;">
-                        <p style="margin: 0; font-size: 14px; color: #666;">Total Saldo Usado</p>
-                        <p style="font-size: 20px; font-weight: bold; margin: 5px 0; color: #FF7A00;">R$ ${formatMoney(balanceStats.total_saldo_usado || 0)}</p>
-                        <p style="margin: 0; font-size: 12px; color: #666;">${transacoesComSaldo} transações com uso de saldo</p>
-                    </div>
-                </div>
-                
-                ${totalTransacoes > 0 ? `
-                <div style="margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                    <p style="margin: 0; font-size: 14px; color: #666;">Taxa de Uso de Saldo</p>
-                    <div style="display: flex; align-items: center; gap: 10px; margin-top: 5px;">
-                        <div style="flex: 1; background: #e9ecef; height: 8px; border-radius: 4px; overflow: hidden;">
-                            <div style="width: ${percentualUso}%; height: 100%; background: #28a745;"></div>
-                        </div>
-                        <span style="font-weight: bold; color: #28a745;">${percentualUso.toFixed(1)}%</span>
-                    </div>
-                </div>
-                ` : ''}
-            </div>
-        `;
-    }
-    
-    let statusClass = '';
-    let statusText = '';
-    
-    switch (store.status) {
-        case 'aprovado':
-            statusClass = 'badge-success';
-            statusText = 'Aprovado';
-            break;
-        case 'pendente':
-            statusClass = 'badge-warning';
-            statusText = 'Pendente';
-            break;
-        case 'rejeitado':
-            statusClass = 'badge-danger';
-            statusText = 'Rejeitado';
-            break;
-    }
-    
-    html += `
-        <div style="margin-bottom: 20px;">
-            <h4 style="margin-bottom: 15px; color: #FF7A00;">Status</h4>
-            <p>Status atual: <span class="badge ${statusClass}">${statusText}</span></p>
-    `;
-    
-    if (store.status === 'pendente') {
-        html += `
-            <div style="display: flex; gap: 10px; margin-top: 15px;">
-                <button class="btn btn-primary" onclick="updateStoreStatus(${store.id}, 'aprovado')">Aprovar</button>
-                <button class="btn btn-secondary" onclick="rejectStore(${store.id})">Rejeitar</button>
-            </div>
-        `;
-    } else if (store.status === 'rejeitado') {
-        html += `
-            <div style="margin-top: 15px;">
-                <button class="btn btn-primary" onclick="updateStoreStatus(${store.id}, 'aprovado')">Aprovar</button>
-            </div>
-        `;
-    }
-    
-    html += `</div>`;
-    
-    document.getElementById('storeDetailsContent').innerHTML = html;
-    
     document.getElementById('editStoreBtn').onclick = function() {
         hideStoreDetailsModal();
         showStoreModal(store.id);
@@ -1144,13 +718,6 @@ function formatDate(dateString) {
     }
 }
 
-function formatMoney(value) {
-    return parseFloat(value || 0).toLocaleString('pt-BR', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-    });
-}
-
 function toggleSelectAll() {
     const selectAll = document.getElementById('selectAll');
     const checkboxes = document.querySelectorAll('.store-checkbox');
@@ -1162,8 +729,7 @@ function toggleSelectAll() {
 
 // ========== EVENT LISTENERS ==========
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Página carregada, iniciando testes...');
-    testBasicConnection();
+    console.log('Página carregada');
     
     // Configurar formulário
     const storeForm = document.getElementById('storeForm');
@@ -1186,7 +752,7 @@ window.onclick = function(event) {
     }
 }
 
-// Adicionar tecla ESC para fechar modais
+// Tecla ESC para fechar modais
 document.addEventListener('keydown', function(event) {
     if (event.key === 'Escape') {
         hideStoreModal();
@@ -1194,9 +760,9 @@ document.addEventListener('keydown', function(event) {
     }
 });
 </script>
-    
-    <style>
-        /* ========== ESTILOS PARA OS MODAIS E DETALHES ========== */
+
+<style>
+/* Estilos para os modais e detalhes */
 .details-table {
     width: 100%;
     border-collapse: collapse;
@@ -1221,7 +787,7 @@ document.addEventListener('keydown', function(event) {
 }
 
 .store-details {
-    padding: 0;
+    padding: 20px;
 }
 
 .store-details h4 {
@@ -1256,6 +822,12 @@ document.addEventListener('keydown', function(event) {
     background: #f8d7da; 
     color: #721c24; 
     border: 1px solid #f5c6cb;
+}
+
+.badge-secondary {
+    background: #e2e3e5;
+    color: #383d41;
+    border: 1px solid #c6c8ca;
 }
 
 .alert {
@@ -1354,296 +926,12 @@ document.addEventListener('keydown', function(event) {
         width: 100%;
         margin-bottom: 10px;
     }
-}
-
-.modal-content {
-    background-color: white;
-    position: relative;
-    margin: 5% auto;
-    padding: 0;
-    width: 90%;
-    max-width: 800px;
-    border-radius: 12px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-    max-height: 90vh;
-    overflow-y: auto;
-}
-
-.modal-header {
-    padding: 20px 24px;
-    border-bottom: 1px solid #e9ecef;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background-color: #f8f9fa;
-    border-radius: 12px 12px 0 0;
-}
-
-.modal-title {
-    margin: 0;
-    color: #2c3e50;
-    font-size: 1.25rem;
-    font-weight: 600;
-}
-
-.modal-close {
-    background: none;
-    border: none;
-    padding: 8px;
-    cursor: pointer;
-    border-radius: 4px;
-    transition: background-color 0.3s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.modal-close:hover {
-    background-color: #e9ecef;
-}
-
-.modal-close svg {
-    color: #6c757d;
-}
-
-/* Formulário dentro do modal */
-.modal-content form {
-    padding: 24px;
-}
-
-.form-group {
-    margin-bottom: 20px;
-}
-
-.form-label {
-    display: block;
-    margin-bottom: 6px;
-    font-weight: 500;
-    color: #333;
-    font-size: 0.9rem;
-}
-
-.form-control,
-.form-select {
-    width: 100%;
-    padding: 10px 12px;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    font-size: 0.9rem;
-    transition: border-color 0.3s, box-shadow 0.3s;
-}
-
-.form-control:focus,
-.form-select:focus {
-    outline: none;
-    border-color: #FF7A00;
-    box-shadow: 0 0 0 3px rgba(255, 122, 0, 0.1);
-}
-
-.form-footer {
-    padding: 16px 24px;
-    border-top: 1px solid #e9ecef;
-    display: flex;
-    justify-content: flex-end;
-    gap: 12px;
-    background-color: #f8f9fa;
-    border-radius: 0 0 12px 12px;
-}
-
-/* Botões */
-.btn {
-    padding: 10px 20px;
-    border: none;
-    border-radius: 8px;
-    font-size: 0.9rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.3s;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-}
-
-.btn-primary {
-    background-color: #FF7A00;
-    color: white;
-}
-
-.btn-primary:hover {
-    background-color: #e56500;
-    transform: translateY(-1px);
-}
-
-.btn-secondary {
-    background-color: #6c757d;
-    color: white;
-}
-
-.btn-secondary:hover {
-    background-color: #5a6169;
-}
-
-/* Badge styles */
-.badge {
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 0.75rem;
-    font-weight: 500;
-}
-
-.badge-success {
-    background-color: #d4edda;
-    color: #155724;
-}
-
-.badge-warning {
-    background-color: #fff3cd;
-    color: #856404;
-}
-
-.badge-danger {
-    background-color: #f8d7da;
-    color: #721c24;
-}
-
-/* Alert styles */
-.alert {
-    padding: 12px 16px;
-    margin-bottom: 20px;
-    border-radius: 8px;
-    font-size: 0.9rem;
-}
-
-.alert-info {
-    background-color: #d1ecf1;
-    border: 1px solid #bee5eb;
-    color: #0c5460;
-}
-
-.alert-danger {
-    background-color: #f8d7da;
-    border: 1px solid #f5c6cb;
-    color: #721c24;
-}
-
-/* Responsividade */
-@media (max-width: 768px) {
-    .modal-content {
-        margin: 2% auto;
-        width: 95%;
-        max-height: 95vh;
-    }
     
-    .modal-header {
-        padding: 16px 20px;
-    }
-    
-    .modal-content form {
-        padding: 20px;
-    }
-    
-    .form-footer {
-        padding: 12px 20px;
-        flex-direction: column;
-    }
-    
-    .btn {
-        width: 100%;
-        justify-content: center;
+    .store-details {
+        padding: 15px;
     }
 }
-    .balance-indicator {
-        margin-left: 5px;
-        font-size: 0.8rem;
-    }
+</style>
     
-    .saldo-amount {
-        color: #28a745;
-        font-weight: 600;
-    }
-    
-    .saldo-count {
-        color: #6c757d;
-        font-size: 0.8rem;
-        display: block;
-    }
-    
-    .sem-saldo,
-    .sem-transacoes {
-        color: #6c757d;
-        font-style: italic;
-    }
-    
-    .percentage-badge {
-        background-color: #e8f5e9;
-        color: #2e7d32;
-        padding: 2px 6px;
-        border-radius: 4px;
-        font-weight: 600;
-        font-size: 0.85rem;
-    }
-    
-    .usage-detail {
-        color: #6c757d;
-        font-size: 0.75rem;
-        display: block;
-        margin-top: 2px;
-    }
-    
-    .stats-container {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-        gap: 20px;
-        margin-bottom: 30px;
-    }
-    
-    .stat-card {
-        background: #fff;
-        padding: 20px;
-        border-radius: 12px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-        border-left: 4px solid var(--primary-color);
-    }
-    
-    .stat-card-title {
-        font-size: 0.9rem;
-        color: #666;
-        margin-bottom: 8px;
-        font-weight: 500;
-    }
-    
-    .stat-card-value {
-        font-size: 1.8rem;
-        font-weight: 700;
-        color: var(--primary-color);
-        margin-bottom: 5px;
-    }
-    
-    .stat-card-subtitle {
-        font-size: 0.8rem;
-        color: #6c757d;
-        font-style: italic;
-    }
-    
-    /* Responsividade */
-    @media (max-width: 768px) {
-        .stats-container {
-            grid-template-columns: 1fr;
-        }
-        
-        .table-container {
-            overflow-x: auto;
-        }
-        
-        .table th:nth-child(6),
-        .table th:nth-child(7),
-        .table td:nth-child(6),
-        .table td:nth-child(7) {
-            display: none;
-        }
-    }
-    </style>
 </body>
 </html>
