@@ -42,6 +42,10 @@ if (isset($_GET['filtrar'])) {
     if (!empty($_GET['status']) && $_GET['status'] != 'todos') {
         $filters['status'] = $_GET['status'];
     }
+    
+    if (!empty($_GET['tipo_transacao']) && $_GET['tipo_transacao'] != 'todos') {
+        $filters['tipo_transacao'] = $_GET['tipo_transacao'];
+    }
 }
 
 // Obter dados do extrato
@@ -53,52 +57,65 @@ $errorMessage = $hasError ? $result['message'] : '';
 
 // Dados para exibição
 $statementData = $hasError ? [] : $result['data'];
-// Obter estatísticas de saldo para o período filtrado
-$saldoStatQuery = "
-    SELECT 
-        SUM(CASE WHEN cm.tipo_operacao = 'credito' THEN cm.valor ELSE 0 END) as total_creditado,
-        SUM(CASE WHEN cm.tipo_operacao = 'uso' THEN cm.valor ELSE 0 END) as total_usado,
-        SUM(CASE WHEN cm.tipo_operacao = 'estorno' THEN cm.valor ELSE 0 END) as total_estornado,
-        COUNT(CASE WHEN cm.tipo_operacao = 'uso' THEN 1 END) as qtd_usos
-    FROM cashback_movimentacoes cm
-    WHERE cm.usuario_id = :user_id
-";
 
-// Aplicar filtros de data se existirem
-$saldoParams = [':user_id' => $userId];
-if (!empty($filters['data_inicio'])) {
-    $saldoStatQuery .= " AND cm.data_operacao >= :data_inicio";
-    $saldoParams[':data_inicio'] = $filters['data_inicio'] . ' 00:00:00';
-}
-if (!empty($filters['data_fim'])) {
-    $saldoStatQuery .= " AND cm.data_operacao <= :data_fim";
-    $saldoParams[':data_fim'] = $filters['data_fim'] . ' 23:59:59';
-}
+try {
+    $db = Database::getConnection();
+    
+    // Obter estatísticas de saldo para o período filtrado
+    $saldoStatQuery = "
+        SELECT 
+            SUM(CASE WHEN cm.tipo_operacao = 'credito' THEN cm.valor ELSE 0 END) as total_creditado,
+            SUM(CASE WHEN cm.tipo_operacao = 'uso' THEN cm.valor ELSE 0 END) as total_usado,
+            SUM(CASE WHEN cm.tipo_operacao = 'estorno' THEN cm.valor ELSE 0 END) as total_estornado,
+            COUNT(CASE WHEN cm.tipo_operacao = 'uso' THEN 1 END) as qtd_usos
+        FROM cashback_movimentacoes cm
+        WHERE cm.usuario_id = :user_id
+    ";
 
-$saldoStatStmt = $db->prepare($saldoStatQuery);
-foreach ($saldoParams as $param => $value) {
-    $saldoStatStmt->bindValue($param, $value);
-}
-$saldoStatStmt->execute();
-$saldoEstatisticas = $saldoStatStmt->fetch(PDO::FETCH_ASSOC);
-
-// Obter transações com informações de saldo usado
-if (!$hasError && !empty($statementData['transacoes'])) {
-    foreach ($statementData['transacoes'] as &$transacao) {
-        // Buscar saldo usado nesta transação
-        $saldoUsadoQuery = "
-            SELECT SUM(valor) as saldo_usado 
-            FROM cashback_movimentacoes 
-            WHERE transacao_uso_id = :transacao_id AND tipo_operacao = 'uso'
-        ";
-        $saldoUsadoStmt = $db->prepare($saldoUsadoQuery);
-        $saldoUsadoStmt->bindParam(':transacao_id', $transacao['id']);
-        $saldoUsadoStmt->execute();
-        $saldoUsado = $saldoUsadoStmt->fetch(PDO::FETCH_ASSOC);
-        
-        $transacao['saldo_usado'] = $saldoUsado['saldo_usado'] ?? 0;
-        $transacao['valor_pago'] = $transacao['valor_total'] - $transacao['saldo_usado'];
+    // Aplicar filtros de data se existirem
+    $saldoParams = [':user_id' => $userId];
+    if (!empty($filters['data_inicio'])) {
+        $saldoStatQuery .= " AND cm.data_operacao >= :data_inicio";
+        $saldoParams[':data_inicio'] = $filters['data_inicio'] . ' 00:00:00';
     }
+    if (!empty($filters['data_fim'])) {
+        $saldoStatQuery .= " AND cm.data_operacao <= :data_fim";
+        $saldoParams[':data_fim'] = $filters['data_fim'] . ' 23:59:59';
+    }
+
+    $saldoStatStmt = $db->prepare($saldoStatQuery);
+    foreach ($saldoParams as $param => $value) {
+        $saldoStatStmt->bindValue($param, $value);
+    }
+    $saldoStatStmt->execute();
+    $saldoEstatisticas = $saldoStatStmt->fetch(PDO::FETCH_ASSOC);
+
+    // Obter transações com informações de saldo usado
+    if (!$hasError && !empty($statementData['transacoes'])) {
+        foreach ($statementData['transacoes'] as &$transacao) {
+            // Buscar saldo usado nesta transação
+            $saldoUsadoQuery = "
+                SELECT SUM(valor) as saldo_usado 
+                FROM cashback_movimentacoes 
+                WHERE transacao_uso_id = :transacao_id AND tipo_operacao = 'uso'
+            ";
+            $saldoUsadoStmt = $db->prepare($saldoUsadoQuery);
+            $saldoUsadoStmt->bindParam(':transacao_id', $transacao['id']);
+            $saldoUsadoStmt->execute();
+            $saldoUsado = $saldoUsadoStmt->fetch(PDO::FETCH_ASSOC);
+            
+            $transacao['saldo_usado'] = $saldoUsado['saldo_usado'] ?? 0;
+            $transacao['valor_pago'] = $transacao['valor_total'] - $transacao['saldo_usado'];
+        }
+    }
+} catch (Exception $e) {
+    error_log('Erro ao carregar estatísticas de saldo: ' . $e->getMessage());
+    $saldoEstatisticas = [
+        'total_creditado' => 0,
+        'total_usado' => 0,
+        'total_estornado' => 0,
+        'qtd_usos' => 0
+    ];
 }
 ?>
 
@@ -209,7 +226,6 @@ if (!$hasError && !empty($statementData['transacoes'])) {
                 <div class="summary-card-value"><?php echo $statementData['estatisticas']['total_transacoes'] ?? 0; ?></div>
             </div>
         </div>
-
         
         <!-- Tabela de Extrato -->
         <div class="card">
@@ -277,38 +293,6 @@ if (!$hasError && !empty($statementData['transacoes'])) {
                             <?php endforeach; ?>
                         <?php endif; ?>
                     </tbody>
-                    <!-- Movimentações de Saldo -->
-                    <?php if (!empty($saldoEstatisticas['qtd_usos']) && $saldoEstatisticas['qtd_usos'] > 0): ?>
-                    <div class="card" style="margin-top: 20px;">
-                        <h3 class="card-title">Resumo de Uso de Saldo no Período</h3>
-                        
-                        <div class="saldo-summary-cards">
-                            <div class="saldo-summary-card">
-                                <div class="saldo-summary-title">Saldo Creditado</div>
-                                <div class="saldo-summary-value">R$ <?php echo number_format($saldoEstatisticas['total_creditado'] ?? 0, 2, ',', '.'); ?></div>
-                            </div>
-                            
-                            <div class="saldo-summary-card">
-                                <div class="saldo-summary-title">Saldo Usado</div>
-                                <div class="saldo-summary-value">R$ <?php echo number_format($saldoEstatisticas['total_usado'] ?? 0, 2, ',', '.'); ?></div>
-                            </div>
-                            
-                            <div class="saldo-summary-card">
-                                <div class="saldo-summary-title">Estornos</div>
-                                <div class="saldo-summary-value">R$ <?php echo number_format($saldoEstatisticas['total_estornado'] ?? 0, 2, ',', '.'); ?></div>
-                            </div>
-                            
-                            <div class="saldo-summary-card">
-                                <div class="saldo-summary-title">Quantidade de Usos</div>
-                                <div class="saldo-summary-value"><?php echo $saldoEstatisticas['qtd_usos'] ?? 0; ?></div>
-                            </div>
-                        </div>
-                        
-                        <div class="saldo-info">
-                            <p><strong>Explicação:</strong> O saldo usado refere-se ao cashback de compras anteriores que você utilizou como desconto em novas compras. O valor pago é o que você efetivamente pagou após o desconto do saldo.</p>
-                        </div>
-                    </div>
-                    <?php endif; ?>
                 </table>
             </div>
             
@@ -364,6 +348,40 @@ if (!$hasError && !empty($statementData['transacoes'])) {
                 </ul>
             <?php endif; ?>
         </div>
+        
+        <!-- Movimentações de Saldo -->
+        <?php if (!empty($saldoEstatisticas['qtd_usos']) && $saldoEstatisticas['qtd_usos'] > 0): ?>
+        <div class="card" style="margin-top: 20px;">
+            <h3 class="card-title">Resumo de Uso de Saldo no Período</h3>
+            
+            <div class="saldo-summary-cards">
+                <div class="saldo-summary-card">
+                    <div class="saldo-summary-title">Saldo Creditado</div>
+                    <div class="saldo-summary-value">R$ <?php echo number_format($saldoEstatisticas['total_creditado'] ?? 0, 2, ',', '.'); ?></div>
+                </div>
+                
+                <div class="saldo-summary-card">
+                    <div class="saldo-summary-title">Saldo Usado</div>
+                    <div class="saldo-summary-value">R$ <?php echo number_format($saldoEstatisticas['total_usado'] ?? 0, 2, ',', '.'); ?></div>
+                </div>
+                
+                <div class="saldo-summary-card">
+                    <div class="saldo-summary-title">Estornos</div>
+                    <div class="saldo-summary-value">R$ <?php echo number_format($saldoEstatisticas['total_estornado'] ?? 0, 2, ',', '.'); ?></div>
+                </div>
+                
+                <div class="saldo-summary-card">
+                    <div class="saldo-summary-title">Quantidade de Usos</div>
+                    <div class="saldo-summary-value"><?php echo $saldoEstatisticas['qtd_usos'] ?? 0; ?></div>
+                </div>
+            </div>
+            
+            <div class="saldo-info">
+                <p><strong>Explicação:</strong> O saldo usado refere-se ao cashback de compras anteriores que você utilizou como desconto em novas compras. O valor pago é o que você efetivamente pagou após o desconto do saldo.</p>
+            </div>
+        </div>
+        <?php endif; ?>
+        
         <?php endif; ?>
     </div>
     
@@ -387,8 +405,16 @@ if (!$hasError && !empty($statementData['transacoes'])) {
                     <div class="detail-value" id="transacao-loja"></div>
                 </div>
                 <div class="transaction-detail-row">
-                    <div class="detail-label">Valor da Compra:</div>
-                    <div class="detail-value" id="transacao-valor"></div>
+                    <div class="detail-label">Valor Original:</div>
+                    <div class="detail-value" id="transacao-valor-original"></div>
+                </div>
+                <div class="transaction-detail-row">
+                    <div class="detail-label">Saldo Usado:</div>
+                    <div class="detail-value" id="transacao-saldo-usado"></div>
+                </div>
+                <div class="transaction-detail-row">
+                    <div class="detail-label">Valor Pago:</div>
+                    <div class="detail-value" id="transacao-valor-pago"></div>
                 </div>
                 <div class="transaction-detail-row">
                     <div class="detail-label">Valor do Cashback:</div>
@@ -406,18 +432,6 @@ if (!$hasError && !empty($statementData['transacoes'])) {
                     <div class="detail-label">Descrição:</div>
                     <div class="detail-value" id="transacao-descricao"></div>
                 </div>
-                <div class="transaction-detail-row">
-                    <div class="detail-label">Valor Original:</div>
-                    <div class="detail-value" id="transacao-valor-original"></div>
-                </div>
-                <div class="transaction-detail-row">
-                    <div class="detail-label">Saldo Usado:</div>
-                    <div class="detail-value" id="transacao-saldo-usado"></div>
-                </div>
-                <div class="transaction-detail-row">
-                    <div class="detail-label">Valor Pago:</div>
-                    <div class="detail-value" id="transacao-valor-pago"></div>
-                </div>
             </div>
         </div>
     </div>
@@ -431,6 +445,7 @@ if (!$hasError && !empty($statementData['transacoes'])) {
         
         // Função para exibir detalhes da transação
         function verDetalhes(transacaoId) {
+            // Em um cenário real, seria feita uma requisição AJAX para buscar os detalhes da transação
             fetch(`<?php echo SITE_URL; ?>/controllers/ClientController.php?action=transaction&transaction_id=${transacaoId}`, {
                 method: 'POST',
                 headers: {
