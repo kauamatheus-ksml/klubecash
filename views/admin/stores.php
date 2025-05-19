@@ -429,7 +429,7 @@ try {
     </div>
 
     <!-- Script JavaScript existente -->
-    <script>
+    javascript<script>
 // Variáveis globais
 let currentStoreId = null;
 
@@ -549,79 +549,74 @@ function renderSimpleStoreDetails(store) {
     
     document.getElementById('storeDetailsContent').innerHTML = html;
 }
+
+// Outras funções existentes...
 function showStoreModal(storeId = null) {
     document.getElementById('storeModal').style.display = 'block';
 }
-    // Função para esconder modal de detalhes
-    function hideStoreDetailsModal() {
-        document.getElementById('storeDetailsModal').style.display = 'none';
-    }
 
-    // Função para aprovar loja
-    function approveStore(storeId) {
-        if (confirm('Tem certeza que deseja aprovar esta loja?')) {
-            updateStoreStatus(storeId, 'aprovado');
+function hideStoreModal() {
+    document.getElementById('storeModal').style.display = 'none';
+}
+
+function hideStoreDetailsModal() {
+    document.getElementById('storeDetailsModal').style.display = 'none';
+}
+
+function approveStore(storeId) {
+    if (confirm('Aprovar esta loja?')) {
+        updateStoreStatus(storeId, 'aprovado');
+    }
+}
+
+function updateStoreStatus(storeId, status) {
+    fetch('../../controllers/AdminController.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `action=update_store_status&store_id=${storeId}&status=${status}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status) {
+            alert('Status atualizado!');
+            location.reload();
+        } else {
+            alert('Erro: ' + data.message);
         }
-    }
-
-    // Função para atualizar status da loja
-    function updateStoreStatus(storeId, status, observacao = '') {
-        fetch('../../controllers/AdminController.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: `action=update_store_status&store_id=${storeId}&status=${status}&observacao=${encodeURIComponent(observacao)}`
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status) {
-                alert(data.message || 'Status atualizado com sucesso!');
-                location.reload();
-            } else {
-                alert('Erro: ' + (data.message || 'Erro desconhecido'));
-            }
-        })
-        .catch(error => {
-            alert('Erro ao atualizar status da loja.');
-        });
-    }
-
-    // Função para selecionar/deselecionar todos
-    function toggleSelectAll() {
-        const selectAll = document.getElementById('selectAll');
-        const checkboxes = document.querySelectorAll('.store-checkbox');
-        
-        checkboxes.forEach(checkbox => {
-            checkbox.checked = selectAll.checked;
-        });
-    }
-
-    // Fechar modais ao clicar fora
-    window.onclick = function(event) {
-        const storeModal = document.getElementById('storeModal');
-        const detailsModal = document.getElementById('storeDetailsModal');
-        
-        if (event.target === storeModal) {
-            hideStoreModal();
-        }
-        
-        if (event.target === detailsModal) {
-            hideStoreDetailsModal();
-        }
-    }
-
-    // Evento para formulário
-    document.addEventListener('DOMContentLoaded', function() {
-        const storeForm = document.getElementById('storeForm');
-        if (storeForm) {
-            storeForm.addEventListener('submit', submitStoreForm);
-        }
+    })
+    .catch(error => {
+        alert('Erro na atualização');
     });
-</script>
+}
+
+function toggleSelectAll() {
+    const selectAll = document.getElementById('selectAll');
+    const checkboxes = document.querySelectorAll('.store-checkbox');
     
-    <style>
-        .details-table {
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = selectAll.checked;
+    });
+}
+
+// Fechar modais
+window.onclick = function(event) {
+    const storeModal = document.getElementById('storeModal');
+    const detailsModal = document.getElementById('storeDetailsModal');
+    
+    if (event.target === storeModal) {
+        hideStoreModal();
+    }
+    
+    if (event.target === detailsModal) {
+        hideStoreDetailsModal();
+    }
+}
+</script>
+
+<style>
+.details-table {
     width: 100%;
     border-collapse: collapse;
     margin-top: 15px;
@@ -653,17 +648,712 @@ function showStoreModal(storeId = null) {
 .badge-success { background: #d4edda; color: #155724; }
 .badge-warning { background: #fff3cd; color: #856404; }
 .badge-danger { background: #f8d7da; color: #721c24; }
-    /* Estilos adicionais para informações de saldo */
-    .modal {
-    display: none;
-    position: fixed;
-    z-index: 1000;
-    left: 0;
-    top: 0;
+</style>
+3. Teste primeiro acessando diretamente:
+Acesse https://seu-dominio.com/views/admin/test_store.php diretamente no navegador para ver se retorna dados JSON válidos.
+4. Se o teste funcionar, volte para a página de lojas e:
+
+Abra o console do navegador (F12 → Console)
+Clique em "Ver Detalhes" de uma loja
+Veja as mensagens que aparecem no console
+
+Me informe:
+
+O que aparece quando você acessa o test_store.php diretamente
+Quais mensagens aparecem no console do navegador
+
+Isso nos ajudará a identificar exatamente onde está o problema!Kenvie o script completoPreparou script completo para solicitação do usuário.1 sO usuário está pedindo o script completo. Vou fornecer a versão completa e funcional do JavaScript para a página de stores.php que inclui todas as funcionalidades necessárias de forma organizada e limpa.Aqui está o script JavaScript completo para o admin/stores.php:
+javascript<script>
+// Variáveis globais
+let currentStoreId = null;
+
+// ========== FUNÇÕES DE TESTE E DEBUG ==========
+function testBasicConnection() {
+    fetch('test_store.php')
+    .then(response => response.text())
+    .then(text => {
+        console.log('Teste básico - resposta:', text);
+        try {
+            const data = JSON.parse(text);
+            console.log('Teste básico - dados:', data);
+            
+            if (data.status) {
+                console.log('✓ Teste básico passou!');
+            } else {
+                console.log('✗ Erro no teste básico:', data.message);
+            }
+        } catch (e) {
+            console.log('✗ Erro ao parsear teste básico:', e);
+            console.log('Resposta bruta:', text);
+        }
+    })
+    .catch(error => {
+        console.log('✗ Erro na requisição do teste:', error);
+    });
+}
+
+// ========== FUNÇÕES DO MODAL DE ADICIONAR/EDITAR LOJA ==========
+function showStoreModal(storeId = null) {
+    currentStoreId = storeId;
+    
+    // Resetar formulário
+    document.getElementById('storeForm').reset();
+    document.getElementById('storeId').value = '';
+    
+    if (storeId) {
+        // Modo edição - carregar dados da loja
+        document.getElementById('storeModalTitle').textContent = 'Editar Loja';
+        loadStoreData(storeId);
+    } else {
+        // Modo criação
+        document.getElementById('storeModalTitle').textContent = 'Adicionar Loja';
+    }
+    
+    // Mostrar modal
+    document.getElementById('storeModal').style.display = 'block';
+}
+
+function hideStoreModal() {
+    document.getElementById('storeModal').style.display = 'none';
+    currentStoreId = null;
+}
+
+function loadStoreData(storeId) {
+    fetch('../../controllers/AdminController.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'action=store_details&store_id=' + storeId
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status && data.data.loja) {
+            const store = data.data.loja;
+            
+            // Preencher formulário
+            document.getElementById('storeId').value = store.id;
+            document.getElementById('nomeFantasia').value = store.nome_fantasia;
+            document.getElementById('razaoSocial').value = store.razao_social;
+            document.getElementById('cnpj').value = store.cnpj;
+            document.getElementById('email').value = store.email;
+            document.getElementById('telefone').value = store.telefone;
+            document.getElementById('categoria').value = store.categoria;
+            document.getElementById('porcentagemCashback').value = store.porcentagem_cashback;
+            document.getElementById('status').value = store.status;
+        } else {
+            alert('Erro ao carregar dados da loja: ' + (data.message || 'Erro desconhecido'));
+        }
+    })
+    .catch(error => {
+        console.error('Erro ao carregar loja:', error);
+        alert('Erro ao carregar dados da loja.');
+    });
+}
+
+function submitStoreForm(event) {
+    event.preventDefault();
+    
+    const formData = new FormData(document.getElementById('storeForm'));
+    const isEditing = document.getElementById('storeId').value !== '';
+    
+    // Adicionar action
+    formData.append('action', isEditing ? 'update_store' : 'create_store');
+    if (isEditing) {
+        formData.append('store_id', document.getElementById('storeId').value);
+    }
+    
+    // Enviar dados
+    fetch('../../controllers/AdminController.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status) {
+            alert(data.message || (isEditing ? 'Loja atualizada com sucesso!' : 'Loja criada com sucesso!'));
+            hideStoreModal();
+            location.reload();
+        } else {
+            alert('Erro: ' + (data.message || 'Erro desconhecido'));
+        }
+    })
+    .catch(error => {
+        console.error('Erro ao salvar loja:', error);
+        alert('Erro ao salvar loja.');
+    });
+}
+
+// ========== FUNÇÕES DO MODAL DE DETALHES ==========
+function viewStoreDetails(storeId) {
+    console.log('=== viewStoreDetails chamada ===');
+    console.log('Store ID:', storeId);
+    
+    currentStoreId = storeId;
+    
+    // Mostrar modal de carregamento
+    document.getElementById('storeDetailsTitle').textContent = 'Carregando...';
+    document.getElementById('storeDetailsContent').innerHTML = '<div class="alert alert-info">Carregando detalhes da loja...</div>';
+    document.getElementById('storeDetailsModal').style.display = 'block';
+    
+    // Tentar usar o arquivo de teste primeiro
+    fetch('test_store.php')
+    .then(response => {
+        console.log('Resposta do teste:', response);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.text();
+    })
+    .then(text => {
+        console.log('Texto da resposta:', text);
+        
+        try {
+            const data = JSON.parse(text);
+            console.log('Dados parseados:', data);
+            
+            if (data.status && data.data && data.data.loja) {
+                renderSimpleStoreDetails(data.data.loja);
+            } else {
+                throw new Error(data.message || 'Dados inválidos');
+            }
+        } catch (e) {
+            console.error('Erro ao processar JSON:', e);
+            document.getElementById('storeDetailsContent').innerHTML = `
+                <div class="alert alert-danger">
+                    <h5>Erro ao processar resposta:</h5>
+                    <p>${e.message}</p>
+                    <details>
+                        <summary>Ver resposta completa</summary>
+                        <pre style="white-space: pre-wrap; max-height: 200px; overflow-y: auto; font-size: 12px;">${text}</pre>
+                    </details>
+                </div>
+            `;
+        }
+    })
+    .catch(error => {
+        console.error('Erro na requisição:', error);
+        
+        // Se falhar o teste, tenta o método original
+        console.log('Tentando método original...');
+        tryOriginalMethod(storeId);
+    });
+}
+
+function tryOriginalMethod(storeId) {
+    fetch('../../controllers/AdminController.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'action=store_details_with_balance&store_id=' + storeId
+    })
+    .then(response => {
+        console.log('Método original - status:', response.status);
+        return response.text();
+    })
+    .then(text => {
+        console.log('Método original - resposta:', text);
+        
+        try {
+            const data = JSON.parse(text);
+            console.log('Método original - dados:', data);
+            
+            if (data.status) {
+                renderStoreDetailsWithBalance(data.data);
+            } else {
+                document.getElementById('storeDetailsContent').innerHTML = `
+                    <div class="alert alert-danger">
+                        <strong>Erro:</strong> ${data.message}
+                    </div>
+                `;
+            }
+        } catch (e) {
+            console.error('Método original - erro JSON:', e);
+            document.getElementById('storeDetailsContent').innerHTML = `
+                <div class="alert alert-danger">
+                    <strong>Erro de formato:</strong> Resposta inválida do servidor<br>
+                    <details style="margin-top: 10px;">
+                        <summary>Ver resposta bruta</summary>
+                        <pre style="white-space: pre-wrap; max-height: 200px; overflow-y: auto; font-size: 12px;">${text}</pre>
+                    </details>
+                </div>
+            `;
+        }
+    })
+    .catch(error => {
+        console.error('Método original - erro:', error);
+        document.getElementById('storeDetailsContent').innerHTML = `
+            <div class="alert alert-danger">
+                <strong>Erro na conexão:</strong> ${error.message}
+                <br><small>Verifique o console para mais detalhes</small>
+            </div>
+        `;
+    });
+}
+
+function hideStoreDetailsModal() {
+    document.getElementById('storeDetailsModal').style.display = 'none';
+}
+
+// ========== FUNÇÕES DE RENDERIZAÇÃO ==========
+function renderSimpleStoreDetails(store) {
+    console.log('Renderizando loja (simples):', store);
+    
+    document.getElementById('storeDetailsTitle').textContent = store.nome_fantasia;
+    
+    let statusClass = '';
+    let statusText = '';
+    
+    switch (store.status) {
+        case 'aprovado':
+            statusClass = 'badge-success';
+            statusText = 'Aprovado';
+            break;
+        case 'pendente':
+            statusClass = 'badge-warning';
+            statusText = 'Pendente';
+            break;
+        case 'rejeitado':
+            statusClass = 'badge-danger';
+            statusText = 'Rejeitado';
+            break;
+    }
+    
+    const html = `
+        <div class="store-details">
+            <h4 style="color: #FF7A00; margin-bottom: 20px;">Informações da Loja</h4>
+            <table class="details-table">
+                <tr><td><strong>Nome Fantasia:</strong></td><td>${store.nome_fantasia}</td></tr>
+                <tr><td><strong>Razão Social:</strong></td><td>${store.razao_social}</td></tr>
+                <tr><td><strong>CNPJ:</strong></td><td>${store.cnpj}</td></tr>
+                <tr><td><strong>Email:</strong></td><td>${store.email}</td></tr>
+                <tr><td><strong>Telefone:</strong></td><td>${store.telefone}</td></tr>
+                <tr><td><strong>Categoria:</strong></td><td>${store.categoria || 'N/A'}</td></tr>
+                <tr><td><strong>Porcentagem Cashback:</strong></td><td>${store.porcentagem_cashback}%</td></tr>
+                <tr><td><strong>Status:</strong></td><td><span class="badge ${statusClass}">${statusText}</span></td></tr>
+                <tr><td><strong>Data Cadastro:</strong></td><td>${formatDate(store.data_cadastro)}</td></tr>
+                ${store.data_aprovacao ? `<tr><td><strong>Data Aprovação:</strong></td><td>${formatDate(store.data_aprovacao)}</td></tr>` : ''}
+            </table>
+            
+            ${store.status === 'pendente' ? `
+                <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee;">
+                    <h5>Ações</h5>
+                    <button class="btn btn-primary" onclick="updateStoreStatus(${store.id}, 'aprovado')" style="margin-right: 10px;">
+                        Aprovar Loja
+                    </button>
+                    <button class="btn btn-secondary" onclick="rejectStore(${store.id})">
+                        Rejeitar Loja
+                    </button>
+                </div>
+            ` : ''}
+        </div>
+    `;
+    
+    document.getElementById('storeDetailsContent').innerHTML = html;
+    
+    // Configurar botão de edição
+    document.getElementById('editStoreBtn').onclick = function() {
+        hideStoreDetailsModal();
+        showStoreModal(store.id);
+    };
+}
+
+function renderStoreDetailsWithBalance(data) {
+    const store = data.loja;
+    const statistics = data.estatisticas;
+    const balanceStats = data.estatisticas_saldo;
+    
+    document.getElementById('storeDetailsTitle').textContent = store.nome_fantasia;
+    
+    let html = `
+        <div style="margin-bottom: 20px;">
+            <h4 style="margin-bottom: 15px; color: #FF7A00;">Informações Básicas</h4>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                <div>
+                    <p><strong>Razão Social:</strong> ${store.razao_social}</p>
+                    <p><strong>CNPJ:</strong> ${store.cnpj}</p>
+                    <p><strong>E-mail:</strong> ${store.email}</p>
+                </div>
+                <div>
+                    <p><strong>Telefone:</strong> ${store.telefone}</p>
+                    <p><strong>Categoria:</strong> ${store.categoria || 'Não definida'}</p>
+                    <p><strong>Cashback:</strong> ${store.porcentagem_cashback}%</p>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    if (statistics) {
+        html += `
+            <div style="margin-bottom: 20px;">
+                <h4 style="margin-bottom: 15px; color: #FF7A00;">Estatísticas de Transações</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
+                    <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; text-align: center;">
+                        <h5 style="margin: 0; color: #333;">Transações</h5>
+                        <p style="font-size: 18px; font-weight: bold; margin: 10px 0;">${statistics.total_transacoes || 0}</p>
+                    </div>
+                    <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; text-align: center;">
+                        <h5 style="margin: 0; color: #333;">Vendas</h5>
+                        <p style="font-size: 18px; font-weight: bold; margin: 10px 0;">R$ ${formatMoney(statistics.total_vendas || 0)}</p>
+                    </div>
+                    <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; text-align: center;">
+                        <h5 style="margin: 0; color: #333;">Cashback</h5>
+                        <p style="font-size: 18px; font-weight: bold; margin: 10px 0;">R$ ${formatMoney(statistics.total_cashback || 0)}</p>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    if (balanceStats) {
+        const totalTransacoes = parseInt(balanceStats.total_transacoes) || 0;
+        const transacoesComSaldo = parseInt(balanceStats.transacoes_com_saldo) || 0;
+        const percentualUso = totalTransacoes > 0 ? (transacoesComSaldo / totalTransacoes) * 100 : 0;
+        
+        html += `
+            <div style="margin-bottom: 20px;">
+                <h4 style="margin-bottom: 15px; color: #28a745;">💰 Estatísticas de Saldo</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div style="background: #f8fff8; padding: 15px; border-radius: 8px; border-left: 4px solid #28a745;">
+                        <p style="margin: 0; font-size: 14px; color: #666;">Saldo Total dos Clientes</p>
+                        <p style="font-size: 20px; font-weight: bold; margin: 5px 0; color: #28a745;">R$ ${formatMoney(balanceStats.total_saldo_clientes || 0)}</p>
+                        <p style="margin: 0; font-size: 12px; color: #666;">${balanceStats.clientes_com_saldo || 0} clientes com saldo</p>
+                    </div>
+                    <div style="background: #fff8f0; padding: 15px; border-radius: 8px; border-left: 4px solid #FF7A00;">
+                        <p style="margin: 0; font-size: 14px; color: #666;">Total Saldo Usado</p>
+                        <p style="font-size: 20px; font-weight: bold; margin: 5px 0; color: #FF7A00;">R$ ${formatMoney(balanceStats.total_saldo_usado || 0)}</p>
+                        <p style="margin: 0; font-size: 12px; color: #666;">${transacoesComSaldo} transações com uso de saldo</p>
+                    </div>
+                </div>
+                
+                ${totalTransacoes > 0 ? `
+                <div style="margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                    <p style="margin: 0; font-size: 14px; color: #666;">Taxa de Uso de Saldo</p>
+                    <div style="display: flex; align-items: center; gap: 10px; margin-top: 5px;">
+                        <div style="flex: 1; background: #e9ecef; height: 8px; border-radius: 4px; overflow: hidden;">
+                            <div style="width: ${percentualUso}%; height: 100%; background: #28a745;"></div>
+                        </div>
+                        <span style="font-weight: bold; color: #28a745;">${percentualUso.toFixed(1)}%</span>
+                    </div>
+                </div>
+                ` : ''}
+            </div>
+        `;
+    }
+    
+    let statusClass = '';
+    let statusText = '';
+    
+    switch (store.status) {
+        case 'aprovado':
+            statusClass = 'badge-success';
+            statusText = 'Aprovado';
+            break;
+        case 'pendente':
+            statusClass = 'badge-warning';
+            statusText = 'Pendente';
+            break;
+        case 'rejeitado':
+            statusClass = 'badge-danger';
+            statusText = 'Rejeitado';
+            break;
+    }
+    
+    html += `
+        <div style="margin-bottom: 20px;">
+            <h4 style="margin-bottom: 15px; color: #FF7A00;">Status</h4>
+            <p>Status atual: <span class="badge ${statusClass}">${statusText}</span></p>
+    `;
+    
+    if (store.status === 'pendente') {
+        html += `
+            <div style="display: flex; gap: 10px; margin-top: 15px;">
+                <button class="btn btn-primary" onclick="updateStoreStatus(${store.id}, 'aprovado')">Aprovar</button>
+                <button class="btn btn-secondary" onclick="rejectStore(${store.id})">Rejeitar</button>
+            </div>
+        `;
+    } else if (store.status === 'rejeitado') {
+        html += `
+            <div style="margin-top: 15px;">
+                <button class="btn btn-primary" onclick="updateStoreStatus(${store.id}, 'aprovado')">Aprovar</button>
+            </div>
+        `;
+    }
+    
+    html += `</div>`;
+    
+    document.getElementById('storeDetailsContent').innerHTML = html;
+    
+    document.getElementById('editStoreBtn').onclick = function() {
+        hideStoreDetailsModal();
+        showStoreModal(store.id);
+    };
+}
+
+// ========== FUNÇÕES DE STATUS ==========
+function approveStore(storeId) {
+    if (confirm('Tem certeza que deseja aprovar esta loja?')) {
+        updateStoreStatus(storeId, 'aprovado');
+    }
+}
+
+function rejectStore(storeId) {
+    const observacao = prompt('Digite o motivo da rejeição (opcional):');
+    updateStoreStatus(storeId, 'rejeitado', observacao);
+}
+
+function updateStoreStatus(storeId, status, observacao = '') {
+    fetch('../../controllers/AdminController.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `action=update_store_status&store_id=${storeId}&status=${status}&observacao=${encodeURIComponent(observacao)}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status) {
+            alert(data.message || 'Status atualizado com sucesso!');
+            location.reload();
+        } else {
+            alert('Erro: ' + (data.message || 'Erro desconhecido'));
+        }
+    })
+    .catch(error => {
+        console.error('Erro ao atualizar status:', error);
+        alert('Erro ao atualizar status da loja.');
+    });
+}
+
+// ========== FUNÇÕES UTILITÁRIAS ==========
+function formatDate(dateString) {
+    if (!dateString) return 'N/A';
+    
+    try {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('pt-BR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    } catch (e) {
+        return dateString;
+    }
+}
+
+function formatMoney(value) {
+    return parseFloat(value || 0).toLocaleString('pt-BR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
+}
+
+function toggleSelectAll() {
+    const selectAll = document.getElementById('selectAll');
+    const checkboxes = document.querySelectorAll('.store-checkbox');
+    
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = selectAll.checked;
+    });
+}
+
+// ========== EVENT LISTENERS ==========
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Página carregada, iniciando testes...');
+    testBasicConnection();
+    
+    // Configurar formulário
+    const storeForm = document.getElementById('storeForm');
+    if (storeForm) {
+        storeForm.addEventListener('submit', submitStoreForm);
+    }
+});
+
+// Fechar modais ao clicar fora
+window.onclick = function(event) {
+    const storeModal = document.getElementById('storeModal');
+    const detailsModal = document.getElementById('storeDetailsModal');
+    
+    if (event.target === storeModal) {
+        hideStoreModal();
+    }
+    
+    if (event.target === detailsModal) {
+        hideStoreDetailsModal();
+    }
+}
+
+// Adicionar tecla ESC para fechar modais
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        hideStoreModal();
+        hideStoreDetailsModal();
+    }
+});
+</script>
+    
+    <style>
+        /* ========== ESTILOS PARA OS MODAIS E DETALHES ========== */
+.details-table {
     width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(3px);
+    border-collapse: collapse;
+    margin-top: 15px;
+}
+
+.details-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #eee;
+    vertical-align: top;
+}
+
+.details-table td:first-child {
+    width: 35%;
+    background-color: #f8f9fa;
+    font-weight: 500;
+    color: #555;
+}
+
+.details-table td:last-child {
+    color: #333;
+}
+
+.store-details {
+    padding: 0;
+}
+
+.store-details h4 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #FF7A00;
+}
+
+.badge {
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.badge-success { 
+    background: #d4edda; 
+    color: #155724; 
+    border: 1px solid #c3e6cb;
+}
+
+.badge-warning { 
+    background: #fff3cd; 
+    color: #856404; 
+    border: 1px solid #ffeaa7;
+}
+
+.badge-danger { 
+    background: #f8d7da; 
+    color: #721c24; 
+    border: 1px solid #f5c6cb;
+}
+
+.alert {
+    padding: 15px;
+    margin-bottom: 20px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+}
+
+.alert-info {
+    color: #0c5460;
+    background-color: #d1ecf1;
+    border-color: #bee5eb;
+}
+
+.alert-danger {
+    color: #721c24;
+    background-color: #f8d7da;
+    border-color: #f5c6cb;
+}
+
+.alert h5 {
+    margin-top: 0;
+    color: inherit;
+}
+
+.alert details {
+    margin-top: 10px;
+}
+
+.alert summary {
+    cursor: pointer;
+    font-weight: 500;
+    margin-bottom: 5px;
+}
+
+.alert pre {
+    background: rgba(0,0,0,0.05);
+    padding: 10px;
+    border-radius: 4px;
+    border-left: 3px solid rgba(0,0,0,0.1);
+}
+
+.btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.btn-primary {
+    background-color: #FF7A00;
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: #e56500;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(255, 122, 0, 0.3);
+}
+
+.btn-secondary {
+    background-color: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background-color: #5a6169;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(108, 117, 125, 0.3);
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .details-table {
+        font-size: 0.9rem;
+    }
+    
+    .details-table td {
+        padding: 8px 10px;
+    }
+    
+    .details-table td:first-child {
+        width: 40%;
+    }
+    
+    .btn {
+        width: 100%;
+        margin-bottom: 10px;
+    }
 }
 
 .modal-content {
