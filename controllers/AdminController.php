@@ -410,6 +410,11 @@ public static function getUserDetails($userId) {
     */
     public static function getStoreDetailsWithBalance($storeId) {
         try {
+            // Verificar se é um administrador
+            if (!self::validateAdmin()) {
+                return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
+            }
+            
             $db = Database::getConnection();
             
             // Buscar dados da loja
@@ -423,12 +428,23 @@ public static function getUserDetails($userId) {
                 return ['status' => false, 'message' => 'Loja não encontrada.'];
             }
             
+            // Buscar endereço da loja
+            $addressStmt = $db->prepare("SELECT * FROM lojas_endereco WHERE loja_id = :store_id");
+            $addressStmt->bindParam(':store_id', $storeId);
+            $addressStmt->execute();
+            $address = $addressStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($address) {
+                $store['endereco'] = $address;
+            }
+            
             // Buscar estatísticas da loja
             $statsStmt = $db->prepare("
                 SELECT 
                     COUNT(*) as total_transacoes,
                     SUM(valor_total) as total_vendas,
-                    SUM(valor_cliente) as total_cashback
+                    SUM(valor_cliente) as total_cashback,
+                    AVG(valor_total) as ticket_medio
                 FROM transacoes_cashback
                 WHERE loja_id = :store_id AND status = 'aprovado'
             ");
@@ -455,12 +471,37 @@ public static function getUserDetails($userId) {
             $balanceStatsStmt->execute();
             $balanceStats = $balanceStatsStmt->fetch(PDO::FETCH_ASSOC);
             
+            // Se não encontrar estatísticas de saldo, criar um array vazio
+            if (!$balanceStats) {
+                $balanceStats = [
+                    'total_saldo_clientes' => 0,
+                    'clientes_com_saldo' => 0,
+                    'total_saldo_usado' => 0,
+                    'total_transacoes' => 0,
+                    'transacoes_com_saldo' => 0
+                ];
+            }
+            
+            // Últimas transações
+            $transStmt = $db->prepare("
+                SELECT t.*, u.nome as cliente_nome
+                FROM transacoes_cashback t
+                JOIN usuarios u ON t.usuario_id = u.id
+                WHERE t.loja_id = :store_id
+                ORDER BY t.data_transacao DESC
+                LIMIT 5
+            ");
+            $transStmt->bindParam(':store_id', $storeId);
+            $transStmt->execute();
+            $transactions = $transStmt->fetchAll(PDO::FETCH_ASSOC);
+            
             return [
                 'status' => true,
                 'data' => [
                     'loja' => $store,
                     'estatisticas' => $statistics,
-                    'estatisticas_saldo' => $balanceStats
+                    'estatisticas_saldo' => $balanceStats,
+                    'transacoes' => $transactions
                 ]
             ];
             
@@ -469,6 +510,7 @@ public static function getUserDetails($userId) {
             return ['status' => false, 'message' => 'Erro ao carregar detalhes da loja.'];
         }
     }
+
     /**
     * Atualiza dados de um usuário
     * 
@@ -1644,14 +1686,15 @@ public static function getAvailableStores() {
             
             switch ($type) {
                 case 'store_details_with_balance':
-                    $storeId = intval($_POST['store_id'] ?? 0);
+                    $storeId = isset($_POST['store_id']) ? intval($_POST['store_id']) : 0;
                     if ($storeId <= 0) {
                         echo json_encode(['status' => false, 'message' => 'ID da loja inválido']);
-                        return;
+                        exit;
                     }
                     
-                    $result = self::getStoreDetailsWithBalance($storeId);
+                    $result = AdminController::getStoreDetailsWithBalance($storeId);
                     echo json_encode($result);
+                    exit;
                     break;
                     
                 case 'financeiro':
