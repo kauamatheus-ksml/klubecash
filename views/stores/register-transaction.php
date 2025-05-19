@@ -48,14 +48,24 @@ $error = '';
 $transactionData = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Debug: Log dos dados recebidos
+    error_log("FORM DEBUG: Dados POST recebidos: " . print_r($_POST, true));
+    
     // Obter dados do formulário
     $clientEmail = $_POST['cliente_email'] ?? '';
     $valorTotal = floatval($_POST['valor_total'] ?? 0);
     $codigoTransacao = $_POST['codigo_transacao'] ?? '';
     $descricao = $_POST['descricao'] ?? '';
     $dataTransacao = $_POST['data_transacao'] ?? date('Y-m-d H:i:s');
+    
+    // CORREÇÃO CRÍTICA: Como o JavaScript envia
     $usarSaldo = isset($_POST['usar_saldo']) && $_POST['usar_saldo'] === 'sim';
     $valorSaldoUsado = floatval($_POST['valor_saldo_usado'] ?? 0);
+    
+    // Debug dos valores de saldo
+    error_log("FORM DEBUG: usar_saldo = " . ($_POST['usar_saldo'] ?? 'undefined'));
+    error_log("FORM DEBUG: usarSaldo (bool) = " . ($usarSaldo ? 'true' : 'false'));
+    error_log("FORM DEBUG: valorSaldoUsado = " . $valorSaldoUsado);
     
     // Buscar usuário pelo email
     $userQuery = $db->prepare("SELECT id, nome FROM usuarios WHERE email = :email AND tipo = :tipo AND status = :status");
@@ -85,7 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         
         if (empty($error)) {
-            // Preparar dados da transação (VALOR ORIGINAL mantido para histórico)
+            // Preparar dados da transação
             $transactionData = [
                 'usuario_id' => $client['id'],
                 'loja_id' => $storeId,
@@ -93,9 +103,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'codigo_transacao' => $codigoTransacao,
                 'descricao' => $descricao,
                 'data_transacao' => $dataTransacao,
-                'usar_saldo' => $usarSaldo,
+                'usar_saldo' => $usarSaldo,  // BOOLEAN, não string
                 'valor_saldo_usado' => $valorSaldoUsado
             ];
+            
+            // Debug dos dados enviados
+            error_log("FORM DEBUG: Dados para TransactionController: " . print_r($transactionData, true));
             
             // Registrar transação
             $result = TransactionController::registerTransaction($transactionData);
@@ -103,8 +116,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($result['status']) {
                 $success = true;
                 $transactionData = [];
+                error_log("FORM DEBUG: Transação registrada com sucesso - ID: " . $result['data']['transaction_id']);
             } else {
                 $error = $result['message'];
+                error_log("FORM DEBUG: Erro ao registrar - " . $result['message']);
             }
         }
     }
@@ -897,7 +912,7 @@ $activeMenu = 'register-transaction';
 
                         <!-- Campos ocultos para uso de saldo -->
                         <input type="hidden" id="usar_saldo" name="usar_saldo" value="nao">
-                        <input type="hidden" id="valor_saldo_usado" name="valor_saldo_usado" value="0">
+                        <input type="hidden" id="valor_saldo_usado_hidden" name="valor_saldo_usado" value="0">
                         
                         <!-- resto dos campos existentes... -->
                         <div class="form-row">
@@ -1193,24 +1208,23 @@ $activeMenu = 'register-transaction';
             const usarSaldoCheck = document.getElementById('usarSaldoCheck');
             const saldoControls = document.getElementById('saldoControls');
             const usarSaldoHidden = document.getElementById('usar_saldo');
-            const valorSaldoUsadoHidden = document.getElementById('valor_saldo_usado_hidden');
             
-            console.log('Toggle saldo:', usarSaldoCheck.checked); // Debug
+            console.log('Toggle saldo - checkbox:', usarSaldoCheck.checked);
             
             if (usarSaldoCheck.checked) {
                 saldoControls.style.display = 'block';
-                usarSaldoHidden.value = 'sim'; // IMPORTANTE: deve ser 'sim'
+                usarSaldoHidden.value = 'sim';  // STRING 'sim'
                 calcularAutomatico();
             } else {
                 saldoControls.style.display = 'none';
-                usarSaldoHidden.value = 'nao';
+                usarSaldoHidden.value = 'nao';  // STRING 'nao'
                 document.getElementById('valorSaldoUsado').value = 0;
-                valorSaldoUsadoHidden.value = '0';
+                document.getElementById('valor_saldo_usado_hidden').value = '0';
                 calcularPreview();
                 atualizarSimulacao();
             }
             
-            console.log('usar_saldo hidden value:', usarSaldoHidden.value); // Debug
+            console.log('usar_saldo hidden value:', usarSaldoHidden.value);
         }
         
         // Função para calcular automaticamente quando sair do campo de valor total
@@ -1239,12 +1253,10 @@ $activeMenu = 'register-transaction';
             document.getElementById('valorSaldoUsadoPreview').textContent = 'R$ ' + formatCurrency(valorSaldoUsado);
             document.getElementById('valorFinal').textContent = 'R$ ' + formatCurrency(valorFinal);
             
-            // IMPORTANTE: Atualizar o campo hidden que será enviado
-            const valorSaldoUsadoHidden = document.getElementById('valor_saldo_usado_hidden');
-            if (valorSaldoUsadoHidden) {
-                valorSaldoUsadoHidden.value = valorSaldoUsado;
-                console.log('Valor saldo usado hidden atualizado:', valorSaldoUsado); // Debug
-            }
+            // CRÍTICO: Atualizar o campo hidden que será enviado
+            document.getElementById('valor_saldo_usado_hidden').value = valorSaldoUsado;
+            
+            console.log('Preview calculado - Saldo usado:', valorSaldoUsado);
             
             // Validações
             const valorSaldoUsadoInput = document.getElementById('valorSaldoUsado');
@@ -1347,21 +1359,16 @@ $activeMenu = 'register-transaction';
         
         // Validação de formulário
         document.getElementById('transactionForm').addEventListener('submit', function(e) {
+            console.log('Enviando formulário...');
+            console.log('usar_saldo:', document.getElementById('usar_saldo').value);
+            console.log('valor_saldo_usado:', document.getElementById('valor_saldo_usado_hidden').value);
+            
             const valorTotal = parseFloat(document.getElementById('valor_total').value) || 0;
             const valorSaldoUsado = parseFloat(document.getElementById('valor_saldo_usado_hidden').value) || 0;
-            const valorPago = valorTotal - valorSaldoUsado;
-            const minValue = <?php echo MIN_TRANSACTION_VALUE; ?>;
             
             if (valorTotal <= 0) {
                 e.preventDefault();
                 alert('Por favor, informe o valor total da venda');
-                document.getElementById('valor_total').focus();
-                return;
-            }
-            
-            if (valorSaldoUsado > 0 && valorPago < 0) {
-                e.preventDefault();
-                alert('O valor do saldo usado não pode ser maior que o valor total da venda');
                 return;
             }
             
@@ -1370,6 +1377,9 @@ $activeMenu = 'register-transaction';
                 alert('Por favor, busque e selecione um cliente antes de registrar a venda');
                 return;
             }
+            
+            // Debug final antes do envio
+            console.log('Formulário validado - enviando...');
         });
     </script>
     <style>
