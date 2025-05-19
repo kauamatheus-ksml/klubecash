@@ -8,6 +8,19 @@ require_once '../../config/database.php';
 require_once '../../config/constants.php';
 require_once '../../controllers/AuthController.php';
 require_once '../../controllers/ClientController.php';
+
+// Iniciar sessão
+session_start();
+
+// Verificar se o usuário está logado e é cliente
+if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION['user_type'] !== USER_TYPE_CLIENT) {
+    header("Location: ../auth/login.php?error=acesso_restrito");
+    exit;
+}
+
+// Obter dados do usuário PRIMEIRO
+$userId = $_SESSION['user_id'];
+
 // DEBUG TEMPORÁRIO - REMOVER DEPOIS
 $debug = true; // Mude para false depois de corrigir
 
@@ -41,54 +54,39 @@ if ($debug) {
             echo "📊 Lojas aprovadas: " . $aprovadas['aprovadas'] . "<br>";
         }
         
-        // Verificar usuário atual
+        // Verificar usuário atual (AGORA com $userId definido)
         echo "👤 User ID: " . $userId . "<br>";
         echo "👤 User Name: " . ($_SESSION['user_name'] ?? 'Não definido') . "<br>";
         
+        // Verificar se o usuário existe no banco
+        $checkUserQuery = "SELECT id, nome, email, user_type FROM usuarios WHERE id = :user_id";
+        $checkUserStmt = $db->prepare($checkUserQuery);
+        $checkUserStmt->bindParam(':user_id', $userId);
+        $checkUserStmt->execute();
+        $userData = $checkUserStmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($userData) {
+            echo "✅ Usuário encontrado no banco: " . $userData['nome'] . " (Tipo: " . $userData['user_type'] . ")<br>";
+        } else {
+            echo "❌ Usuário não encontrado no banco<br>";
+        }
+        
     } catch (Exception $e) {
         echo "❌ ERRO: " . $e->getMessage() . "<br>";
+        echo "❌ Stack trace: " . $e->getTraceAsString() . "<br>";
     }
     
     echo "</div>";
-}
-
-// Iniciar sessão
-session_start();
-
-// Verificar se o usuário está logado e é cliente
-if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION['user_type'] !== USER_TYPE_CLIENT) {
-    header("Location: ../auth/login.php?error=acesso_restrito");
-    exit;
-}
-
-// Obter dados do usuário
-
-// DEBUG ADICIONAL - Verificar sessão completa
-if ($debug) {
+    
+    // Debug adicional da sessão
     echo "<div style='background: #fff3cd; padding: 10px; margin: 10px; border: 1px solid #ffeaa7;'>";
     echo "<h4>🔍 DEBUG - Dados da Sessão</h4>";
     echo "<pre>";
     print_r($_SESSION);
     echo "</pre>";
-    
-    // Verificar se o usuário realmente existe no banco
-    if (!empty($_SESSION['user_id'])) {
-        $checkUserQuery = "SELECT id, nome, email, user_type FROM usuarios WHERE id = :user_id";
-        $checkUserStmt = $db->prepare($checkUserQuery);
-        $checkUserStmt->bindParam(':user_id', $_SESSION['user_id']);
-        $checkUserStmt->execute();
-        $userData = $checkUserStmt->fetch(PDO::FETCH_ASSOC);
-        
-        if ($userData) {
-            echo "✅ Usuário encontrado no banco: " . $userData['nome'];
-        } else {
-            echo "❌ Usuário não encontrado no banco";
-        }
-    }
     echo "</div>";
 }
 
-$userId = $_SESSION['user_id'];
 // Definir valores padrão para filtros e paginação
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $filters = [];
@@ -116,11 +114,34 @@ if (isset($_GET['filtrar'])) {
     }
 }
 
+// Debug dos filtros se necessário
+if ($debug) {
+    echo "<div style='background: #e7f3ff; padding: 10px; margin: 10px; border: 1px solid #bee5eb;'>";
+    echo "<h4>🔍 DEBUG - Filtros Aplicados</h4>";
+    echo "<pre>";
+    print_r($filters);
+    echo "</pre>";
+    echo "📄 Página: " . $page . "<br>";
+    echo "</div>";
+}
+
 try {
-    $db = Database::getConnection();
-    
-    // Obter dados das lojas parceiras com informações de saldo
+    // Chamar o método para buscar lojas
     $result = ClientController::getPartnerStores($userId, $filters, $page);
+    
+    // Debug do resultado
+    if ($debug) {
+        echo "<div style='background: #f8f9fa; padding: 10px; margin: 10px; border: 1px solid #dee2e6;'>";
+        echo "<h4>🔍 DEBUG - Resultado do Controller</h4>";
+        echo "Status: " . ($result['status'] ? 'SUCCESS' : 'ERRO') . "<br>";
+        if (!$result['status']) {
+            echo "Mensagem de erro: " . $result['message'] . "<br>";
+        } else {
+            echo "Lojas encontradas: " . count($result['data']['lojas']) . "<br>";
+            echo "Categorias: " . count($result['data']['categorias']) . "<br>";
+        }
+        echo "</div>";
+    }
     
     // Verificar se houve erro
     $hasError = !$result['status'];
@@ -131,6 +152,7 @@ try {
     
     // Se não há erro, enriquecer dados com informações de saldo
     if (!$hasError && !empty($storesData['lojas'])) {
+        $db = Database::getConnection();
         foreach ($storesData['lojas'] as &$loja) {
             // Buscar saldo disponível do cliente nesta loja
             $saldoQuery = "
@@ -198,6 +220,16 @@ try {
     $estatisticasGerais = $estatisticasStmt->fetch(PDO::FETCH_ASSOC);
     
 } catch (Exception $e) {
+    if ($debug) {
+        echo "<div style='background: #f8d7da; padding: 10px; margin: 10px; border: 1px solid #f5c6cb;'>";
+        echo "<h4>❌ DEBUG - Erro na Execução</h4>";
+        echo "Erro: " . $e->getMessage() . "<br>";
+        echo "Arquivo: " . $e->getFile() . "<br>";
+        echo "Linha: " . $e->getLine() . "<br>";
+        echo "Stack trace: " . $e->getTraceAsString();
+        echo "</div>";
+    }
+    
     error_log('Erro ao carregar lojas parceiras: ' . $e->getMessage());
     $hasError = true;
     $errorMessage = 'Erro ao carregar dados das lojas parceiras.';
@@ -225,7 +257,7 @@ if (isset($_POST['toggle_favorite'])) {
     $storesData = $hasError ? [] : $result['data'];
 }
 
-// Função para formatar valor
+// Funções auxiliares
 function formatCurrency($value) {
     return 'R$ ' . number_format($value ?: 0, 2, ',', '.');
 }
