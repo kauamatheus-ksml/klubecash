@@ -53,6 +53,53 @@ $errorMessage = $hasError ? $result['message'] : '';
 
 // Dados para exibição
 $statementData = $hasError ? [] : $result['data'];
+// Obter estatísticas de saldo para o período filtrado
+$saldoStatQuery = "
+    SELECT 
+        SUM(CASE WHEN cm.tipo_operacao = 'credito' THEN cm.valor ELSE 0 END) as total_creditado,
+        SUM(CASE WHEN cm.tipo_operacao = 'uso' THEN cm.valor ELSE 0 END) as total_usado,
+        SUM(CASE WHEN cm.tipo_operacao = 'estorno' THEN cm.valor ELSE 0 END) as total_estornado,
+        COUNT(CASE WHEN cm.tipo_operacao = 'uso' THEN 1 END) as qtd_usos
+    FROM cashback_movimentacoes cm
+    WHERE cm.usuario_id = :user_id
+";
+
+// Aplicar filtros de data se existirem
+$saldoParams = [':user_id' => $userId];
+if (!empty($filters['data_inicio'])) {
+    $saldoStatQuery .= " AND cm.data_operacao >= :data_inicio";
+    $saldoParams[':data_inicio'] = $filters['data_inicio'] . ' 00:00:00';
+}
+if (!empty($filters['data_fim'])) {
+    $saldoStatQuery .= " AND cm.data_operacao <= :data_fim";
+    $saldoParams[':data_fim'] = $filters['data_fim'] . ' 23:59:59';
+}
+
+$saldoStatStmt = $db->prepare($saldoStatQuery);
+foreach ($saldoParams as $param => $value) {
+    $saldoStatStmt->bindValue($param, $value);
+}
+$saldoStatStmt->execute();
+$saldoEstatisticas = $saldoStatStmt->fetch(PDO::FETCH_ASSOC);
+
+// Obter transações com informações de saldo usado
+if (!$hasError && !empty($statementData['transacoes'])) {
+    foreach ($statementData['transacoes'] as &$transacao) {
+        // Buscar saldo usado nesta transação
+        $saldoUsadoQuery = "
+            SELECT SUM(valor) as saldo_usado 
+            FROM cashback_movimentacoes 
+            WHERE transacao_uso_id = :transacao_id AND tipo_operacao = 'uso'
+        ";
+        $saldoUsadoStmt = $db->prepare($saldoUsadoQuery);
+        $saldoUsadoStmt->bindParam(':transacao_id', $transacao['id']);
+        $saldoUsadoStmt->execute();
+        $saldoUsado = $saldoUsadoStmt->fetch(PDO::FETCH_ASSOC);
+        
+        $transacao['saldo_usado'] = $saldoUsado['saldo_usado'] ?? 0;
+        $transacao['valor_pago'] = $transacao['valor_total'] - $transacao['saldo_usado'];
+    }
+}
 ?>
 
 <!DOCTYPE html>
@@ -125,6 +172,15 @@ $statementData = $hasError ? [] : $result['data'];
                     </select>
                 </div>
                 
+                <div class="form-group">
+                    <label class="form-label" for="tipo_transacao">Tipo</label>
+                    <select id="tipo_transacao" name="tipo_transacao" class="form-control">
+                        <option value="todos">Todos</option>
+                        <option value="com_saldo" <?php echo (isset($filters['tipo_transacao']) && $filters['tipo_transacao'] == 'com_saldo') ? 'selected' : ''; ?>>Com uso de saldo</option>
+                        <option value="sem_saldo" <?php echo (isset($filters['tipo_transacao']) && $filters['tipo_transacao'] == 'sem_saldo') ? 'selected' : ''; ?>>Sem uso de saldo</option>
+                    </select>
+                </div>
+                
                 <div class="form-group" style="display: flex; align-items: flex-end;">
                     <button type="submit" name="filtrar" value="1" class="btn btn-primary">Filtrar</button>
                 </div>
@@ -144,10 +200,16 @@ $statementData = $hasError ? [] : $result['data'];
             </div>
             
             <div class="summary-card">
+                <div class="summary-card-title">Saldo Usado</div>
+                <div class="summary-card-value">R$ <?php echo number_format($saldoEstatisticas['total_usado'] ?? 0, 2, ',', '.'); ?></div>
+            </div>
+            
+            <div class="summary-card">
                 <div class="summary-card-title">Transações</div>
                 <div class="summary-card-value"><?php echo $statementData['estatisticas']['total_transacoes'] ?? 0; ?></div>
             </div>
         </div>
+
         
         <!-- Tabela de Extrato -->
         <div class="card">
@@ -157,7 +219,9 @@ $statementData = $hasError ? [] : $result['data'];
                         <tr>
                             <th>Data</th>
                             <th>Loja</th>
-                            <th>Valor da Compra</th>
+                            <th>Valor Original</th>
+                            <th>Saldo Usado</th>
+                            <th>Valor Pago</th>
                             <th>Cashback</th>
                             <th>Status</th>
                             <th>Ações</th>
@@ -166,7 +230,7 @@ $statementData = $hasError ? [] : $result['data'];
                     <tbody>
                         <?php if (empty($statementData['transacoes'])): ?>
                             <tr>
-                                <td colspan="6" style="text-align:center;">Nenhuma transação encontrada.</td>
+                                <td colspan="8" style="text-align:center;">Nenhuma transação encontrada.</td>
                             </tr>
                         <?php else: ?>
                             <?php foreach ($statementData['transacoes'] as $transacao): ?>
@@ -174,6 +238,16 @@ $statementData = $hasError ? [] : $result['data'];
                                     <td><?php echo date('d/m/Y', strtotime($transacao['data_transacao'])); ?></td>
                                     <td><?php echo htmlspecialchars($transacao['loja_nome']); ?></td>
                                     <td>R$ <?php echo number_format($transacao['valor_total'], 2, ',', '.'); ?></td>
+                                    <td>
+                                        <?php if ($transacao['saldo_usado'] > 0): ?>
+                                            <span style="color: #4CAF50; font-weight: 600;">
+                                                R$ <?php echo number_format($transacao['saldo_usado'], 2, ',', '.'); ?>
+                                            </span>
+                                        <?php else: ?>
+                                            <span style="color: #666;">-</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>R$ <?php echo number_format($transacao['valor_pago'], 2, ',', '.'); ?></td>
                                     <td>R$ <?php echo number_format($transacao['valor_cashback'], 2, ',', '.'); ?></td>
                                     <td>
                                         <?php 
@@ -203,6 +277,38 @@ $statementData = $hasError ? [] : $result['data'];
                             <?php endforeach; ?>
                         <?php endif; ?>
                     </tbody>
+                    <!-- Movimentações de Saldo -->
+                    <?php if (!empty($saldoEstatisticas['qtd_usos']) && $saldoEstatisticas['qtd_usos'] > 0): ?>
+                    <div class="card" style="margin-top: 20px;">
+                        <h3 class="card-title">Resumo de Uso de Saldo no Período</h3>
+                        
+                        <div class="saldo-summary-cards">
+                            <div class="saldo-summary-card">
+                                <div class="saldo-summary-title">Saldo Creditado</div>
+                                <div class="saldo-summary-value">R$ <?php echo number_format($saldoEstatisticas['total_creditado'] ?? 0, 2, ',', '.'); ?></div>
+                            </div>
+                            
+                            <div class="saldo-summary-card">
+                                <div class="saldo-summary-title">Saldo Usado</div>
+                                <div class="saldo-summary-value">R$ <?php echo number_format($saldoEstatisticas['total_usado'] ?? 0, 2, ',', '.'); ?></div>
+                            </div>
+                            
+                            <div class="saldo-summary-card">
+                                <div class="saldo-summary-title">Estornos</div>
+                                <div class="saldo-summary-value">R$ <?php echo number_format($saldoEstatisticas['total_estornado'] ?? 0, 2, ',', '.'); ?></div>
+                            </div>
+                            
+                            <div class="saldo-summary-card">
+                                <div class="saldo-summary-title">Quantidade de Usos</div>
+                                <div class="saldo-summary-value"><?php echo $saldoEstatisticas['qtd_usos'] ?? 0; ?></div>
+                            </div>
+                        </div>
+                        
+                        <div class="saldo-info">
+                            <p><strong>Explicação:</strong> O saldo usado refere-se ao cashback de compras anteriores que você utilizou como desconto em novas compras. O valor pago é o que você efetivamente pagou após o desconto do saldo.</p>
+                        </div>
+                    </div>
+                    <?php endif; ?>
                 </table>
             </div>
             
@@ -300,6 +406,18 @@ $statementData = $hasError ? [] : $result['data'];
                     <div class="detail-label">Descrição:</div>
                     <div class="detail-value" id="transacao-descricao"></div>
                 </div>
+                <div class="transaction-detail-row">
+                    <div class="detail-label">Valor Original:</div>
+                    <div class="detail-value" id="transacao-valor-original"></div>
+                </div>
+                <div class="transaction-detail-row">
+                    <div class="detail-label">Saldo Usado:</div>
+                    <div class="detail-value" id="transacao-saldo-usado"></div>
+                </div>
+                <div class="transaction-detail-row">
+                    <div class="detail-label">Valor Pago:</div>
+                    <div class="detail-value" id="transacao-valor-pago"></div>
+                </div>
             </div>
         </div>
     </div>
@@ -313,7 +431,6 @@ $statementData = $hasError ? [] : $result['data'];
         
         // Função para exibir detalhes da transação
         function verDetalhes(transacaoId) {
-            // Em um cenário real, seria feita uma requisição AJAX para buscar os detalhes da transação
             fetch(`<?php echo SITE_URL; ?>/controllers/ClientController.php?action=transaction&transaction_id=${transacaoId}`, {
                 method: 'POST',
                 headers: {
@@ -329,6 +446,17 @@ $statementData = $hasError ? [] : $result['data'];
                     document.getElementById('transacao-id').textContent = transacao.id;
                     document.getElementById('transacao-data').textContent = formatarData(transacao.data_transacao);
                     document.getElementById('transacao-loja').textContent = transacao.loja_nome;
+                    
+                    // Valores originais e calculados
+                    const valorOriginal = parseFloat(transacao.valor_total);
+                    const saldoUsado = parseFloat(transacao.saldo_usado || 0);
+                    const valorPago = valorOriginal - saldoUsado;
+                    
+                    document.getElementById('transacao-valor-original').textContent = 'R$ ' + formatarValor(valorOriginal);
+                    document.getElementById('transacao-saldo-usado').textContent = saldoUsado > 0 ? 'R$ ' + formatarValor(saldoUsado) : 'Não usado';
+                    document.getElementById('transacao-valor-pago').textContent = 'R$ ' + formatarValor(valorPago);
+                    
+                    // Valores tradicionais
                     document.getElementById('transacao-valor').textContent = 'R$ ' + formatarValor(transacao.valor_total);
                     document.getElementById('transacao-cashback').textContent = 'R$ ' + formatarValor(transacao.valor_cashback);
                     
