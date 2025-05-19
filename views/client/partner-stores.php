@@ -9,7 +9,7 @@ require_once '../../config/constants.php';
 require_once '../../controllers/AuthController.php';
 require_once '../../controllers/ClientController.php';
 // DEBUG TEMPORÁRIO - REMOVER DEPOIS
-$debug = false; // Mude para false depois de corrigir
+$debug = true; // Mude para false depois de corrigir
 
 if ($debug) {
     echo "<div style='background: #f0f0f0; padding: 10px; margin: 10px; border: 1px solid #ccc;'>";
@@ -63,7 +63,30 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION[
 
 // Obter dados do usuário
 $userId = $_SESSION['user_id'];
-
+// DEBUG ADICIONAL - Verificar sessão completa
+if ($debug) {
+    echo "<div style='background: #fff3cd; padding: 10px; margin: 10px; border: 1px solid #ffeaa7;'>";
+    echo "<h4>🔍 DEBUG - Dados da Sessão</h4>";
+    echo "<pre>";
+    print_r($_SESSION);
+    echo "</pre>";
+    
+    // Verificar se o usuário realmente existe no banco
+    if (!empty($_SESSION['user_id'])) {
+        $checkUserQuery = "SELECT id, nome, email, user_type FROM usuarios WHERE id = :user_id";
+        $checkUserStmt = $db->prepare($checkUserQuery);
+        $checkUserStmt->bindParam(':user_id', $_SESSION['user_id']);
+        $checkUserStmt->execute();
+        $userData = $checkUserStmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($userData) {
+            echo "✅ Usuário encontrado no banco: " . $userData['nome'];
+        } else {
+            echo "❌ Usuário não encontrado no banco";
+        }
+    }
+    echo "</div>";
+}
 // Definir valores padrão para filtros e paginação
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $filters = [];
