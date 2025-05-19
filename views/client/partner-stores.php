@@ -9,7 +9,7 @@ require_once '../../config/constants.php';
 require_once '../../controllers/AuthController.php';
 require_once '../../controllers/ClientController.php';
 // DEBUG TEMPORÁRIO - REMOVER DEPOIS
-$debug = true; // Mude para false depois de corrigir
+$debug = false; // Mude para false depois de corrigir
 
 if ($debug) {
     echo "<div style='background: #f0f0f0; padding: 10px; margin: 10px; border: 1px solid #ccc;'>";
