@@ -169,7 +169,212 @@ class AdminController {
             return ['status' => false, 'message' => 'Erro ao carregar dados do dashboard. Tente novamente.'];
         }
     }
-    
+    // Adicionar este método no AdminController.php
+
+/**
+* Gerenciar transações com informações de saldo
+* 
+* @param array $filters Filtros de busca
+* @param int $page Página atual
+* @return array Resultado da operação
+*/
+public static function manageTransactionsWithBalance($filters = [], $page = 1) {
+    try {
+        $db = Database::getConnection();
+        $limit = ITEMS_PER_PAGE;
+        $offset = ($page - 1) * $limit;
+        
+        // Construir condições WHERE
+        $whereConditions = ["t.id IS NOT NULL"];
+        $params = [];
+        
+        // Aplicar filtros
+        if (!empty($filters['busca'])) {
+            $whereConditions[] = "(u.nome LIKE :busca OR u.email LIKE :busca OR l.nome_fantasia LIKE :busca OR t.codigo_transacao LIKE :busca)";
+            $params[':busca'] = '%' . $filters['busca'] . '%';
+        }
+        
+        if (!empty($filters['loja_id'])) {
+            $whereConditions[] = "t.loja_id = :loja_id";
+            $params[':loja_id'] = $filters['loja_id'];
+        }
+        
+        if (!empty($filters['status'])) {
+            $whereConditions[] = "t.status = :status";
+            $params[':status'] = $filters['status'];
+        }
+        
+        if (!empty($filters['data_inicio'])) {
+            $whereConditions[] = "DATE(t.data_transacao) >= :data_inicio";
+            $params[':data_inicio'] = $filters['data_inicio'];
+        }
+        
+        if (!empty($filters['data_fim'])) {
+            $whereConditions[] = "DATE(t.data_transacao) <= :data_fim";
+            $params[':data_fim'] = $filters['data_fim'];
+        }
+        
+        $whereClause = "WHERE " . implode(" AND ", $whereConditions);
+        
+        // Query para obter transações com informações de saldo
+        $transactionsQuery = "
+            SELECT 
+                t.*,
+                u.nome as cliente_nome,
+                u.email as cliente_email,
+                l.nome_fantasia as loja_nome,
+                COALESCE(
+                    (SELECT SUM(cm.valor) 
+                     FROM cashback_movimentacoes cm 
+                     WHERE cm.transacao_uso_id = t.id AND cm.tipo_operacao = 'uso'), 0
+                ) as saldo_usado
+            FROM transacoes_cashback t
+            JOIN usuarios u ON t.usuario_id = u.id
+            JOIN lojas l ON t.loja_id = l.id
+            $whereClause
+            ORDER BY t.data_transacao DESC
+            LIMIT :limit OFFSET :offset
+        ";
+        
+        $stmt = $db->prepare($transactionsQuery);
+        foreach ($params as $key => $value) {
+            $stmt->bindValue($key, $value);
+        }
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        $stmt->execute();
+        
+        $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Query para contar total de transações
+        $countQuery = "
+            SELECT COUNT(*) as total
+            FROM transacoes_cashback t
+            JOIN usuarios u ON t.usuario_id = u.id
+            JOIN lojas l ON t.loja_id = l.id
+            $whereClause
+        ";
+        
+        $countStmt = $db->prepare($countQuery);
+        foreach ($params as $key => $value) {
+            $countStmt->bindValue($key, $value);
+        }
+        $countStmt->execute();
+        $totalCount = $countStmt->fetch(PDO::FETCH_ASSOC)['total'];
+        
+        // Obter lista de lojas para filtros
+        $storesStmt = $db->query("SELECT id, nome_fantasia FROM lojas WHERE status = 'aprovado' ORDER BY nome_fantasia");
+        $stores = $storesStmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Calcular estatísticas com informações de saldo
+        $statsQuery = "
+            SELECT 
+                COUNT(*) as total_transacoes,
+                SUM(t.valor_total) as valor_vendas_originais,
+                SUM(t.valor_cliente) as total_cashback,
+                COALESCE(SUM(
+                    (SELECT SUM(cm.valor) 
+                     FROM cashback_movimentacoes cm 
+                     WHERE cm.transacao_uso_id = t.id AND cm.tipo_operacao = 'uso')
+                ), 0) as total_saldo_usado,
+                COUNT(CASE WHEN EXISTS(
+                    SELECT 1 FROM cashback_movimentacoes cm2 
+                    WHERE cm2.transacao_uso_id = t.id AND cm2.tipo_operacao = 'uso'
+                ) THEN 1 END) as transacoes_com_saldo
+            FROM transacoes_cashback t
+            JOIN usuarios u ON t.usuario_id = u.id
+            JOIN lojas l ON t.loja_id = l.id
+            $whereClause
+        ";
+        
+        $statsStmt = $db->prepare($statsQuery);
+        foreach ($params as $key => $value) {
+            $statsStmt->bindValue($key, $value);
+        }
+        $statsStmt->execute();
+        $statistics = $statsStmt->fetch(PDO::FETCH_ASSOC);
+        
+        // Calcular valores derivados
+        $statistics['valor_liquido_pago'] = $statistics['valor_vendas_originais'] - $statistics['total_saldo_usado'];
+        $statistics['percentual_uso_saldo'] = $statistics['total_transacoes'] > 0 ? 
+            ($statistics['transacoes_com_saldo'] / $statistics['total_transacoes']) * 100 : 0;
+        
+        // Calcular paginação
+        $totalPages = ceil($totalCount / $limit);
+        
+        return [
+            'status' => true,
+            'data' => [
+                'transacoes' => $transactions,
+                'lojas' => $stores,
+                'estatisticas' => $statistics,
+                'paginacao' => [
+                    'pagina_atual' => $page,
+                    'total_paginas' => $totalPages,
+                    'total_itens' => $totalCount,
+                    'itens_por_pagina' => $limit
+                ]
+            ]
+        ];
+        
+    } catch (PDOException $e) {
+        error_log('Erro ao gerenciar transações com saldo: ' . $e->getMessage());
+        return ['status' => false, 'message' => 'Erro ao carregar dados das transações.'];
+    }
+}
+
+    /**
+    * Obter detalhes de uma transação com informações de saldo
+    * 
+    * @param int $transactionId ID da transação
+    * @return array Resultado da operação
+    */
+    public static function getTransactionDetailsWithBalance($transactionId) {
+        try {
+            $db = Database::getConnection();
+            
+            // Buscar dados da transação com informações de saldo
+            $stmt = $db->prepare("
+                SELECT 
+                    t.*,
+                    u.nome as cliente_nome,
+                    u.email as cliente_email,
+                    l.nome_fantasia as loja_nome,
+                    COALESCE(
+                        (SELECT SUM(cm.valor) 
+                        FROM cashback_movimentacoes cm 
+                        WHERE cm.transacao_uso_id = t.id AND cm.tipo_operacao = 'uso'), 0
+                    ) as saldo_usado,
+                    COALESCE(
+                        (SELECT cm.descricao 
+                        FROM cashback_movimentacoes cm 
+                        WHERE cm.transacao_uso_id = t.id AND cm.tipo_operacao = 'uso'
+                        LIMIT 1), NULL
+                    ) as descricao_uso_saldo
+                FROM transacoes_cashback t
+                JOIN usuarios u ON t.usuario_id = u.id
+                JOIN lojas l ON t.loja_id = l.id
+                WHERE t.id = :transaction_id
+            ");
+            $stmt->bindParam(':transaction_id', $transactionId);
+            $stmt->execute();
+            
+            $transaction = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$transaction) {
+                return ['status' => false, 'message' => 'Transação não encontrada.'];
+            }
+            
+            return [
+                'status' => true,
+                'data' => $transaction
+            ];
+            
+        } catch (PDOException $e) {
+            error_log('Erro ao obter detalhes da transação com saldo: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro ao carregar detalhes da transação.'];
+        }
+    }
     /**
      * Gerencia usuários do sistema
      * 
@@ -1740,7 +1945,16 @@ public static function getAvailableStores() {
                     exit;
                     break;
 
-
+                case 'transaction_details_with_balance':
+                    $transactionId = intval($_POST['transaction_id'] ?? 0);
+                    if ($transactionId <= 0) {
+                        echo json_encode(['status' => false, 'message' => 'ID da transação inválido']);
+                        return;
+                    }
+                    
+                    $result = self::getTransactionDetailsWithBalance($transactionId);
+                    echo json_encode($result);
+                    break;
                 case 'store_details_with_balance':
                     // Limpar qualquer output anterior
                     if (ob_get_level()) {

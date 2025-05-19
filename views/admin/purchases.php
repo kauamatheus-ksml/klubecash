@@ -8,6 +8,7 @@ require_once '../../config/database.php';
 require_once '../../config/constants.php';
 require_once '../../controllers/AuthController.php';
 require_once '../../controllers/AdminController.php';
+require_once '../../models/CashbackBalance.php';
 
 // Iniciar sessão
 session_start();
@@ -36,13 +37,17 @@ if (isset($_GET['loja_id']) && !empty($_GET['loja_id'])) {
     $filters['loja_id'] = $_GET['loja_id'];
 }
 
+if (isset($_GET['status']) && !empty($_GET['status'])) {
+    $filters['status'] = $_GET['status'];
+}
+
 if (isset($_GET['busca']) && !empty($_GET['busca'])) {
     $filters['busca'] = $_GET['busca'];
 }
 
 try {
-    // Obter dados das transações
-    $result = AdminController::manageTransactions($filters, $page);
+    // Obter dados das transações com informações de saldo
+    $result = AdminController::manageTransactionsWithBalance($filters, $page);
 
     // Verificar se houve erro
     $hasError = !$result['status'];
@@ -51,12 +56,14 @@ try {
     // Dados para exibição na página
     $transactions = $hasError ? [] : $result['data']['transacoes'];
     $stores = $hasError ? [] : $result['data']['lojas'];
+    $statistics = $hasError ? [] : $result['data']['estatisticas'];
     $pagination = $hasError ? [] : $result['data']['paginacao'];
 } catch (Exception $e) {
     $hasError = true;
     $errorMessage = "Erro ao processar a requisição: " . $e->getMessage();
     $transactions = [];
     $stores = [];
+    $statistics = [];
     $pagination = [];
 }
 
@@ -80,6 +87,81 @@ function formatCurrency($value) {
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
     <link rel="stylesheet" href="../../assets/css/views/admin/purchases.css">
     
+    <style>
+        /* Estilos adicionais para informações de saldo */
+        .balance-indicator {
+            margin-left: 5px;
+            font-size: 0.8rem;
+        }
+        
+        .saldo-usado {
+            color: #28a745;
+            font-weight: 600;
+        }
+        
+        .sem-saldo {
+            color: #6c757d;
+            font-style: italic;
+        }
+        
+        .valor-original {
+            color: #2d3748;
+            font-weight: 500;
+        }
+        
+        .valor-pago {
+            color: #4a5568;
+            font-size: 0.9rem;
+        }
+        
+        .economia-badge {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+        
+        .stat-card-balance {
+            border-left: 4px solid #28a745;
+        }
+        
+        .stat-card-balance .stat-card-value {
+            color: #28a745;
+        }
+        
+        .stat-card-subtitle {
+            font-size: 0.8rem;
+            color: #6c757d;
+            margin-top: 5px;
+            font-style: italic;
+        }
+        
+        .impacto-saldo {
+            background: #f8fff8;
+            border-left: 4px solid #28a745;
+            padding: 10px 15px;
+            margin: 5px 0;
+            border-radius: 8px;
+        }
+        
+        .impacto-item {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+        }
+        
+        .impacto-label {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .impacto-value {
+            color: #28a745;
+            font-weight: 600;
+        }
+    </style>
 </head>
 <body>
     <?php include_once '../components/sidebar.php'; ?>
@@ -93,6 +175,46 @@ function formatCurrency($value) {
                     <?php echo htmlspecialchars($errorMessage); ?>
                 </div>
             <?php else: ?>
+            
+            <!-- Cards de Estatísticas com Informações de Saldo -->
+            <?php if (!empty($statistics)): ?>
+            <div class="stats-container">
+                <div class="stat-card">
+                    <div class="stat-card-title">Total de Transações</div>
+                    <div class="stat-card-value"><?php echo number_format($statistics['total_transacoes']); ?></div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-card-title">Valor Total Original</div>
+                    <div class="stat-card-value"><?php echo formatCurrency($statistics['valor_vendas_originais']); ?></div>
+                    <div class="stat-card-subtitle">Antes de descontos</div>
+                </div>
+                
+                <div class="stat-card stat-card-balance">
+                    <div class="stat-card-title">Saldo Usado Clientes</div>
+                    <div class="stat-card-value"><?php echo formatCurrency($statistics['total_saldo_usado']); ?></div>
+                    <div class="stat-card-subtitle">Economia gerada</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-card-title">Valor Efetivamente Pago</div>
+                    <div class="stat-card-value"><?php echo formatCurrency($statistics['valor_liquido_pago']); ?></div>
+                    <div class="stat-card-subtitle">Após uso de saldo</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-card-title">Cashback Total</div>
+                    <div class="stat-card-value"><?php echo formatCurrency($statistics['total_cashback']); ?></div>
+                    <div class="stat-card-subtitle">Gerado aos clientes</div>
+                </div>
+                
+                <div class="stat-card stat-card-balance">
+                    <div class="stat-card-title">Transações c/ Saldo</div>
+                    <div class="stat-card-value"><?php echo number_format($statistics['transacoes_com_saldo']); ?></div>
+                    <div class="stat-card-subtitle"><?php echo number_format($statistics['percentual_uso_saldo'], 1); ?>% do total</div>
+                </div>
+            </div>
+            <?php endif; ?>
             
             <!-- Filtros -->
             <div class="filters-bar">
@@ -112,17 +234,26 @@ function formatCurrency($value) {
                         <select class="filter-select" id="storeFilter" onchange="applyFilters()">
                             <option value="">Loja</option>
                             <?php foreach ($stores as $store): ?>
-                                <option value="<?php echo $store['id']; ?>">
+                                <option value="<?php echo $store['id']; ?>" <?php echo (isset($_GET['loja_id']) && $_GET['loja_id'] == $store['id']) ? 'selected' : ''; ?>>
                                     <?php echo htmlspecialchars($store['nome_fantasia']); ?>
                                 </option>
                             <?php endforeach; ?>
+                        </select>
+                    </div>
+                    
+                    <div class="filter-item">
+                        <select class="filter-select" id="statusFilter" onchange="applyFilters()">
+                            <option value="">Status</option>
+                            <option value="pendente" <?php echo (isset($_GET['status']) && $_GET['status'] === 'pendente') ? 'selected' : ''; ?>>Pendente</option>
+                            <option value="aprovado" <?php echo (isset($_GET['status']) && $_GET['status'] === 'aprovado') ? 'selected' : ''; ?>>Aprovado</option>
+                            <option value="cancelado" <?php echo (isset($_GET['status']) && $_GET['status'] === 'cancelado') ? 'selected' : ''; ?>>Cancelado</option>
                         </select>
                     </div>
                 </div>
                 
                 <div class="filter-group">
                     <div class="search-bar">
-                        <input type="text" id="searchInput" placeholder="Buscar..." onkeyup="if(event.key === 'Enter') applyFilters()">
+                        <input type="text" id="searchInput" placeholder="Buscar..." value="<?php echo isset($_GET['busca']) ? htmlspecialchars($_GET['busca']) : ''; ?>" onkeyup="if(event.key === 'Enter') applyFilters()">
                         <span class="search-icon">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <circle cx="11" cy="11" r="8"></circle>
@@ -148,11 +279,13 @@ function formatCurrency($value) {
                                     <span class="checkmark"></span>
                                 </div>
                             </th>
-                            <th>ID Pedido</th>
-                            <th>Nome do Cliente</th>
+                            <th>ID Transação</th>
+                            <th>Cliente</th>
                             <th>Loja</th>
-                            <th>Comissão Plataforma</th>
-                            <th>Valor Total</th>
+                            <th>Valor Original</th>
+                            <th>Saldo Usado</th>
+                            <th>Valor Pago</th>
+                            <th>Cashback Cliente</th>
                             <th>Data</th>
                             <th>Status</th>
                             <th>Ações</th>
@@ -161,10 +294,15 @@ function formatCurrency($value) {
                     <tbody>
                         <?php if (empty($transactions)): ?>
                             <tr>
-                                <td colspan="9" style="text-align: center;">Nenhuma transação encontrada</td>
+                                <td colspan="11" style="text-align: center;">Nenhuma transação encontrada</td>
                             </tr>
                         <?php else: ?>
                             <?php foreach ($transactions as $index => $transaction): ?>
+                                <?php 
+                                $saldoUsado = $transaction['saldo_usado'] ?? 0;
+                                $valorOriginal = $transaction['valor_total'];
+                                $valorPago = $valorOriginal - $saldoUsado;
+                                ?>
                                 <tr>
                                     <td>
                                         <div class="checkbox-wrapper">
@@ -172,17 +310,31 @@ function formatCurrency($value) {
                                             <span class="checkmark"></span>
                                         </div>
                                     </td>
-                                    <td><?php echo $transaction['id']; ?></td>
-                                    <td><?php echo htmlspecialchars($transaction['cliente_nome']); ?></td>
+                                    <td>#<?php echo $transaction['id']; ?></td>
+                                    <td>
+                                        <?php echo htmlspecialchars($transaction['cliente_nome']); ?>
+                                        <?php if ($saldoUsado > 0): ?>
+                                            <span class="balance-indicator" title="Cliente usou saldo">💰</span>
+                                        <?php endif; ?>
+                                    </td>
                                     <td><?php echo htmlspecialchars($transaction['loja_nome']); ?></td>
                                     <td>
-                                        <?php 
-                                            // Comissão da plataforma (valor_admin na tabela transacoes_comissao)
-                                            // Aqui você precisaria buscar esse valor ou adicionar ao resultado do controller
-                                            echo isset($transaction['valor_admin']) ? formatCurrency($transaction['valor_admin']) : '-';
-                                        ?>
+                                        <span class="valor-original"><?php echo formatCurrency($valorOriginal); ?></span>
                                     </td>
-                                    <td><?php echo formatCurrency($transaction['valor_total']); ?></td>
+                                    <td>
+                                        <?php if ($saldoUsado > 0): ?>
+                                            <span class="saldo-usado"><?php echo formatCurrency($saldoUsado); ?></span>
+                                        <?php else: ?>
+                                            <span class="sem-saldo">-</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <span class="valor-pago"><?php echo formatCurrency($valorPago); ?></span>
+                                        <?php if ($saldoUsado > 0): ?>
+                                            <br><span class="economia-badge">Economia aplicada</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td><?php echo formatCurrency($transaction['valor_cliente']); ?></td>
                                     <td><?php echo formatDate($transaction['data_transacao']); ?></td>
                                     <td>
                                         <?php 
@@ -209,7 +361,7 @@ function formatCurrency($value) {
                                         </span>
                                     </td>
                                     <td>
-                                        <button class="action-btn" onclick="viewDetails(<?php echo $transaction['id']; ?>)">
+                                        <button class="action-btn" onclick="viewTransactionDetails(<?php echo $transaction['id']; ?>)">
                                             Ver Detalhes
                                         </button>
                                     </td>
@@ -223,7 +375,7 @@ function formatCurrency($value) {
             <!-- Paginação -->
             <?php if (!empty($pagination) && $pagination['total_paginas'] > 1): ?>
                 <div class="pagination">
-                    <a href="?page=<?php echo max(1, $page - 1); ?>" class="arrow">
+                    <a href="?page=<?php echo max(1, $page - 1); ?><?php echo buildQueryString(['page']); ?>" class="arrow">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <polyline points="15 18 9 12 15 6"></polyline>
                         </svg>
@@ -238,19 +390,61 @@ function formatCurrency($value) {
                         
                         for ($i = $startPage; $i <= $endPage; $i++): 
                     ?>
-                        <a href="?page=<?php echo $i; ?>" class="<?php echo ($i == $page) ? 'active' : ''; ?>">
+                        <a href="?page=<?php echo $i; ?><?php echo buildQueryString(['page']); ?>" class="<?php echo ($i == $page) ? 'active' : ''; ?>">
                             <?php echo $i; ?>
                         </a>
                     <?php endfor; ?>
                     
-                    <a href="?page=<?php echo min($pagination['total_paginas'], $page + 1); ?>" class="arrow">
+                    <a href="?page=<?php echo min($pagination['total_paginas'], $page + 1); ?><?php echo buildQueryString(['page']); ?>" class="arrow">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <polyline points="9 18 15 12 9 6"></polyline>
                         </svg>
                     </a>
                 </div>
             <?php endif; ?>
+            
+            <!-- Resumo de Impacto do Saldo -->
+            <?php if (!empty($statistics) && $statistics['total_saldo_usado'] > 0): ?>
+            <div class="impacto-saldo">
+                <h4 style="margin: 0 0 10px 0; color: #28a745;">💰 Impacto do Sistema de Saldo</h4>
+                <div class="impacto-item">
+                    <span class="impacto-label">Economia gerada aos clientes:</span>
+                    <span class="impacto-value"><?php echo formatCurrency($statistics['total_saldo_usado']); ?></span>
+                </div>
+                <div class="impacto-item">
+                    <span class="impacto-label">Redução no faturamento das lojas:</span>
+                    <span class="impacto-value"><?php echo formatCurrency($statistics['total_saldo_usado']); ?></span>
+                </div>
+                <div class="impacto-item">
+                    <span class="impacto-label">Redução nas comissões Klube Cash:</span>
+                    <span class="impacto-value"><?php echo formatCurrency($statistics['total_saldo_usado'] * 0.1); ?></span>
+                </div>
+                <div class="impacto-item">
+                    <span class="impacto-label">Taxa de adoção do sistema de saldo:</span>
+                    <span class="impacto-value"><?php echo number_format($statistics['percentual_uso_saldo'], 1); ?>%</span>
+                </div>
+            </div>
             <?php endif; ?>
+            
+            <?php endif; ?>
+        </div>
+    </div>
+    
+    <!-- Modal de Detalhes da Transação -->
+    <div id="transactionDetailsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTransactionTitle">Detalhes da Transação</h3>
+                <button class="modal-close" onclick="closeTransactionModal()">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body" id="modalTransactionContent">
+                <!-- Conteúdo será carregado via JavaScript -->
+            </div>
         </div>
     </div>
     
@@ -269,6 +463,7 @@ function formatCurrency($value) {
         function applyFilters() {
             const dataFilter = document.getElementById('dataFilter').value;
             const storeFilter = document.getElementById('storeFilter').value;
+            const statusFilter = document.getElementById('statusFilter').value;
             const searchInput = document.getElementById('searchInput').value;
             
             let queryParams = [];
@@ -315,6 +510,11 @@ function formatCurrency($value) {
                 queryParams.push(`loja_id=${storeFilter}`);
             }
             
+            // Filtro de status
+            if (statusFilter) {
+                queryParams.push(`status=${statusFilter}`);
+            }
+            
             // Busca
             if (searchInput) {
                 queryParams.push(`busca=${encodeURIComponent(searchInput)}`);
@@ -333,16 +533,151 @@ function formatCurrency($value) {
         }
         
         // Visualizar detalhes da transação
-        function viewDetails(transactionId) {
-            window.location.href = "<?php echo SITE_URL; ?>/admin/transacao/" + transactionId;
+        function viewTransactionDetails(transactionId) {
+            const modal = document.getElementById('transactionDetailsModal');
+            const content = document.getElementById('modalTransactionContent');
+            
+            modal.style.display = 'block';
+            content.innerHTML = '<p>Carregando detalhes...</p>';
+            
+            fetch('../../controllers/AdminController.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'action=transaction_details_with_balance&transaction_id=' + transactionId
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status) {
+                    renderTransactionDetailsWithBalance(data.data);
+                } else {
+                    content.innerHTML = `<p class="error">Erro: ${data.message}</p>`;
+                }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                content.innerHTML = `<p class="error">Erro ao carregar detalhes. Tente novamente.</p>`;
+            });
+        }
+        
+        // Renderizar detalhes da transação com informações de saldo
+        function renderTransactionDetailsWithBalance(transaction) {
+            const saldoUsado = parseFloat(transaction.saldo_usado || 0);
+            const valorOriginal = parseFloat(transaction.valor_total);
+            const valorPago = valorOriginal - saldoUsado;
+            
+            const content = document.getElementById('modalTransactionContent');
+            document.getElementById('modalTransactionTitle').textContent = `Transação #${transaction.id}`;
+            
+            let html = `
+                <div class="transaction-details">
+                    <div class="detail-section">
+                        <h4>Informações Gerais</h4>
+                        <p><strong>ID:</strong> #${transaction.id}</p>
+                        <p><strong>Código:</strong> ${transaction.codigo_transacao || 'N/A'}</p>
+                        <p><strong>Cliente:</strong> ${transaction.cliente_nome}${saldoUsado > 0 ? ' 💰' : ''}</p>
+                        <p><strong>Loja:</strong> ${transaction.loja_nome}</p>
+                        <p><strong>Data:</strong> ${formatDate(transaction.data_transacao)}</p>
+                        <p><strong>Status:</strong> <span class="status-badge status-${transaction.status}">${getStatusText(transaction.status)}</span></p>
+                        ${transaction.descricao ? `<p><strong>Descrição:</strong> ${transaction.descricao}</p>` : ''}
+                    </div>
+                    
+                    <div class="detail-section">
+                        <h4>Informações Financeiras</h4>
+                        <div class="financial-breakdown">
+                            <div class="breakdown-item">
+                                <span>Valor original da venda:</span>
+                                <span class="valor-original">${formatCurrency(valorOriginal)}</span>
+                            </div>
+                            ${saldoUsado > 0 ? `
+                            <div class="breakdown-item">
+                                <span>Saldo usado pelo cliente:</span>
+                                <span class="saldo-usado">- ${formatCurrency(saldoUsado)}</span>
+                            </div>
+                            <div class="breakdown-item total">
+                                <span>Valor efetivamente pago:</span>
+                                <span class="valor-pago">${formatCurrency(valorPago)}</span>
+                            </div>
+                            ` : ''}
+                            <div class="breakdown-item">
+                                <span>Cashback gerado ao cliente:</span>
+                                <span class="cashback-value">${formatCurrency(transaction.valor_cliente)}</span>
+                            </div>
+                            <div class="breakdown-item">
+                                <span>Comissão Klube Cash:</span>
+                                <span class="commission-value">${formatCurrency(transaction.valor_admin)}</span>
+                            </div>
+                        </div>
+                    </div>
+            `;
+            
+            if (saldoUsado > 0) {
+                html += `
+                    <div class="detail-section saldo-impact">
+                        <h4 style="color: #28a745;">💰 Impacto do Uso de Saldo</h4>
+                        <div class="impact-details">
+                            <p><strong>Economia do cliente:</strong> ${formatCurrency(saldoUsado)}</p>
+                            <p><strong>Desconto na comissão:</strong> ${formatCurrency(saldoUsado * 0.1)} (sobre valor não pago)</p>
+                            <p><strong>Benefício mútuo:</strong> Cliente economiza, loja mantém fidelidade</p>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            html += `</div>`;
+            content.innerHTML = html;
+        }
+        
+        // Funções auxiliares
+        function getStatusText(status) {
+            switch(status) {
+                case 'aprovado': return 'Aprovado';
+                case 'pendente': return 'Pendente';
+                case 'cancelado': return 'Cancelado';
+                default: return status;
+            }
+        }
+        
+        function formatCurrency(value) {
+            return 'R$ ' + parseFloat(value).toLocaleString('pt-BR', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+        
+        function formatDate(dateString) {
+            return new Date(dateString).toLocaleDateString('pt-BR');
+        }
+        
+        // Fechar modal
+        function closeTransactionModal() {
+            document.getElementById('transactionDetailsModal').style.display = 'none';
+        }
+        
+        // Fechar modal ao clicar fora
+        window.onclick = function(event) {
+            const modal = document.getElementById('transactionDetailsModal');
+            if (event.target === modal) {
+                modal.style.display = 'none';
+            }
         }
         
         // Exportar para PDF
         function exportToPDF() {
             alert('Funcionalidade de exportação para PDF será implementada.');
-            // Aqui você pode implementar a lógica de exportação para PDF
-            // Pode usar bibliotecas como jsPDF ou fazer uma requisição para um endpoint do backend
         }
     </script>
+    
+    <?php 
+    // Função auxiliar para construir query string preservando filtros existentes
+    function buildQueryString($exclude = []) {
+        $params = $_GET;
+        foreach ($exclude as $key) {
+            unset($params[$key]);
+        }
+        return $params ? '&' . http_build_query($params) : '';
+    }
+    ?>
 </body>
 </html>
