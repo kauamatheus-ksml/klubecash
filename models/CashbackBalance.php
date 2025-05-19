@@ -110,8 +110,11 @@ class CashbackBalance {
      */
     public function addBalance($userId, $storeId, $amount, $description = '', $transactionId = null) {
         if ($amount <= 0) {
+            error_log("Tentativa de adicionar saldo inválido: {$amount}");
             return false;
         }
+        
+        error_log("Iniciando addBalance - User: {$userId}, Store: {$storeId}, Amount: {$amount}");
         
         try {
             $this->db->beginTransaction();
@@ -119,6 +122,8 @@ class CashbackBalance {
             // Obter saldo atual
             $currentBalance = $this->getStoreBalance($userId, $storeId);
             $newBalance = $currentBalance + $amount;
+            
+            error_log("Saldo atual: {$currentBalance}, Novo saldo: {$newBalance}");
             
             // Atualizar ou inserir saldo
             $stmt = $this->db->prepare("
@@ -129,18 +134,28 @@ class CashbackBalance {
                     total_creditado = total_creditado + :amount,
                     ultima_atualizacao = CURRENT_TIMESTAMP
             ");
+            
             $stmt->bindParam(':user_id', $userId);
             $stmt->bindParam(':store_id', $storeId);
             $stmt->bindParam(':amount', $amount);
             
-            if (!$stmt->execute()) {
+            $result = $stmt->execute();
+            
+            if (!$result) {
+                error_log("Erro na query de inserção/atualização do saldo");
                 throw new Exception('Erro ao atualizar saldo');
             }
             
             // Registrar movimentação
-            $this->recordMovement($userId, $storeId, 'credito', $amount, $currentBalance, $newBalance, $description, $transactionId);
+            $movResult = $this->recordMovement($userId, $storeId, 'credito', $amount, $currentBalance, $newBalance, $description, $transactionId);
+            
+            if (!$movResult) {
+                error_log("Erro ao registrar movimentação");
+                throw new Exception('Erro ao registrar movimentação');
+            }
             
             $this->db->commit();
+            error_log("Saldo adicionado com sucesso - Novo saldo: {$newBalance}");
             return true;
             
         } catch (Exception $e) {

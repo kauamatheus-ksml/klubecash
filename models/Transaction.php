@@ -198,37 +198,54 @@ class Transaction {
      * @return bool Verdadeiro se aprovada com sucesso
      */
     public function aprovar() {
-    if ($this->status !== TRANSACTION_PENDING) {
-        return false;
-    }
-    
-    try {
-        $this->db->beginTransaction();
-        
-        // Aprovar a transação
-        $this->status = TRANSACTION_APPROVED;
-        if (!$this->save()) {
-            throw new Exception('Erro ao salvar transação');
+        if ($this->status !== TRANSACTION_PENDING && $this->status !== TRANSACTION_PAYMENT_PENDING) {
+            error_log("Tentativa de aprovar transação com status inválido: " . $this->status);
+            return false;
         }
         
-        // Creditar cashback no saldo do cliente
-        require_once __DIR__ . '/CashbackBalance.php';
-        $balanceModel = new CashbackBalance();
-        
-        $description = "Cashback da compra - Transação " . ($this->id ?? 'Nova');
-        if (!$balanceModel->addBalance($this->usuarioId, $this->lojaId, $this->valorCliente, $description, $this->id)) {
-            throw new Exception('Erro ao creditar cashback no saldo');
+        try {
+            $this->db->beginTransaction();
+            
+            // 1. Primeiro, aprovar a transação
+            $this->status = TRANSACTION_APPROVED;
+            if (!$this->save()) {
+                throw new Exception('Erro ao salvar transação');
+            }
+            
+            // 2. Creditar cashback no saldo do cliente
+            require_once __DIR__ . '/CashbackBalance.php';
+            $balanceModel = new CashbackBalance();
+            
+            $description = "Cashback da compra - Transação #" . $this->id . " (" . ($this->codigo_transacao ?: 'Sem código') . ")";
+            
+            // Debug: Log da operação
+            error_log("Creditando saldo - Usuario: {$this->usuarioId}, Loja: {$this->lojaId}, Valor: {$this->valorCliente}");
+            
+            $creditResult = $balanceModel->addBalance(
+                $this->usuarioId, 
+                $this->lojaId, 
+                $this->valorCliente, 
+                $description, 
+                $this->id
+            );
+            
+            if (!$creditResult) {
+                error_log("Erro ao creditar cashback no saldo - Transação: " . $this->id);
+                throw new Exception('Erro ao creditar cashback no saldo');
+            }
+            
+            // 3. Log de sucesso
+            error_log("Transação aprovada com sucesso - ID: {$this->id}, Cashback creditado: {$this->valorCliente}");
+            
+            $this->db->commit();
+            return true;
+            
+        } catch (Exception $e) {
+            $this->db->rollBack();
+            error_log('Erro ao aprovar transação: ' . $e->getMessage());
+            return false;
         }
-        
-        $this->db->commit();
-        return true;
-        
-    } catch (Exception $e) {
-        $this->db->rollBack();
-        error_log('Erro ao aprovar transação: ' . $e->getMessage());
-        return false;
     }
-}
     
     /**
      * Cancela a transação
