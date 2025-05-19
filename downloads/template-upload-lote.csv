@@ -1,0 +1,4 @@
+email_cliente,valor_total,codigo_transacao,data_transacao,descricao,valor_saldo_usado
+cliente1@email.com,150.50,VENDA001,2025-01-15 14:30:00,Compra produtos diversos,25.00
+cliente2@email.com,89.99,VENDA002,,Compra especial,
+cliente3@email.com,200.00,VENDA003,2025-01-15 16:45:00,Compra com desconto,50.00

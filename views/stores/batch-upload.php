@@ -64,18 +64,13 @@ function processBatchUpload($file, $storeId) {
     
     // Verificar tipo do arquivo
     $fileType = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-    if (!in_array($fileType, ['csv', 'xlsx', 'xls'])) {
-        return ['status' => false, 'message' => 'Arquivo deve ser CSV ou Excel (.xlsx, .xls)'];
+    if (!in_array($fileType, ['csv'])) {
+        return ['status' => false, 'message' => 'Arquivo deve ser CSV'];
     }
     
     // Processar conforme o tipo
     try {
-        if ($fileType === 'csv') {
-            $data = readCSV($file['tmp_name']);
-        } else {
-            // Para Excel, você precisará de uma biblioteca como PhpSpreadsheet
-            $data = readExcel($file['tmp_name']);
-        }
+        $data = readCSV($file['tmp_name']);
         
         if (empty($data)) {
             return ['status' => false, 'message' => 'Arquivo vazio ou formato inválido'];
@@ -125,7 +120,6 @@ function processBatchUpload($file, $storeId) {
 
 function readCSV($filePath) {
     $data = [];
-    $header = null;
     
     if (($handle = fopen($filePath, 'r')) !== FALSE) {
         // Ler cabeçalho
@@ -133,7 +127,7 @@ function readCSV($filePath) {
         
         // Ler dados
         while (($row = fgetcsv($handle, 1000, ',')) !== FALSE) {
-            if (count($row) >= 4) { // Mínimo: email, valor, código, data
+            if (count($row) >= 3) { // Mínimo: email, valor, código
                 $data[] = array_combine($header, $row);
             }
         }
@@ -143,15 +137,7 @@ function readCSV($filePath) {
     return $data;
 }
 
-function readExcel($filePath) {
-    // Implementação básica para Excel
-    // Idealmente deveria usar PhpSpreadsheet
-    return [];
-}
-
 function processTransactionRow($row, $storeId, $lineNumber) {
-    global $db;
-    
     try {
         // Verificar campos obrigatórios
         $requiredFields = ['email_cliente', 'valor_total', 'codigo_transacao'];
@@ -288,325 +274,7 @@ $activeMenu = 'batch-upload';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Upload em Lote - Klube Cash</title>
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
-    
-    <style>
-        /* Estilos existentes + novos para upload em lote */
-        :root {
-            --primary-color: #FF7A00;
-            --primary-dark: #E06E00;
-            --primary-light: #FFF0E6;
-            --secondary-color: #2A3F54;
-            --success-color: #28A745;
-            --warning-color: #FFC107; 
-            --danger-color: #DC3545;
-            --info-color: #17A2B8;
-            --light-gray: #F8F9FA;
-            --medium-gray: #6C757D;
-            --dark-gray: #343A40;
-            --white: #FFFFFF;
-            --shadow-sm: 0 2px 8px rgba(0,0,0,0.04);
-            --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
-            --shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
-            --border-radius: 12px;
-            --transition: all 0.3s ease;
-        }
-
-        /* Upload Area */
-        .upload-area {
-            border: 2px dashed var(--primary-color);
-            border-radius: 12px;
-            padding: 40px;
-            text-align: center;
-            background-color: var(--primary-light);
-            transition: var(--transition);
-            cursor: pointer;
-            margin-bottom: 30px;
-        }
-
-        .upload-area:hover {
-            border-color: var(--primary-dark);
-            background-color: rgba(255, 122, 0, 0.1);
-        }
-
-        .upload-area.dragover {
-            background-color: rgba(255, 122, 0, 0.2);
-        }
-
-        .upload-icon {
-            width: 60px;
-            height: 60px;
-            margin: 0 auto 20px;
-            color: var(--primary-color);
-        }
-
-        .upload-text {
-            font-size: 1.1rem;
-            color: var(--dark-gray);
-            margin-bottom: 10px;
-        }
-
-        .upload-hint {
-            font-size: 0.9rem;
-            color: var(--medium-gray);
-        }
-
-        .file-input {
-            display: none;
-        }
-
-        .file-info {
-            margin-top: 20px;
-            padding: 15px;
-            background-color: var(--white);
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
-        }
-
-        .file-name {
-            font-weight: 500;
-            color: var(--dark-gray);
-        }
-
-        .file-size {
-            font-size: 0.9rem;
-            color: var(--medium-gray);
-        }
-
-        /* Template Section */
-        .template-section {
-            background-color: var(--white);
-            border-radius: 12px;
-            padding: 25px;
-            margin-bottom: 30px;
-            box-shadow: var(--shadow-sm);
-        }
-
-        .template-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-
-        .template-header h3 {
-            margin: 0;
-            color: var(--dark-gray);
-        }
-
-        .download-template-btn {
-            background-color: var(--success-color);
-            color: var(--white);
-            border: none;
-            padding: 10px 20px;
-            border-radius: 8px;
-            text-decoration: none;
-            font-weight: 500;
-            transition: var(--transition);
-        }
-
-        .download-template-btn:hover {
-            background-color: #218838;
-        }
-
-        .template-preview {
-            overflow-x: auto;
-            margin-top: 15px;
-        }
-
-        .template-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.9rem;
-        }
-
-        .template-table th,
-        .template-table td {
-            border: 1px solid var(--border-color);
-            padding: 10px;
-            text-align: left;
-        }
-
-        .template-table th {
-            background-color: var(--light-gray);
-            font-weight: 600;
-        }
-
-        .template-table .required {
-            color: var(--danger-color);
-        }
-
-        .template-table .optional {
-            color: var(--medium-gray);
-        }
-
-        /* Results Section */
-        .results-section {
-            background-color: var(--white);
-            border-radius: 12px;
-            padding: 25px;
-            margin-bottom: 30px;
-            box-shadow: var(--shadow-sm);
-        }
-
-        .results-stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-bottom: 25px;
-        }
-
-        .results-stat {
-            text-align: center;
-            padding: 20px;
-            border-radius: 8px;
-            background-color: var(--light-gray);
-        }
-
-        .results-stat.success {
-            background-color: rgba(40, 167, 69, 0.1);
-            color: var(--success-color);
-        }
-
-        .results-stat.error {
-            background-color: rgba(220, 53, 69, 0.1);
-            color: var(--danger-color);
-        }
-
-        .results-stat.warning {
-            background-color: rgba(255, 193, 7, 0.1);
-            color: var(--warning-color);
-        }
-
-        .results-stat-number {
-            font-size: 2rem;
-            font-weight: 700;
-            display: block;
-        }
-
-        .results-stat-label {
-            font-size: 0.9rem;
-            font-weight: 500;
-        }
-
-        .results-details {
-            max-height: 400px;
-            overflow-y: auto;
-        }
-
-        .result-item {
-            padding: 15px;
-            margin-bottom: 10px;
-            border-radius: 8px;
-            border-left: 4px solid;
-        }
-
-        .result-item.success {
-            background-color: rgba(40, 167, 69, 0.05);
-            border-color: var(--success-color);
-        }
-
-        .result-item.error {
-            background-color: rgba(220, 53, 69, 0.05);
-            border-color: var(--danger-color);
-        }
-
-        .result-item.skipped {
-            background-color: rgba(255, 193, 7, 0.05);
-            border-color: var(--warning-color);
-        }
-
-        .result-item-header {
-            display: flex;
-            justify-content: between;
-            align-items: center;
-            margin-bottom: 5px;
-        }
-
-        .result-item-line {
-            font-weight: 600;
-            color: var(--dark-gray);
-        }
-
-        .result-item-status {
-            font-size: 0.8rem;
-            font-weight: 500;
-            padding: 3px 8px;
-            border-radius: 4px;
-            color: var(--white);
-        }
-
-        .result-item-status.success {
-            background-color: var(--success-color);
-        }
-
-        .result-item-status.error {
-            background-color: var(--danger-color);
-        }
-
-        .result-item-status.skipped {
-            background-color: var(--warning-color);
-        }
-
-        .result-item-message {
-            font-size: 0.9rem;
-            color: var(--dark-gray);
-        }
-
-        .result-item-data {
-            font-size: 0.8rem;
-            color: var(--medium-gray);
-            margin-top: 5px;
-        }
-
-        /* Progress bar */
-        .progress-container {
-            margin: 20px 0;
-            display: none;
-        }
-
-        .progress-bar {
-            width: 100%;
-            height: 25px;
-            background-color: var(--light-gray);
-            border-radius: 12px;
-            overflow: hidden;
-        }
-
-        .progress-fill {
-            height: 100%;
-            background-color: var(--primary-color);
-            width: 0%;
-            transition: width 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--white);
-            font-weight: 500;
-            font-size: 0.9rem;
-        }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            .upload-area {
-                padding: 25px 15px;
-            }
-            
-            .template-section,
-            .results-section {
-                padding: 15px;
-            }
-            
-            .template-header {
-                flex-direction: column;
-                gap: 15px;
-                text-align: center;
-            }
-            
-            .results-stats {
-                grid-template-columns: 1fr;
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="../../assets/css/views/stores/batch-upload.css">
 </head>
 <body>
     <div class="dashboard-container">
@@ -670,11 +338,6 @@ $activeMenu = 'batch-upload';
                 </div>
                 <?php else: ?>
                 <div class="alert error">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <line x1="12" y1="8" x2="12" y2="12"></line>
-                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                    </svg>
                     <div>
                         <h4>Erro no processamento</h4>
                         <p><?php echo htmlspecialchars($uploadResult['message']); ?></p>
@@ -688,11 +351,6 @@ $activeMenu = 'batch-upload';
                 <div class="template-header">
                     <h3>Template do Arquivo</h3>
                     <a href="../../downloads/template-upload-lote.csv" class="download-template-btn" download>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                            <polyline points="7 10 12 15 17 10"></polyline>
-                            <line x1="12" y1="15" x2="12" y2="3"></line>
-                        </svg>
                         Baixar Template CSV
                     </a>
                 </div>
@@ -749,15 +407,10 @@ $activeMenu = 'batch-upload';
             <div class="content-card">
                 <form id="uploadForm" method="POST" enctype="multipart/form-data">
                     <div class="upload-area" id="uploadArea">
-                        <svg class="upload-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                            <polyline points="14 2 14 8 20 8"></polyline>
-                            <line x1="12" y1="12" x2="12" y2="18"></line>
-                            <line x1="9" y1="15" x2="15" y2="15"></line>
-                        </svg>
+                        <div class="upload-icon">📁</div>
                         <div class="upload-text">Clique ou arraste seu arquivo aqui</div>
-                        <div class="upload-hint">Aceita arquivos CSV, XLS e XLSX (máx. 10MB)</div>
-                        <input type="file" id="batchFile" name="batch_file" class="file-input" accept=".csv,.xlsx,.xls">
+                        <div class="upload-hint">Aceita arquivos CSV (máx. 10MB)</div>
+                        <input type="file" id="batchFile" name="batch_file" class="file-input" accept=".csv">
                     </div>
                     
                     <div id="fileInfo" class="file-info" style="display: none;">
@@ -773,11 +426,6 @@ $activeMenu = 'batch-upload';
                     
                     <div class="form-actions">
                         <button type="submit" id="uploadBtn" class="btn btn-primary" disabled>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                <polyline points="17 8 12 3 7 8"></polyline>
-                                <line x1="12" y1="3" x2="12" y2="15"></line>
-                            </svg>
                             Processar Arquivo
                         </button>
                         <a href="<?php echo STORE_DASHBOARD_URL; ?>" class="btn btn-secondary">Voltar ao Dashboard</a>
@@ -867,7 +515,6 @@ $activeMenu = 'batch-upload';
             
             function handleFileSelect(file) {
                 const maxSize = 10 * 1024 * 1024; // 10MB
-                const allowedTypes = ['text/csv', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
                 
                 if (file.size > maxSize) {
                     alert('Arquivo muito grande. Tamanho máximo: 10MB');
@@ -875,8 +522,8 @@ $activeMenu = 'batch-upload';
                     return;
                 }
                 
-                if (!allowedTypes.includes(file.type) && !file.name.match(/\.(csv|xlsx|xls)$/i)) {
-                    alert('Tipo de arquivo não suportado. Use CSV, XLS ou XLSX');
+                if (!file.name.match(/\.csv$/i)) {
+                    alert('Tipo de arquivo não suportado. Use apenas CSV');
                     fileInput.value = '';
                     return;
                 }
@@ -906,9 +553,9 @@ $activeMenu = 'batch-upload';
                 // Show progress bar
                 progressContainer.style.display = 'block';
                 uploadBtn.disabled = true;
-                uploadBtn.innerHTML = '<span class="loading-spinner"></span> Processando...';
+                uploadBtn.innerHTML = 'Processando...';
                 
-                // Simulate progress (real implementation would use XMLHttpRequest)
+                // Simulate progress
                 let progress = 0;
                 const interval = setInterval(() => {
                     progress += 10;
