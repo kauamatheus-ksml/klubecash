@@ -5,6 +5,7 @@ require_once '../../config/database.php';
 require_once '../../config/constants.php';
 require_once '../../controllers/AuthController.php';
 require_once '../../controllers/TransactionController.php';
+require_once '../../models/CashbackBalance.php';
 
 // Iniciar sessão
 session_start();
@@ -38,6 +39,8 @@ $storeName = $store['nome_fantasia'];
 // Verificar se viemos da página de comissões pendentes
 $selectedTransactions = [];
 $totalValue = 0;
+$totalOriginalValue = 0;
+$totalBalanceUsed = 0;
 $error = '';
 $success = '';
 
@@ -47,11 +50,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (isset($_POST['transacoes']) && is_array($_POST['transacoes'])) {
             $selectedTransactions = $_POST['transacoes'];
             
-            // Buscar dados das transações selecionadas
+            // Buscar dados das transações selecionadas com informações de saldo
             if (!empty($selectedTransactions)) {
                 $placeholders = implode(',', array_fill(0, count($selectedTransactions), '?'));
                 $stmt = $db->prepare("
-                    SELECT t.*, u.nome as cliente_nome 
+                    SELECT 
+                        t.*, 
+                        u.nome as cliente_nome,
+                        COALESCE(
+                            (SELECT SUM(cm.valor) 
+                             FROM cashback_movimentacoes cm 
+                             WHERE cm.usuario_id = t.usuario_id 
+                             AND cm.loja_id = t.loja_id 
+                             AND cm.tipo_operacao = 'uso'
+                             AND cm.transacao_uso_id = t.id), 0
+                        ) as saldo_usado
                     FROM transacoes_cashback t
                     JOIN usuarios u ON t.usuario_id = u.id
                     WHERE t.id IN ($placeholders) AND t.loja_id = ? AND t.status = 'pendente'
@@ -62,7 +75,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 
                 foreach ($transactions as $transaction) {
-                    $totalValue += $transaction['valor_cashback'];
+                    $saldoUsado = $transaction['saldo_usado'] ?? 0;
+                    $valorOriginal = $transaction['valor_total'];
+                    $valorCobrado = $valorOriginal - $saldoUsado;
+                    
+                    $totalOriginalValue += $valorOriginal;
+                    $totalBalanceUsed += $saldoUsado;
+                    $totalValue += $transaction['valor_cashback']; // Comissão a ser paga
                 }
             }
         } else {
@@ -92,31 +111,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 if (in_array($extension, ['jpg', 'jpeg', 'png', 'pdf'])) {
                     $comprovante = 'comprovante_' . $storeId . '_' . time() . '.' . $extension;
-                    move_uploaded_file($_FILES['comprovante']['tmp_name'], $uploadDir . $comprovante);
+                    if (move_uploaded_file($_FILES['comprovante']['tmp_name'], $uploadDir . $comprovante)) {
+                        // Upload realizado com sucesso
+                    } else {
+                        $error = 'Erro ao fazer upload do comprovante.';
+                    }
                 }
             }
             
-            // Preparar dados do pagamento
-            $paymentData = [
-                'loja_id' => $storeId,
-                'transacoes' => explode(',', $transactionIds),
-                'valor_total' => $valorTotal,
-                'metodo_pagamento' => $metodoPagamento,
-                'numero_referencia' => $numeroReferencia,
-                'comprovante' => $comprovante,
-                'observacao' => $observacao
-            ];
-            
-            // Registrar pagamento
-            $result = TransactionController::registerPayment($paymentData);
-            
-            if ($result['status']) {
-                $success = $result['message'];
-                // Limpar dados da sessão
-                $selectedTransactions = [];
-                $totalValue = 0;
-            } else {
-                $error = $result['message'];
+            if (empty($error)) {
+                // Preparar dados do pagamento
+                $paymentData = [
+                    'loja_id' => $storeId,
+                    'transacoes' => explode(',', $transactionIds),
+                    'valor_total' => $valorTotal,
+                    'metodo_pagamento' => $metodoPagamento,
+                    'numero_referencia' => $numeroReferencia,
+                    'comprovante' => $comprovante,
+                    'observacao' => $observacao
+                ];
+                
+                // Registrar pagamento
+                $result = TransactionController::registerPayment($paymentData);
+                
+                if ($result['status']) {
+                    $success = $result['message'];
+                    // Limpar dados da sessão
+                    $selectedTransactions = [];
+                    $totalValue = 0;
+                    $totalOriginalValue = 0;
+                    $totalBalanceUsed = 0;
+                } else {
+                    $error = $result['message'];
+                }
             }
         }
     }
@@ -128,12 +155,22 @@ if (empty($selectedTransactions) && !$success && !$error) {
     exit;
 }
 
-// Buscar dados das transações para exibir
+// Buscar dados das transações para exibir com informações de saldo
 $transactions = [];
 if (!empty($selectedTransactions)) {
     $placeholders = implode(',', array_fill(0, count($selectedTransactions), '?'));
     $stmt = $db->prepare("
-        SELECT t.*, u.nome as cliente_nome 
+        SELECT 
+            t.*, 
+            u.nome as cliente_nome,
+            COALESCE(
+                (SELECT SUM(cm.valor) 
+                 FROM cashback_movimentacoes cm 
+                 WHERE cm.usuario_id = t.usuario_id 
+                 AND cm.loja_id = t.loja_id 
+                 AND cm.tipo_operacao = 'uso'
+                 AND cm.transacao_uso_id = t.id), 0
+            ) as saldo_usado
         FROM transacoes_cashback t
         JOIN usuarios u ON t.usuario_id = u.id
         WHERE t.id IN ($placeholders) AND t.loja_id = ?
@@ -143,9 +180,14 @@ if (!empty($selectedTransactions)) {
     $stmt->execute($params);
     $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    // Recalcular total
+    // Recalcular totais
     $totalValue = 0;
+    $totalOriginalValue = 0;
+    $totalBalanceUsed = 0;
     foreach ($transactions as $transaction) {
+        $saldoUsado = $transaction['saldo_usado'] ?? 0;
+        $totalOriginalValue += $transaction['valor_total'];
+        $totalBalanceUsed += $saldoUsado;
         $totalValue += $transaction['valor_cashback'];
     }
 }
@@ -160,229 +202,7 @@ $activeMenu = 'payment';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
     <title>Realizar Pagamento - Klube Cash</title>
-    <style>
-        /* CSS similar ao da página de transações pendentes, adaptado para pagamento */
-        :root {
-            --primary-color: #FF7A00;
-            --primary-dark: #E06E00;
-            --primary-light: #FFF0E6;
-            --secondary-color: #2A3F54;
-            --success-color: #28A745;
-            --danger-color: #DC3545;
-            --white: #FFFFFF;
-            --light-gray: #F8F9FA;
-            --medium-gray: #6C757D;
-            --dark-gray: #343A40;
-            --border-radius: 12px;
-            --shadow: 0 4px 12px rgba(0,0,0,0.08);
-        }
-        
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #F5F7FA;
-            margin: 0;
-            padding: 0;
-            color: var(--dark-gray);
-        }
-        
-        .main-content {
-            margin-left: 250px;
-            padding: 1.5rem;
-            min-height: 100vh;
-        }
-        
-        .dashboard-header {
-            margin-bottom: 2rem;
-        }
-        
-        .dashboard-header h1 {
-            font-size: 1.75rem;
-            color: var(--secondary-color);
-            margin-bottom: 0.5rem;
-        }
-        
-        .subtitle {
-            color: var(--medium-gray);
-            font-size: 1rem;
-        }
-        
-        .alert {
-            padding: 1rem 1.5rem;
-            border-radius: var(--border-radius);
-            margin-bottom: 1.5rem;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-        
-        .alert.success {
-            background-color: #D4EDDA;
-            color: #155724;
-            border: 1px solid #C3E6CB;
-        }
-        
-        .alert.error {
-            background-color: #F8D7DA;
-            color: #721C24;
-            border: 1px solid #F5C6CB;
-        }
-        
-        .card {
-            background: var(--white);
-            border-radius: var(--border-radius);
-            box-shadow: var(--shadow);
-            padding: 1.5rem;
-            margin-bottom: 1.5rem;
-        }
-        
-        .card-header {
-            border-bottom: 1px solid #E1E5E9;
-            padding-bottom: 1rem;
-            margin-bottom: 1.5rem;
-        }
-        
-        .card-title {
-            font-size: 1.25rem;
-            font-weight: 600;
-            color: var(--secondary-color);
-            margin: 0;
-        }
-        
-        .form-group {
-            margin-bottom: 1.5rem;
-        }
-        
-        .form-group label {
-            display: block;
-            margin-bottom: 0.5rem;
-            font-weight: 600;
-            color: var(--dark-gray);
-        }
-        
-        .form-group input,
-        .form-group select,
-        .form-group textarea {
-            width: 100%;
-            padding: 0.75rem 1rem;
-            border: 1px solid #D1D5DB;
-            border-radius: 8px;
-            font-size: 1rem;
-            transition: border-color 0.3s;
-        }
-        
-        .form-group input:focus,
-        .form-group select:focus,
-        .form-group textarea:focus {
-            outline: none;
-            border-color: var(--primary-color);
-            box-shadow: 0 0 0 3px rgba(255, 122, 0, 0.1);
-        }
-        
-        .form-row {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 1.5rem;
-        }
-        
-        .btn {
-            padding: 0.75rem 1.5rem;
-            border: none;
-            border-radius: var(--border-radius);
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            transition: all 0.3s;
-        }
-        
-        .btn-primary {
-            background-color: var(--primary-color);
-            color: var(--white);
-        }
-        
-        .btn-primary:hover {
-            background-color: var(--primary-dark);
-            transform: translateY(-2px);
-        }
-        
-        .btn-secondary {
-            background-color: var(--medium-gray);
-            color: var(--white);
-        }
-        
-        .btn-secondary:hover {
-            background-color: #5A6C7D;
-        }
-        
-        .payment-summary {
-            background: var(--primary-light);
-            border-radius: var(--border-radius);
-            padding: 1.5rem;
-            margin-bottom: 1.5rem;
-        }
-        
-        .summary-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 0.75rem;
-        }
-        
-        .summary-item:last-child {
-            margin-bottom: 0;
-            font-weight: 700;
-            font-size: 1.1rem;
-            padding-top: 0.75rem;
-            border-top: 1px solid #FFB366;
-        }
-        
-        .table-responsive {
-            overflow-x: auto;
-        }
-        
-        .table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 1rem;
-        }
-        
-        .table th,
-        .table td {
-            padding: 0.75rem;
-            text-align: left;
-            border-bottom: 1px solid #E1E5E9;
-        }
-        
-        .table th {
-            background-color: var(--light-gray);
-            font-weight: 600;
-            color: var(--secondary-color);
-        }
-        
-        .form-actions {
-            display: flex;
-            gap: 1rem;
-            margin-top: 2rem;
-        }
-        
-        @media (max-width: 991.98px) {
-            .main-content {
-                margin-left: 0;
-            }
-            
-            .form-row {
-                grid-template-columns: 1fr;
-            }
-            
-            .form-actions {
-                flex-direction: column;
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="../../assets/css/views/stores/payment.css">
 </head>
 <body>
     <?php include_once '../components/sidebar-store.php'; ?>
@@ -430,17 +250,42 @@ $activeMenu = 'payment';
                                 <th>Código</th>
                                 <th>Cliente</th>
                                 <th>Data</th>
-                                <th>Valor Venda</th>
+                                <th>Valor Original</th>
+                                <th>Saldo Usado</th>
+                                <th>Valor Cobrado</th>
                                 <th>Comissão</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php foreach ($transactions as $transaction): ?>
+                                <?php 
+                                $saldoUsado = $transaction['saldo_usado'] ?? 0;
+                                $valorOriginal = $transaction['valor_total'];
+                                $valorCobrado = $valorOriginal - $saldoUsado;
+                                ?>
                                 <tr>
                                     <td><?php echo htmlspecialchars($transaction['codigo_transacao'] ?? 'N/A'); ?></td>
-                                    <td><?php echo htmlspecialchars($transaction['cliente_nome']); ?></td>
+                                    <td>
+                                        <?php echo htmlspecialchars($transaction['cliente_nome']); ?>
+                                        <?php if ($saldoUsado > 0): ?>
+                                            <span class="balance-indicator" title="Cliente usou saldo">💰</span>
+                                        <?php endif; ?>
+                                    </td>
                                     <td><?php echo date('d/m/Y H:i', strtotime($transaction['data_transacao'])); ?></td>
-                                    <td>R$ <?php echo number_format($transaction['valor_total'], 2, ',', '.'); ?></td>
+                                    <td>R$ <?php echo number_format($valorOriginal, 2, ',', '.'); ?></td>
+                                    <td>
+                                        <?php if ($saldoUsado > 0): ?>
+                                            <span class="saldo-usado">R$ <?php echo number_format($saldoUsado, 2, ',', '.'); ?></span>
+                                        <?php else: ?>
+                                            <span class="sem-saldo">-</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td>
+                                        <strong>R$ <?php echo number_format($valorCobrado, 2, ',', '.'); ?></strong>
+                                        <?php if ($valorCobrado < $valorOriginal): ?>
+                                            <small class="desconto">(com desconto)</small>
+                                        <?php endif; ?>
+                                    </td>
                                     <td>R$ <?php echo number_format($transaction['valor_cashback'], 2, ',', '.'); ?></td>
                                 </tr>
                             <?php endforeach; ?>
@@ -454,7 +299,19 @@ $activeMenu = 'payment';
                         <span><?php echo count($transactions); ?></span>
                     </div>
                     <div class="summary-item">
-                        <span>Valor total a pagar:</span>
+                        <span>Valor total das vendas:</span>
+                        <span class="original-value">R$ <?php echo number_format($totalOriginalValue, 2, ',', '.'); ?></span>
+                    </div>
+                    <div class="summary-item">
+                        <span>Total saldo usado pelos clientes:</span>
+                        <span class="balance-used">R$ <?php echo number_format($totalBalanceUsed, 2, ',', '.'); ?></span>
+                    </div>
+                    <div class="summary-item">
+                        <span>Valor efetivamente cobrado:</span>
+                        <span class="charged-value">R$ <?php echo number_format($totalOriginalValue - $totalBalanceUsed, 2, ',', '.'); ?></span>
+                    </div>
+                    <div class="summary-item total">
+                        <span>Valor total a pagar ao Klube Cash:</span>
                         <span>R$ <?php echo number_format($totalValue, 2, ',', '.'); ?></span>
                     </div>
                 </div>
@@ -512,16 +369,181 @@ $activeMenu = 'payment';
             
             <div class="card">
                 <div class="card-header">
-                    <h2 class="card-title">Informações Importantes</h2>
+                    <h2 class="card-title">Entenda seu Pagamento</h2>
                 </div>
-                <div style="color: var(--medium-gray); line-height: 1.6;">
-                    <p>• O pagamento será analisado pela nossa equipe em até 24 horas após o envio.</p>
-                    <p>• Após a aprovação, o cashback será automaticamente liberado para os clientes.</p>
-                    <p>• Em caso de rejeição, você receberá uma notificação com o motivo e poderá enviar um novo comprovante.</p>
-                    <p>• Mantenha o comprovante original até a confirmação da aprovação.</p>
+                <div class="info-content">
+                    <div class="info-section">
+                        <h3>📊 Como são calculadas as comissões:</h3>
+                        <ul>
+                            <li><strong>Valor original das vendas:</strong> Total das vendas registradas (R$ <?php echo number_format($totalOriginalValue, 2, ',', '.'); ?>)</li>
+                            <li><strong>Saldo usado pelos clientes:</strong> Desconto aplicado com cashback (R$ <?php echo number_format($totalBalanceUsed, 2, ',', '.'); ?>)</li>
+                            <li><strong>Valor efetivamente cobrado:</strong> O que realmente foi pago pelos clientes (R$ <?php echo number_format($totalOriginalValue - $totalBalanceUsed, 2, ',', '.'); ?>)</li>
+                            <li><strong>Comissão devida:</strong> 10% sobre o valor efetivamente cobrado (R$ <?php echo number_format($totalValue, 2, ',', '.'); ?>)</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="info-section">
+                        <h3>💰 Sobre o uso de saldo pelos clientes:</h3>
+                        <ul>
+                            <li>Quando um cliente usa seu saldo de cashback, ele recebe desconto na compra</li>
+                            <li>A comissão é calculada apenas sobre o valor que o cliente efetivamente pagou</li>
+                            <li>Isso é justo para você, pois você paga comissão apenas sobre o que realmente recebeu</li>
+                            <li>O cliente ainda ganha cashback normal sobre a nova compra</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="info-section">
+                        <h3>🔄 Processo após o pagamento:</h3>
+                        <ol>
+                            <li>Sua confirmação de pagamento será analisada em até 24 horas</li>
+                            <li>Após aprovação, o cashback será liberado automaticamente para os clientes</li>
+                            <li>Em caso de rejeição, você receberá notificação e poderá enviar novo comprovante</li>
+                            <li>Mantenha o comprovante original até a confirmação da aprovação</li>
+                        </ol>
+                    </div>
                 </div>
             </div>
         <?php endif; ?>
     </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Validação do formulário
+            const form = document.querySelector('form[method="POST"]');
+            const comprovanteInput = document.getElementById('comprovante');
+            
+            if (form) {
+                form.addEventListener('submit', function(e) {
+                    // Validar arquivo
+                    if (comprovanteInput && comprovanteInput.files.length > 0) {
+                        const file = comprovanteInput.files[0];
+                        const maxSize = 5 * 1024 * 1024; // 5MB
+                        
+                        if (file.size > maxSize) {
+                            e.preventDefault();
+                            alert('O arquivo do comprovante é muito grande. Tamanho máximo: 5MB');
+                            return;
+                        }
+                        
+                        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+                        if (!allowedTypes.includes(file.type)) {
+                            e.preventDefault();
+                            alert('Tipo de arquivo não permitido. Use apenas JPG, PNG ou PDF');
+                            return;
+                        }
+                    }
+                });
+            }
+            
+            // Preview do arquivo selecionado
+            if (comprovanteInput) {
+                comprovanteInput.addEventListener('change', function() {
+                    const file = this.files[0];
+                    if (file) {
+                        const fileName = file.name;
+                        const fileSize = (file.size / 1024 / 1024).toFixed(2) + ' MB';
+                        
+                        // Criar ou atualizar preview
+                        let preview = document.getElementById('file-preview');
+                        if (!preview) {
+                            preview = document.createElement('div');
+                            preview.id = 'file-preview';
+                            preview.style.marginTop = '10px';
+                            preview.style.padding = '10px';
+                            preview.style.backgroundColor = '#f8f9fa';
+                            preview.style.borderRadius = '5px';
+                            preview.style.fontSize = '14px';
+                            this.parentNode.appendChild(preview);
+                        }
+                        
+                        preview.innerHTML = `
+                            <strong>Arquivo selecionado:</strong><br>
+                            📄 ${fileName}<br>
+                            📏 ${fileSize}
+                        `;
+                    }
+                });
+            }
+        });
+    </script>
+    
+    <style>
+    /* Estilos específicos para informações de saldo */
+    .balance-indicator {
+        margin-left: 5px;
+        font-size: 0.8rem;
+    }
+    
+    .saldo-usado {
+        color: #28a745;
+        font-weight: 600;
+    }
+    
+    .sem-saldo {
+        color: #6c757d;
+        font-style: italic;
+    }
+    
+    .desconto {
+        color: #28a745;
+        font-size: 0.8rem;
+        display: block;
+    }
+    
+    .payment-summary .original-value {
+        color: #333;
+    }
+    
+    .payment-summary .balance-used {
+        color: #28a745;
+        font-weight: 600;
+    }
+    
+    .payment-summary .charged-value {
+        color: #007bff;
+        font-weight: 600;
+    }
+    
+    .payment-summary .total span:last-child {
+        color: #FF7A00;
+        font-weight: 700;
+        font-size: 1.1rem;
+    }
+    
+    .info-section {
+        margin-bottom: 25px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid #eee;
+    }
+    
+    .info-section:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+    }
+    
+    .info-section h3 {
+        color: #333;
+        margin-bottom: 15px;
+        font-size: 1.1rem;
+    }
+    
+    .info-section ul,
+    .info-section ol {
+        padding-left: 20px;
+    }
+    
+    .info-section li {
+        margin-bottom: 10px;
+        line-height: 1.6;
+    }
+    
+    .info-section ul li::marker {
+        color: #FF7A00;
+    }
+    
+    .info-section ol li::marker {
+        color: #FF7A00;
+    }
+    </style>
 </body>
 </html>
