@@ -1795,28 +1795,21 @@ public static function getAvailableStores() {
         try {
             $db = Database::getConnection();
             
-            // Query super simples para testar
-            $query = "SELECT 
-                        l.id,
-                        l.nome_fantasia,
-                        l.categoria,
-                        l.porcentagem_cashback,
-                        l.website,
-                        l.status
-                    FROM lojas l 
-                    WHERE l.status = 'aprovado'
-                    ORDER BY l.nome_fantasia 
-                    LIMIT 10";
-            
+            // Query simples
+            $query = "SELECT * FROM lojas WHERE status = 'aprovado' ORDER BY nome_fantasia";
             $stmt = $db->query($query);
             $lojas = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
-            // Dados mínimos para funcionar
+            // Adicionar is_favorite = 0 para todas (temporário)
+            foreach ($lojas as &$loja) {
+                $loja['is_favorite'] = 0;
+            }
+            
             return [
                 'status' => true,
                 'data' => [
                     'lojas' => $lojas,
-                    'categorias' => ['Varejo', 'Eletrônicos', 'Moda'], // Dados fixos para teste
+                    'categorias' => ['Varejo', 'Eletrônicos', 'Moda'],
                     'estatisticas' => [
                         'total_lojas' => count($lojas),
                         'media_cashback' => 3.5,
