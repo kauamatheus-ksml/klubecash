@@ -38,17 +38,109 @@ if (isset($_GET['filtrar'])) {
     if (!empty($_GET['cashback_min'])) {
         $filters['cashback_min'] = $_GET['cashback_min'];
     }
+    
+    if (!empty($_GET['tem_saldo']) && $_GET['tem_saldo'] != 'todas') {
+        $filters['tem_saldo'] = $_GET['tem_saldo'];
+    }
+    
+    if (!empty($_GET['ordenar']) && $_GET['ordenar'] != 'nome') {
+        $filters['ordenar'] = $_GET['ordenar'];
+    }
 }
 
-// Obter dados das lojas parceiras
-$result = ClientController::getPartnerStores($userId, $filters, $page);
-
-// Verificar se houve erro
-$hasError = !$result['status'];
-$errorMessage = $hasError ? $result['message'] : '';
-
-// Dados para exibição
-$storesData = $hasError ? [] : $result['data'];
+try {
+    $db = Database::getConnection();
+    
+    // Obter dados das lojas parceiras com informações de saldo
+    $result = ClientController::getPartnerStores($userId, $filters, $page);
+    
+    // Verificar se houve erro
+    $hasError = !$result['status'];
+    $errorMessage = $hasError ? $result['message'] : '';
+    
+    // Dados para exibição
+    $storesData = $hasError ? [] : $result['data'];
+    
+    // Se não há erro, enriquecer dados com informações de saldo
+    if (!$hasError && !empty($storesData['lojas'])) {
+        foreach ($storesData['lojas'] as &$loja) {
+            // Buscar saldo disponível do cliente nesta loja
+            $saldoQuery = "
+                SELECT 
+                    saldo_disponivel,
+                    total_creditado,
+                    total_usado,
+                    (SELECT COUNT(*) FROM cashback_movimentacoes cm 
+                     WHERE cm.usuario_id = :user_id AND cm.loja_id = :loja_id AND cm.tipo_operacao = 'uso') as total_usos,
+                    (SELECT data_operacao FROM cashback_movimentacoes cm 
+                     WHERE cm.usuario_id = :user_id AND cm.loja_id = :loja_id 
+                     ORDER BY cm.data_operacao DESC LIMIT 1) as ultimo_uso
+                FROM cashback_saldos 
+                WHERE usuario_id = :user_id AND loja_id = :loja_id
+            ";
+            $saldoStmt = $db->prepare($saldoQuery);
+            $saldoStmt->bindParam(':user_id', $userId);
+            $saldoStmt->bindParam(':loja_id', $loja['id']);
+            $saldoStmt->execute();
+            $saldoInfo = $saldoStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($saldoInfo) {
+                $loja['saldo_disponivel'] = $saldoInfo['saldo_disponivel'];
+                $loja['total_creditado'] = $saldoInfo['total_creditado'];
+                $loja['total_usado'] = $saldoInfo['total_usado'];
+                $loja['total_usos'] = $saldoInfo['total_usos'];
+                $loja['ultimo_uso'] = $saldoInfo['ultimo_uso'];
+            } else {
+                $loja['saldo_disponivel'] = 0;
+                $loja['total_creditado'] = 0;
+                $loja['total_usado'] = 0;
+                $loja['total_usos'] = 0;
+                $loja['ultimo_uso'] = null;
+            }
+            
+            // Buscar cashback pendente
+            $pendingQuery = "
+                SELECT SUM(valor_cliente) as cashback_pendente
+                FROM transacoes_cashback 
+                WHERE usuario_id = :user_id AND loja_id = :loja_id AND status = 'pendente'
+            ";
+            $pendingStmt = $db->prepare($pendingQuery);
+            $pendingStmt->bindParam(':user_id', $userId);
+            $pendingStmt->bindParam(':loja_id', $loja['id']);
+            $pendingStmt->execute();
+            $pendingInfo = $pendingStmt->fetch(PDO::FETCH_ASSOC);
+            
+            $loja['cashback_pendente'] = $pendingInfo['cashback_pendente'] ?? 0;
+        }
+    }
+    
+    // Obter estatísticas gerais do cliente
+    $estatisticasQuery = "
+        SELECT 
+            COUNT(DISTINCT cs.loja_id) as lojas_com_saldo,
+            SUM(cs.saldo_disponivel) as total_saldo_disponivel,
+            SUM(cs.total_usado) as total_usado_geral,
+            COUNT(DISTINCT CASE WHEN cs.saldo_disponivel > 0 THEN cs.loja_id END) as lojas_saldo_disponivel
+        FROM cashback_saldos cs
+        WHERE cs.usuario_id = :user_id
+    ";
+    $estatisticasStmt = $db->prepare($estatisticasQuery);
+    $estatisticasStmt->bindParam(':user_id', $userId);
+    $estatisticasStmt->execute();
+    $estatisticasGerais = $estatisticasStmt->fetch(PDO::FETCH_ASSOC);
+    
+} catch (Exception $e) {
+    error_log('Erro ao carregar lojas parceiras: ' . $e->getMessage());
+    $hasError = true;
+    $errorMessage = 'Erro ao carregar dados das lojas parceiras.';
+    $storesData = [];
+    $estatisticasGerais = [
+        'lojas_com_saldo' => 0,
+        'total_saldo_disponivel' => 0,
+        'total_usado_geral' => 0,
+        'lojas_saldo_disponivel' => 0
+    ];
+}
 
 // Processar adição/remoção de favoritos
 $favoriteMessage = '';
@@ -63,6 +155,17 @@ if (isset($_POST['toggle_favorite'])) {
     $result = ClientController::getPartnerStores($userId, $filters, $page);
     $hasError = !$result['status'];
     $storesData = $hasError ? [] : $result['data'];
+}
+
+// Função para formatar valor
+function formatCurrency($value) {
+    return 'R$ ' . number_format($value ?: 0, 2, ',', '.');
+}
+
+// Função para formatar data
+function formatDate($date) {
+    if (!$date) return 'Nunca';
+    return date('d/m/Y', strtotime($date));
 }
 ?>
 
@@ -86,6 +189,9 @@ if (isset($_POST['toggle_favorite'])) {
                 <h1>Lojas Parceiras</h1>
                 <p>Conheça as lojas que oferecem cashback no Klube Cash</p>
             </div>
+            <div class="header-actions">
+                <a href="<?php echo CLIENT_BALANCE_URL; ?>" class="btn btn-secondary">Meus Saldos</a>
+            </div>
         </div>
         
         <?php if (!empty($favoriteMessage)): ?>
@@ -99,6 +205,31 @@ if (isset($_POST['toggle_favorite'])) {
                 <?php echo htmlspecialchars($errorMessage); ?>
             </div>
         <?php else: ?>
+        
+        <!-- Resumo de Saldos -->
+        <div class="balance-summary-section">
+            <div class="balance-summary-cards">
+                <div class="balance-summary-card">
+                    <div class="balance-summary-title">Saldo Total Disponível</div>
+                    <div class="balance-summary-value"><?php echo formatCurrency($estatisticasGerais['total_saldo_disponivel']); ?></div>
+                </div>
+                
+                <div class="balance-summary-card">
+                    <div class="balance-summary-title">Lojas com Saldo</div>
+                    <div class="balance-summary-value"><?php echo $estatisticasGerais['lojas_saldo_disponivel']; ?></div>
+                </div>
+                
+                <div class="balance-summary-card">
+                    <div class="balance-summary-title">Total Usado</div>
+                    <div class="balance-summary-value"><?php echo formatCurrency($estatisticasGerais['total_usado_geral']); ?></div>
+                </div>
+                
+                <div class="balance-summary-card">
+                    <div class="balance-summary-title">Lojas Utilizadas</div>
+                    <div class="balance-summary-value"><?php echo $estatisticasGerais['lojas_com_saldo']; ?></div>
+                </div>
+            </div>
+        </div>
         
         <!-- Filtros -->
         <div class="card filters-section">
@@ -128,6 +259,26 @@ if (isset($_POST['toggle_favorite'])) {
                     <input type="number" id="cashback_min" name="cashback_min" class="form-control" value="<?php echo $filters['cashback_min'] ?? ''; ?>" min="0" step="0.5" placeholder="Ex: 3.5">
                 </div>
                 
+                <div class="form-group">
+                    <label class="form-label" for="tem_saldo">Saldo</label>
+                    <select id="tem_saldo" name="tem_saldo" class="form-control">
+                        <option value="todas">Todas as Lojas</option>
+                        <option value="com_saldo" <?php echo (isset($filters['tem_saldo']) && $filters['tem_saldo'] == 'com_saldo') ? 'selected' : ''; ?>>Com saldo disponível</option>
+                        <option value="sem_saldo" <?php echo (isset($filters['tem_saldo']) && $filters['tem_saldo'] == 'sem_saldo') ? 'selected' : ''; ?>>Sem saldo</option>
+                        <option value="ja_usei" <?php echo (isset($filters['tem_saldo']) && $filters['tem_saldo'] == 'ja_usei') ? 'selected' : ''; ?>>Já usei saldo</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="ordenar">Ordenar por</label>
+                    <select id="ordenar" name="ordenar" class="form-control">
+                        <option value="nome" <?php echo (!isset($filters['ordenar']) || $filters['ordenar'] == 'nome') ? 'selected' : ''; ?>>Nome</option>
+                        <option value="cashback" <?php echo (isset($filters['ordenar']) && $filters['ordenar'] == 'cashback') ? 'selected' : ''; ?>>% Cashback</option>
+                        <option value="saldo" <?php echo (isset($filters['ordenar']) && $filters['ordenar'] == 'saldo') ? 'selected' : ''; ?>>Saldo disponível</option>
+                        <option value="uso" <?php echo (isset($filters['ordenar']) && $filters['ordenar'] == 'uso') ? 'selected' : ''; ?>>Mais usadas</option>
+                    </select>
+                </div>
+                
                 <div class="form-group" style="display: flex; align-items: flex-end;">
                     <button type="submit" name="filtrar" value="1" class="btn btn-primary">Filtrar</button>
                 </div>
@@ -150,6 +301,11 @@ if (isset($_POST['toggle_favorite'])) {
                 <div class="summary-card-title">Maior Cashback</div>
                 <div class="summary-card-value"><?php echo number_format($storesData['estatisticas']['maior_cashback'] ?? 0, 2); ?>%</div>
             </div>
+            
+            <div class="summary-card">
+                <div class="summary-card-title">Menor Cashback</div>
+                <div class="summary-card-value"><?php echo number_format($storesData['estatisticas']['menor_cashback'] ?? 0, 2); ?>%</div>
+            </div>
         </div>
         
         <!-- Lista de Lojas -->
@@ -160,7 +316,7 @@ if (isset($_POST['toggle_favorite'])) {
                 </div>
             <?php else: ?>
                 <?php foreach ($storesData['lojas'] as $loja): ?>
-                    <div class="store-card">
+                    <div class="store-card <?php echo $loja['saldo_disponivel'] > 0 ? 'has-balance' : ''; ?>">
                         <div class="store-header">
                             <div class="store-logo">
                                 <?php echo strtoupper(substr($loja['nome_fantasia'], 0, 1)); ?>
@@ -171,6 +327,16 @@ if (isset($_POST['toggle_favorite'])) {
                                     <?php echo htmlspecialchars($loja['categoria']); ?>
                                 </span>
                             </p>
+                            
+                            <!-- Indicador de saldo -->
+                            <?php if ($loja['saldo_disponivel'] > 0): ?>
+                                <div class="balance-indicator">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                                    </svg>
+                                    Saldo: <?php echo formatCurrency($loja['saldo_disponivel']); ?>
+                                </div>
+                            <?php endif; ?>
                             
                             <form method="POST" style="display: inline;">
                                 <input type="hidden" name="store_id" value="<?php echo $loja['id']; ?>">
@@ -190,22 +356,51 @@ if (isset($_POST['toggle_favorite'])) {
                                 Cashback: <span><?php echo number_format($loja['porcentagem_cashback'], 2); ?>%</span>
                             </p>
                             
-                            <?php if (!empty($loja['cashback_recebido']) || !empty($loja['compras_realizadas'])): ?>
-                                <div class="store-info">
-                                    <span>Compras: <?php echo $loja['compras_realizadas'] ?? 0; ?></span>
-                                    <span>Cashback recebido: R$ <?php echo number_format($loja['cashback_recebido'] ?? 0, 2, ',', '.'); ?></span>
-                                </div>
-                            <?php endif; ?>
+                            <!-- Informações de saldo e uso -->
+                            <div class="balance-info">
+                                <?php if ($loja['cashback_pendente'] > 0): ?>
+                                    <div class="balance-pending">
+                                        <span class="balance-label">Pendente:</span>
+                                        <span class="balance-value"><?php echo formatCurrency($loja['cashback_pendente']); ?></span>
+                                    </div>
+                                <?php endif; ?>
+                                
+                                <?php if ($loja['total_usado'] > 0): ?>
+                                    <div class="balance-used">
+                                        <span class="balance-label">Já usado:</span>
+                                        <span class="balance-value"><?php echo formatCurrency($loja['total_usado']); ?></span>
+                                        <small class="usage-count">(<?php echo $loja['total_usos']; ?> vezes)</small>
+                                    </div>
+                                <?php endif; ?>
+                                
+                                <?php if ($loja['ultimo_uso']): ?>
+                                    <div class="last-usage">
+                                        <span class="balance-label">Último uso:</span>
+                                        <span class="balance-value"><?php echo formatDate($loja['ultimo_uso']); ?></span>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
                             
+                            <!-- Informações tradicionais -->
                             <?php if (!empty($loja['website'])): ?>
-                                <p style="font-size: 14px; color: var(--medium-gray);">
+                                <p style="font-size: 14px; color: var(--medium-gray); margin-top: 10px;">
                                     Website: <a href="<?php echo htmlspecialchars($loja['website']); ?>" target="_blank" style="color: var(--primary-color);"><?php echo htmlspecialchars($loja['website']); ?></a>
                                 </p>
                             <?php endif; ?>
                         </div>
                         
                         <div class="store-footer">
-                            <a href="#" class="store-button" onclick="verDetalhes(<?php echo $loja['id']; ?>)">Ver Detalhes</a>
+                            <div class="store-actions">
+                                <a href="#" class="store-button" onclick="verDetalhes(<?php echo $loja['id']; ?>)">Ver Detalhes</a>
+                                <?php if ($loja['saldo_disponivel'] > 0): ?>
+                                    <button class="btn-use-balance" onclick="usarSaldo(<?php echo $loja['id']; ?>)">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                                        </svg>
+                                        Usar Saldo
+                                    </button>
+                                <?php endif; ?>
+                            </div>
                         </div>
                     </div>
                 <?php endforeach; ?>
@@ -266,11 +461,11 @@ if (isset($_POST['toggle_favorite'])) {
         <?php endif; ?>
     </div>
     
-    <!-- Modal de Detalhes da Loja (será implementado via JavaScript) -->
-    <div id="storeModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
-        <div style="background-color: white; padding: 30px; border-radius: 15px; max-width: 600px; width: 90%; position: relative;">
-            <button onclick="closeModal()" style="position: absolute; top: 15px; right: 15px; background: none; border: none; font-size: 24px; cursor: pointer;">&times;</button>
-            <h3 style="margin-bottom: 20px; font-size: 22px;">Detalhes da Loja</h3>
+    <!-- Modal de Detalhes da Loja -->
+    <div id="storeModal" class="modal">
+        <div class="modal-content">
+            <button onclick="closeModal()" class="modal-close">&times;</button>
+            <h3 class="modal-title">Detalhes da Loja</h3>
             <div id="storeDetails">
                 <!-- Será preenchido via JavaScript -->
                 <p>Carregando detalhes...</p>
@@ -278,33 +473,63 @@ if (isset($_POST['toggle_favorite'])) {
         </div>
     </div>
     
+    <!-- Modal de Uso de Saldo -->
+    <div id="useBalanceModal" class="modal">
+        <div class="modal-content">
+            <button onclick="closeUseBalanceModal()" class="modal-close">&times;</button>
+            <h3 class="modal-title">Usar Saldo</h3>
+            <div id="useBalanceContent">
+                <p>Funcionalidade de uso de saldo será implementada em breve!</p>
+                <p>Esta opção permitirá que você use seu saldo de cashback diretamente na loja.</p>
+            </div>
+        </div>
+    </div>
+    
     <script>
         // Função para exibir detalhes da loja
         function verDetalhes(storeId) {
-            // Em um cenário real, faríamos uma requisição AJAX para buscar os detalhes da loja
-            // Aqui apenas simularemos isso exibindo o modal
-            
             document.getElementById('storeModal').style.display = 'flex';
             
             // Simular carregamento de dados (em produção, faria uma chamada AJAX)
             document.getElementById('storeDetails').innerHTML = `
                 <div style="text-align: center; padding: 20px;">
                     <p>Carregando detalhes da loja #${storeId}...</p>
-                    <p>Esta funcionalidade estará disponível em breve!</p>
+                    <p>Esta funcionalidade incluirá:</p>
+                    <ul style="text-align: left; max-width: 300px; margin: 20px auto;">
+                        <li>Histórico completo de transações</li>
+                        <li>Detalhamento do saldo disponível</li>
+                        <li>Gráfico de movimentações</li>
+                        <li>Informações detalhadas da loja</li>
+                    </ul>
                 </div>
             `;
         }
         
-        // Função para fechar modal
+        // Função para usar saldo
+        function usarSaldo(storeId) {
+            document.getElementById('useBalanceModal').style.display = 'flex';
+        }
+        
+        // Função para fechar modal principal
         function closeModal() {
             document.getElementById('storeModal').style.display = 'none';
         }
         
+        // Função para fechar modal de uso de saldo
+        function closeUseBalanceModal() {
+            document.getElementById('useBalanceModal').style.display = 'none';
+        }
+        
         // Fechar modal ao clicar fora dele
         window.onclick = function(event) {
-            const modal = document.getElementById('storeModal');
-            if (event.target === modal) {
+            const storeModal = document.getElementById('storeModal');
+            const useBalanceModal = document.getElementById('useBalanceModal');
+            
+            if (event.target === storeModal) {
                 closeModal();
+            }
+            if (event.target === useBalanceModal) {
+                closeUseBalanceModal();
             }
         };
     </script>

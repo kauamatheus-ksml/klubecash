@@ -324,7 +324,255 @@ body {
     color: var(--danger-color);
     border: 1px solid var(--danger-color);
 }
+/* Adicionar ao final do arquivo assets/css/views/client/partner-stores.css */
 
+/* Header Actions */
+.header-actions {
+    display: flex;
+    gap: 10px;
+}
+
+/* Balance Summary Section */
+.balance-summary-section {
+    margin-bottom: 25px;
+}
+
+.balance-summary-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.balance-summary-card {
+    background-color: #E8F5E9;
+    border-radius: 10px;
+    padding: 15px;
+    text-align: center;
+    border: 1px solid #C8E6C9;
+}
+
+.balance-summary-title {
+    font-size: 14px;
+    color: var(--medium-gray);
+    margin-bottom: 5px;
+    font-weight: 500;
+}
+
+.balance-summary-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: #2E7D32;
+}
+
+/* Store Cards with Balance */
+.store-card.has-balance {
+    border: 2px solid #4CAF50;
+    box-shadow: 0 4px 15px rgba(76, 175, 80, 0.2);
+}
+
+.store-card.has-balance .store-header {
+    background-color: #F1F8E9;
+}
+
+/* Balance Indicator */
+.balance-indicator {
+    background-color: #4CAF50;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 15px;
+    font-size: 12px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin: 5px 0;
+}
+
+/* Balance Info */
+.balance-info {
+    margin: 10px 0;
+    padding: 10px;
+    background-color: #F8F9FA;
+    border-radius: 8px;
+    border-left: 3px solid #4CAF50;
+}
+
+.balance-info > div {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 5px;
+}
+
+.balance-info > div:last-child {
+    margin-bottom: 0;
+}
+
+.balance-label {
+    font-size: 12px;
+    color: var(--medium-gray);
+    font-weight: 500;
+}
+
+.balance-value {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--dark-gray);
+}
+
+.balance-pending .balance-value {
+    color: #FF9800;
+}
+
+.balance-used .balance-value {
+    color: #4CAF50;
+}
+
+.usage-count {
+    font-size: 11px;
+    color: var(--medium-gray);
+    margin-left: 5px;
+}
+
+.last-usage .balance-value {
+    color: #2196F3;
+}
+
+/* Store Actions */
+.store-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.btn-use-balance {
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 15px;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.3s;
+}
+
+.btn-use-balance:hover {
+    background-color: #388E3C;
+    transform: scale(1.05);
+}
+
+/* Modal Styles */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-content {
+    background-color: white;
+    padding: 30px;
+    border-radius: 15px;
+    max-width: 600px;
+    width: 90%;
+    position: relative;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.modal-title {
+    margin-bottom: 20px;
+    font-size: 22px;
+    color: var(--dark-gray);
+}
+
+.modal-close {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: var(--medium-gray);
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: background-color 0.3s;
+}
+
+.modal-close:hover {
+    background-color: #F0F0F0;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .balance-summary-cards {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+    }
+    
+    .store-actions {
+        flex-direction: column;
+        gap: 5px;
+    }
+    
+    .btn-use-balance {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .balance-info > div {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 2px;
+    }
+}
+
+@media (max-width: 480px) {
+    .balance-summary-cards {
+        grid-template-columns: 1fr;
+    }
+    
+    .modal-content {
+        width: 95%;
+        padding: 20px;
+    }
+}
+
+/* Animações */
+@keyframes balanceGlow {
+    0% { box-shadow: 0 4px 15px rgba(76, 175, 80, 0.2); }
+    50% { box-shadow: 0 4px 25px rgba(76, 175, 80, 0.4); }
+    100% { box-shadow: 0 4px 15px rgba(76, 175, 80, 0.2); }
+}
+
+.store-card.has-balance {
+    animation: balanceGlow 3s ease-in-out infinite;
+}
+
+/* Estados interativos */
+.store-card:hover.has-balance {
+    transform: translateY(-8px);
+}
+
+.balance-indicator:hover {
+    background-color: #388E3C;
+}
 /* Responsividade */
 @media (max-width: 768px) {
     .page-header {
