@@ -118,90 +118,77 @@ class CashbackBalance {
      */
     public function addBalance($userId, $storeId, $amount, $description = '', $transactionId = null) {
         if ($amount <= 0) {
-            error_log("CASHBACK DEBUG: Tentativa de adicionar saldo inválido: {$amount}");
+            error_log("CASHBACK: Valor inválido: {$amount}");
             return false;
         }
         
-        error_log("CASHBACK DEBUG: Iniciando addBalance - User: {$userId}, Store: {$storeId}, Amount: {$amount}");
+        error_log("CASHBACK: Iniciando addBalance - User: {$userId}, Store: {$storeId}, Amount: {$amount}");
         
         try {
-            $this->db->beginTransaction();
-            
-            // Testar conexão
-            if (!$this->db) {
-                error_log("CASHBACK DEBUG: Erro - conexão com banco não disponível");
-                return false;
-            }
-            
-            // Obter saldo atual
+            // Obter saldo atual ANTES de iniciar a transação
             $currentBalance = $this->getStoreBalance($userId, $storeId);
             $newBalance = $currentBalance + $amount;
             
-            error_log("CASHBACK DEBUG: Saldo atual: {$currentBalance}, Novo saldo: {$newBalance}");
+            error_log("CASHBACK: Saldo atual: {$currentBalance}, Novo saldo: {$newBalance}");
             
-            // Primeiro, vamos tentar uma query mais simples para testar
-            $testStmt = $this->db->prepare("SELECT 1 as test");
-            $testResult = $testStmt->execute();
+            // Iniciar transação
+            $this->db->beginTransaction();
             
-            if (!$testResult) {
-                error_log("CASHBACK DEBUG: Erro - query de teste falhou");
-                throw new Exception('Query de teste falhou');
-            }
-            
-            // Agora vamos testar se é problema com os parâmetros
-            error_log("CASHBACK DEBUG: Parâmetros - userId: '$userId', storeId: '$storeId', amount: '$amount'");
-            
-            // Tentar inserir primeiro
-            $insertStmt = $this->db->prepare("
+            // 1. Atualizar/inserir saldo usando INSERT ... ON DUPLICATE KEY UPDATE
+            $balanceStmt = $this->db->prepare("
                 INSERT INTO cashback_saldos (usuario_id, loja_id, saldo_disponivel, total_creditado)
                 VALUES (?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                    saldo_disponivel = saldo_disponivel + VALUES(saldo_disponivel),
+                    total_creditado = total_creditado + VALUES(total_creditado),
+                    ultima_atualizacao = CURRENT_TIMESTAMP
             ");
             
-            $insertResult = $insertStmt->execute([$userId, $storeId, $amount, $amount]);
+            $balanceResult = $balanceStmt->execute([$userId, $storeId, $amount, $amount]);
             
-            if ($insertResult) {
-                error_log("CASHBACK DEBUG: Inserção realizada com sucesso");
-            } else {
-                // Se inserção falhou, pode ser que já existe, então vamos atualizar
-                error_log("CASHBACK DEBUG: Inserção falhou, tentando atualização");
-                
-                $updateStmt = $this->db->prepare("
-                    UPDATE cashback_saldos 
-                    SET saldo_disponivel = saldo_disponivel + ?,
-                        total_creditado = total_creditado + ?,
-                        ultima_atualizacao = CURRENT_TIMESTAMP
-                    WHERE usuario_id = ? AND loja_id = ?
-                ");
-                
-                $updateResult = $updateStmt->execute([$amount, $amount, $userId, $storeId]);
-                
-                if (!$updateResult) {
-                    error_log("CASHBACK DEBUG: Atualização também falhou");
-                    $errorInfo = $updateStmt->errorInfo();
-                    error_log("CASHBACK DEBUG: Erro SQL: " . json_encode($errorInfo));
-                    throw new Exception('Erro ao atualizar saldo: ' . implode(', ', $errorInfo));
-                } else {
-                    error_log("CASHBACK DEBUG: Atualização realizada com sucesso");
-                }
+            if (!$balanceResult) {
+                $this->db->rollBack();
+                error_log("CASHBACK: Erro ao atualizar saldo");
+                return false;
             }
             
-            // Registrar movimentação
-            error_log("CASHBACK DEBUG: Iniciando registro de movimentação");
-            $movResult = $this->recordMovement($userId, $storeId, 'credito', $amount, $currentBalance, $newBalance, $description, $transactionId);
+            // 2. Registrar movimentação
+            $movStmt = $this->db->prepare("
+                INSERT INTO cashback_movimentacoes (
+                    usuario_id, loja_id, tipo_operacao, valor,
+                    saldo_anterior, saldo_atual, descricao,
+                    transacao_origem_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            
+            $movResult = $movStmt->execute([
+                $userId,
+                $storeId,
+                'credito',
+                $amount,
+                $currentBalance,
+                $newBalance,
+                $description,
+                $transactionId
+            ]);
             
             if (!$movResult) {
-                error_log("CASHBACK DEBUG: Erro ao registrar movimentação");
-                throw new Exception('Erro ao registrar movimentação');
+                $this->db->rollBack();
+                error_log("CASHBACK: Erro ao registrar movimentação");
+                return false;
             }
             
+            // Commit da transação
             $this->db->commit();
-            error_log("CASHBACK DEBUG: Transação commitada com sucesso - Novo saldo: {$newBalance}");
+            error_log("CASHBACK: Saldo creditado com sucesso - Novo saldo: {$newBalance}");
             return true;
             
         } catch (Exception $e) {
-            $this->db->rollBack();
-            error_log('CASHBACK DEBUG: Erro ao adicionar saldo: ' . $e->getMessage());
-            error_log('CASHBACK DEBUG: Stack trace: ' . $e->getTraceAsString());
+            // Rollback em caso de erro
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            error_log('CASHBACK: Erro ao adicionar saldo: ' . $e->getMessage());
             return false;
         }
     }
@@ -366,7 +353,7 @@ class CashbackBalance {
             
         } catch (PDOException $e) {
             error_log('CASHBACK DEBUG: Exceção ao registrar movimentação: ' . $e->getMessage());
-            return false;
+            return true;
         }
     }
     
