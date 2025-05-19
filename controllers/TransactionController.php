@@ -1004,7 +1004,7 @@ class TransactionController {
                 
                 // 2. Obter transações associadas ao pagamento
                 $transStmt = $db->prepare("
-                    SELECT t.id, t.usuario_id
+                    SELECT t.id, t.usuario_id, t.loja_id, t.valor_cliente
                     FROM pagamentos_transacoes pt
                     JOIN transacoes_cashback t ON pt.transacao_id = t.id
                     WHERE pt.pagamento_id = ?
@@ -1012,11 +1012,15 @@ class TransactionController {
                 $transStmt->execute([$paymentId]);
                 $transactions = $transStmt->fetchAll(PDO::FETCH_ASSOC);
                 
-                // 3. Atualizar status das transações para aprovado
+                // 3. Atualizar status das transações para aprovado E creditar saldo
                 if (count($transactions) > 0) {
+                    require_once __DIR__ . '/../models/CashbackBalance.php';
+                    $balanceModel = new CashbackBalance();
+                    
                     $transactionIds = array_column($transactions, 'id');
                     $placeholders = implode(',', array_fill(0, count($transactionIds), '?'));
                     
+                    // Atualizar transações
                     $updateTransStmt = $db->prepare("
                         UPDATE transacoes_cashback 
                         SET status = 'aprovado' 
@@ -1024,7 +1028,7 @@ class TransactionController {
                     ");
                     $updateTransStmt->execute($transactionIds);
                     
-                    // 4. Atualizar comissões (se existirem)
+                    // Atualizar comissões
                     $updateCommissionStmt = $db->prepare("
                         UPDATE transacoes_comissao 
                         SET status = 'aprovado' 
@@ -1032,7 +1036,27 @@ class TransactionController {
                     ");
                     $updateCommissionStmt->execute($transactionIds);
                     
-                    // 5. Notificar clientes
+                    // NOVO: Creditar saldo para cada transação
+                    foreach ($transactions as $transaction) {
+                        if ($transaction['valor_cliente'] > 0) {
+                            $description = "Cashback da compra - Transação #{$transaction['id']} (Pagamento #{$paymentId} aprovado)";
+                            
+                            $creditResult = $balanceModel->addBalance(
+                                $transaction['usuario_id'],
+                                $transaction['loja_id'],
+                                $transaction['valor_cliente'],
+                                $description,
+                                $transaction['id']
+                            );
+                            
+                            if (!$creditResult) {
+                                error_log("Erro ao creditar saldo - Transação: {$transaction['id']}, Usuario: {$transaction['usuario_id']}, Loja: {$transaction['loja_id']}, Valor: {$transaction['valor_cliente']}");
+                                // Continuamos o processo mesmo se falhar um crédito individual
+                            }
+                        }
+                    }
+                    
+                    // 4. Notificar clientes (código existente mantido)
                     $clienteNotificados = [];
                     foreach ($transactions as $transaction) {
                         if (!in_array($transaction['usuario_id'], $clienteNotificados)) {
@@ -1069,7 +1093,7 @@ class TransactionController {
                     }
                 }
                 
-                // 6. Notificar loja (se tiver usuário associado)
+                // 5. Notificar loja (código existente mantido)
                 $storeUserStmt = $db->prepare("SELECT usuario_id FROM lojas WHERE id = ?");
                 $storeUserStmt->execute([$payment['loja_id']]);
                 $storeUser = $storeUserStmt->fetch(PDO::FETCH_ASSOC);

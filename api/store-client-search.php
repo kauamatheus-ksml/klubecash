@@ -76,6 +76,9 @@ try {
     $balanceModel = new CashbackBalance();
     $saldo = $balanceModel->getStoreBalance($client['id'], $storeId);
     
+    // Debug log para verificar se o saldo está sendo obtido corretamente
+    error_log("DEBUG: Obtendo saldo para cliente {$client['id']} na loja {$storeId}: R$ {$saldo}");
+    
     // Obter estatísticas do cliente na loja
     $statsStmt = $db->prepare("
         SELECT 

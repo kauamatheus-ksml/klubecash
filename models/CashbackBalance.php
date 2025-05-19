@@ -23,6 +23,9 @@ class CashbackBalance {
      */
     public function getStoreBalance($userId, $storeId) {
         try {
+            // Debug log
+            error_log("DEBUG: Consultando saldo - Usuario: {$userId}, Loja: {$storeId}");
+            
             $stmt = $this->db->prepare("
                 SELECT saldo_disponivel 
                 FROM cashback_saldos 
@@ -33,7 +36,12 @@ class CashbackBalance {
             $stmt->execute();
             
             $result = $stmt->fetch(PDO::FETCH_ASSOC);
-            return $result ? floatval($result['saldo_disponivel']) : 0.00;
+            $saldo = $result ? floatval($result['saldo_disponivel']) : 0.00;
+            
+            // Debug log
+            error_log("DEBUG: Saldo encontrado: R$ {$saldo}");
+            
+            return $saldo;
             
         } catch (PDOException $e) {
             error_log('Erro ao obter saldo da loja: ' . $e->getMessage());
