@@ -8,6 +8,7 @@ require_once '../../config/database.php';
 require_once '../../config/constants.php';
 require_once '../../controllers/AuthController.php';
 require_once '../../controllers/TransactionController.php';
+require_once '../../models/CashbackBalance.php';
 
 // Iniciar sessão
 session_start();
@@ -57,23 +58,21 @@ if (isset($_GET['valor_max']) && !empty($_GET['valor_max'])) {
     $filters['valor_max'] = floatval($_GET['valor_max']);
 }
 
-// Obter transações pendentes
-$result = TransactionController::getPendingTransactions($storeId, $filters, $page);
+// Obter transações pendentes com informações sobre saldo usado
+$result = TransactionController::getPendingTransactionsWithBalance($storeId, $filters, $page);
 
 // Calcular totais
 $totalTransacoes = 0;
 $totalValorVendas = 0;
 $totalValorComissoes = 0;
+$totalSaldoUsado = 0;
 
 if ($result['status'] && isset($result['data']['totais'])) {
     $totalTransacoes = $result['data']['totais']['total_transacoes'];
-    $totalValorVendas = $result['data']['totais']['total_valor_compras'];
+    $totalValorVendas = $result['data']['totais']['total_valor_vendas_originais'];
     $totalValorComissoes = $result['data']['totais']['total_valor_comissoes'];
+    $totalSaldoUsado = $result['data']['totais']['total_saldo_usado'];
 }
-
-
-
-
 ?>
 
 <!DOCTYPE html>
@@ -108,11 +107,19 @@ if ($result['status'] && isset($result['data']['totais'])) {
                 <div class="stat-card">
                     <div class="stat-card-title">Valor Total de Vendas</div>
                     <div class="stat-card-value">R$ <?php echo number_format($totalValorVendas, 2, ',', '.'); ?></div>
+                    <div class="stat-card-subtitle">Valor original das vendas</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-card-title">Total Saldo Usado</div>
+                    <div class="stat-card-value">R$ <?php echo number_format($totalSaldoUsado, 2, ',', '.'); ?></div>
+                    <div class="stat-card-subtitle">Desconto aplicado pelos clientes</div>
                 </div>
                 
                 <div class="stat-card">
                     <div class="stat-card-title">Valor Total de Comissões</div>
                     <div class="stat-card-value">R$ <?php echo number_format($totalValorComissoes, 2, ',', '.'); ?></div>
+                    <div class="stat-card-subtitle">Valor a pagar ao Klube Cash</div>
                 </div>
             </div>
             
@@ -174,13 +181,20 @@ if ($result['status'] && isset($result['data']['totais'])) {
                                         <th>Código</th>
                                         <th>Cliente</th>
                                         <th>Data</th>
-                                        <th>Valor Venda</th>
+                                        <th>Valor Original</th>
+                                        <th>Saldo Usado</th>
+                                        <th>Valor Cobrado</th>
                                         <th>Comissão</th>
                                         <th>Cashback Cliente</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php foreach ($result['data']['transacoes'] as $transaction): ?>
+                                        <?php 
+                                        $valorOriginal = $transaction['valor_total'];
+                                        $saldoUsado = $transaction['saldo_usado'] ?? 0;
+                                        $valorCobrado = $valorOriginal - $saldoUsado;
+                                        ?>
                                         <tr>
                                             <td>
                                                 <input type="checkbox" name="transacoes[]" value="<?php echo $transaction['id']; ?>" 
@@ -188,9 +202,27 @@ if ($result['status'] && isset($result['data']['totais'])) {
                                                        data-value="<?php echo $transaction['valor_cashback']; ?>">
                                             </td>
                                             <td><?php echo htmlspecialchars($transaction['codigo_transacao'] ?? 'N/A'); ?></td>
-                                            <td><?php echo htmlspecialchars($transaction['cliente_nome']); ?></td>
+                                            <td>
+                                                <?php echo htmlspecialchars($transaction['cliente_nome']); ?>
+                                                <?php if ($saldoUsado > 0): ?>
+                                                    <span class="balance-used-badge" title="Cliente usou saldo">💰</span>
+                                                <?php endif; ?>
+                                            </td>
                                             <td><?php echo date('d/m/Y H:i', strtotime($transaction['data_transacao'])); ?></td>
-                                            <td>R$ <?php echo number_format($transaction['valor_total'], 2, ',', '.'); ?></td>
+                                            <td>R$ <?php echo number_format($valorOriginal, 2, ',', '.'); ?></td>
+                                            <td>
+                                                <?php if ($saldoUsado > 0): ?>
+                                                    <span class="saldo-usado">R$ <?php echo number_format($saldoUsado, 2, ',', '.'); ?></span>
+                                                <?php else: ?>
+                                                    <span class="sem-saldo">-</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <strong>R$ <?php echo number_format($valorCobrado, 2, ',', '.'); ?></strong>
+                                                <?php if ($valorCobrado < $valorOriginal): ?>
+                                                    <small class="desconto">(com desconto)</small>
+                                                <?php endif; ?>
+                                            </td>
                                             <td>R$ <?php echo number_format($transaction['valor_cashback'], 2, ',', '.'); ?></td>
                                             <td>R$ <?php echo number_format($transaction['valor_cliente'], 2, ',', '.'); ?></td>
                                         </tr>
@@ -209,8 +241,16 @@ if ($result['status'] && isset($result['data']['totais'])) {
                                     <span class="value" id="selectedCount">0</span>
                                 </div>
                                 <div class="summary-item">
+                                    <span class="label">Valor total das vendas:</span>
+                                    <span class="value" id="totalSalesValue">R$ 0,00</span>
+                                </div>
+                                <div class="summary-item">
+                                    <span class="label">Total saldo usado:</span>
+                                    <span class="value" id="totalBalanceUsed">R$ 0,00</span>
+                                </div>
+                                <div class="summary-item">
                                     <span class="label">Valor total a pagar:</span>
-                                    <span class="value" id="totalValue">R$ 0,00</span>
+                                    <span class="value" id="totalCommissionValue">R$ 0,00</span>
                                 </div>
                             </div>
                         </div>
@@ -255,12 +295,35 @@ if ($result['status'] && isset($result['data']['totais'])) {
             <!-- Informações Adicionais -->
             <div class="card info-card">
                 <div class="card-header">
-                    <div class="card-title">Informações Importantes</div>
+                    <div class="card-title">Informações sobre Saldo e Comissões</div>
                 </div>
                 <div class="info-content">
-                    <p>As comissões pendentes representam os valores a serem pagos pela sua loja ao Klube Cash. Após o pagamento e aprovação, o cashback será liberado para os clientes.</p>
-                    <p>Para realizar o pagamento, selecione as transações desejadas e clique no botão "Pagar Selecionadas". Você será direcionado para a página de pagamento, onde poderá escolher o método e enviar o comprovante.</p>
-                    <p>Pagamentos são processados em até 24 horas úteis após o envio do comprovante.</p>
+                    <div class="info-section">
+                        <h4>📊 Como são calculadas as comissões:</h4>
+                        <ul>
+                            <li>A comissão é calculada apenas sobre o valor efetivamente cobrado do cliente</li>
+                            <li>Se o cliente usou saldo, o valor é descontado antes do cálculo</li>
+                            <li>Exemplo: Venda de R$ 100,00 - Saldo usado R$ 20,00 = Comissão sobre R$ 80,00</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="info-section">
+                        <h4>💰 Sobre o uso de saldo:</h4>
+                        <ul>
+                            <li>Clientes podem usar seu saldo de cashback para desconto em novas compras</li>
+                            <li>O saldo usado é identificado pelo ícone 💰 ao lado do nome do cliente</li>
+                            <li>Isso não afeta o cashback que será gerado para o cliente na nova compra</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="info-section">
+                        <h4>🔔 Processo de pagamento:</h4>
+                        <ul>
+                            <li>Selecione as transações que deseja quitar</li>
+                            <li>O valor total será a soma das comissões de todas as transações selecionadas</li>
+                            <li>Após o pagamento e aprovação, o cashback será liberado para os clientes</li>
+                        </ul>
+                    </div>
                 </div>
             </div>
         </div>
@@ -272,7 +335,9 @@ if ($result['status'] && isset($result['data']['totais'])) {
             const transactionCheckboxes = document.querySelectorAll('.transaction-checkbox');
             const paySelectedBtn = document.getElementById('paySelectedBtn');
             const selectedCountElement = document.getElementById('selectedCount');
-            const totalValueElement = document.getElementById('totalValue');
+            const totalSalesValueElement = document.getElementById('totalSalesValue');
+            const totalBalanceUsedElement = document.getElementById('totalBalanceUsed');
+            const totalCommissionValueElement = document.getElementById('totalCommissionValue');
             const paymentForm = document.getElementById('paymentForm');
             const paymentSummary = document.getElementById('paymentSummary');
             
@@ -289,14 +354,36 @@ if ($result['status'] && isset($result['data']['totais'])) {
             function updatePaymentSummary() {
                 const selectedCheckboxes = document.querySelectorAll('.transaction-checkbox:checked');
                 const selectedCount = selectedCheckboxes.length;
-                let totalValue = 0;
+                let totalCommission = 0;
+                let totalSalesValue = 0;
+                let totalBalanceUsed = 0;
                 
                 selectedCheckboxes.forEach(checkbox => {
-                    totalValue += parseFloat(checkbox.getAttribute('data-value'));
+                    const row = checkbox.closest('tr');
+                    const cells = row.querySelectorAll('td');
+                    
+                    // Valor original da venda
+                    const originalValueText = cells[4].textContent.replace('R$ ', '').replace('.', '').replace(',', '.');
+                    const originalValue = parseFloat(originalValueText);
+                    
+                    // Saldo usado
+                    const balanceUsedElement = cells[5].querySelector('.saldo-usado');
+                    const balanceUsed = balanceUsedElement ? 
+                        parseFloat(balanceUsedElement.textContent.replace('R$ ', '').replace('.', '').replace(',', '.')) : 0;
+                    
+                    // Comissão
+                    const commissionText = cells[7].textContent.replace('R$ ', '').replace('.', '').replace(',', '.');
+                    const commission = parseFloat(commissionText);
+                    
+                    totalSalesValue += originalValue;
+                    totalBalanceUsed += balanceUsed;
+                    totalCommission += commission;
                 });
                 
                 selectedCountElement.textContent = selectedCount;
-                totalValueElement.textContent = formatCurrency(totalValue);
+                totalSalesValueElement.textContent = formatCurrency(totalSalesValue);
+                totalBalanceUsedElement.textContent = formatCurrency(totalBalanceUsed);
+                totalCommissionValueElement.textContent = formatCurrency(totalCommission);
                 
                 // Habilitar/desabilitar botão de pagamento
                 paySelectedBtn.disabled = selectedCount === 0;
@@ -345,5 +432,63 @@ if ($result['status'] && isset($result['data']['totais'])) {
             updatePaymentSummary();
         });
     </script>
+    
+    <style>
+        /* Estilos adicionais para saldo usado */
+        .balance-used-badge {
+            margin-left: 5px;
+            font-size: 0.8rem;
+        }
+        
+        .saldo-usado {
+            color: #28a745;
+            font-weight: 600;
+        }
+        
+        .sem-saldo {
+            color: #6c757d;
+            font-style: italic;
+        }
+        
+        .desconto {
+            color: #28a745;
+            font-size: 0.8rem;
+            display: block;
+        }
+        
+        .info-section {
+            margin-bottom: 20px;
+        }
+        
+        .info-section h4 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .info-section ul {
+            list-style-type: none;
+            padding-left: 0;
+        }
+        
+        .info-section li {
+            margin-bottom: 8px;
+            padding-left: 20px;
+            position: relative;
+        }
+        
+        .info-section li::before {
+            content: "•";
+            color: #FF7A00;
+            font-weight: bold;
+            position: absolute;
+            left: 0;
+        }
+        
+        .stat-card-subtitle {
+            font-size: 0.8rem;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+    </style>
 </body>
 </html>
