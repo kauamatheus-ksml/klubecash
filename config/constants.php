@@ -68,6 +68,8 @@ define('CLIENT_STORES_URL', SITE_URL . '/cliente/lojas-parceiras');
 define('CLIENT_PROFILE_URL', SITE_URL . '/cliente/perfil');
 // URLs do cliente
 define('CLIENT_BALANCE_URL', SITE_URL . '/cliente/saldo');
+// URLs de ações
+define('CLIENT_ACTIONS_URL', SITE_URL . '/cliente/actions');
 
 // URLs adicionais para admin
 define('ADMIN_USERS_URL', SITE_URL . '/admin/usuarios');

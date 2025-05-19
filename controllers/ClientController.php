@@ -1292,7 +1292,141 @@ class ClientController {
             return ['status' => false, 'message' => 'Erro ao gerar relatório. Tente novamente.'];
         }
     }
-    
+    /**
+    * Obtém o saldo completo do cliente com detalhes por loja
+    * 
+    * @param int $userId ID do cliente
+    * @return array Resultado da operação
+    */
+    public static function getClientBalanceDetails($userId) {
+        try {
+            if (!self::validateClient($userId)) {
+                return ['status' => false, 'message' => 'Cliente não encontrado ou inativo.'];
+            }
+            
+            require_once __DIR__ . '/../models/CashbackBalance.php';
+            $balanceModel = new CashbackBalance();
+            
+            $balances = $balanceModel->getAllUserBalances($userId);
+            $totalBalance = $balanceModel->getTotalBalance($userId);
+            
+            // Enriquecer dados com estatísticas
+            foreach ($balances as &$balance) {
+                $stats = $balanceModel->getBalanceStatistics($userId, $balance['loja_id']);
+                $balance['estatisticas'] = $stats;
+            }
+            
+            return [
+                'status' => true,
+                'data' => [
+                    'saldo_total' => $totalBalance,
+                    'saldos_por_loja' => $balances,
+                    'total_lojas' => count($balances)
+                ]
+            ];
+            
+        } catch (Exception $e) {
+            error_log('Erro ao obter detalhes do saldo: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro ao carregar saldo.'];
+        }
+    }
+
+    /**
+    * Usa saldo do cliente em uma loja específica
+    * 
+    * @param int $userId ID do cliente
+    * @param int $storeId ID da loja
+    * @param float $amount Valor a ser usado
+    * @param string $description Descrição do uso
+    * @return array Resultado da operação
+    */
+    public static function useClientBalance($userId, $storeId, $amount, $description = '', $transactionId = null) {
+        try {
+            if (!self::validateClient($userId)) {
+                return ['status' => false, 'message' => 'Cliente não encontrado ou inativo.'];
+            }
+            
+            require_once __DIR__ . '/../models/CashbackBalance.php';
+            $balanceModel = new CashbackBalance();
+            
+            $currentBalance = $balanceModel->getStoreBalance($userId, $storeId);
+            
+            if ($currentBalance < $amount) {
+                return [
+                    'status' => false, 
+                    'message' => 'Saldo insuficiente. Disponível: R$ ' . number_format($currentBalance, 2, ',', '.')
+                ];
+            }
+            
+            // Adicionar ID da transação na descrição se não fornecida
+            if (empty($description) && $transactionId) {
+                $description = "Uso do saldo - Transação #" . $transactionId;
+            } elseif (empty($description)) {
+                $description = "Uso do saldo de cashback";
+            }
+            
+            if ($balanceModel->useBalance($userId, $storeId, $amount, $description, $transactionId)) {
+                $newBalance = $balanceModel->getStoreBalance($userId, $storeId);
+                
+                return [
+                    'status' => true,
+                    'message' => 'Saldo usado com sucesso!',
+                    'data' => [
+                        'valor_usado' => $amount,
+                        'saldo_anterior' => $currentBalance,
+                        'saldo_atual' => $newBalance,
+                        'transacao_id' => $transactionId
+                    ]
+                ];
+            } else {
+                return ['status' => false, 'message' => 'Erro ao usar saldo. Tente novamente.'];
+            }
+            
+        } catch (Exception $e) {
+            error_log('Erro ao usar saldo: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro ao processar uso do saldo.'];
+        }
+    }
+
+    /**
+    * Obtém o histórico de movimentações do saldo de uma loja
+    * 
+    * @param int $userId ID do cliente
+    * @param int $storeId ID da loja
+    * @param int $page Página atual
+    * @param int $limit Itens por página
+    * @return array Resultado da operação
+    */
+    public static function getBalanceHistory($userId, $storeId, $page = 1, $limit = 20) {
+        try {
+            if (!self::validateClient($userId)) {
+                return ['status' => false, 'message' => 'Cliente não encontrado ou inativo.'];
+            }
+            
+            require_once __DIR__ . '/../models/CashbackBalance.php';
+            $balanceModel = new CashbackBalance();
+            
+            $offset = ($page - 1) * $limit;
+            $history = $balanceModel->getMovementHistory($userId, $storeId, $limit, $offset);
+            
+            return [
+                'status' => true,
+                'data' => [
+                    'movimentacoes' => $history,
+                    'pagina_atual' => $page,
+                    'itens_por_pagina' => $limit
+                ]
+            ];
+            
+        } catch (Exception $e) {
+            error_log('Erro ao obter histórico: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro ao carregar histórico.'];
+        }
+    }
+
+
+
+
     /**
      * Marca uma loja como favorita
      * 
@@ -1723,6 +1857,285 @@ if (basename($_SERVER['PHP_SELF']) === 'ClientController.php') {
     $action = $_REQUEST['action'] ?? '';
     
     switch ($action) {
+
+
+        case 'get_balance_details':
+            $result = self::getClientBalanceDetails($userId);
+            echo json_encode($result);
+            break;
+            
+        case 'get_store_balance':
+            $storeId = intval($_GET['store_id'] ?? $_POST['store_id'] ?? 0);
+            
+            if ($storeId <= 0) {
+                echo json_encode(['status' => false, 'message' => 'ID da loja inválido']);
+                return;
+            }
+            
+            try {
+                require_once __DIR__ . '/../models/CashbackBalance.php';
+                $balanceModel = new CashbackBalance();
+                $balance = $balanceModel->getStoreBalance($userId, $storeId);
+                $statistics = $balanceModel->getBalanceStatistics($userId, $storeId);
+                
+                echo json_encode([
+                    'status' => true,
+                    'data' => [
+                        'saldo_disponivel' => $balance,
+                        'estatisticas' => $statistics
+                    ]
+                ]);
+            } catch (Exception $e) {
+                echo json_encode(['status' => false, 'message' => 'Erro ao obter saldo da loja']);
+            }
+            break;
+            
+        case 'get_total_balance':
+            try {
+                require_once __DIR__ . '/../models/CashbackBalance.php';
+                $balanceModel = new CashbackBalance();
+                $totalBalance = $balanceModel->getTotalBalance($userId);
+                
+                echo json_encode([
+                    'status' => true,
+                    'data' => ['saldo_total' => $totalBalance]
+                ]);
+            } catch (Exception $e) {
+                echo json_encode(['status' => false, 'message' => 'Erro ao obter saldo total']);
+            }
+            break;
+            
+        case 'use_balance':
+            $storeId = intval($_POST['store_id'] ?? 0);
+            $amount = floatval($_POST['amount'] ?? 0);
+            $description = trim($_POST['description'] ?? '');
+            $transactionId = intval($_POST['transaction_id'] ?? 0) ?: null;
+            
+            if ($storeId <= 0) {
+                echo json_encode(['status' => false, 'message' => 'ID da loja inválido']);
+                return;
+            }
+            
+            if ($amount <= 0) {
+                echo json_encode(['status' => false, 'message' => 'Valor deve ser maior que zero']);
+                return;
+            }
+            
+            $result = self::useClientBalance($userId, $storeId, $amount, $description, $transactionId);
+            echo json_encode($result);
+            break;
+            
+        case 'get_balance_history':
+            $storeId = intval($_GET['store_id'] ?? 0);
+            $page = intval($_GET['page'] ?? 1);
+            $limit = intval($_GET['limit'] ?? 20);
+            
+            if ($storeId <= 0) {
+                echo json_encode(['status' => false, 'message' => 'ID da loja inválido']);
+                return;
+            }
+            
+            $result = self::getBalanceHistory($userId, $storeId, $page, $limit);
+            echo json_encode($result);
+            break;
+            
+        case 'simulate_balance_use':
+            // Simular uso do saldo (para calculadoras em formulários)
+            $storeId = intval($_POST['store_id'] ?? 0);
+            $amount = floatval($_POST['amount'] ?? 0);
+            
+            if ($storeId <= 0 || $amount <= 0) {
+                echo json_encode(['status' => false, 'message' => 'Parâmetros inválidos']);
+                return;
+            }
+            
+            try {
+                require_once __DIR__ . '/../models/CashbackBalance.php';
+                $balanceModel = new CashbackBalance();
+                $currentBalance = $balanceModel->getStoreBalance($userId, $storeId);
+                
+                $canUse = $currentBalance >= $amount;
+                $remainingBalance = $canUse ? ($currentBalance - $amount) : $currentBalance;
+                
+                echo json_encode([
+                    'status' => true,
+                    'data' => [
+                        'pode_usar' => $canUse,
+                        'saldo_atual' => $currentBalance,
+                        'valor_solicitado' => $amount,
+                        'saldo_restante' => $remainingBalance,
+                        'valor_maximo_permitido' => $currentBalance
+                    ]
+                ]);
+            } catch (Exception $e) {
+                echo json_encode(['status' => false, 'message' => 'Erro ao simular uso do saldo']);
+            }
+            break;
+            
+        case 'refresh_balances':
+            // Sincronizar saldos com base nas transações (útil para correções)
+            try {
+                require_once __DIR__ . '/../models/CashbackBalance.php';
+                $balanceModel = new CashbackBalance();
+                
+                if ($balanceModel->syncBalancesFromTransactions($userId)) {
+                    echo json_encode([
+                        'status' => true,
+                        'message' => 'Saldos sincronizados com sucesso'
+                    ]);
+                } else {
+                    echo json_encode([
+                        'status' => false,
+                        'message' => 'Erro ao sincronizar saldos'
+                    ]);
+                }
+            } catch (Exception $e) {
+                echo json_encode(['status' => false, 'message' => 'Erro ao sincronizar saldos']);
+            }
+            break;
+            
+        case 'validate_balance_use':
+            // Validar se o cliente pode usar determinado valor
+            $storeId = intval($_POST['store_id'] ?? 0);
+            $amount = floatval($_POST['amount'] ?? 0);
+            
+            try {
+                require_once __DIR__ . '/../models/CashbackBalance.php';
+                $balanceModel = new CashbackBalance();
+                $currentBalance = $balanceModel->getStoreBalance($userId, $storeId);
+                
+                $validation = [
+                    'valido' => $currentBalance >= $amount && $amount > 0,
+                    'saldo_disponivel' => $currentBalance,
+                    'valor_solicitado' => $amount,
+                    'mensagem' => ''
+                ];
+                
+                if ($amount <= 0) {
+                    $validation['mensagem'] = 'Valor deve ser maior que zero';
+                } elseif ($currentBalance < $amount) {
+                    $validation['mensagem'] = 'Saldo insuficiente. Disponível: R$ ' . number_format($currentBalance, 2, ',', '.');
+                } else {
+                    $validation['mensagem'] = 'Valor válido para uso';
+                }
+                
+                echo json_encode(['status' => true, 'data' => $validation]);
+            } catch (Exception $e) {
+                echo json_encode(['status' => false, 'message' => 'Erro ao validar uso do saldo']);
+            }
+            break;
+            
+        case 'get_balance_widget_data':
+            // Dados específicos para o widget de saldo
+            $storeId = isset($_GET['store_id']) ? intval($_GET['store_id']) : null;
+            
+            try {
+                require_once __DIR__ . '/../models/CashbackBalance.php';
+                $balanceModel = new CashbackBalance();
+                
+                if ($storeId) {
+                    // Dados de uma loja específica
+                    $balance = $balanceModel->getStoreBalance($userId, $storeId);
+                    $statistics = $balanceModel->getBalanceStatistics($userId, $storeId);
+                    
+                    // Buscar dados da loja
+                    $db = Database::getConnection();
+                    $stmt = $db->prepare("SELECT nome_fantasia, logo, categoria FROM lojas WHERE id = :store_id");
+                    $stmt->bindParam(':store_id', $storeId);
+                    $stmt->execute();
+                    $storeData = $stmt->fetch(PDO::FETCH_ASSOC);
+                    
+                    $data = [
+                        'tipo' => 'loja_especifica',
+                        'loja' => array_merge($storeData, [
+                            'id' => $storeId,
+                            'saldo_disponivel' => $balance,
+                            'estatisticas' => $statistics
+                        ]),
+                        'saldo_total' => $balance
+                    ];
+                } else {
+                    // Dados de todas as lojas
+                    $balances = $balanceModel->getAllUserBalances($userId);
+                    $totalBalance = $balanceModel->getTotalBalance($userId);
+                    
+                    $data = [
+                        'tipo' => 'todas_lojas',
+                        'lojas' => $balances,
+                        'saldo_total' => $totalBalance,
+                        'total_lojas' => count($balances)
+                    ];
+                }
+                
+                echo json_encode(['status' => true, 'data' => $data]);
+            } catch (Exception $e) {
+                echo json_encode(['status' => false, 'message' => 'Erro ao obter dados do widget']);
+            }
+            break;
+            
+        case 'export_balance_history':
+            // Exportar histórico de saldo em CSV
+            $storeId = intval($_GET['store_id'] ?? 0);
+            
+            if ($storeId <= 0) {
+                echo json_encode(['status' => false, 'message' => 'ID da loja inválido']);
+                return;
+            }
+            
+            try {
+                require_once __DIR__ . '/../models/CashbackBalance.php';
+                $balanceModel = new CashbackBalance();
+                
+                // Obter todo o histórico (sem limite)
+                $history = $balanceModel->getMovementHistory($userId, $storeId, 999999, 0);
+                
+                // Gerar CSV
+                $filename = 'historico_saldo_loja_' . $storeId . '_' . date('Y-m-d') . '.csv';
+                
+                header('Content-Type: text/csv; charset=utf-8');
+                header('Content-Disposition: attachment; filename="' . $filename . '"');
+                header('Cache-Control: must-revalidate, post-check=0, pre-check=0');
+                header('Pragma: no-cache');
+                
+                $output = fopen('php://output', 'w');
+                
+                // Cabeçalho CSV
+                fputcsv($output, [
+                    'Data/Hora',
+                    'Tipo',
+                    'Valor',
+                    'Saldo Anterior',
+                    'Saldo Atual',
+                    'Descrição'
+                ]);
+                
+                // Dados
+                foreach ($history as $movement) {
+                    $type = '';
+                    switch ($movement['tipo_operacao']) {
+                        case 'credito': $type = 'Crédito'; break;
+                        case 'uso': $type = 'Uso'; break;
+                        case 'estorno': $type = 'Estorno'; break;
+                    }
+                    
+                    fputcsv($output, [
+                        date('d/m/Y H:i:s', strtotime($movement['data_operacao'])),
+                        $type,
+                        'R$ ' . number_format($movement['valor'], 2, ',', '.'),
+                        'R$ ' . number_format($movement['saldo_anterior'], 2, ',', '.'),
+                        'R$ ' . number_format($movement['saldo_atual'], 2, ',', '.'),
+                        $movement['descricao']
+                    ]);
+                }
+                
+                fclose($output);
+                exit;
+            } catch (Exception $e) {
+                echo json_encode(['status' => false, 'message' => 'Erro ao exportar histórico']);
+            }
+            break;
+
+
         case 'dashboard':
             $result = ClientController::getDashboardData($userId);
             echo json_encode($result);

@@ -198,13 +198,37 @@ class Transaction {
      * @return bool Verdadeiro se aprovada com sucesso
      */
     public function aprovar() {
-        if ($this->status !== TRANSACTION_PENDING) {
-            return false;
+    if ($this->status !== TRANSACTION_PENDING) {
+        return false;
+    }
+    
+    try {
+        $this->db->beginTransaction();
+        
+        // Aprovar a transação
+        $this->status = TRANSACTION_APPROVED;
+        if (!$this->save()) {
+            throw new Exception('Erro ao salvar transação');
         }
         
-        $this->status = TRANSACTION_APPROVED;
-        return $this->save();
+        // Creditar cashback no saldo do cliente
+        require_once __DIR__ . '/CashbackBalance.php';
+        $balanceModel = new CashbackBalance();
+        
+        $description = "Cashback da compra - Transação " . ($this->id ?? 'Nova');
+        if (!$balanceModel->addBalance($this->usuarioId, $this->lojaId, $this->valorCliente, $description, $this->id)) {
+            throw new Exception('Erro ao creditar cashback no saldo');
+        }
+        
+        $this->db->commit();
+        return true;
+        
+    } catch (Exception $e) {
+        $this->db->rollBack();
+        error_log('Erro ao aprovar transação: ' . $e->getMessage());
+        return false;
     }
+}
     
     /**
      * Cancela a transação
@@ -212,13 +236,37 @@ class Transaction {
      * @return bool Verdadeiro se cancelada com sucesso
      */
     public function cancelar() {
-        if ($this->status === TRANSACTION_CANCELED) {
-            return false;
+    if ($this->status === TRANSACTION_CANCELED) {
+        return false;
+    }
+    
+    try {
+        $this->db->beginTransaction();
+        
+        // Se a transação estava aprovada, estornar cashback
+        if ($this->status === TRANSACTION_APPROVED) {
+            require_once __DIR__ . '/CashbackBalance.php';
+            $balanceModel = new CashbackBalance();
+            
+            $description = "Estorno - Cancelamento da transação " . $this->id;
+            $balanceModel->refundBalance($this->usuarioId, $this->lojaId, $this->valorCliente, $description, $this->id);
         }
         
+        // Cancelar a transação
         $this->status = TRANSACTION_CANCELED;
-        return $this->save();
+        if (!$this->save()) {
+            throw new Exception('Erro ao salvar transação cancelada');
+        }
+        
+        $this->db->commit();
+        return true;
+        
+    } catch (Exception $e) {
+        $this->db->rollBack();
+        error_log('Erro ao cancelar transação: ' . $e->getMessage());
+        return false;
     }
+}
     
     /**
      * Obtém detalhes completos da transação incluindo dados da loja e usuário
