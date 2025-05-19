@@ -10,6 +10,12 @@ require_once __DIR__ . '/AuthController.php';
 ini_set('display_errors', 0);
 error_reporting(E_ALL);
 
+function sendJsonResponse($data) {
+    header('Content-Type: application/json; charset=UTF-8');
+    echo json_encode($data);
+    exit;
+}
+
 // Adicione um manipulador de erros para registrar erros sem exibi-los
 set_error_handler(function($errno, $errstr, $errfile, $errline) {
     error_log("Erro PHP [$errno]: $errstr em $errfile:$errline");
@@ -289,6 +295,11 @@ public static function getUserDetails($userId) {
     */
     public static function manageStoresWithBalance($filters = [], $page = 1) {
         try {
+        // Verificar se é um administrador
+            if (!self::validateAdmin()) {
+                return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
+            }
+
             $db = Database::getConnection();
             $limit = ITEMS_PER_PAGE;
             $offset = ($page - 1) * $limit;
@@ -362,7 +373,7 @@ public static function getUserDetails($userId) {
             $categoriesStmt = $db->query("SELECT DISTINCT categoria FROM lojas WHERE categoria IS NOT NULL ORDER BY categoria");
             $categories = $categoriesStmt->fetchAll(PDO::FETCH_COLUMN);
             
-            // Calcular estatísticas gerais
+            // Calcular estatísticas gerais - usando consulta simples
             $statsQuery = "
                 SELECT 
                     COUNT(DISTINCT l.id) as total_lojas,
@@ -396,7 +407,7 @@ public static function getUserDetails($userId) {
                 ]
             ];
             
-        } catch (PDOException $e) {
+        } catch (Exception $e) {
             error_log('Erro ao gerenciar lojas com saldo: ' . $e->getMessage());
             return ['status' => false, 'message' => 'Erro ao carregar dados das lojas.'];
         }
@@ -1686,13 +1697,41 @@ public static function getAvailableStores() {
             
             switch ($type) {
                 case 'create_store':
+                    header('Content-Type: application/json; charset=UTF-8');
+                    
                     $data = $_POST;
                     unset($data['action']); // Remove action dos dados
                     
-                    // Lógica para criar nova loja
-                    $db = Database::getConnection();
+                    // Validar dados obrigatórios
+                    $required = ['nome_fantasia', 'razao_social', 'cnpj', 'email', 'telefone'];
+                    foreach ($required as $field) {
+                        if (!isset($data[$field]) || empty(trim($data[$field]))) {
+                            sendJsonResponse(['status' => false, 'message' => "Campo '$field' é obrigatório"]);
+                        }
+                    }
                     
                     try {
+                        $db = Database::getConnection();
+                        
+                        // Verificar se já existe loja com mesmo CNPJ
+                        $checkStmt = $db->prepare("SELECT id FROM lojas WHERE cnpj = :cnpj");
+                        $stmt->bindParam(':cnpj', $data['cnpj']);
+                        $checkStmt->execute();
+                        
+                        if ($checkStmt->rowCount() > 0) {
+                            sendJsonResponse(['status' => false, 'message' => 'Já existe uma loja com este CNPJ']);
+                        }
+                        
+                        // Verificar se já existe loja com mesmo email
+                        $checkEmailStmt = $db->prepare("SELECT id FROM lojas WHERE email = :email");
+                        $checkEmailStmt->bindParam(':email', $data['email']);
+                        $checkEmailStmt->execute();
+                        
+                        if ($checkEmailStmt->rowCount() > 0) {
+                            sendJsonResponse(['status' => false, 'message' => 'Já existe uma loja com este email']);
+                        }
+                        
+                        // Inserir nova loja
                         $stmt = $db->prepare("
                             INSERT INTO lojas (
                                 nome_fantasia, razao_social, cnpj, email, telefone,
@@ -1708,32 +1747,35 @@ public static function getAvailableStores() {
                         $stmt->bindParam(':cnpj', $data['cnpj']);
                         $stmt->bindParam(':email', $data['email']);
                         $stmt->bindParam(':telefone', $data['telefone']);
-                        $stmt->bindParam(':categoria', $data['categoria']);
-                        $stmt->bindParam(':porcentagem_cashback', $data['porcentagem_cashback']);
-                        $stmt->bindParam(':status', $data['status']);
+                        $categoria = isset($data['categoria']) ? $data['categoria'] : 'Outros';
+                        $stmt->bindParam(':categoria', $categoria);
+                        $porcentagem = isset($data['porcentagem_cashback']) ? $data['porcentagem_cashback'] : 5.00;
+                        $stmt->bindParam(':porcentagem_cashback', $porcentagem);
+                        $status = isset($data['status']) ? $data['status'] : 'pendente';
+                        $stmt->bindParam(':status', $status);
                         
                         if ($stmt->execute()) {
-                            echo json_encode(['status' => true, 'message' => 'Loja criada com sucesso!']);
+                            sendJsonResponse(['status' => true, 'message' => 'Loja criada com sucesso!']);
                         } else {
-                            echo json_encode(['status' => false, 'message' => 'Erro ao criar loja']);
+                            sendJsonResponse(['status' => false, 'message' => 'Erro ao criar loja']);
                         }
                     } catch (PDOException $e) {
                         error_log('Erro ao criar loja: ' . $e->getMessage());
-                        echo json_encode(['status' => false, 'message' => 'Erro no banco de dados: ' . $e->getMessage()]);
+                        sendJsonResponse(['status' => false, 'message' => 'Erro no banco de dados']);
                     }
                     break;
 
 
                 case 'store_details_with_balance':
+                    header('Content-Type: application/json; charset=UTF-8');
+                    
                     $storeId = isset($_POST['store_id']) ? intval($_POST['store_id']) : 0;
                     if ($storeId <= 0) {
-                        echo json_encode(['status' => false, 'message' => 'ID da loja inválido']);
-                        exit;
+                        sendJsonResponse(['status' => false, 'message' => 'ID da loja inválido']);
                     }
                     
                     $result = AdminController::getStoreDetailsWithBalance($storeId);
-                    echo json_encode($result);
-                    exit;
+                    sendJsonResponse($result);
                     break;
                     
                 case 'financeiro':
