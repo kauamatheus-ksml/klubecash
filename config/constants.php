@@ -121,4 +121,16 @@ if (!defined('LOG_LEVEL')) {
 if (!defined('ENVIRONMENT')) {
     define('ENVIRONMENT', 'production');
 }
+
+
+
+// Configurações de sessão
+if (session_status() === PHP_SESSION_NONE) {
+    ini_set('session.cookie_lifetime', 0);
+    ini_set('session.use_only_cookies', 1);
+    ini_set('session.cookie_httponly', 1);
+    ini_set('session.cookie_secure', 0); // Mude para 1 se usar HTTPS
+    session_start();
+}
 ?>
+

@@ -1742,17 +1742,130 @@ public static function getAvailableStores() {
 
 
                 case 'store_details_with_balance':
-                    header('Content-Type: application/json; charset=UTF-8');
-                    
-                    $storeId = isset($_POST['store_id']) ? intval($_POST['store_id']) : 0;
-                    
-                    if ($storeId <= 0) {
-                        echo json_encode(['status' => false, 'message' => 'ID da loja inválido']);
-                        exit;
+                    // Limpar qualquer output anterior
+                    if (ob_get_level()) {
+                        ob_clean();
                     }
                     
-                    $result = self::getStoreDetailsWithBalance($storeId);
-                    echo json_encode($result, JSON_UNESCAPED_UNICODE);
+                    // Headers para JSON
+                    header('Content-Type: application/json; charset=UTF-8');
+                    header('Cache-Control: no-cache, must-revalidate');
+                    
+                    try {
+                        // Log para debug
+                        error_log("store_details_with_balance: Iniciando");
+                        
+                        // Verificar se usuário está logado
+                        if (!isset($_SESSION['user_id'])) {
+                            error_log("store_details_with_balance: Usuário não logado");
+                            echo json_encode(['status' => false, 'message' => 'Usuário não logado']);
+                            exit;
+                        }
+                        
+                        // Verificar se é admin
+                        if (!AuthController::isAdmin()) {
+                            error_log("store_details_with_balance: Usuário não é admin");
+                            echo json_encode(['status' => false, 'message' => 'Acesso restrito a administradores']);
+                            exit;
+                        }
+                        
+                        // Validar storeId
+                        $storeId = isset($_POST['store_id']) ? intval($_POST['store_id']) : 0;
+                        error_log("store_details_with_balance: storeId = $storeId");
+                        
+                        if ($storeId <= 0) {
+                            error_log("store_details_with_balance: ID inválido");
+                            echo json_encode(['status' => false, 'message' => 'ID da loja inválido']);
+                            exit;
+                        }
+                        
+                        // Testar conexão com banco
+                        $db = Database::getConnection();
+                        if (!$db) {
+                            error_log("store_details_with_balance: Erro na conexão com banco");
+                            echo json_encode(['status' => false, 'message' => 'Erro na conexão com banco']);
+                            exit;
+                        }
+                        
+                        // Buscar dados básicos da loja
+                        $storeStmt = $db->prepare("SELECT * FROM lojas WHERE id = ?");
+                        $storeStmt->execute([$storeId]);
+                        $store = $storeStmt->fetch(PDO::FETCH_ASSOC);
+                        
+                        if (!$store) {
+                            error_log("store_details_with_balance: Loja não encontrada");
+                            echo json_encode(['status' => false, 'message' => 'Loja não encontrada']);
+                            exit;
+                        }
+                        
+                        error_log("store_details_with_balance: Loja encontrada - " . $store['nome_fantasia']);
+                        
+                        // Buscar estatísticas básicas
+                        $statsStmt = $db->prepare("
+                            SELECT 
+                                COUNT(*) as total_transacoes,
+                                COALESCE(SUM(valor_total), 0) as total_vendas,
+                                COALESCE(SUM(valor_cliente), 0) as total_cashback
+                            FROM transacoes_cashback
+                            WHERE loja_id = ? AND status = 'aprovado'
+                        ");
+                        $statsStmt->execute([$storeId]);
+                        $statistics = $statsStmt->fetch(PDO::FETCH_ASSOC);
+                        
+                        error_log("store_details_with_balance: Estatísticas obtidas");
+                        
+                        // Preparar resposta
+                        $result = [
+                            'status' => true,
+                            'data' => [
+                                'loja' => $store,
+                                'estatisticas' => $statistics,
+                                'estatisticas_saldo' => [
+                                    'total_saldo_clientes' => 0,
+                                    'clientes_com_saldo' => 0,
+                                    'total_saldo_usado' => 0,
+                                    'total_transacoes' => $statistics['total_transacoes'] ?? 0,
+                                    'transacoes_com_saldo' => 0
+                                ],
+                                'transacoes' => []
+                            ]
+                        ];
+                        
+                        error_log("store_details_with_balance: Enviando resposta JSON");
+                        echo json_encode($result, JSON_UNESCAPED_UNICODE);
+                        
+                    } catch (Exception $e) {
+                        error_log('store_details_with_balance: Erro - ' . $e->getMessage());
+                        echo json_encode([
+                            'status' => false, 
+                            'message' => 'Erro interno: ' . $e->getMessage(),
+                            'file' => $e->getFile(),
+                            'line' => $e->getLine()
+                        ]);
+                    }
+                    exit;
+                    break;
+                case 'test_store_connection':
+                    header('Content-Type: application/json; charset=UTF-8');
+                    
+                    try {
+                        $db = Database::getConnection();
+                        $stmt = $db->query("SELECT COUNT(*) as total FROM lojas");
+                        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+                        
+                        echo json_encode([
+                            'status' => true,
+                            'message' => 'Conexão OK',
+                            'total_lojas' => $result['total'],
+                            'session_user_id' => $_SESSION['user_id'] ?? 'não definido',
+                            'session_user_type' => $_SESSION['user_type'] ?? 'não definido'
+                        ]);
+                    } catch (Exception $e) {
+                        echo json_encode([
+                            'status' => false,
+                            'message' => 'Erro: ' . $e->getMessage()
+                        ]);
+                    }
                     exit;
                     break;
                 

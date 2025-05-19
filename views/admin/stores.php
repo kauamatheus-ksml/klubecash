@@ -19,6 +19,27 @@ require_once '../../models/CashbackBalance.php';
 // Iniciar sessão
 session_start();
 
+// Debug da sessão
+error_log("stores.php - Session status: " . session_status());
+error_log("stores.php - User ID: " . ($_SESSION['user_id'] ?? 'não definido'));
+error_log("stores.php - User type: " . ($_SESSION['user_type'] ?? 'não definido'));
+
+// Verificar se há dados na sessão
+if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type'])) {
+    error_log("stores.php - ERRO: Dados de sessão ausentes, redirecionando...");
+    header("Location: /views/auth/login.php?error=sessao_expirada");
+    exit;
+}
+
+// Verificar se é admin
+if ($_SESSION['user_type'] !== USER_TYPE_ADMIN) {
+    error_log("stores.php - ERRO: Usuário não é admin, tipo: " . $_SESSION['user_type']);
+    header("Location: /views/auth/login.php?error=acesso_negado");
+    exit;
+}
+
+error_log("stores.php - Verificações de sessão OK");
+
 set_error_handler(function($severity, $message, $file, $line) {
     error_log("PHP Error: $message in $file on line $line");
     return true;
@@ -409,6 +430,113 @@ try {
 
     <!-- Script JavaScript existente -->
     <script>
+        function testStoreConnection() {
+        fetch('../../controllers/AdminController.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: 'action=test_store_connection'
+        })
+        .then(response => {
+            console.log('Test response status:', response.status);
+            return response.text();
+        })
+        .then(text => {
+            console.log('Test response text:', text);
+            try {
+                const data = JSON.parse(text);
+                console.log('Test connection result:', data);
+            } catch (e) {
+                console.error('Test JSON parse error:', e);
+            }
+        })
+        .catch(error => {
+            console.error('Test connection error:', error);
+        });
+    }
+
+    // Chama o teste quando a página carrega
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('Página carregada, testando conexão...');
+        testStoreConnection();
+    });
+
+    // Atualizar a função viewStoreDetails:
+    function viewStoreDetails(storeId) {
+        console.log('viewStoreDetails called with ID:', storeId);
+        currentStoreId = storeId;
+        
+        // Mostrar carregamento
+        document.getElementById('storeDetailsTitle').textContent = 'Carregando...';
+        document.getElementById('storeDetailsContent').innerHTML = '<div class="alert alert-info">Carregando detalhes da loja...</div>';
+        document.getElementById('storeDetailsModal').style.display = 'block';
+        
+        // Fazer requisição
+        fetch('../../controllers/AdminController.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: 'action=store_details_with_balance&store_id=' + storeId
+        })
+        .then(response => {
+            console.log('Response status:', response.status);
+            console.log('Response headers:', response.headers);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            return response.text();
+        })
+        .then(text => {
+            console.log('Raw response:', text);
+            
+            // Tentar parsear JSON
+            try {
+                const data = JSON.parse(text);
+                console.log('Parsed data:', data);
+                
+                if (data.status) {
+                    renderStoreDetailsWithBalance(data.data);
+                } else {
+                    let errorMsg = data.message || 'Erro desconhecido';
+                    if (data.file && data.line) {
+                        errorMsg += ` (${data.file}:${data.line})`;
+                    }
+                    
+                    document.getElementById('storeDetailsContent').innerHTML = `
+                        <div class="alert alert-danger">
+                            <strong>Erro:</strong> ${errorMsg}
+                        </div>
+                    `;
+                }
+            } catch (e) {
+                console.error('JSON parse error:', e);
+                document.getElementById('storeDetailsContent').innerHTML = `
+                    <div class="alert alert-danger">
+                        <strong>Erro de formato:</strong> Resposta inválida do servidor<br>
+                        <details style="margin-top: 10px;">
+                            <summary>Ver resposta bruta</summary>
+                            <pre style="white-space: pre-wrap; word-wrap: break-word; max-height: 200px; overflow-y: auto;">${text}</pre>
+                        </details>
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            console.error('Fetch error:', error);
+            document.getElementById('storeDetailsContent').innerHTML = `
+                <div class="alert alert-danger">
+                    <strong>Erro de conexão:</strong> ${error.message}
+                </div>
+            `;
+        });
+    } 
+
+
+
     // Variáveis globais
     let currentStoreId = null;
 
