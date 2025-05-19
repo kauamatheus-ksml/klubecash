@@ -315,7 +315,329 @@ body {
 .notification a:hover:after {
     opacity: 1;
 }
+/* Adicionar ao assets/css/views/client/dashboard.css existente */
 
+/* Movimentações de Saldo */
+.movements-list {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.movement-item {
+    display: flex;
+    align-items: center;
+    padding: 12px;
+    border-bottom: 1px solid #F0F0F0;
+    transition: background-color 0.3s;
+}
+
+.movement-item:last-child {
+    border-bottom: none;
+}
+
+.movement-item:hover {
+    background-color: #FFFCF8;
+}
+
+.movement-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: #F9F9F9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 12px;
+}
+
+.movement-details {
+    flex: 1;
+}
+
+.movement-description {
+    font-weight: 500;
+    font-size: 14px;
+    color: var(--dark-gray);
+    margin-bottom: 2px;
+}
+
+.movement-date {
+    font-size: 12px;
+    color: var(--medium-gray);
+}
+
+.movement-amount .amount {
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.movement-amount .amount.positive {
+    color: #4CAF50;
+}
+
+.movement-amount .amount.negative {
+    color: #FF9800;
+}
+
+/* Saldos por Loja */
+.balance-by-store {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.store-balance-item {
+    display: flex;
+    align-items: center;
+    padding: 12px;
+    border-bottom: 1px solid #F0F0F0;
+    transition: background-color 0.3s;
+}
+
+.store-balance-item:last-child {
+    border-bottom: none;
+}
+
+.store-balance-item:hover {
+    background-color: #FFFCF8;
+}
+
+.store-balance-item .store-logo {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: var(--primary-color);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 16px;
+    margin-right: 12px;
+}
+
+.store-balance-item .store-info {
+    flex: 1;
+}
+
+.store-balance-item .store-name {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--dark-gray);
+    margin: 0 0 2px 0;
+}
+
+.store-balance-item .store-balance {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--primary-color);
+    margin: 0;
+}
+
+.store-balance-item .store-stats {
+    font-size: 12px;
+    color: var(--medium-gray);
+}
+
+/* Saldos Pendentes */
+.pending-balances {
+    margin-top: 10px;
+}
+
+.pending-info {
+    background-color: #FFF8E1;
+    border: 1px solid #FFD54F;
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 15px;
+}
+
+.pending-info p {
+    margin: 0;
+    font-size: 13px;
+    color: #E65100;
+    line-height: 1.4;
+}
+
+.pending-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    background-color: #FFFEF7;
+    border: 1px solid #FFF3E0;
+    border-radius: 6px;
+    margin-bottom: 10px;
+}
+
+.pending-store {
+    font-weight: 500;
+    color: var(--dark-gray);
+    font-size: 14px;
+}
+
+.pending-details {
+    text-align: right;
+}
+
+.pending-amount {
+    display: block;
+    font-weight: 600;
+    color: var(--warning-color);
+    font-size: 14px;
+}
+
+.pending-count {
+    font-size: 12px;
+    color: var(--medium-gray);
+}
+
+/* Lojas Onde Mais Usa Saldo */
+.top-stores-usage {
+    margin-top: 10px;
+}
+
+.usage-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    border-bottom: 1px solid #F0F0F0;
+}
+
+.usage-item:last-child {
+    border-bottom: none;
+}
+
+.usage-store {
+    font-weight: 500;
+    color: var(--dark-gray);
+    font-size: 14px;
+}
+
+.usage-stats {
+    text-align: right;
+}
+
+.usage-amount {
+    display: block;
+    font-weight: 600;
+    color: var(--success-color);
+    font-size: 14px;
+}
+
+.usage-count {
+    font-size: 12px;
+    color: var(--medium-gray);
+}
+
+/* Melhorias na tabela de transações */
+.table td:nth-child(4) {
+    /* Coluna Saldo Usado */
+    text-align: center;
+}
+
+/* Cards de resumo - cores específicas */
+.summary-card:nth-child(2) .card-change.warning {
+    color: var(--warning-color);
+}
+
+.summary-card:nth-child(2) .card-change.warning svg {
+    stroke: var(--warning-color);
+}
+
+/* Responsividade para novas seções */
+@media (max-width: 768px) {
+    .movement-item,
+    .store-balance-item,
+    .usage-item {
+        padding: 8px;
+    }
+    
+    .movement-icon,
+    .store-balance-item .store-logo {
+        width: 35px;
+        height: 35px;
+        font-size: 14px;
+    }
+    
+    .movement-description,
+    .store-name,
+    .usage-store {
+        font-size: 13px;
+    }
+    
+    .pending-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 5px;
+    }
+    
+    .pending-details {
+        text-align: left;
+    }
+}
+
+/* Estados de loading para gráficos */
+.chart-container {
+    position: relative;
+    height: 300px;
+    width: 100%;
+}
+
+.chart-loading {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: var(--medium-gray);
+    font-size: 14px;
+}
+
+/* Animações */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.movement-item,
+.store-balance-item,
+.usage-item,
+.pending-item {
+    animation: fadeInUp 0.3s ease-out;
+}
+
+/* Indicadores visuais */
+.see-all {
+    color: var(--primary-color);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    padding: 10px 15px;
+    display: inline-block;
+    border-top: 1px solid #F0F0F0;
+    width: 100%;
+    text-align: center;
+    transition: background-color 0.3s;
+}
+
+.see-all:hover {
+    background-color: #FFFCF8;
+    text-decoration: none;
+}
+
+/* Melhorias de acessibilidade */
+.movement-item:focus,
+.store-balance-item:focus,
+.usage-item:focus {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
 /* Responsividade */
 @media (max-width: 768px) {
     .dashboard-grid {
