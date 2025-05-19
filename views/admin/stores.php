@@ -13,6 +13,11 @@ require_once '../../models/CashbackBalance.php';
 // Iniciar sessão
 session_start();
 
+set_error_handler(function($severity, $message, $file, $line) {
+    error_log("PHP Error: $message in $file on line $line");
+    return true;
+});
+
 // Verificar se o usuário está logado e é administrador
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION['user_type'] !== USER_TYPE_ADMIN) {
     // Redirecionar para a página de login com mensagem de erro
@@ -505,7 +510,7 @@ try {
         document.getElementById('storeDetailsContent').innerHTML = '<div class="alert alert-info">Carregando detalhes da loja...</div>';
         document.getElementById('storeDetailsModal').style.display = 'block';
         
-        // Fazer requisição AJAX para obter dados da loja com informações de saldo
+        // Fazer requisição AJAX
         fetch('../../controllers/AdminController.php', {
             method: 'POST',
             headers: {
@@ -514,10 +519,20 @@ try {
             body: 'action=store_details_with_balance&store_id=' + storeId
         })
         .then(response => {
+            // Verificar se a resposta é OK
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                throw new Error(`Erro HTTP: ${response.status}`);
             }
-            return response.json();
+            
+            // Tentar parsear como JSON
+            return response.text().then(text => {
+                try {
+                    return JSON.parse(text);
+                } catch (e) {
+                    console.error('Resposta não é JSON válido:', text);
+                    throw new Error('Resposta inválida do servidor');
+                }
+            });
         })
         .then(data => {
             if (data.status) {
@@ -531,7 +546,7 @@ try {
         .catch(error => {
             console.error('Erro:', error);
             document.getElementById('storeDetailsContent').innerHTML = `
-                <div class="alert alert-danger">Erro ao carregar detalhes da loja: ${error.message}</div>
+                <div class="alert alert-danger">Erro ao carregar detalhes da loja. Tente novamente.</div>
             `;
         });
     }
