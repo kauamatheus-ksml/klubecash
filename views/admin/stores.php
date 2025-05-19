@@ -430,367 +430,128 @@ try {
 
     <!-- Script JavaScript existente -->
     <script>
-        function testStoreConnection() {
-        fetch('../../controllers/AdminController.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: 'action=test_store_connection'
-        })
-        .then(response => {
-            console.log('Test response status:', response.status);
-            return response.text();
-        })
-        .then(text => {
-            console.log('Test response text:', text);
-            try {
-                const data = JSON.parse(text);
-                console.log('Test connection result:', data);
-            } catch (e) {
-                console.error('Test JSON parse error:', e);
-            }
-        })
-        .catch(error => {
-            console.error('Test connection error:', error);
-        });
-    }
+// Variáveis globais
+let currentStoreId = null;
 
-    // Chama o teste quando a página carrega
-    document.addEventListener('DOMContentLoaded', function() {
-        console.log('Página carregada, testando conexão...');
-        testStoreConnection();
+// Teste básico primeiro
+function testBasicConnection() {
+    fetch('test_store.php')
+    .then(response => response.text())
+    .then(text => {
+        console.log('Teste básico - resposta:', text);
+        try {
+            const data = JSON.parse(text);
+            console.log('Teste básico - dados:', data);
+            
+            if (data.status) {
+                console.log('✓ Teste básico passou!');
+                // Se o teste básico passar, podemos usar a função principal
+            } else {
+                console.log('✗ Erro no teste básico:', data.message);
+            }
+        } catch (e) {
+            console.log('✗ Erro ao parsear teste básico:', e);
+            console.log('Resposta bruta:', text);
+        }
+    })
+    .catch(error => {
+        console.log('✗ Erro na requisição do teste:', error);
     });
+}
 
-    // Atualizar a função viewStoreDetails:
-    function viewStoreDetails(storeId) {
-        console.log('viewStoreDetails called with ID:', storeId);
-        currentStoreId = storeId;
+// Executar teste ao carregar a página
+document.addEventListener('DOMContentLoaded', function() {
+    testBasicConnection();
+});
+
+// Função simplificada para ver detalhes
+function viewStoreDetails(storeId) {
+    console.log('=== viewStoreDetails chamada ===');
+    console.log('Store ID:', storeId);
+    
+    currentStoreId = storeId;
+    
+    // Mostrar modal
+    document.getElementById('storeDetailsTitle').textContent = 'Carregando...';
+    document.getElementById('storeDetailsContent').innerHTML = '<div class="alert alert-info">Carregando...</div>';
+    document.getElementById('storeDetailsModal').style.display = 'block';
+    
+    // Primeiro tentar o teste básico com ID específico
+    fetch('test_store.php')
+    .then(response => {
+        console.log('Resposta recebida:', response);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        return response.text();
+    })
+    .then(text => {
+        console.log('Texto da resposta:', text);
         
-        // Mostrar carregamento
-        document.getElementById('storeDetailsTitle').textContent = 'Carregando...';
-        document.getElementById('storeDetailsContent').innerHTML = '<div class="alert alert-info">Carregando detalhes da loja...</div>';
-        document.getElementById('storeDetailsModal').style.display = 'block';
-        
-        // Fazer requisição
-        fetch('../../controllers/AdminController.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: 'action=store_details_with_balance&store_id=' + storeId
-        })
-        .then(response => {
-            console.log('Response status:', response.status);
-            console.log('Response headers:', response.headers);
+        try {
+            const data = JSON.parse(text);
+            console.log('Dados parseados:', data);
             
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            if (data.status && data.data && data.data.loja) {
+                // Renderizar com os dados do teste
+                renderSimpleStoreDetails(data.data.loja);
+            } else {
+                throw new Error(data.message || 'Dados inválidos');
             }
-            
-            return response.text();
-        })
-        .then(text => {
-            console.log('Raw response:', text);
-            
-            // Tentar parsear JSON
-            try {
-                const data = JSON.parse(text);
-                console.log('Parsed data:', data);
-                
-                if (data.status) {
-                    renderStoreDetailsWithBalance(data.data);
-                } else {
-                    let errorMsg = data.message || 'Erro desconhecido';
-                    if (data.file && data.line) {
-                        errorMsg += ` (${data.file}:${data.line})`;
-                    }
-                    
-                    document.getElementById('storeDetailsContent').innerHTML = `
-                        <div class="alert alert-danger">
-                            <strong>Erro:</strong> ${errorMsg}
-                        </div>
-                    `;
-                }
-            } catch (e) {
-                console.error('JSON parse error:', e);
-                document.getElementById('storeDetailsContent').innerHTML = `
-                    <div class="alert alert-danger">
-                        <strong>Erro de formato:</strong> Resposta inválida do servidor<br>
-                        <details style="margin-top: 10px;">
-                            <summary>Ver resposta bruta</summary>
-                            <pre style="white-space: pre-wrap; word-wrap: break-word; max-height: 200px; overflow-y: auto;">${text}</pre>
-                        </details>
-                    </div>
-                `;
-            }
-        })
-        .catch(error => {
-            console.error('Fetch error:', error);
+        } catch (e) {
+            console.error('Erro ao processar JSON:', e);
             document.getElementById('storeDetailsContent').innerHTML = `
                 <div class="alert alert-danger">
-                    <strong>Erro de conexão:</strong> ${error.message}
+                    <h5>Erro ao processar resposta:</h5>
+                    <p>${e.message}</p>
+                    <details>
+                        <summary>Ver resposta completa</summary>
+                        <pre style="white-space: pre-wrap; max-height: 200px; overflow-y: auto;">${text}</pre>
+                    </details>
                 </div>
             `;
-        });
-    } 
-
-
-
-    // Variáveis globais
-    let currentStoreId = null;
-
-    // Função para mostrar o modal de adicionar loja
-    function showStoreModal(storeId = null) {
-        currentStoreId = storeId;
-        
-        document.getElementById('storeForm').reset();
-        document.getElementById('storeId').value = '';
-        
-        if (storeId) {
-            document.getElementById('storeModalTitle').textContent = 'Editar Loja';
-            loadStoreData(storeId);
-        } else {
-            document.getElementById('storeModalTitle').textContent = 'Adicionar Loja';
         }
-        
-        document.getElementById('storeModal').style.display = 'block';
-    }
-
-    // Função para esconder o modal de loja
-    function hideStoreModal() {
-        document.getElementById('storeModal').style.display = 'none';
-        currentStoreId = null;
-    }
-
-    // Função para carregar dados da loja (para edição)
-    function loadStoreData(storeId) {
-        fetch('../../controllers/AdminController.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: 'action=store_details&store_id=' + storeId
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status && data.data.loja) {
-                const store = data.data.loja;
-                
-                document.getElementById('storeId').value = store.id;
-                document.getElementById('nomeFantasia').value = store.nome_fantasia;
-                document.getElementById('razaoSocial').value = store.razao_social;
-                document.getElementById('cnpj').value = store.cnpj;
-                document.getElementById('email').value = store.email;
-                document.getElementById('telefone').value = store.telefone;
-                document.getElementById('categoria').value = store.categoria;
-                document.getElementById('porcentagemCashback').value = store.porcentagem_cashback;
-                document.getElementById('status').value = store.status;
-            } else {
-                alert('Erro ao carregar dados da loja: ' + (data.message || 'Erro desconhecido'));
-            }
-        })
-        .catch(error => {
-            alert('Erro ao carregar dados da loja.');
-        });
-    }
-
-    // Função para submeter o formulário da loja
-    function submitStoreForm(event) {
-        event.preventDefault();
-        
-        const formData = new FormData(document.getElementById('storeForm'));
-        const isEditing = document.getElementById('storeId').value !== '';
-        
-        formData.append('action', isEditing ? 'update_store' : 'create_store');
-        if (isEditing) {
-            formData.append('store_id', document.getElementById('storeId').value);
-        }
-        
-        fetch('../../controllers/AdminController.php', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status) {
-                alert(data.message || (isEditing ? 'Loja atualizada com sucesso!' : 'Loja criada com sucesso!'));
-                hideStoreModal();
-                location.reload();
-            } else {
-                alert('Erro: ' + (data.message || 'Erro desconhecido'));
-            }
-        })
-        .catch(error => {
-            alert('Erro ao salvar loja.');
-        });
-    }
-
-    // Função para ver detalhes da loja
-    function viewStoreDetails(storeId) {
-        currentStoreId = storeId;
-        
-        document.getElementById('storeDetailsTitle').textContent = 'Carregando...';
-        document.getElementById('storeDetailsContent').innerHTML = '<div class="alert alert-info">Carregando detalhes da loja...</div>';
-        document.getElementById('storeDetailsModal').style.display = 'block';
-        
-        fetch('../../controllers/AdminController.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: 'action=store_details_with_balance&store_id=' + storeId
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status) {
-                renderStoreDetailsWithBalance(data.data);
-            } else {
-                document.getElementById('storeDetailsContent').innerHTML = `
-                    <div class="alert alert-danger">${data.message || 'Erro ao carregar detalhes da loja.'}</div>
-                `;
-            }
-        })
-        .catch(error => {
-            document.getElementById('storeDetailsContent').innerHTML = `
-                <div class="alert alert-danger">Erro ao carregar detalhes da loja.</div>
-            `;
-        });
-    }
-
-    // Função para renderizar detalhes da loja
-    function renderStoreDetailsWithBalance(data) {
-        const store = data.loja;
-        const statistics = data.estatisticas;
-        const balanceStats = data.estatisticas_saldo;
-        
-        document.getElementById('storeDetailsTitle').textContent = store.nome_fantasia;
-        
-        let html = `
-            <div style="margin-bottom: 20px;">
-                <h4 style="margin-bottom: 15px; color: #FF7A00;">Informações Básicas</h4>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                    <div>
-                        <p><strong>Razão Social:</strong> ${store.razao_social}</p>
-                        <p><strong>CNPJ:</strong> ${store.cnpj}</p>
-                        <p><strong>E-mail:</strong> ${store.email}</p>
-                    </div>
-                    <div>
-                        <p><strong>Telefone:</strong> ${store.telefone}</p>
-                        <p><strong>Categoria:</strong> ${store.categoria || 'Não definida'}</p>
-                        <p><strong>Cashback:</strong> ${store.porcentagem_cashback}%</p>
-                    </div>
-                </div>
+    })
+    .catch(error => {
+        console.error('Erro na requisição:', error);
+        document.getElementById('storeDetailsContent').innerHTML = `
+            <div class="alert alert-danger">
+                <h5>Erro na requisição:</h5>
+                <p>${error.message}</p>
+                <p>Verifique o console para mais detalhes.</p>
             </div>
         `;
-        
-        if (statistics) {
-            html += `
-                <div style="margin-bottom: 20px;">
-                    <h4 style="margin-bottom: 15px; color: #FF7A00;">Estatísticas de Transações</h4>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
-                        <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; text-align: center;">
-                            <h5 style="margin: 0; color: #333;">Transações</h5>
-                            <p style="font-size: 18px; font-weight: bold; margin: 10px 0;">${statistics.total_transacoes || 0}</p>
-                        </div>
-                        <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; text-align: center;">
-                            <h5 style="margin: 0; color: #333;">Vendas</h5>
-                            <p style="font-size: 18px; font-weight: bold; margin: 10px 0;">R$ ${parseFloat(statistics.total_vendas || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
-                        </div>
-                        <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; text-align: center;">
-                            <h5 style="margin: 0; color: #333;">Cashback</h5>
-                            <p style="font-size: 18px; font-weight: bold; margin: 10px 0;">R$ ${parseFloat(statistics.total_cashback || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-        
-        if (balanceStats) {
-            const totalTransacoes = parseInt(balanceStats.total_transacoes) || 0;
-            const transacoesComSaldo = parseInt(balanceStats.transacoes_com_saldo) || 0;
-            const percentualUso = totalTransacoes > 0 ? (transacoesComSaldo / totalTransacoes) * 100 : 0;
-            
-            html += `
-                <div style="margin-bottom: 20px;">
-                    <h4 style="margin-bottom: 15px; color: #28a745;">💰 Estatísticas de Saldo</h4>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                        <div style="background: #f8fff8; padding: 15px; border-radius: 8px; border-left: 4px solid #28a745;">
-                            <p style="margin: 0; font-size: 14px; color: #666;">Saldo Total dos Clientes</p>
-                            <p style="font-size: 20px; font-weight: bold; margin: 5px 0; color: #28a745;">R$ ${parseFloat(balanceStats.total_saldo_clientes || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
-                            <p style="margin: 0; font-size: 12px; color: #666;">${balanceStats.clientes_com_saldo || 0} clientes com saldo</p>
-                        </div>
-                        <div style="background: #fff8f0; padding: 15px; border-radius: 8px; border-left: 4px solid #FF7A00;">
-                            <p style="margin: 0; font-size: 14px; color: #666;">Total Saldo Usado</p>
-                            <p style="font-size: 20px; font-weight: bold; margin: 5px 0; color: #FF7A00;">R$ ${parseFloat(balanceStats.total_saldo_usado || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
-                            <p style="margin: 0; font-size: 12px; color: #666;">${transacoesComSaldo} transações com uso de saldo</p>
-                        </div>
-                    </div>
-                    
-                    ${totalTransacoes > 0 ? `
-                    <div style="margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                        <p style="margin: 0; font-size: 14px; color: #666;">Taxa de Uso de Saldo</p>
-                        <div style="display: flex; align-items: center; gap: 10px; margin-top: 5px;">
-                            <div style="flex: 1; background: #e9ecef; height: 8px; border-radius: 4px; overflow: hidden;">
-                                <div style="width: ${percentualUso}%; height: 100%; background: #28a745;"></div>
-                            </div>
-                            <span style="font-weight: bold; color: #28a745;">${percentualUso.toFixed(1)}%</span>
-                        </div>
-                    </div>
-                    ` : ''}
-                </div>
-            `;
-        }
-        
-        let statusClass = '';
-        let statusText = '';
-        
-        switch (store.status) {
-            case 'aprovado':
-                statusClass = 'badge-success';
-                statusText = 'Aprovado';
-                break;
-            case 'pendente':
-                statusClass = 'badge-warning';
-                statusText = 'Pendente';
-                break;
-            case 'rejeitado':
-                statusClass = 'badge-danger';
-                statusText = 'Rejeitado';
-                break;
-        }
-        
-        html += `
-            <div style="margin-bottom: 20px;">
-                <h4 style="margin-bottom: 15px; color: #FF7A00;">Status</h4>
-                <p>Status atual: <span class="badge ${statusClass}">${statusText}</span></p>
-        `;
-        
-        if (store.status === 'pendente') {
-            html += `
-                <div style="display: flex; gap: 10px; margin-top: 15px;">
-                    <button class="btn btn-primary" onclick="updateStoreStatus(${store.id}, 'aprovado')">Aprovar</button>
-                    <button class="btn btn-secondary" onclick="updateStoreStatus(${store.id}, 'rejeitado')">Rejeitar</button>
-                </div>
-            `;
-        } else if (store.status === 'rejeitado') {
-            html += `
-                <div style="margin-top: 15px;">
-                    <button class="btn btn-primary" onclick="updateStoreStatus(${store.id}, 'aprovado')">Aprovar</button>
-                </div>
-            `;
-        }
-        
-        html += `</div>`;
-        
-        document.getElementById('storeDetailsContent').innerHTML = html;
-        
-        document.getElementById('editStoreBtn').onclick = function() {
-            hideStoreDetailsModal();
-            showStoreModal(store.id);
-        };
-    }
+    });
+}
 
+// Função simplificada para renderizar detalhes
+function renderSimpleStoreDetails(store) {
+    console.log('Renderizando loja:', store);
+    
+    document.getElementById('storeDetailsTitle').textContent = store.nome_fantasia;
+    
+    const html = `
+        <div class="store-details">
+            <h4>Informações da Loja</h4>
+            <table class="details-table">
+                <tr><td><strong>Nome Fantasia:</strong></td><td>${store.nome_fantasia}</td></tr>
+                <tr><td><strong>Razão Social:</strong></td><td>${store.razao_social}</td></tr>
+                <tr><td><strong>CNPJ:</strong></td><td>${store.cnpj}</td></tr>
+                <tr><td><strong>Email:</strong></td><td>${store.email}</td></tr>
+                <tr><td><strong>Telefone:</strong></td><td>${store.telefone}</td></tr>
+                <tr><td><strong>Categoria:</strong></td><td>${store.categoria || 'N/A'}</td></tr>
+                <tr><td><strong>Cashback:</strong></td><td>${store.porcentagem_cashback}%</td></tr>
+                <tr><td><strong>Status:</strong></td><td><span class="badge badge-${store.status === 'aprovado' ? 'success' : store.status === 'pendente' ? 'warning' : 'danger'}">${store.status}</span></td></tr>
+                <tr><td><strong>Data Cadastro:</strong></td><td>${new Date(store.data_cadastro).toLocaleDateString('pt-BR')}</td></tr>
+            </table>
+        </div>
+    `;
+    
+    document.getElementById('storeDetailsContent').innerHTML = html;
+}
+function showStoreModal(storeId = null) {
+    document.getElementById('storeModal').style.display = 'block';
+}
     // Função para esconder modal de detalhes
     function hideStoreDetailsModal() {
         document.getElementById('storeDetailsModal').style.display = 'none';
@@ -860,6 +621,38 @@ try {
 </script>
     
     <style>
+        .details-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+}
+
+.details-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #eee;
+    vertical-align: top;
+}
+
+.details-table td:first-child {
+    width: 30%;
+    background-color: #f8f9fa;
+    font-weight: 500;
+}
+
+.store-details {
+    padding: 20px;
+}
+
+.badge {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+}
+
+.badge-success { background: #d4edda; color: #155724; }
+.badge-warning { background: #fff3cd; color: #856404; }
+.badge-danger { background: #f8d7da; color: #721c24; }
     /* Estilos adicionais para informações de saldo */
     .modal {
     display: none;
