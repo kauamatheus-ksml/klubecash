@@ -3,6 +3,49 @@
 // Versão simplificada para teste
 require_once '../../config/database.php';
 require_once '../../config/constants.php';
+// DEBUG TEMPORÁRIO - REMOVER DEPOIS
+$debug = true; // Mude para false depois de corrigir
+
+if ($debug) {
+    echo "<div style='background: #f0f0f0; padding: 10px; margin: 10px; border: 1px solid #ccc;'>";
+    echo "<h3>DEBUG - Informações do Sistema</h3>";
+    
+    try {
+        $db = Database::getConnection();
+        echo "✓ Conexão com banco OK<br>";
+        
+        // Verificar tabelas
+        $tables = ['lojas', 'usuarios', 'transacoes_cashback', 'cashback_saldos', 'cashback_movimentacoes', 'favorites'];
+        foreach ($tables as $table) {
+            $result = $db->query("SHOW TABLES LIKE '$table'");
+            if ($result->rowCount() > 0) {
+                echo "✓ Tabela '$table' existe<br>";
+            } else {
+                echo "✗ Tabela '$table' NÃO existe<br>";
+            }
+        }
+        
+        // Verificar se há lojas
+        $result = $db->query("SELECT COUNT(*) as total FROM lojas");
+        $count = $result->fetch();
+        echo "📊 Total de lojas: " . $count['total'] . "<br>";
+        
+        if ($count['total'] > 0) {
+            $result = $db->query("SELECT COUNT(*) as aprovadas FROM lojas WHERE status = 'aprovado'");
+            $aprovadas = $result->fetch();
+            echo "📊 Lojas aprovadas: " . $aprovadas['aprovadas'] . "<br>";
+        }
+        
+        // Verificar usuário atual
+        echo "👤 User ID: " . $userId . "<br>";
+        echo "👤 User Name: " . ($_SESSION['user_name'] ?? 'Não definido') . "<br>";
+        
+    } catch (Exception $e) {
+        echo "❌ ERRO: " . $e->getMessage() . "<br>";
+    }
+    
+    echo "</div>";
+}
 
 session_start();
 

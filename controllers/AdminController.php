@@ -1790,7 +1790,55 @@ public static function getAvailableStores() {
             return ['status' => false, 'message' => 'Erro ao carregar configurações. Tente novamente.'];
         }
     }
-    
+    // Adicionar TEMPORARIAMENTE no ClientController.php
+    public static function getPartnerStoresSimple($userId, $filters = [], $page = 1) {
+        try {
+            $db = Database::getConnection();
+            
+            // Query super simples para testar
+            $query = "SELECT 
+                        l.id,
+                        l.nome_fantasia,
+                        l.categoria,
+                        l.porcentagem_cashback,
+                        l.website,
+                        l.status
+                    FROM lojas l 
+                    WHERE l.status = 'aprovado'
+                    ORDER BY l.nome_fantasia 
+                    LIMIT 10";
+            
+            $stmt = $db->query($query);
+            $lojas = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            // Dados mínimos para funcionar
+            return [
+                'status' => true,
+                'data' => [
+                    'lojas' => $lojas,
+                    'categorias' => ['Varejo', 'Eletrônicos', 'Moda'], // Dados fixos para teste
+                    'estatisticas' => [
+                        'total_lojas' => count($lojas),
+                        'media_cashback' => 3.5,
+                        'maior_cashback' => 5.0,
+                        'menor_cashback' => 2.0
+                    ],
+                    'paginacao' => [
+                        'pagina_atual' => 1,
+                        'total_paginas' => 1,
+                        'total_itens' => count($lojas),
+                        'itens_por_pagina' => 10
+                    ]
+                ]
+            ];
+            
+        } catch (Exception $e) {
+            return [
+                'status' => false,
+                'message' => 'Erro: ' . $e->getMessage()
+            ];
+        }
+    }
     /**
      * Atualiza configurações do sistema
      * 
