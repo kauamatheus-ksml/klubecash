@@ -3,6 +3,12 @@
  * Constantes do sistema
  * Klube Cash - Sistema de Cashback
  */
+define('PRIMARY_COLOR', '#FF7A00');
+define('SECONDARY_COLOR', '#2c3e50');
+define('SUCCESS_COLOR', '#28a745');
+define('WARNING_COLOR', '#ffc107');
+define('DANGER_COLOR', '#dc3545');
+define('INFO_COLOR', '#17a2b8');
 
 // Informações básicas do sistema
 define('SYSTEM_NAME', 'Klube Cash');

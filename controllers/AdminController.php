@@ -1685,6 +1685,45 @@ public static function getAvailableStores() {
             $reportData = [];
             
             switch ($type) {
+                case 'create_store':
+                    $data = $_POST;
+                    unset($data['action']); // Remove action dos dados
+                    
+                    // Lógica para criar nova loja
+                    $db = Database::getConnection();
+                    
+                    try {
+                        $stmt = $db->prepare("
+                            INSERT INTO lojas (
+                                nome_fantasia, razao_social, cnpj, email, telefone,
+                                categoria, porcentagem_cashback, status, data_cadastro
+                            ) VALUES (
+                                :nome_fantasia, :razao_social, :cnpj, :email, :telefone,
+                                :categoria, :porcentagem_cashback, :status, NOW()
+                            )
+                        ");
+                        
+                        $stmt->bindParam(':nome_fantasia', $data['nome_fantasia']);
+                        $stmt->bindParam(':razao_social', $data['razao_social']);
+                        $stmt->bindParam(':cnpj', $data['cnpj']);
+                        $stmt->bindParam(':email', $data['email']);
+                        $stmt->bindParam(':telefone', $data['telefone']);
+                        $stmt->bindParam(':categoria', $data['categoria']);
+                        $stmt->bindParam(':porcentagem_cashback', $data['porcentagem_cashback']);
+                        $stmt->bindParam(':status', $data['status']);
+                        
+                        if ($stmt->execute()) {
+                            echo json_encode(['status' => true, 'message' => 'Loja criada com sucesso!']);
+                        } else {
+                            echo json_encode(['status' => false, 'message' => 'Erro ao criar loja']);
+                        }
+                    } catch (PDOException $e) {
+                        error_log('Erro ao criar loja: ' . $e->getMessage());
+                        echo json_encode(['status' => false, 'message' => 'Erro no banco de dados: ' . $e->getMessage()]);
+                    }
+                    break;
+
+
                 case 'store_details_with_balance':
                     $storeId = isset($_POST['store_id']) ? intval($_POST['store_id']) : 0;
                     if ($storeId <= 0) {

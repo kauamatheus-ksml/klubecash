@@ -398,182 +398,358 @@ try {
 
     <!-- Script JavaScript existente -->
     <script>
-        // Variáveis globais
-        let currentStoreId = null;
+    // Variáveis globais
+    let currentStoreId = null;
+
+    // Função para mostrar o modal de adicionar loja
+    function showStoreModal(storeId = null) {
+        currentStoreId = storeId;
         
-        // ... código JavaScript existente mantido igual ...
+        // Resetar formulário
+        document.getElementById('storeForm').reset();
+        document.getElementById('storeId').value = '';
         
-        // Função atualizada para exibir detalhes da loja com informações de saldo
-        function viewStoreDetails(storeId) {
-            currentStoreId = storeId;
-            
-            // Mostrar carregamento
-            document.getElementById('storeDetailsTitle').textContent = 'Carregando...';
-            document.getElementById('storeDetailsContent').innerHTML = '<div class="alert alert-info">Carregando detalhes da loja...</div>';
-            document.getElementById('storeDetailsModal').classList.add('show');
-            
-            // Fazer requisição AJAX para obter dados da loja com informações de saldo
-            fetch('../../controllers/AdminController.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: 'action=store_details_with_balance&store_id=' + storeId
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status) {
-                    renderStoreDetailsWithBalance(data.data);
-                } else {
-                    document.getElementById('storeDetailsContent').innerHTML = `
-                        <div class="alert alert-danger">${data.message || 'Erro ao carregar detalhes da loja.'}</div>
-                    `;
-                }
-            })
-            .catch(error => {
-                console.error('Erro:', error);
-                document.getElementById('storeDetailsContent').innerHTML = `
-                    <div class="alert alert-danger">Erro ao carregar detalhes da loja: ${error.message}</div>
-                `;
-            });
+        if (storeId) {
+            // Modo edição - carregar dados da loja
+            document.getElementById('storeModalTitle').textContent = 'Editar Loja';
+            loadStoreData(storeId);
+        } else {
+            // Modo criação
+            document.getElementById('storeModalTitle').textContent = 'Adicionar Loja';
         }
         
-        function renderStoreDetailsWithBalance(data) {
-            const store = data.loja;
-            const statistics = data.estatisticas;
-            const balanceStats = data.estatisticas_saldo;
-            
-            // Atualizar título do modal
-            document.getElementById('storeDetailsTitle').textContent = store.nome_fantasia;
-            
-            // Construir o conteúdo HTML com informações de saldo
-            let html = `
+        // Mostrar modal
+        document.getElementById('storeModal').style.display = 'block';
+    }
+
+    // Função para esconder o modal de loja
+    function hideStoreModal() {
+        document.getElementById('storeModal').style.display = 'none';
+        currentStoreId = null;
+    }
+
+    // Função para carregar dados da loja (para edição)
+    function loadStoreData(storeId) {
+        fetch('../../controllers/AdminController.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: 'action=store_details&store_id=' + storeId
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status && data.data.loja) {
+                const store = data.data.loja;
+                
+                // Preencher formulário
+                document.getElementById('storeId').value = store.id;
+                document.getElementById('nomeFantasia').value = store.nome_fantasia;
+                document.getElementById('razaoSocial').value = store.razao_social;
+                document.getElementById('cnpj').value = store.cnpj;
+                document.getElementById('email').value = store.email;
+                document.getElementById('telefone').value = store.telefone;
+                document.getElementById('categoria').value = store.categoria;
+                document.getElementById('porcentagemCashback').value = store.porcentagem_cashback;
+                document.getElementById('status').value = store.status;
+            } else {
+                alert('Erro ao carregar dados da loja: ' + (data.message || 'Erro desconhecido'));
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert('Erro ao carregar dados da loja.');
+        });
+    }
+
+    // Função para submeter o formulário da loja
+    function submitStoreForm(event) {
+        event.preventDefault();
+        
+        const formData = new FormData(document.getElementById('storeForm'));
+        const isEditing = document.getElementById('storeId').value !== '';
+        
+        // Adicionar action
+        formData.append('action', isEditing ? 'update_store' : 'create_store');
+        if (isEditing) {
+            formData.append('store_id', document.getElementById('storeId').value);
+        }
+        
+        // Enviar dados
+        fetch('../../controllers/AdminController.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status) {
+                alert(data.message || (isEditing ? 'Loja atualizada com sucesso!' : 'Loja criada com sucesso!'));
+                hideStoreModal();
+                location.reload(); // Recarregar página para mostrar mudanças
+            } else {
+                alert('Erro: ' + (data.message || 'Erro desconhecido'));
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert('Erro ao salvar loja.');
+        });
+    }
+
+    // Função para ver detalhes da loja com saldo
+    function viewStoreDetails(storeId) {
+        currentStoreId = storeId;
+        
+        // Mostrar carregamento
+        document.getElementById('storeDetailsTitle').textContent = 'Carregando...';
+        document.getElementById('storeDetailsContent').innerHTML = '<div class="alert alert-info">Carregando detalhes da loja...</div>';
+        document.getElementById('storeDetailsModal').style.display = 'block';
+        
+        // Fazer requisição AJAX para obter dados da loja com informações de saldo
+        fetch('../../controllers/AdminController.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: 'action=store_details_with_balance&store_id=' + storeId
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.status) {
+                renderStoreDetailsWithBalance(data.data);
+            } else {
+                document.getElementById('storeDetailsContent').innerHTML = `
+                    <div class="alert alert-danger">${data.message || 'Erro ao carregar detalhes da loja.'}</div>
+                `;
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            document.getElementById('storeDetailsContent').innerHTML = `
+                <div class="alert alert-danger">Erro ao carregar detalhes da loja: ${error.message}</div>
+            `;
+        });
+    }
+
+    // Função para renderizar detalhes da loja com saldo
+    function renderStoreDetailsWithBalance(data) {
+        const store = data.loja;
+        const statistics = data.estatisticas;
+        const balanceStats = data.estatisticas_saldo;
+        
+        // Atualizar título do modal
+        document.getElementById('storeDetailsTitle').textContent = store.nome_fantasia;
+        
+        // Construir o conteúdo HTML com informações de saldo
+        let html = `
+            <div style="margin-bottom: 20px;">
+                <h4 style="margin-bottom: 15px; color: var(--primary-color);">Informações Básicas</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div>
+                        <p><strong>Razão Social:</strong> ${store.razao_social}</p>
+                        <p><strong>CNPJ:</strong> ${store.cnpj}</p>
+                        <p><strong>E-mail:</strong> ${store.email}</p>
+                    </div>
+                    <div>
+                        <p><strong>Telefone:</strong> ${store.telefone}</p>
+                        <p><strong>Categoria:</strong> ${store.categoria || 'Não definida'}</p>
+                        <p><strong>Cashback:</strong> ${store.porcentagem_cashback}%</p>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Estatísticas gerais
+        if (statistics) {
+            html += `
                 <div style="margin-bottom: 20px;">
-                    <h4 style="margin-bottom: 15px; color: var(--primary-color);">Informações Básicas</h4>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                        <div>
-                            <p><strong>Razão Social:</strong> ${store.razao_social}</p>
-                            <p><strong>CNPJ:</strong> ${store.cnpj}</p>
-                            <p><strong>E-mail:</strong> ${store.email}</p>
+                    <h4 style="margin-bottom: 15px; color: var(--primary-color);">Estatísticas de Transações</h4>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
+                        <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; text-align: center;">
+                            <h5 style="margin: 0; color: var(--dark-gray);">Transações</h5>
+                            <p style="font-size: 18px; font-weight: bold; margin: 10px 0;">${statistics.total_transacoes || 0}</p>
                         </div>
-                        <div>
-                            <p><strong>Telefone:</strong> ${store.telefone}</p>
-                            <p><strong>Categoria:</strong> ${store.categoria || 'Não definida'}</p>
-                            <p><strong>Cashback:</strong> ${store.porcentagem_cashback}%</p>
+                        <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; text-align: center;">
+                            <h5 style="margin: 0; color: var(--dark-gray);">Vendas</h5>
+                            <p style="font-size: 18px; font-weight: bold; margin: 10px 0;">R$ ${parseFloat(statistics.total_vendas || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
+                        </div>
+                        <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; text-align: center;">
+                            <h5 style="margin: 0; color: var(--dark-gray);">Cashback</h5>
+                            <p style="font-size: 18px; font-weight: bold; margin: 10px 0;">R$ ${parseFloat(statistics.total_cashback || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
                         </div>
                     </div>
                 </div>
             `;
-            
-            // Estatísticas gerais
-            if (statistics) {
-                html += `
-                    <div style="margin-bottom: 20px;">
-                        <h4 style="margin-bottom: 15px; color: var(--primary-color);">Estatísticas de Transações</h4>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
-                            <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; text-align: center;">
-                                <h5 style="margin: 0; color: var(--dark-gray);">Transações</h5>
-                                <p style="font-size: 18px; font-weight: bold; margin: 10px 0;">${statistics.total_transacoes || 0}</p>
-                            </div>
-                            <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; text-align: center;">
-                                <h5 style="margin: 0; color: var(--dark-gray);">Vendas</h5>
-                                <p style="font-size: 18px; font-weight: bold; margin: 10px 0;">R$ ${parseFloat(statistics.total_vendas || 0).toFixed(2)}</p>
-                            </div>
-                            <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; text-align: center;">
-                                <h5 style="margin: 0; color: var(--dark-gray);">Cashback</h5>
-                                <p style="font-size: 18px; font-weight: bold; margin: 10px 0;">R$ ${parseFloat(statistics.total_cashback || 0).toFixed(2)}</p>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }
-            
-            // Estatísticas de saldo
-            if (balanceStats) {
-                html += `
-                    <div style="margin-bottom: 20px;">
-                        <h4 style="margin-bottom: 15px; color: #28a745;">💰 Estatísticas de Saldo</h4>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                            <div style="background: #f8fff8; padding: 15px; border-radius: 8px; border-left: 4px solid #28a745;">
-                                <p style="margin: 0; font-size: 14px; color: #666;">Saldo Total dos Clientes</p>
-                                <p style="font-size: 20px; font-weight: bold; margin: 5px 0; color: #28a745;">R$ ${parseFloat(balanceStats.total_saldo_clientes || 0).toFixed(2)}</p>
-                                <p style="margin: 0; font-size: 12px; color: #666;">${balanceStats.clientes_com_saldo || 0} clientes com saldo</p>
-                            </div>
-                            <div style="background: #fff8f0; padding: 15px; border-radius: 8px; border-left: 4px solid #FF7A00;">
-                                <p style="margin: 0; font-size: 14px; color: #666;">Total Saldo Usado</p>
-                                <p style="font-size: 20px; font-weight: bold; margin: 5px 0; color: #FF7A00;">R$ ${parseFloat(balanceStats.total_saldo_usado || 0).toFixed(2)}</p>
-                                <p style="margin: 0; font-size: 12px; color: #666;">${balanceStats.transacoes_com_saldo || 0} transações com uso de saldo</p>
-                            </div>
-                        </div>
-                        
-                        ${balanceStats.total_transacoes > 0 ? `
-                        <div style="margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                            <p style="margin: 0; font-size: 14px; color: #666;">Taxa de Uso de Saldo</p>
-                            <div style="display: flex; align-items: center; gap: 10px; margin-top: 5px;">
-                                <div style="flex: 1; background: #e9ecef; height: 8px; border-radius: 4px; overflow: hidden;">
-                                    <div style="width: ${(balanceStats.transacoes_com_saldo / balanceStats.total_transacoes * 100)}%; height: 100%; background: #28a745;"></div>
-                                </div>
-                                <span style="font-weight: bold; color: #28a745;">${((balanceStats.transacoes_com_saldo / balanceStats.total_transacoes) * 100).toFixed(1)}%</span>
-                            </div>
-                        </div>
-                        ` : ''}
-                    </div>
-                `;
-            }
-            
-            // Status atual
-            let statusClass = '';
-            let statusText = '';
-            
-            switch (store.status) {
-                case 'aprovado':
-                    statusClass = 'badge-success';
-                    statusText = 'Aprovado';
-                    break;
-                case 'pendente':
-                    statusClass = 'badge-warning';
-                    statusText = 'Pendente';
-                    break;
-                case 'rejeitado':
-                    statusClass = 'badge-danger';
-                    statusText = 'Rejeitado';
-                    break;
-            }
+        }
+        
+        // Estatísticas de saldo
+        if (balanceStats) {
+            const totalTransacoes = parseInt(balanceStats.total_transacoes) || 0;
+            const transacoesComSaldo = parseInt(balanceStats.transacoes_com_saldo) || 0;
+            const percentualUso = totalTransacoes > 0 ? (transacoesComSaldo / totalTransacoes) * 100 : 0;
             
             html += `
                 <div style="margin-bottom: 20px;">
-                    <h4 style="margin-bottom: 15px; color: var(--primary-color);">Status</h4>
-                    <p>Status atual: <span class="badge ${statusClass}">${statusText}</span></p>
+                    <h4 style="margin-bottom: 15px; color: #28a745;">💰 Estatísticas de Saldo</h4>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <div style="background: #f8fff8; padding: 15px; border-radius: 8px; border-left: 4px solid #28a745;">
+                            <p style="margin: 0; font-size: 14px; color: #666;">Saldo Total dos Clientes</p>
+                            <p style="font-size: 20px; font-weight: bold; margin: 5px 0; color: #28a745;">R$ ${parseFloat(balanceStats.total_saldo_clientes || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
+                            <p style="margin: 0; font-size: 12px; color: #666;">${balanceStats.clientes_com_saldo || 0} clientes com saldo</p>
+                        </div>
+                        <div style="background: #fff8f0; padding: 15px; border-radius: 8px; border-left: 4px solid #FF7A00;">
+                            <p style="margin: 0; font-size: 14px; color: #666;">Total Saldo Usado</p>
+                            <p style="font-size: 20px; font-weight: bold; margin: 5px 0; color: #FF7A00;">R$ ${parseFloat(balanceStats.total_saldo_usado || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
+                            <p style="margin: 0; font-size: 12px; color: #666;">${transacoesComSaldo} transações com uso de saldo</p>
+                        </div>
+                    </div>
+                    
+                    ${totalTransacoes > 0 ? `
+                    <div style="margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                        <p style="margin: 0; font-size: 14px; color: #666;">Taxa de Uso de Saldo</p>
+                        <div style="display: flex; align-items: center; gap: 10px; margin-top: 5px;">
+                            <div style="flex: 1; background: #e9ecef; height: 8px; border-radius: 4px; overflow: hidden;">
+                                <div style="width: ${percentualUso}%; height: 100%; background: #28a745;"></div>
+                            </div>
+                            <span style="font-weight: bold; color: #28a745;">${percentualUso.toFixed(1)}%</span>
+                        </div>
+                    </div>
+                    ` : ''}
+                </div>
             `;
-            
-            // Ações de status
-            if (store.status === 'pendente') {
-                html += `
-                    <div style="display: flex; gap: 10px; margin-top: 15px;">
-                        <button class="btn btn-primary" onclick="approveStore(${store.id})">Aprovar</button>
-                        <button class="btn btn-secondary" onclick="rejectStore(${store.id})">Rejeitar</button>
-                    </div>
-                `;
-            } else if (store.status === 'rejeitado') {
-                html += `
-                    <div style="margin-top: 15px;">
-                        <button class="btn btn-primary" onclick="approveStore(${store.id})">Aprovar</button>
-                    </div>
-                `;
-            }
-            
-            html += `</div>`;
-            
-            // Atualizar conteúdo
-            document.getElementById('storeDetailsContent').innerHTML = html;
-            
-            // Configurar botão de edição
-            document.getElementById('editStoreBtn').onclick = function() {
-                editStore(store.id);
-            };
         }
         
-        // ... resto do código JavaScript mantido igual ...
+        // Status atual
+        let statusClass = '';
+        let statusText = '';
+        
+        switch (store.status) {
+            case 'aprovado':
+                statusClass = 'badge-success';
+                statusText = 'Aprovado';
+                break;
+            case 'pendente':
+                statusClass = 'badge-warning';
+                statusText = 'Pendente';
+                break;
+            case 'rejeitado':
+                statusClass = 'badge-danger';
+                statusText = 'Rejeitado';
+                break;
+        }
+        
+        html += `
+            <div style="margin-bottom: 20px;">
+                <h4 style="margin-bottom: 15px; color: var(--primary-color);">Status</h4>
+                <p>Status atual: <span class="badge ${statusClass}">${statusText}</span></p>
+        `;
+        
+        // Ações de status
+        if (store.status === 'pendente') {
+            html += `
+                <div style="display: flex; gap: 10px; margin-top: 15px;">
+                    <button class="btn btn-primary" onclick="updateStoreStatus(${store.id}, 'aprovado')">Aprovar</button>
+                    <button class="btn btn-secondary" onclick="updateStoreStatus(${store.id}, 'rejeitado')">Rejeitar</button>
+                </div>
+            `;
+        } else if (store.status === 'rejeitado') {
+            html += `
+                <div style="margin-top: 15px;">
+                    <button class="btn btn-primary" onclick="updateStoreStatus(${store.id}, 'aprovado')">Aprovar</button>
+                </div>
+            `;
+        }
+        
+        html += `</div>`;
+        
+        // Atualizar conteúdo
+        document.getElementById('storeDetailsContent').innerHTML = html;
+        
+        // Configurar botão de edição
+        document.getElementById('editStoreBtn').onclick = function() {
+            hideStoreDetailsModal();
+            showStoreModal(store.id);
+        };
+    }
+
+    // Função para esconder modal de detalhes
+    function hideStoreDetailsModal() {
+        document.getElementById('storeDetailsModal').style.display = 'none';
+    }
+
+    // Função para aprovar loja
+    function approveStore(storeId) {
+        if (confirm('Tem certeza que deseja aprovar esta loja?')) {
+            updateStoreStatus(storeId, 'aprovado');
+        }
+    }
+
+    // Função para rejeitar loja
+    function rejectStore(storeId) {
+        const observacao = prompt('Digite o motivo da rejeição (opcional):');
+        updateStoreStatus(storeId, 'rejeitado', observacao);
+    }
+
+    // Função para atualizar status da loja
+    function updateStoreStatus(storeId, status, observacao = '') {
+        fetch('../../controllers/AdminController.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `action=update_store_status&store_id=${storeId}&status=${status}&observacao=${encodeURIComponent(observacao)}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status) {
+                alert(data.message || 'Status atualizado com sucesso!');
+                location.reload();
+            } else {
+                alert('Erro: ' + (data.message || 'Erro desconhecido'));
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            alert('Erro ao atualizar status da loja.');
+        });
+    }
+
+    // Função para selecionar/deselecionar todos
+    function toggleSelectAll() {
+        const selectAll = document.getElementById('selectAll');
+        const checkboxes = document.querySelectorAll('.store-checkbox');
+        
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = selectAll.checked;
+        });
+    }
+
+    // Fechar modais ao clicar fora
+    window.onclick = function(event) {
+        const storeModal = document.getElementById('storeModal');
+        const detailsModal = document.getElementById('storeDetailsModal');
+        
+        if (event.target === storeModal) {
+            hideStoreModal();
+        }
+        
+        if (event.target === detailsModal) {
+            hideStoreDetailsModal();
+        }
+    }
+
+    // Evento para formulário
+    document.addEventListener('DOMContentLoaded', function() {
+        const storeForm = document.getElementById('storeForm');
+        if (storeForm) {
+            storeForm.addEventListener('submit', submitStoreForm);
+        }
+    });
     </script>
     
     <style>
