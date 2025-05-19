@@ -8,6 +8,7 @@ require_once '../../config/database.php';
 require_once '../../config/constants.php';
 require_once '../../controllers/AuthController.php';
 require_once '../../controllers/TransactionController.php';
+require_once '../../models/CashbackBalance.php';
 
 // Iniciar sessão
 session_start();
@@ -57,8 +58,8 @@ if (isset($_GET['metodo_pagamento']) && !empty($_GET['metodo_pagamento'])) {
     $filters['metodo_pagamento'] = $_GET['metodo_pagamento'];
 }
 
-// Obter histórico de pagamentos
-$result = TransactionController::getPaymentHistory($storeId, $filters, $page);
+// Obter histórico de pagamentos com informações de saldo
+$result = TransactionController::getPaymentHistoryWithBalance($storeId, $filters, $page);
 
 // Calcular estatísticas
 $totalPagamentos = 0;
@@ -66,11 +67,15 @@ $totalAprovados = 0;
 $totalPendentes = 0;
 $totalRejeitados = 0;
 $valorTotalPagamentos = 0;
+$valorTotalVendasOriginais = 0;
+$totalSaldoUsado = 0;
 
 if ($result['status'] && isset($result['data']['pagamentos'])) {
     foreach ($result['data']['pagamentos'] as $payment) {
         $totalPagamentos++;
         $valorTotalPagamentos += $payment['valor_total'];
+        $valorTotalVendasOriginais += $payment['valor_vendas_originais'];
+        $totalSaldoUsado += $payment['total_saldo_usado'];
         
         if ($payment['status'] === 'aprovado') {
             $totalAprovados++;
@@ -111,7 +116,7 @@ $metodosPagamento = [
             <!-- Cabeçalho -->
             <div class="dashboard-header">
                 <h1>Histórico de Pagamentos</h1>
-                <p class="subtitle">Acompanhe todos os pagamentos de comissões realizados</p>
+                <p class="subtitle">Acompanhe todos os pagamentos de comissões realizados para <?php echo htmlspecialchars($storeName); ?></p>
             </div>
             
             <!-- Cards de estatísticas -->
@@ -134,6 +139,19 @@ $metodosPagamento = [
                 <div class="stat-card">
                     <div class="stat-card-title">Valor Total Pago</div>
                     <div class="stat-card-value">R$ <?php echo number_format($valorTotalPagamentos, 2, ',', '.'); ?></div>
+                    <div class="stat-card-subtitle">Comissões pagas ao Klube Cash</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-card-title">Valor Total de Vendas</div>
+                    <div class="stat-card-value">R$ <?php echo number_format($valorTotalVendasOriginais, 2, ',', '.'); ?></div>
+                    <div class="stat-card-subtitle">Valor original das vendas</div>
+                </div>
+                
+                <div class="stat-card">
+                    <div class="stat-card-title">Total Saldo Usado</div>
+                    <div class="stat-card-value">R$ <?php echo number_format($totalSaldoUsado, 2, ',', '.'); ?></div>
+                    <div class="stat-card-subtitle">Desconto dado aos clientes</div>
                 </div>
             </div>
             
@@ -197,7 +215,9 @@ $metodosPagamento = [
                                 <tr>
                                     <th>#ID</th>
                                     <th>Data</th>
-                                    <th>Valor</th>
+                                    <th>Valor Vendas</th>
+                                    <th>Saldo Usado</th>
+                                    <th>Comissão Paga</th>
                                     <th>Método</th>
                                     <th>Status</th>
                                     <th>Transações</th>
@@ -209,7 +229,29 @@ $metodosPagamento = [
                                     <tr>
                                         <td><?php echo $payment['id']; ?></td>
                                         <td><?php echo date('d/m/Y H:i', strtotime($payment['data_registro'])); ?></td>
-                                        <td>R$ <?php echo number_format($payment['valor_total'], 2, ',', '.'); ?></td>
+                                        <td>
+                                            <div class="valor-detalhado">
+                                                <strong>R$ <?php echo number_format($payment['valor_vendas_originais'], 2, ',', '.'); ?></strong>
+                                                <small class="valor-original">Total vendas</small>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <?php if ($payment['total_saldo_usado'] > 0): ?>
+                                                <span class="saldo-usado">
+                                                    💰 R$ <?php echo number_format($payment['total_saldo_usado'], 2, ',', '.'); ?>
+                                                </span>
+                                            <?php else: ?>
+                                                <span class="sem-saldo">-</span>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td>
+                                            <div class="valor-detalhado">
+                                                <strong>R$ <?php echo number_format($payment['valor_total'], 2, ',', '.'); ?></strong>
+                                                <?php if ($payment['total_saldo_usado'] > 0): ?>
+                                                    <small class="valor-liquido">Valor líquido</small>
+                                                <?php endif; ?>
+                                            </div>
+                                        </td>
                                         <td><?php echo isset($metodosPagamento[$payment['metodo_pagamento']]) ? $metodosPagamento[$payment['metodo_pagamento']] : $payment['metodo_pagamento']; ?></td>
                                         <td>
                                             <span class="status-badge status-<?php echo $payment['status']; ?>">
@@ -230,7 +272,14 @@ $metodosPagamento = [
                                                 ?>
                                             </span>
                                         </td>
-                                        <td><?php echo $payment['qtd_transacoes']; ?></td>
+                                        <td>
+                                            <div class="transacoes-info">
+                                                <?php echo $payment['qtd_transacoes']; ?> vendas
+                                                <?php if ($payment['qtd_com_saldo'] > 0): ?>
+                                                    <small>(<?php echo $payment['qtd_com_saldo']; ?> c/ saldo)</small>
+                                                <?php endif; ?>
+                                            </div>
+                                        </td>
                                         <td>
                                             <button class="btn btn-action" onclick="viewPaymentDetails(<?php echo $payment['id']; ?>)">Detalhes</button>
                                             <?php if (!empty($payment['comprovante'])): ?>
@@ -278,23 +327,46 @@ $metodosPagamento = [
                 <?php endif; ?>
             </div>
             
-            <!-- Informações sobre Status -->
+            <!-- Informações sobre Status e Saldo -->
             <div class="card info-card">
                 <div class="card-header">
-                    <div class="card-title">Sobre os Status de Pagamento</div>
+                    <div class="card-title">Informações sobre Pagamentos e Saldo</div>
                 </div>
                 <div class="status-info">
-                    <div class="status-item">
-                        <span class="status-badge status-pendente">Pendente</span>
-                        <p>O pagamento foi registrado e está aguardando a análise do administrador.</p>
+                    <div class="info-section">
+                        <h4>📊 Status dos Pagamentos:</h4>
+                        <div class="status-item">
+                            <span class="status-badge status-pendente">Pendente</span>
+                            <p>O pagamento foi registrado e está aguardando a análise do administrador.</p>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-badge status-aprovado">Aprovado</span>
+                            <p>O pagamento foi confirmado e o cashback já foi liberado para os clientes.</p>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-badge status-rejeitado">Rejeitado</span>
+                            <p>O pagamento foi rejeitado pelo administrador. Verifique o motivo nos detalhes e faça um novo pagamento.</p>
+                        </div>
                     </div>
-                    <div class="status-item">
-                        <span class="status-badge status-aprovado">Aprovado</span>
-                        <p>O pagamento foi confirmado e o cashback já foi liberado para os clientes.</p>
+                    
+                    <div class="info-section">
+                        <h4>💰 Sobre o Uso de Saldo:</h4>
+                        <ul>
+                            <li><strong>Valor Vendas:</strong> Valor original total das vendas incluídas no pagamento</li>
+                            <li><strong>Saldo Usado:</strong> Total de saldo de cashback usado pelos clientes nas vendas</li>
+                            <li><strong>Comissão Paga:</strong> Valor líquido pago ao Klube Cash (sobre valor efetivamente cobrado)</li>
+                            <li><strong>Transações c/ saldo:</strong> Quantidade de vendas onde clientes usaram saldo</li>
+                        </ul>
                     </div>
-                    <div class="status-item">
-                        <span class="status-badge status-rejeitado">Rejeitado</span>
-                        <p>O pagamento foi rejeitado pelo administrador. Verifique o motivo nos detalhes e faça um novo pagamento.</p>
+                    
+                    <div class="info-section">
+                        <h4>🔄 Processo de Pagamento:</h4>
+                        <ol>
+                            <li>Você seleciona transações pendentes e realiza o pagamento</li>
+                            <li>A comissão é calculada sobre o valor efetivamente cobrado (descontando saldo usado)</li>
+                            <li>O administrador analisa e aprova/rejeita o pagamento</li>
+                            <li>Após aprovação, o cashback é liberado para os clientes</li>
+                        </ol>
                     </div>
                 </div>
             </div>
@@ -338,7 +410,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const receiptImage = document.getElementById('receiptImage');
     
     // Configuração dos botões de fechar modais
-    // Este código adiciona event listeners para todos os elementos com classe 'close'
     const closeButtons = document.getElementsByClassName('close');
     for (let i = 0; i < closeButtons.length; i++) {
         closeButtons[i].addEventListener('click', function() {
@@ -348,7 +419,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Fechar modal quando clicar fora dela (no backdrop)
-    // Esta funcionalidade melhora a experiência do usuário
     window.addEventListener('click', function(event) {
         if (event.target === paymentDetailsModal) {
             paymentDetailsModal.style.display = 'none';
@@ -359,7 +429,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Função principal para visualizar detalhes do pagamento
-    // CORREÇÃO PRINCIPAL: Mudança da API para o TransactionController
     window.viewPaymentDetails = function(paymentId) {
         // Validação básica do ID do pagamento
         if (!paymentId || paymentId <= 0) {
@@ -371,35 +440,29 @@ document.addEventListener('DOMContentLoaded', function() {
         paymentDetailsModal.style.display = 'block';
         paymentDetailsContent.innerHTML = '<p>Carregando detalhes...</p>';
         
-        // CORREÇÃO: Usar TransactionController ao invés da API separada
-        // Mudando de GET para POST conforme esperado pelo controller
+        // Usar TransactionController para buscar detalhes com informações de saldo
         fetch('../../controllers/TransactionController.php', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
             },
-            // Enviando dados no formato correto para o controller
-            body: 'action=payment_details&payment_id=' + encodeURIComponent(paymentId)
+            body: 'action=payment_details_with_balance&payment_id=' + encodeURIComponent(paymentId)
         })
         .then(response => {
-            // Verificar se a resposta HTTP foi bem-sucedida
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
             return response.json();
         })
         .then(data => {
-            // Processar resposta do servidor
             if (data && data.status) {
-                renderPaymentDetails(data.data);
+                renderPaymentDetailsWithBalance(data.data);
             } else {
-                // Mostrar mensagem de erro específica retornada pelo servidor
                 const errorMessage = data && data.message ? data.message : 'Erro desconhecido ao carregar detalhes';
                 paymentDetailsContent.innerHTML = `<p class="error">Erro: ${errorMessage}</p>`;
             }
         })
         .catch(error => {
-            // Tratamento de erros de conexão ou processamento
             console.error('Erro na requisição:', error);
             paymentDetailsContent.innerHTML = `
                 <p class="error">
@@ -412,17 +475,14 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Função para visualizar comprovante de pagamento
     window.viewReceipt = function(receiptUrl) {
-        // Validação da URL do comprovante
         if (!receiptUrl) {
             alert('Comprovante não disponível');
             return;
         }
         
-        // Configurar a URL do comprovante e abrir modal
         receiptImage.src = '../../uploads/comprovantes/' + encodeURIComponent(receiptUrl);
         receiptModal.style.display = 'block';
         
-        // Ajustar tamanho da imagem quando carregada
         receiptImage.onload = function() {
             if (receiptImage.height > 600) {
                 receiptImage.style.height = '600px';
@@ -430,17 +490,14 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         };
         
-        // Tratamento de erro no carregamento da imagem
         receiptImage.onerror = function() {
             alert('Erro ao carregar o comprovante. Arquivo pode estar corrompido ou não encontrado.');
             receiptModal.style.display = 'none';
         };
     };
     
-    // Função para renderizar os detalhes do pagamento no modal
-    // MELHORIAS: Adicionadas verificações de segurança e tratamento de dados nulos
-    function renderPaymentDetails(data) {
-        // Verificação de segurança - garantir que os dados existem
+    // Função para renderizar os detalhes do pagamento com informações de saldo
+    function renderPaymentDetailsWithBalance(data) {
         if (!data || !data.pagamento) {
             paymentDetailsContent.innerHTML = '<p class="error">Dados do pagamento não encontrados.</p>';
             return;
@@ -449,7 +506,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const payment = data.pagamento;
         const transactions = data.transacoes || [];
         
-        // Construção do HTML de forma segura com verificações
+        // Construção do HTML com informações de saldo
         let html = `
             <div class="payment-summary">
                 <div class="summary-row">
@@ -461,7 +518,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     <span class="summary-value">${formatDate(payment.data_registro)}</span>
                 </div>
                 <div class="summary-row">
-                    <span class="summary-label">Valor Total:</span>
+                    <span class="summary-label">Valor Total das Vendas:</span>
+                    <span class="summary-value">R$ ${formatCurrency(payment.valor_vendas_originais || payment.valor_total)}</span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">Total Saldo Usado:</span>
+                    <span class="summary-value balance-used">R$ ${formatCurrency(payment.total_saldo_usado || 0)}</span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">Comissão Paga:</span>
                     <span class="summary-value">R$ ${formatCurrency(payment.valor_total)}</span>
                 </div>
                 <div class="summary-row">
@@ -504,7 +569,7 @@ document.addEventListener('DOMContentLoaded', function() {
             `;
         }
         
-        // Lista de transações incluídas no pagamento
+        // Lista de transações incluídas no pagamento com informações de saldo
         html += `
             <div class="transactions-list">
                 <h3>Transações Incluídas (${transactions.length})</h3>
@@ -516,20 +581,30 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <th>Código</th>
                                 <th>Cliente</th>
                                 <th>Data</th>
-                                <th>Valor</th>
+                                <th>Valor Venda</th>
+                                <th>Saldo Usado</th>
+                                <th>Valor Pago</th>
                                 <th>Cashback</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${transactions.map(transaction => `
+                            ${transactions.map(transaction => {
+                                const saldoUsado = transaction.saldo_usado || 0;
+                                const valorPago = transaction.valor_total - saldoUsado;
+                                return `
                                 <tr>
                                     <td>${escapeHtml(transaction.codigo_transacao || 'N/A')}</td>
-                                    <td>${escapeHtml(transaction.cliente_nome || 'N/A')}</td>
+                                    <td>
+                                        ${escapeHtml(transaction.cliente_nome || 'N/A')}
+                                        ${saldoUsado > 0 ? '<span class="balance-indicator">💰</span>' : ''}
+                                    </td>
                                     <td>${formatDate(transaction.data_transacao)}</td>
                                     <td>R$ ${formatCurrency(transaction.valor_total)}</td>
+                                    <td>${saldoUsado > 0 ? 'R$ ' + formatCurrency(saldoUsado) : '-'}</td>
+                                    <td>R$ ${formatCurrency(valorPago)}</td>
                                     <td>R$ ${formatCurrency(transaction.valor_cliente)}</td>
                                 </tr>
-                            `).join('')}
+                            `}).join('')}
                         </tbody>
                     </table>
                 </div>
@@ -556,19 +631,15 @@ document.addEventListener('DOMContentLoaded', function() {
             `;
         }
         
-        // Inserir o HTML construído no modal
         paymentDetailsContent.innerHTML = html;
     }
     
     // Funções auxiliares para formatação e segurança
-    
-    // Formatar datas de forma segura
     function formatDate(dateString) {
         if (!dateString) return 'N/A';
         
         try {
             const date = new Date(dateString);
-            // Verificar se a data é válida
             if (isNaN(date.getTime())) return 'Data inválida';
             
             return date.toLocaleDateString('pt-BR') + ' ' + 
@@ -579,18 +650,14 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Formatar valores monetários de forma segura
     function formatCurrency(value) {
-        // Converter para número e tratar valores inválidos
         const numValue = parseFloat(value) || 0;
-        
         return numValue.toLocaleString('pt-BR', {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2
         });
     }
     
-    // Obter nome do método de pagamento de forma legível
     function getPaymentMethodName(method) {
         const methods = {
             'pix': 'PIX',
@@ -603,7 +670,6 @@ document.addEventListener('DOMContentLoaded', function() {
         return methods[method] || 'Método não especificado';
     }
     
-    // Obter nome do status de forma legível
     function getStatusName(status) {
         switch(status) {
             case 'aprovado': return 'Aprovado';
@@ -613,7 +679,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Função de segurança para escapar HTML e prevenir XSS
     function escapeHtml(text) {
         if (!text) return '';
         
@@ -629,5 +694,90 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 </script>
+
+<style>
+/* Estilos adicionais para informações de saldo */
+.stat-card-subtitle {
+    font-size: 0.8rem;
+    color: #6c757d;
+    margin-top: 5px;
+}
+
+.valor-detalhado {
+    display: flex;
+    flex-direction: column;
+}
+
+.valor-original, 
+.valor-liquido {
+    font-size: 0.8rem;
+    color: #6c757d;
+    font-style: italic;
+}
+
+.saldo-usado {
+    color: #28a745;
+    font-weight: 600;
+}
+
+.sem-saldo {
+    color: #6c757d;
+    font-style: italic;
+}
+
+.transacoes-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.balance-used {
+    color: #28a745 !important;
+    font-weight: 600;
+}
+
+.balance-indicator {
+    margin-left: 5px;
+    font-size: 0.8rem;
+}
+
+.info-section {
+    margin-bottom: 25px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #eee;
+}
+
+.info-section:last-child {
+    border-bottom: none;
+}
+
+.info-section h4 {
+    color: #333;
+    margin-bottom: 15px;
+    font-size: 1.1rem;
+}
+
+.info-section ul {
+    list-style-type: none;
+    padding-left: 0;
+}
+
+.info-section ol {
+    padding-left: 0;
+}
+
+.info-section li {
+    margin-bottom: 10px;
+    padding-left: 20px;
+    position: relative;
+}
+
+.info-section ul li::before {
+    content: "•";
+    color: #FF7A00;
+    font-weight: bold;
+    position: absolute;
+    left: 0;
+}
+</style>
 </body>
 </html>

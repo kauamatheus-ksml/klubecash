@@ -13,7 +13,215 @@ require_once __DIR__ . '/../utils/Validator.php';
  */
 class TransactionController {
     // Adicionar este método no TransactionController.php
+   
 
+    /**
+    * Obtém histórico de pagamentos com informações de saldo usado
+    * 
+    * @param int $storeId ID da loja
+    * @param array $filters Filtros adicionais
+    * @param int $page Página atual para paginação
+    * @return array Resultado da operação
+    */
+    public static function getPaymentHistoryWithBalance($storeId, $filters = [], $page = 1) {
+        try {
+            if (!AuthController::isAuthenticated()) {
+                return ['status' => false, 'message' => 'Usuário não autenticado.'];
+            }
+            
+            $db = Database::getConnection();
+            $limit = ITEMS_PER_PAGE;
+            $offset = ($page - 1) * $limit;
+            
+            // Construir condições WHERE
+            $whereConditions = ["pc.loja_id = :loja_id"];
+            $params = [':loja_id' => $storeId];
+            
+            // Aplicar filtros
+            if (!empty($filters['status'])) {
+                $whereConditions[] = "pc.status = :status";
+                $params[':status'] = $filters['status'];
+            }
+            
+            if (!empty($filters['data_inicio'])) {
+                $whereConditions[] = "DATE(pc.data_registro) >= :data_inicio";
+                $params[':data_inicio'] = $filters['data_inicio'];
+            }
+            
+            if (!empty($filters['data_fim'])) {
+                $whereConditions[] = "DATE(pc.data_registro) <= :data_fim";
+                $params[':data_fim'] = $filters['data_fim'];
+            }
+            
+            if (!empty($filters['metodo_pagamento'])) {
+                $whereConditions[] = "pc.metodo_pagamento = :metodo_pagamento";
+                $params[':metodo_pagamento'] = $filters['metodo_pagamento'];
+            }
+            
+            $whereClause = "WHERE " . implode(" AND ", $whereConditions);
+            
+            // Query para obter pagamentos com informações agregadas de saldo
+            $paymentsQuery = "
+                SELECT 
+                    pc.*,
+                    COUNT(pt.transacao_id) as qtd_transacoes,
+                    SUM(t.valor_total) as valor_vendas_originais,
+                    COALESCE(SUM(
+                        (SELECT SUM(cm.valor) 
+                        FROM cashback_movimentacoes cm 
+                        WHERE cm.usuario_id = t.usuario_id 
+                        AND cm.loja_id = t.loja_id 
+                        AND cm.tipo_operacao = 'uso'
+                        AND cm.transacao_uso_id = t.id)
+                    ), 0) as total_saldo_usado,
+                    SUM(CASE WHEN EXISTS(
+                        SELECT 1 FROM cashback_movimentacoes cm2 
+                        WHERE cm2.usuario_id = t.usuario_id 
+                        AND cm2.loja_id = t.loja_id 
+                        AND cm2.tipo_operacao = 'uso'
+                        AND cm2.transacao_uso_id = t.id
+                    ) THEN 1 ELSE 0 END) as qtd_com_saldo
+                FROM pagamentos_comissao pc
+                LEFT JOIN pagamentos_transacoes pt ON pc.id = pt.pagamento_id
+                LEFT JOIN transacoes_cashback t ON pt.transacao_id = t.id
+                $whereClause
+                GROUP BY pc.id
+                ORDER BY pc.data_registro DESC
+                LIMIT :limit OFFSET :offset
+            ";
+            
+            $stmt = $db->prepare($paymentsQuery);
+            foreach ($params as $key => $value) {
+                $stmt->bindValue($key, $value);
+            }
+            $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+            $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+            $stmt->execute();
+            
+            $payments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            // Query para contar total de pagamentos
+            $countQuery = "
+                SELECT COUNT(DISTINCT pc.id) as total
+                FROM pagamentos_comissao pc
+                LEFT JOIN pagamentos_transacoes pt ON pc.id = pt.pagamento_id
+                LEFT JOIN transacoes_cashback t ON pt.transacao_id = t.id
+                $whereClause
+            ";
+            
+            $countStmt = $db->prepare($countQuery);
+            foreach ($params as $key => $value) {
+                $countStmt->bindValue($key, $value);
+            }
+            $countStmt->execute();
+            $totalCount = $countStmt->fetch(PDO::FETCH_ASSOC)['total'];
+            
+            // Calcular paginação
+            $totalPages = ceil($totalCount / $limit);
+            
+            return [
+                'status' => true,
+                'data' => [
+                    'pagamentos' => $payments,
+                    'paginacao' => [
+                        'pagina_atual' => $page,
+                        'total_paginas' => $totalPages,
+                        'total_itens' => $totalCount,
+                        'itens_por_pagina' => $limit
+                    ]
+                ]
+            ];
+            
+        } catch (PDOException $e) {
+            error_log('Erro ao buscar histórico de pagamentos com saldo: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro ao buscar histórico de pagamentos.'];
+        }
+    }
+
+    /**
+    * Obtém detalhes de um pagamento específico com informações de saldo
+    * 
+    * @param int $paymentId ID do pagamento
+    * @return array Resultado da operação
+     */
+    public static function getPaymentDetailsWithBalance($paymentId) {
+        try {
+            if (!AuthController::isAuthenticated()) {
+                return ['status' => false, 'message' => 'Usuário não autenticado.'];
+            }
+            
+            $db = Database::getConnection();
+            
+            // Buscar dados do pagamento
+            $paymentQuery = "
+                SELECT 
+                    pc.*,
+                    SUM(t.valor_total) as valor_vendas_originais,
+                    COALESCE(SUM(
+                        (SELECT SUM(cm.valor) 
+                        FROM cashback_movimentacoes cm 
+                        WHERE cm.usuario_id = t.usuario_id 
+                        AND cm.loja_id = t.loja_id 
+                        AND cm.tipo_operacao = 'uso'
+                        AND cm.transacao_uso_id = t.id)
+                    ), 0) as total_saldo_usado
+                FROM pagamentos_comissao pc
+                LEFT JOIN pagamentos_transacoes pt ON pc.id = pt.pagamento_id
+                LEFT JOIN transacoes_cashback t ON pt.transacao_id = t.id
+                WHERE pc.id = :payment_id
+                GROUP BY pc.id
+            ";
+            
+            $paymentStmt = $db->prepare($paymentQuery);
+            $paymentStmt->bindParam(':payment_id', $paymentId);
+            $paymentStmt->execute();
+            
+            $payment = $paymentStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$payment) {
+                return ['status' => false, 'message' => 'Pagamento não encontrado.'];
+            }
+            
+            // Buscar transações do pagamento com informações de saldo
+            $transactionsQuery = "
+                SELECT 
+                    t.*,
+                    u.nome as cliente_nome,
+                    u.email as cliente_email,
+                    COALESCE(
+                        (SELECT SUM(cm.valor) 
+                        FROM cashback_movimentacoes cm 
+                        WHERE cm.usuario_id = t.usuario_id 
+                        AND cm.loja_id = t.loja_id 
+                        AND cm.tipo_operacao = 'uso'
+                        AND cm.transacao_uso_id = t.id), 0
+                    ) as saldo_usado
+                FROM transacoes_cashback t
+                JOIN usuarios u ON t.usuario_id = u.id
+                JOIN pagamentos_transacoes pt ON t.id = pt.transacao_id
+                WHERE pt.pagamento_id = :payment_id
+                ORDER BY t.data_transacao DESC
+            ";
+            
+            $transactionsStmt = $db->prepare($transactionsQuery);
+            $transactionsStmt->bindParam(':payment_id', $paymentId);
+            $transactionsStmt->execute();
+            
+            $transactions = $transactionsStmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            return [
+                'status' => true,
+                'data' => [
+                    'pagamento' => $payment,
+                    'transacoes' => $transactions
+                ]
+            ];
+            
+        } catch (PDOException $e) {
+            error_log('Erro ao buscar detalhes do pagamento: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro ao buscar detalhes do pagamento.'];
+        }
+    }
     /**
     * Obtém transações pendentes com informações de saldo usado
     * 
@@ -1522,7 +1730,18 @@ if (basename($_SERVER['PHP_SELF']) === 'TransactionController.php') {
             $result = TransactionController::registerTransaction($data);
             echo json_encode($result);
             break;
+        // Adicionar este case no switch do TransactionController.php
+
+        case 'payment_details_with_balance':
+            $paymentId = intval($_POST['payment_id'] ?? 0);
+            if ($paymentId <= 0) {
+                echo json_encode(['status' => false, 'message' => 'ID do pagamento inválido']);
+                return;
+            }
             
+            $result = self::getPaymentDetailsWithBalance($paymentId);
+            echo json_encode($result);
+            break;    
         case 'process_batch':
             $file = $_FILES['arquivo'] ?? null;
             $storeId = isset($_POST['loja_id']) ? intval($_POST['loja_id']) : 0;
