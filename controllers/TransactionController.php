@@ -12,7 +12,150 @@ require_once __DIR__ . '/../utils/Validator.php';
  * Gerencia operações relacionadas a transações, comissões e cashback
  */
 class TransactionController {
-    
+    // Adicionar este método no TransactionController.php
+
+    /**
+    * Obtém transações pendentes com informações de saldo usado
+    * 
+    * @param int $storeId ID da loja
+    * @param array $filters Filtros adicionais
+    * @param int $page Página atual para paginação
+    * @return array Resultado da operação
+    */
+    public static function getPendingTransactionsWithBalance($storeId, $filters = [], $page = 1) {
+        try {
+            if (!AuthController::isAuthenticated()) {
+                return ['status' => false, 'message' => 'Usuário não autenticado.'];
+            }
+            
+            $db = Database::getConnection();
+            $limit = ITEMS_PER_PAGE;
+            $offset = ($page - 1) * $limit;
+            
+            // Construir condições WHERE
+            $whereConditions = ["t.loja_id = :loja_id", "t.status = :status"];
+            $params = [
+                ':loja_id' => $storeId,
+                ':status' => TRANSACTION_PENDING
+            ];
+            
+            // Aplicar filtros
+            if (!empty($filters['data_inicio'])) {
+                $whereConditions[] = "DATE(t.data_transacao) >= :data_inicio";
+                $params[':data_inicio'] = $filters['data_inicio'];
+            }
+            
+            if (!empty($filters['data_fim'])) {
+                $whereConditions[] = "DATE(t.data_transacao) <= :data_fim";
+                $params[':data_fim'] = $filters['data_fim'];
+            }
+            
+            if (!empty($filters['valor_min'])) {
+                $whereConditions[] = "t.valor_total >= :valor_min";
+                $params[':valor_min'] = $filters['valor_min'];
+            }
+            
+            if (!empty($filters['valor_max'])) {
+                $whereConditions[] = "t.valor_total <= :valor_max";
+                $params[':valor_max'] = $filters['valor_max'];
+            }
+            
+            $whereClause = "WHERE " . implode(" AND ", $whereConditions);
+            
+            // Query para obter transações com informações de saldo usado
+            $transactionsQuery = "
+                SELECT 
+                    t.*,
+                    u.nome as cliente_nome,
+                    u.email as cliente_email,
+                    COALESCE(
+                        (SELECT SUM(cm.valor) 
+                        FROM cashback_movimentacoes cm 
+                        WHERE cm.usuario_id = t.usuario_id 
+                        AND cm.loja_id = t.loja_id 
+                        AND cm.tipo_operacao = 'uso'
+                        AND cm.transacao_uso_id = t.id), 0
+                    ) as saldo_usado
+                FROM transacoes_cashback t
+                JOIN usuarios u ON t.usuario_id = u.id
+                $whereClause
+                ORDER BY t.data_transacao DESC
+                LIMIT :limit OFFSET :offset
+            ";
+            
+            $stmt = $db->prepare($transactionsQuery);
+            foreach ($params as $key => $value) {
+                $stmt->bindValue($key, $value);
+            }
+            $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+            $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+            $stmt->execute();
+            
+            $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            // Query para contar total de transações
+            $countQuery = "
+                SELECT COUNT(*) as total
+                FROM transacoes_cashback t
+                JOIN usuarios u ON t.usuario_id = u.id
+                $whereClause
+            ";
+            
+            $countStmt = $db->prepare($countQuery);
+            foreach ($params as $key => $value) {
+                $countStmt->bindValue($key, $value);
+            }
+            $countStmt->execute();
+            $totalCount = $countStmt->fetch(PDO::FETCH_ASSOC)['total'];
+            
+            // Query para totais
+            $totalsQuery = "
+                SELECT 
+                    COUNT(*) as total_transacoes,
+                    SUM(t.valor_total) as total_valor_vendas_originais,
+                    SUM(t.valor_cashback) as total_valor_comissoes,
+                    COALESCE(SUM(
+                        (SELECT SUM(cm.valor) 
+                        FROM cashback_movimentacoes cm 
+                        WHERE cm.usuario_id = t.usuario_id 
+                        AND cm.loja_id = t.loja_id 
+                        AND cm.tipo_operacao = 'uso'
+                        AND cm.transacao_uso_id = t.id)
+                    ), 0) as total_saldo_usado
+                FROM transacoes_cashback t
+                JOIN usuarios u ON t.usuario_id = u.id
+                $whereClause
+            ";
+            
+            $totalsStmt = $db->prepare($totalsQuery);
+            foreach ($params as $key => $value) {
+                $totalsStmt->bindValue($key, $value);
+            }
+            $totalsStmt->execute();
+            $totals = $totalsStmt->fetch(PDO::FETCH_ASSOC);
+            
+            // Calcular paginação
+            $totalPages = ceil($totalCount / $limit);
+            
+            return [
+                'status' => true,
+                'data' => [
+                    'transacoes' => $transactions,
+                    'totais' => $totals,
+                    'paginacao' => [
+                        'pagina_atual' => $page,
+                        'total_paginas' => $totalPages,
+                        'total_itens' => $totalCount,
+                        'itens_por_pagina' => $limit
+                    ]
+                ]
+            ];
+            
+        } catch (PDOException $e) {
+            error_log('Erro ao buscar transações pendentes com saldo: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro ao buscar transações pendentes.'];
+        }
+    }
     /**
      * Registra uma nova transação de cashback
      * 
