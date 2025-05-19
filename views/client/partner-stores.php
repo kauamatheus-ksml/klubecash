@@ -22,7 +22,7 @@ if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id']) || !isset($_SESS
 $userId = $_SESSION['user_id'];
 
 // DEBUG TEMPORÁRIO - REMOVER DEPOIS
-$debug = false; // Mude para false depois de corrigir
+$debug = true; // Mude para false depois de corrigir
 
 if ($debug) {
     echo "<div style='background: #f0f0f0; padding: 10px; margin: 10px; border: 1px solid #ccc;'>";
