@@ -278,7 +278,197 @@ public static function getUserDetails($userId) {
 }
     
      
-    
+    // Adicionar este método no AdminController.php
+
+    /**
+    * Gerenciar lojas com informações de saldo
+    * 
+    * @param array $filters Filtros de busca
+    * @param int $page Página atual
+    * @return array Resultado da operação
+    */
+    public static function manageStoresWithBalance($filters = [], $page = 1) {
+        try {
+            $db = Database::getConnection();
+            $limit = ITEMS_PER_PAGE;
+            $offset = ($page - 1) * $limit;
+            
+            // Construir condições WHERE
+            $whereConditions = ["l.id IS NOT NULL"];
+            $params = [];
+            
+            // Aplicar filtros
+            if (!empty($filters['busca'])) {
+                $whereConditions[] = "(l.nome_fantasia LIKE :busca OR l.razao_social LIKE :busca OR l.email LIKE :busca)";
+                $params[':busca'] = '%' . $filters['busca'] . '%';
+            }
+            
+            if (!empty($filters['status'])) {
+                $whereConditions[] = "l.status = :status";
+                $params[':status'] = $filters['status'];
+            }
+            
+            if (!empty($filters['categoria'])) {
+                $whereConditions[] = "l.categoria = :categoria";
+                $params[':categoria'] = $filters['categoria'];
+            }
+            
+            $whereClause = "WHERE " . implode(" AND ", $whereConditions);
+            
+            // Query para obter lojas com informações de saldo
+            $storesQuery = "
+                SELECT 
+                    l.*,
+                    COALESCE(SUM(cs.saldo_disponivel), 0) as total_saldo_clientes,
+                    COUNT(CASE WHEN cs.saldo_disponivel > 0 THEN 1 END) as clientes_com_saldo,
+                    COUNT(DISTINCT t.id) as total_transacoes,
+                    COUNT(DISTINCT CASE WHEN cm.id IS NOT NULL THEN t.id END) as transacoes_com_saldo,
+                    COALESCE(SUM(cm.valor), 0) as total_saldo_usado
+                FROM lojas l
+                LEFT JOIN cashback_saldos cs ON l.id = cs.loja_id
+                LEFT JOIN transacoes_cashback t ON l.id = t.loja_id AND t.status = 'aprovado'
+                LEFT JOIN cashback_movimentacoes cm ON t.id = cm.transacao_uso_id AND cm.tipo_operacao = 'uso'
+                $whereClause
+                GROUP BY l.id
+                ORDER BY l.data_cadastro DESC
+                LIMIT :limit OFFSET :offset
+            ";
+            
+            $stmt = $db->prepare($storesQuery);
+            foreach ($params as $key => $value) {
+                $stmt->bindValue($key, $value);
+            }
+            $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+            $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+            $stmt->execute();
+            
+            $stores = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            // Query para contar total de lojas
+            $countQuery = "
+                SELECT COUNT(DISTINCT l.id) as total
+                FROM lojas l
+                $whereClause
+            ";
+            
+            $countStmt = $db->prepare($countQuery);
+            foreach ($params as $key => $value) {
+                $countStmt->bindValue($key, $value);
+            }
+            $countStmt->execute();
+            $totalCount = $countStmt->fetch(PDO::FETCH_ASSOC)['total'];
+            
+            // Obter categorias disponíveis
+            $categoriesStmt = $db->query("SELECT DISTINCT categoria FROM lojas WHERE categoria IS NOT NULL ORDER BY categoria");
+            $categories = $categoriesStmt->fetchAll(PDO::FETCH_COLUMN);
+            
+            // Calcular estatísticas gerais
+            $statsQuery = "
+                SELECT 
+                    COUNT(DISTINCT l.id) as total_lojas,
+                    COUNT(DISTINCT CASE WHEN cs.saldo_disponivel > 0 THEN l.id END) as lojas_com_saldo,
+                    COALESCE(SUM(cs.saldo_disponivel), 0) as total_saldo_acumulado,
+                    COALESCE(SUM(cm.valor), 0) as total_saldo_usado
+                FROM lojas l
+                LEFT JOIN cashback_saldos cs ON l.id = cs.loja_id
+                LEFT JOIN cashback_movimentacoes cm ON l.id = cm.loja_id AND cm.tipo_operacao = 'uso'
+                WHERE l.status = 'aprovado'
+            ";
+            
+            $statsStmt = $db->query($statsQuery);
+            $statistics = $statsStmt->fetch(PDO::FETCH_ASSOC);
+            
+            // Calcular paginação
+            $totalPages = ceil($totalCount / $limit);
+            
+            return [
+                'status' => true,
+                'data' => [
+                    'lojas' => $stores,
+                    'estatisticas' => $statistics,
+                    'categorias' => $categories,
+                    'paginacao' => [
+                        'pagina_atual' => $page,
+                        'total_paginas' => $totalPages,
+                        'total_itens' => $totalCount,
+                        'itens_por_pagina' => $limit
+                    ]
+                ]
+            ];
+            
+        } catch (PDOException $e) {
+            error_log('Erro ao gerenciar lojas com saldo: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro ao carregar dados das lojas.'];
+        }
+    }
+
+    /**
+    * Obter detalhes de uma loja com informações de saldo
+    * 
+    * @param int $storeId ID da loja
+    * @return array Resultado da operação
+    */
+    public static function getStoreDetailsWithBalance($storeId) {
+        try {
+            $db = Database::getConnection();
+            
+            // Buscar dados da loja
+            $storeStmt = $db->prepare("SELECT * FROM lojas WHERE id = :store_id");
+            $storeStmt->bindParam(':store_id', $storeId);
+            $storeStmt->execute();
+            
+            $store = $storeStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$store) {
+                return ['status' => false, 'message' => 'Loja não encontrada.'];
+            }
+            
+            // Buscar estatísticas da loja
+            $statsStmt = $db->prepare("
+                SELECT 
+                    COUNT(*) as total_transacoes,
+                    SUM(valor_total) as total_vendas,
+                    SUM(valor_cliente) as total_cashback
+                FROM transacoes_cashback
+                WHERE loja_id = :store_id AND status = 'aprovado'
+            ");
+            $statsStmt->bindParam(':store_id', $storeId);
+            $statsStmt->execute();
+            $statistics = $statsStmt->fetch(PDO::FETCH_ASSOC);
+            
+            // Buscar estatísticas de saldo
+            $balanceStatsStmt = $db->prepare("
+                SELECT 
+                    COALESCE(SUM(cs.saldo_disponivel), 0) as total_saldo_clientes,
+                    COUNT(CASE WHEN cs.saldo_disponivel > 0 THEN 1 END) as clientes_com_saldo,
+                    COALESCE(SUM(cm.valor), 0) as total_saldo_usado,
+                    COUNT(DISTINCT t.id) as total_transacoes,
+                    COUNT(DISTINCT CASE WHEN cm.id IS NOT NULL THEN t.id END) as transacoes_com_saldo
+                FROM lojas l
+                LEFT JOIN cashback_saldos cs ON l.id = cs.loja_id
+                LEFT JOIN transacoes_cashback t ON l.id = t.loja_id AND t.status = 'aprovado'
+                LEFT JOIN cashback_movimentacoes cm ON t.id = cm.transacao_uso_id AND cm.tipo_operacao = 'uso'
+                WHERE l.id = :store_id
+                GROUP BY l.id
+            ");
+            $balanceStatsStmt->bindParam(':store_id', $storeId);
+            $balanceStatsStmt->execute();
+            $balanceStats = $balanceStatsStmt->fetch(PDO::FETCH_ASSOC);
+            
+            return [
+                'status' => true,
+                'data' => [
+                    'loja' => $store,
+                    'estatisticas' => $statistics,
+                    'estatisticas_saldo' => $balanceStats
+                ]
+            ];
+            
+        } catch (PDOException $e) {
+            error_log('Erro ao obter detalhes da loja com saldo: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro ao carregar detalhes da loja.'];
+        }
+    }
     /**
     * Atualiza dados de um usuário
     * 
@@ -1453,6 +1643,17 @@ public static function getAvailableStores() {
             $reportData = [];
             
             switch ($type) {
+                case 'store_details_with_balance':
+                    $storeId = intval($_POST['store_id'] ?? 0);
+                    if ($storeId <= 0) {
+                        echo json_encode(['status' => false, 'message' => 'ID da loja inválido']);
+                        return;
+                    }
+                    
+                    $result = self::getStoreDetailsWithBalance($storeId);
+                    echo json_encode($result);
+                    break;
+                    
                 case 'financeiro':
                     // Dados financeiros gerais
                     $financeQuery = "
