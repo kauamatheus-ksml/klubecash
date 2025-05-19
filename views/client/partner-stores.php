@@ -22,7 +22,7 @@ if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id']) || !isset($_SESS
 $userId = $_SESSION['user_id'];
 
 // DEBUG TEMPORÁRIO - REMOVER DEPOIS
-$debug = true; // Mude para false depois de corrigir
+$debug = false; // Mude para false depois de corrigir
 
 if ($debug) {
     echo "<div style='background: #f0f0f0; padding: 10px; margin: 10px; border: 1px solid #ccc;'>";
@@ -59,14 +59,14 @@ if ($debug) {
         echo "👤 User Name: " . ($_SESSION['user_name'] ?? 'Não definido') . "<br>";
         
         // Verificar se o usuário existe no banco
-        $checkUserQuery = "SELECT id, nome, email, tipo_usuario FROM usuarios WHERE id = :user_id";
+        $checkUserQuery = "SELECT id, nome, email, tipo FROM usuarios WHERE id = :user_id";
         $checkUserStmt = $db->prepare($checkUserQuery);
         $checkUserStmt->bindParam(':user_id', $userId);
         $checkUserStmt->execute();
         $userData = $checkUserStmt->fetch(PDO::FETCH_ASSOC);
         
         if ($userData) {
-            echo "✅ Usuário encontrado no banco: " . $userData['nome'] . " (Tipo: " . $userData['user_type'] . ")<br>";
+            echo "✅ Usuário encontrado no banco: " . $userData['nome'] . " (Tipo: " . $userData['tipo'] . ")<br>";
         } else {
             echo "❌ Usuário não encontrado no banco<br>";
         }
