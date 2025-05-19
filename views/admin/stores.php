@@ -1,4 +1,10 @@
 <?php
+// No topo do stores.php, adicionar:
+error_log("=== Iniciando stores.php ===");
+error_log("Session user_id: " . ($_SESSION['user_id'] ?? 'não definido'));
+error_log("Session user_type: " . ($_SESSION['user_type'] ?? 'não definido'));
+?>
+<?php
 // views/admin/stores.php
 // Definir o menu ativo na sidebar
 $activeMenu = 'lojas';
@@ -765,6 +771,98 @@ try {
             storeForm.addEventListener('submit', submitStoreForm);
         }
     });
+
+
+
+
+    // Função para testar a conexão primeiro
+function testConnection() {
+    fetch('../../controllers/AdminController.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'action=test_connection'
+    })
+    .then(response => response.text())
+    .then(text => {
+        console.log('Teste de conexão - resposta bruta:', text);
+        try {
+            const data = JSON.parse(text);
+            console.log('Teste de conexão - dados parseados:', data);
+        } catch (e) {
+            console.error('Erro ao parsear resposta do teste:', e);
+        }
+    })
+    .catch(error => {
+        console.error('Erro no teste de conexão:', error);
+    });
+}
+
+// Chamar o teste ao carregar a página
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Página carregada, testando conexão...');
+    testConnection();
+});
+
+// Função melhorada para ver detalhes da loja
+function viewStoreDetails(storeId) {
+    console.log('viewStoreDetails chamada para ID:', storeId);
+    currentStoreId = storeId;
+    
+    // Mostrar carregamento
+    document.getElementById('storeDetailsTitle').textContent = 'Carregando...';
+    document.getElementById('storeDetailsContent').innerHTML = '<div class="alert alert-info">Carregando detalhes da loja...</div>';
+    document.getElementById('storeDetailsModal').style.display = 'block';
+    
+    // Primeiro testar com o arquivo de teste
+    fetch('../../controllers/test_store_details.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'store_id=' + storeId
+    })
+    .then(response => {
+        console.log('Status da resposta:', response.status);
+        return response.text();
+    })
+    .then(text => {
+        console.log('Resposta bruta do teste:', text);
+        
+        try {
+            const data = JSON.parse(text);
+            console.log('Dados parseados do teste:', data);
+            
+            if (data.status) {
+                renderStoreDetailsWithBalance(data.data);
+            } else {
+                document.getElementById('storeDetailsContent').innerHTML = `
+                    <div class="alert alert-danger">
+                        <strong>Erro:</strong> ${data.message}<br>
+                        <small>Arquivo: ${data.file || 'N/A'}, Linha: ${data.line || 'N/A'}</small>
+                    </div>
+                `;
+            }
+        } catch (e) {
+            console.error('Erro ao parsear JSON:', e);
+            document.getElementById('storeDetailsContent').innerHTML = `
+                <div class="alert alert-danger">
+                    <strong>Erro de JSON:</strong> ${e.message}<br>
+                    <pre style="max-height: 200px; overflow-y: auto; font-size: 12px;">${text}</pre>
+                </div>
+            `;
+        }
+    })
+    .catch(error => {
+        console.error('Erro na requisição:', error);
+        document.getElementById('storeDetailsContent').innerHTML = `
+            <div class="alert alert-danger">
+                <strong>Erro na requisição:</strong> ${error.message}
+            </div>
+        `;
+    });
+}
     </script>
     
     <style>

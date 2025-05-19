@@ -433,22 +433,31 @@ public static function getUserDetails($userId) {
     */
     public static function getStoreDetailsWithBalance($storeId) {
         try {
+            // Log para debug
+            error_log("getStoreDetailsWithBalance chamado para loja ID: $storeId");
+            
             // Verificar se é um administrador
-            if (!self::validateAdmin()) {
+            if (!AuthController::isAdmin()) {
+                error_log("Acesso negado: usuário não é admin");
                 return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
             }
             
             $db = Database::getConnection();
+            if (!$db) {
+                throw new Exception("Erro na conexão com banco de dados");
+            }
             
             // Buscar dados da loja
             $storeStmt = $db->prepare("SELECT * FROM lojas WHERE id = ?");
             $storeStmt->execute([$storeId]);
-            
             $store = $storeStmt->fetch(PDO::FETCH_ASSOC);
             
             if (!$store) {
+                error_log("Loja não encontrada: ID $storeId");
                 return ['status' => false, 'message' => 'Loja não encontrada.'];
             }
+            
+            error_log("Loja encontrada: " . $store['nome_fantasia']);
             
             // Buscar endereço da loja
             $addressStmt = $db->prepare("SELECT * FROM lojas_endereco WHERE loja_id = ?");
@@ -472,44 +481,22 @@ public static function getUserDetails($userId) {
             $statsStmt->execute([$storeId]);
             $statistics = $statsStmt->fetch(PDO::FETCH_ASSOC);
             
-            // Buscar estatísticas de saldo (verificar se tabelas existem)
+            error_log("Estatísticas carregadas: " . json_encode($statistics));
+            
+            // Inicializar estatísticas de saldo com valores padrão
             $balanceStats = [
                 'total_saldo_clientes' => 0,
                 'clientes_com_saldo' => 0,
                 'total_saldo_usado' => 0,
-                'total_transacoes' => $statistics['total_transacoes'],
+                'total_transacoes' => $statistics['total_transacoes'] ?? 0,
                 'transacoes_com_saldo' => 0
             ];
             
-            // Verificar se a tabela cashback_saldos existe
-            try {
-                $tableCheck = $db->query("SHOW TABLES LIKE 'cashback_saldos'");
-                if ($tableCheck->rowCount() > 0) {
-                    $balanceStatsStmt = $db->prepare("
-                        SELECT 
-                            COALESCE(SUM(cs.saldo_disponivel), 0) as total_saldo_clientes,
-                            COUNT(CASE WHEN cs.saldo_disponivel > 0 THEN 1 END) as clientes_com_saldo
-                        FROM cashback_saldos cs
-                        WHERE cs.loja_id = ?
-                    ");
-                    $balanceStatsStmt->execute([$storeId]);
-                    $tempBalance = $balanceStatsStmt->fetch(PDO::FETCH_ASSOC);
-                    
-                    if ($tempBalance) {
-                        $balanceStats['total_saldo_clientes'] = $tempBalance['total_saldo_clientes'];
-                        $balanceStats['clientes_com_saldo'] = $tempBalance['clientes_com_saldo'];
-                    }
-                }
-            } catch (Exception $e) {
-                // Se der erro, manter valores padrão
-                error_log('Erro ao buscar saldos: ' . $e->getMessage());
-            }
-            
-            // Últimas transações
+            // Buscar algumas transações recentes
             $transStmt = $db->prepare("
                 SELECT t.*, u.nome as cliente_nome
                 FROM transacoes_cashback t
-                JOIN usuarios u ON t.usuario_id = u.id
+                LEFT JOIN usuarios u ON t.usuario_id = u.id
                 WHERE t.loja_id = ?
                 ORDER BY t.data_transacao DESC
                 LIMIT 5
@@ -517,7 +504,9 @@ public static function getUserDetails($userId) {
             $transStmt->execute([$storeId]);
             $transactions = $transStmt->fetchAll(PDO::FETCH_ASSOC);
             
-            return [
+            error_log("Transações carregadas: " . count($transactions));
+            
+            $result = [
                 'status' => true,
                 'data' => [
                     'loja' => $store,
@@ -527,8 +516,12 @@ public static function getUserDetails($userId) {
                 ]
             ];
             
+            error_log("Resultado preparado com sucesso");
+            return $result;
+            
         } catch (Exception $e) {
             error_log('Erro ao obter detalhes da loja: ' . $e->getMessage());
+            error_log('Stack trace: ' . $e->getTraceAsString());
             return ['status' => false, 'message' => 'Erro ao carregar detalhes da loja: ' . $e->getMessage()];
         }
     }
@@ -1775,22 +1768,59 @@ public static function getAvailableStores() {
 
 
                 case 'store_details_with_balance':
+                    // Limpar qualquer output anterior
+                    if (ob_get_level()) {
+                        ob_clean();
+                    }
+                    
+                    // Definir headers
+                    header('Content-Type: application/json; charset=UTF-8');
+                    header('Cache-Control: no-cache, must-revalidate');
+                    
                     try {
                         $storeId = isset($_POST['store_id']) ? intval($_POST['store_id']) : 0;
                         
+                        error_log("Processando store_details_with_balance para ID: $storeId");
+                        
                         if ($storeId <= 0) {
-                            self::sendJsonResponse(['status' => false, 'message' => 'ID da loja inválido']);
+                            echo json_encode(['status' => false, 'message' => 'ID da loja inválido']);
+                            exit;
                         }
                         
                         $result = self::getStoreDetailsWithBalance($storeId);
-                        self::sendJsonResponse($result);
+                        echo json_encode($result, JSON_UNESCAPED_UNICODE);
                         
                     } catch (Exception $e) {
                         error_log('Erro na action store_details_with_balance: ' . $e->getMessage());
-                        self::sendJsonResponse(['status' => false, 'message' => 'Erro interno do servidor']);
+                        echo json_encode(['status' => false, 'message' => 'Erro interno: ' . $e->getMessage()]);
                     }
+                    exit;
                     break;
+                
+                case 'test_connection':
+                    header('Content-Type: application/json; charset=UTF-8');
                     
+                    try {
+                        $db = Database::getConnection();
+                        $stmt = $db->query("SELECT COUNT(*) as total FROM lojas");
+                        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+                        
+                        echo json_encode([
+                            'status' => true,
+                            'message' => 'Conexão OK',
+                            'total_lojas' => $result['total'],
+                            'user_type' => $_SESSION['user_type'] ?? 'não definido',
+                            'user_id' => $_SESSION['user_id'] ?? 'não definido'
+                        ]);
+                    } catch (Exception $e) {
+                        echo json_encode([
+                            'status' => false,
+                            'message' => 'Erro de conexão: ' . $e->getMessage()
+                        ]);
+                    }
+                    exit;
+                    break;
+
                 case 'financeiro':
                     // Dados financeiros gerais
                     $financeQuery = "
