@@ -62,7 +62,7 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION[
 }
 
 // Obter dados do usuário
-$userId = $_SESSION['user_id'];
+
 // DEBUG ADICIONAL - Verificar sessão completa
 if ($debug) {
     echo "<div style='background: #fff3cd; padding: 10px; margin: 10px; border: 1px solid #ffeaa7;'>";
@@ -87,6 +87,8 @@ if ($debug) {
     }
     echo "</div>";
 }
+
+$userId = $_SESSION['user_id'];
 // Definir valores padrão para filtros e paginação
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $filters = [];
@@ -118,7 +120,7 @@ try {
     $db = Database::getConnection();
     
     // Obter dados das lojas parceiras com informações de saldo
-    $result = ClientController::getPartnerStoresSimple($userId, $filters, $page);
+    $result = ClientController::getPartnerStores($userId, $filters, $page);
     
     // Verificar se houve erro
     $hasError = !$result['status'];

@@ -1791,44 +1791,111 @@ public static function getAvailableStores() {
         }
     }
     // Adicionar TEMPORARIAMENTE no ClientController.php
-    public static function getPartnerStoresSimple($userId, $filters = [], $page = 1) {
+    public static function getPartnerStores($userId, $filters = [], $page = 1) {
         try {
             $db = Database::getConnection();
             
-            // Query simples
-            $query = "SELECT * FROM lojas WHERE status = 'aprovado' ORDER BY nome_fantasia";
-            $stmt = $db->query($query);
+            $offset = ($page - 1) * (defined('ITEMS_PER_PAGE') ? ITEMS_PER_PAGE : 10);
+            $limit = defined('ITEMS_PER_PAGE') ? ITEMS_PER_PAGE : 10;
+            
+            // Query base
+            $baseWhere = " WHERE l.status = 'aprovado'";
+            $params = [];
+            
+            // Aplicar filtros
+            if (!empty($filters['categoria'])) {
+                $baseWhere .= " AND l.categoria = :categoria";
+                $params[':categoria'] = $filters['categoria'];
+            }
+            
+            if (!empty($filters['nome'])) {
+                $baseWhere .= " AND l.nome_fantasia LIKE :nome";
+                $params[':nome'] = '%' . $filters['nome'] . '%';
+            }
+            
+            if (!empty($filters['cashback_min'])) {
+                $baseWhere .= " AND l.porcentagem_cashback >= :cashback_min";
+                $params[':cashback_min'] = floatval($filters['cashback_min']);
+            }
+            
+            // Query principal
+            $query = "
+                SELECT 
+                    l.*,
+                    CASE WHEN f.id IS NOT NULL THEN 1 ELSE 0 END as is_favorite
+                FROM lojas l
+                LEFT JOIN favorites f ON f.store_id = l.id AND f.user_id = :user_id
+                " . $baseWhere . "
+                ORDER BY l.nome_fantasia
+                LIMIT :limit OFFSET :offset
+            ";
+            
+            $params[':user_id'] = $userId;
+            $params[':limit'] = $limit;
+            $params[':offset'] = $offset;
+            
+            $stmt = $db->prepare($query);
+            foreach ($params as $key => $value) {
+                if (in_array($key, [':limit', ':offset'])) {
+                    $stmt->bindValue($key, $value, PDO::PARAM_INT);
+                } else {
+                    $stmt->bindValue($key, $value);
+                }
+            }
+            $stmt->execute();
             $lojas = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
-            // Adicionar is_favorite = 0 para todas (temporário)
-            foreach ($lojas as &$loja) {
-                $loja['is_favorite'] = 0;
+            // Buscar categorias disponíveis
+            $categoriesQuery = "SELECT DISTINCT categoria FROM lojas WHERE status = 'aprovado' ORDER BY categoria";
+            $categoriesStmt = $db->query($categoriesQuery);
+            $categorias = $categoriesStmt->fetchAll(PDO::FETCH_COLUMN);
+            
+            // Estatísticas
+            $statsQuery = "
+                SELECT 
+                    COUNT(*) as total_lojas,
+                    COALESCE(AVG(porcentagem_cashback), 0) as media_cashback,
+                    COALESCE(MAX(porcentagem_cashback), 0) as maior_cashback,
+                    COALESCE(MIN(porcentagem_cashback), 0) as menor_cashback
+                FROM lojas 
+                WHERE status = 'aprovado'
+            ";
+            $statsStmt = $db->query($statsQuery);
+            $estatisticas = $statsStmt->fetch(PDO::FETCH_ASSOC);
+            
+            // Contar total para paginação
+            $countQuery = "SELECT COUNT(*) as total FROM lojas l" . $baseWhere;
+            $countStmt = $db->prepare($countQuery);
+            foreach ($params as $key => $value) {
+                if (!in_array($key, [':limit', ':offset', ':user_id'])) {
+                    $countStmt->bindValue($key, $value);
+                }
             }
+            $countStmt->execute();
+            $totalItems = $countStmt->fetch()['total'];
+            
+            $totalPages = ceil($totalItems / $limit);
             
             return [
                 'status' => true,
                 'data' => [
                     'lojas' => $lojas,
-                    'categorias' => ['Varejo', 'Eletrônicos', 'Moda'],
-                    'estatisticas' => [
-                        'total_lojas' => count($lojas),
-                        'media_cashback' => 3.5,
-                        'maior_cashback' => 5.0,
-                        'menor_cashback' => 2.0
-                    ],
+                    'categorias' => $categorias,
+                    'estatisticas' => $estatisticas,
                     'paginacao' => [
-                        'pagina_atual' => 1,
-                        'total_paginas' => 1,
-                        'total_itens' => count($lojas),
-                        'itens_por_pagina' => 10
+                        'pagina_atual' => $page,
+                        'total_paginas' => $totalPages,
+                        'total_itens' => $totalItems,
+                        'itens_por_pagina' => $limit
                     ]
                 ]
             ];
             
         } catch (Exception $e) {
+            error_log('Erro em getPartnerStores: ' . $e->getMessage());
             return [
                 'status' => false,
-                'message' => 'Erro: ' . $e->getMessage()
+                'message' => 'Erro ao carregar lojas: ' . $e->getMessage()
             ];
         }
     }
