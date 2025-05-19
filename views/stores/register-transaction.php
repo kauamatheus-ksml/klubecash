@@ -50,7 +50,7 @@ $transactionData = [];
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Obter dados do formulário
     $clientEmail = $_POST['cliente_email'] ?? '';
-    $valorTotal = $_POST['valor_total'] ?? '';
+    $valorTotal = floatval($_POST['valor_total'] ?? 0);
     $codigoTransacao = $_POST['codigo_transacao'] ?? '';
     $descricao = $_POST['descricao'] ?? '';
     $dataTransacao = $_POST['data_transacao'] ?? date('Y-m-d H:i:s');
@@ -79,18 +79,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             if ($saldoDisponivel < $valorSaldoUsado) {
                 $error = 'Saldo insuficiente. Cliente possui R$ ' . number_format($saldoDisponivel, 2, ',', '.') . ' disponível.';
-            } else {
-                // Ajustar o valor total da transação descontando o saldo usado
-                $valorTotal = $valorTotal - $valorSaldoUsado;
-                
-                if ($valorTotal < 0) {
-                    $error = 'O valor do saldo usado não pode ser maior que o valor total da venda.';
-                }
+            } else if ($valorSaldoUsado > $valorTotal) {
+                $error = 'O valor do saldo usado não pode ser maior que o valor total da venda.';
             }
         }
         
         if (empty($error)) {
-            // Preparar dados da transação
+            // Preparar dados da transação (VALOR ORIGINAL mantido para histórico)
             $transactionData = [
                 'usuario_id' => $client['id'],
                 'loja_id' => $storeId,
@@ -106,13 +101,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $result = TransactionController::registerTransaction($transactionData);
             
             if ($result['status']) {
-                // Se usou saldo, debitar do saldo do cliente
-                if ($usarSaldo && $valorSaldoUsado > 0) {
-                    $balanceModel = new CashbackBalance();
-                    $descricaoUso = "Uso do saldo na compra - Código: " . $codigoTransacao;
-                    $balanceModel->useBalance($client['id'], $storeId, $valorSaldoUsado, $descricaoUso, $result['data']['transaction_id']);
-                }
-                
                 $success = true;
                 $transactionData = [];
             } else {
@@ -805,7 +793,7 @@ $activeMenu = 'register-transaction';
             </div>
             <?php endif; ?>
             
-            <div class="content-card">
+             <div class="content-card">
                 <div class="form-wrapper">
                     <form id="transactionForm" method="POST" action="">
                         <div class="form-row">
@@ -815,8 +803,8 @@ $activeMenu = 'register-transaction';
                                     <div class="email-input-group">
                                         <div class="email-input-wrapper">
                                             <input type="email" id="cliente_email" name="cliente_email" 
-                                                   placeholder="Email do cliente cadastrado no Klube Cash" required
-                                                   value="<?php echo isset($transactionData['cliente_email']) ? htmlspecialchars($transactionData['cliente_email']) : ''; ?>">
+                                                placeholder="Email do cliente cadastrado no Klube Cash" required
+                                                value="<?php echo isset($transactionData['cliente_email']) ? htmlspecialchars($transactionData['cliente_email']) : ''; ?>">
                                             <small>O cliente deve estar cadastrado no Klube Cash</small>
                                         </div>
                                         <button type="button" id="searchClientBtn" class="search-client-btn">
@@ -859,7 +847,59 @@ $activeMenu = 'register-transaction';
                                 <small>Identificador único da venda no seu sistema</small>
                             </div>
                         </div>
+                        <!-- NOVA SEÇÃO: USO DE SALDO -->
+                        <div id="saldoSection" class="saldo-section" style="display: none;">
+                            <h3>💰 Usar Saldo do Cliente</h3>
+                            <div class="saldo-info">
+                                <div class="saldo-disponivel">
+                                    <span>Saldo disponível: </span>
+                                    <span id="saldoDisponivel" class="saldo-value">R$ 0,00</span>
+                                </div>
+                                <div class="usar-saldo-toggle">
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="usarSaldoCheck" name="usar_saldo_check">
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                    <span>Usar saldo nesta venda</span>
+                                </div>
+                            </div>
+                            
+                            <div id="saldoControls" class="saldo-controls" style="display: none;">
+                                <div class="form-group">
+                                    <label for="valorSaldoUsado">Valor do saldo a usar (R$)</label>
+                                    <input type="number" id="valorSaldoUsado" name="valor_saldo_usado" 
+                                        min="0" step="0.01" value="0">
+                                    <small>Máximo: <span id="maxSaldo">R$ 0,00</span></small>
+                                </div>
+                                
+                                <div class="saldo-buttons">
+                                    <button type="button" id="usarTodoSaldo" class="btn-saldo">Usar Todo Saldo</button>
+                                    <button type="button" id="usar50Saldo" class="btn-saldo">Usar 50%</button>
+                                    <button type="button" id="limparSaldo" class="btn-saldo">Limpar</button>
+                                </div>
+                                
+                                <div class="calculo-preview">
+                                    <div class="calculo-item">
+                                        <span>Valor original:</span>
+                                        <span id="valorOriginal">R$ 0,00</span>
+                                    </div>
+                                    <div class="calculo-item">
+                                        <span>Saldo usado:</span>
+                                        <span id="valorSaldoUsadoPreview">R$ 0,00</span>
+                                    </div>
+                                    <div class="calculo-item valor-final">
+                                        <span>Valor a pagar:</span>
+                                        <span id="valorFinal">R$ 0,00</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Campos ocultos para uso de saldo -->
+                        <input type="hidden" id="usar_saldo" name="usar_saldo" value="nao">
+                        <input type="hidden" id="valor_saldo_usado" name="valor_saldo_usado" value="0">
                         
+                        <!-- resto dos campos existentes... -->
                         <div class="form-row">
                             <div class="form-group">
                                 <label for="data_transacao">Data da Venda</label>
@@ -876,16 +916,20 @@ $activeMenu = 'register-transaction';
                             </div>
                         </div>
                         
-                        <!-- Campos ocultos para uso de saldo -->
-                        <input type="hidden" id="usar_saldo" name="usar_saldo" value="nao">
-                        <input type="hidden" id="valor_saldo_usado" name="valor_saldo_usado" value="0">
-                        
                         <div class="cashback-calculator">
                             <h3>Simulação de Cashback</h3>
                             <div class="cashback-details">
                                 <div class="cashback-item">
                                     <span class="cashback-label">Valor da Venda:</span>
                                     <span class="cashback-value" id="display-valor-venda">R$ 0,00</span>
+                                </div>
+                                <div class="cashback-item saldo-row" id="cashback-saldo-row" style="display: none;">
+                                    <span class="cashback-label">Saldo Usado:</span>
+                                    <span class="cashback-value" id="display-saldo-usado">R$ 0,00</span>
+                                </div>
+                                <div class="cashback-item">
+                                    <span class="cashback-label">Valor Efetivamente Pago:</span>
+                                    <span class="cashback-value" id="display-valor-pago">R$ 0,00</span>
                                 </div>
                                 <div class="cashback-item">
                                     <span class="cashback-label">Cashback do Cliente (<?php echo DEFAULT_CASHBACK_CLIENT; ?>%):</span>
@@ -902,6 +946,7 @@ $activeMenu = 'register-transaction';
                             </div>
                             <div class="cashback-note">
                                 <p>* O valor de cashback será liberado para o cliente após o pagamento da comissão.</p>
+                                <p id="cashback-note-saldo" style="display: none;">* A comissão é calculada apenas sobre o valor efetivamente pago (após desconto do saldo).</p>
                             </div>
                         </div>
                         
@@ -962,15 +1007,42 @@ $activeMenu = 'register-transaction';
             const valorInput = document.getElementById('valor_total');
             const emailInput = document.getElementById('cliente_email');
             const searchBtn = document.getElementById('searchClientBtn');
+            const usarSaldoCheck = document.getElementById('usarSaldoCheck');
+            const valorSaldoUsado = document.getElementById('valorSaldoUsado');
             
             // Event listeners
-            valorInput.addEventListener('input', atualizarSimulacao);
-            searchBtn.addEventListener('click', buscarCliente);
+            valorInput.addEventListener('input', calcularAutomatico);
+            valorInput.addEventListener('blur', calcularAutomatico);
             emailInput.addEventListener('keypress', function(e) {
                 if (e.key === 'Enter') {
                     e.preventDefault();
                     buscarCliente();
                 }
+            });
+            searchBtn.addEventListener('click', buscarCliente);
+            
+            // Event listeners para uso de saldo
+            usarSaldoCheck.addEventListener('change', toggleUsarSaldo);
+            valorSaldoUsado.addEventListener('input', calcularPreview);
+            valorSaldoUsado.addEventListener('blur', atualizarSimulacao);
+            
+            // Botões de saldo
+            document.getElementById('usarTodoSaldo').addEventListener('click', () => {
+                document.getElementById('valorSaldoUsado').value = clientBalance.toFixed(2);
+                calcularPreview();
+                atualizarSimulacao();
+            });
+            
+            document.getElementById('usar50Saldo').addEventListener('click', () => {
+                document.getElementById('valorSaldoUsado').value = (clientBalance * 0.5).toFixed(2);
+                calcularPreview();
+                atualizarSimulacao();
+            });
+            
+            document.getElementById('limparSaldo').addEventListener('click', () => {
+                document.getElementById('valorSaldoUsado').value = 0;
+                calcularPreview();
+                atualizarSimulacao();
             });
             
             // Accordion para ajuda
@@ -1015,12 +1087,15 @@ $activeMenu = 'register-transaction';
                     clientData = data.data;
                     clientBalance = data.data.saldo || 0;
                     mostrarInfoCliente(data.data);
+                    mostrarSecaoSaldo();
                 } else {
                     mostrarErroCliente(data.message);
+                    esconderSecaoSaldo();
                 }
             } catch (error) {
                 console.error('Erro ao buscar cliente:', error);
                 mostrarErroCliente('Erro ao buscar cliente. Tente novamente.');
+                esconderSecaoSaldo();
             } finally {
                 // Esconder loading
                 searchBtn.disabled = false;
@@ -1054,51 +1129,11 @@ $activeMenu = 'register-transaction';
                     <span class="client-info-label">Status:</span>
                     <span class="client-info-value">Cliente ativo</span>
                 </div>
+                <div class="client-info-item">
+                    <span class="client-info-label">Saldo disponível:</span>
+                    <span class="client-info-value">${client.saldo > 0 ? 'R$ ' + formatCurrency(client.saldo) : 'Nenhum saldo disponível'}</span>
+                </div>
             `;
-            
-            if (client.saldo > 0) {
-                detailsHTML += `
-                    <div class="balance-info">
-                        <div class="client-info-item">
-                            <span class="client-info-label">Saldo disponível nesta loja:</span>
-                            <span class="balance-amount">R$ ${formatCurrency(client.saldo)}</span>
-                        </div>
-                        <div class="use-balance-section">
-                            <div class="use-balance-toggle">
-                                <input type="checkbox" id="useBalanceCheck" onchange="toggleUseBalance()">
-                                <label for="useBalanceCheck">Usar saldo do cliente nesta venda</label>
-                            </div>
-                            <div class="use-balance-inputs" id="useBalanceInputs">
-                                <div class="form-group">
-                                    <label for="balanceAmountInput">Valor a usar do saldo</label>
-                                    <div class="input-group">
-                                        <span class="input-group-text">R$</span>
-                                        <input type="number" id="balanceAmountInput" 
-                                               step="0.01" min="0" max="${client.saldo}"
-                                               placeholder="0,00" onchange="updateBalanceSlider()">
-                                    </div>
-                                </div>
-                                <div class="balance-slider-container">
-                                    <input type="range" id="balanceSlider" class="balance-slider"
-                                           min="0" max="${client.saldo}" step="0.01" value="0"
-                                           oninput="updateBalanceInput()">
-                                    <div class="balance-values">
-                                        <span>R$ 0,00</span>
-                                        <span>R$ ${formatCurrency(client.saldo)}</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            } else {
-                detailsHTML += `
-                    <div class="client-info-item">
-                        <span class="client-info-label">Saldo:</span>
-                        <span class="client-info-value">Nenhum saldo disponível nesta loja</span>
-                    </div>
-                `;
-            }
             
             clientInfoDetails.innerHTML = detailsHTML;
         }
@@ -1127,56 +1162,94 @@ $activeMenu = 'register-transaction';
             clientBalance = 0;
         }
         
+        // Função para mostrar seção de saldo
+        function mostrarSecaoSaldo() {
+            const saldoSection = document.getElementById('saldoSection');
+            const saldoDisponivel = document.getElementById('saldoDisponivel');
+            const maxSaldo = document.getElementById('maxSaldo');
+            const valorSaldoUsado = document.getElementById('valorSaldoUsado');
+            
+            if (clientBalance > 0) {
+                saldoSection.style.display = 'block';
+                saldoDisponivel.textContent = 'R$ ' + formatCurrency(clientBalance);
+                maxSaldo.textContent = 'R$ ' + formatCurrency(clientBalance);
+                valorSaldoUsado.max = clientBalance;
+            } else {
+                saldoSection.style.display = 'none';
+            }
+        }
+        
+        // Função para esconder seção de saldo
+        function esconderSecaoSaldo() {
+            document.getElementById('saldoSection').style.display = 'none';
+            document.getElementById('usarSaldoCheck').checked = false;
+            document.getElementById('saldoControls').style.display = 'none';
+            document.getElementById('usar_saldo').value = 'nao';
+            document.getElementById('valor_saldo_usado_hidden').value = '0';
+        }
+        
         // Função para alternar uso de saldo
-        function toggleUseBalance() {
-            const useBalanceCheck = document.getElementById('useBalanceCheck');
-            const useBalanceInputs = document.getElementById('useBalanceInputs');
+        function toggleUsarSaldo() {
+            const usarSaldoCheck = document.getElementById('usarSaldoCheck');
+            const saldoControls = document.getElementById('saldoControls');
             const usarSaldoHidden = document.getElementById('usar_saldo');
             
-            if (useBalanceCheck.checked) {
-                useBalanceInputs.classList.add('active');
+            if (usarSaldoCheck.checked) {
+                saldoControls.style.display = 'block';
                 usarSaldoHidden.value = 'sim';
+                calcularAutomatico(); // Calcular automaticamente quando ativar
             } else {
-                useBalanceInputs.classList.remove('active');
+                saldoControls.style.display = 'none';
                 usarSaldoHidden.value = 'nao';
-                document.getElementById('valor_saldo_usado').value = '0';
-                document.getElementById('balanceAmountInput').value = '';
-                document.getElementById('balanceSlider').value = '0';
+                document.getElementById('valorSaldoUsado').value = 0;
+                document.getElementById('valor_saldo_usado_hidden').value = '0';
+                calcularPreview();
                 atualizarSimulacao();
             }
         }
         
-        // Função para atualizar slider baseado no input
-        function updateBalanceSlider() {
-            const balanceInput = document.getElementById('balanceAmountInput');
-            const balanceSlider = document.getElementById('balanceSlider');
-            const valorSaldoUsado = document.getElementById('valor_saldo_usado');
+        // Função para calcular automaticamente quando sair do campo de valor total
+        function calcularAutomatico() {
+            const valorTotal = parseFloat(document.getElementById('valor_total').value) || 0;
+            const usarSaldoCheck = document.getElementById('usarSaldoCheck');
             
-            let value = parseFloat(balanceInput.value) || 0;
-            
-            // Limitar ao máximo permitido
-            if (value > clientBalance) {
-                value = clientBalance;
-                balanceInput.value = value.toFixed(2);
+            if (clientBalance > 0 && usarSaldoCheck.checked && valorTotal > 0) {
+                // Calcular o máximo de saldo que pode ser usado
+                const maxSaldoUsavel = Math.min(clientBalance, valorTotal);
+                document.getElementById('valorSaldoUsado').value = maxSaldoUsavel.toFixed(2);
+                calcularPreview();
             }
-            
-            balanceSlider.value = value;
-            valorSaldoUsado.value = value;
             
             atualizarSimulacao();
         }
         
-        // Função para atualizar input baseado no slider
-        function updateBalanceInput() {
-            const balanceInput = document.getElementById('balanceAmountInput');
-            const balanceSlider = document.getElementById('balanceSlider');
-            const valorSaldoUsado = document.getElementById('valor_saldo_usado');
+        // Função para calcular preview do uso de saldo
+        function calcularPreview() {
+            const valorTotal = parseFloat(document.getElementById('valor_total').value) || 0;
+            const valorSaldoUsado = parseFloat(document.getElementById('valorSaldoUsado').value) || 0;
+            const valorFinal = Math.max(0, valorTotal - valorSaldoUsado);
             
-            const value = parseFloat(balanceSlider.value);
-            balanceInput.value = value.toFixed(2);
-            valorSaldoUsado.value = value;
+            // Atualizar preview
+            document.getElementById('valorOriginal').textContent = 'R$ ' + formatCurrency(valorTotal);
+            document.getElementById('valorSaldoUsadoPreview').textContent = 'R$ ' + formatCurrency(valorSaldoUsado);
+            document.getElementById('valorFinal').textContent = 'R$ ' + formatCurrency(valorFinal);
             
-            atualizarSimulacao();
+            // Atualizar campo hidden
+            document.getElementById('valor_saldo_usado_hidden').value = valorSaldoUsado;
+            
+            // Validações
+            const valorSaldoUsadoInput = document.getElementById('valorSaldoUsado');
+            if (valorSaldoUsado > clientBalance) {
+                valorSaldoUsadoInput.value = clientBalance.toFixed(2);
+                calcularPreview();
+                return;
+            }
+            
+            if (valorSaldoUsado > valorTotal) {
+                valorSaldoUsadoInput.value = valorTotal.toFixed(2);
+                calcularPreview();
+                return;
+            }
         }
         
         // Função para formatar valores como moeda
@@ -1191,18 +1264,28 @@ $activeMenu = 'register-transaction';
         function atualizarSimulacao() {
             const valorInput = document.getElementById('valor_total');
             const displayValorVenda = document.getElementById('display-valor-venda');
+            const displaySaldoUsado = document.getElementById('display-saldo-usado');
+            const displayValorPago = document.getElementById('display-valor-pago');
             const displayValorCliente = document.getElementById('display-valor-cliente');
             const displayValorAdmin = document.getElementById('display-valor-admin');
             const displayValorTotal = document.getElementById('display-valor-total');
+            const saldoRow = document.getElementById('cashback-saldo-row');
+            const noteSaldo = document.getElementById('cashback-note-saldo');
             
-            let valor = parseFloat(valorInput.value) || 0;
+            let valorTotal = parseFloat(valorInput.value) || 0;
             
-            // Subtrair saldo usado se aplicável
+            // Verificar se está usando saldo
             const usarSaldo = document.getElementById('usar_saldo').value === 'sim';
-            const valorSaldoUsado = parseFloat(document.getElementById('valor_saldo_usado').value) || 0;
+            const valorSaldoUsado = parseFloat(document.getElementById('valor_saldo_usado_hidden').value) || 0;
             
+            let valorPago = valorTotal;
             if (usarSaldo && valorSaldoUsado > 0) {
-                valor = Math.max(0, valor - valorSaldoUsado);
+                valorPago = Math.max(0, valorTotal - valorSaldoUsado);
+                saldoRow.style.display = 'flex';
+                noteSaldo.style.display = 'block';
+            } else {
+                saldoRow.style.display = 'none';
+                noteSaldo.style.display = 'none';
             }
             
             // Porcentagens de cashback
@@ -1210,23 +1293,21 @@ $activeMenu = 'register-transaction';
             const porcentagemAdmin = <?php echo DEFAULT_CASHBACK_ADMIN; ?>;
             const porcentagemTotal = <?php echo DEFAULT_CASHBACK_TOTAL; ?>;
             
-            const valorCliente = valor * porcentagemCliente / 100;
-            const valorAdmin = valor * porcentagemAdmin / 100;
-            const valorTotal = valor * porcentagemTotal / 100;
+            // Calcular cashback sobre o valor PAGO (não sobre o valor total)
+            const valorCliente = valorPago * porcentagemCliente / 100;
+            const valorAdmin = valorPago * porcentagemAdmin / 100;
+            const valorTotalComissao = valorPago * porcentagemTotal / 100;
             
-            // Mostrar valor original da venda
-            displayValorVenda.textContent = `R$ ${formatCurrency(parseFloat(valorInput.value) || 0)}`;
+            // Atualizar displays
+            displayValorVenda.textContent = `R$ ${formatCurrency(valorTotal)}`;
+            displaySaldoUsado.textContent = `R$ ${formatCurrency(valorSaldoUsado)}`;
+            displayValorPago.textContent = `R$ ${formatCurrency(valorPago)}`;
             displayValorCliente.textContent = `R$ ${formatCurrency(valorCliente)}`;
             displayValorAdmin.textContent = `R$ ${formatCurrency(valorAdmin)}`;
-            displayValorTotal.textContent = `R$ ${formatCurrency(valorTotal)}`;
-            
-            // Mostrar informação sobre saldo usado
-            if (usarSaldo && valorSaldoUsado > 0) {
-                displayValorVenda.textContent += ` (- R$ ${formatCurrency(valorSaldoUsado)} saldo)`;
-            }
+            displayValorTotal.textContent = `R$ ${formatCurrency(valorTotalComissao)}`;
         }
         
-        // Função para setup do accordion
+        // Função para setup do accordion (mantida do código original)
         function setupAccordion() {
             const accordionItems = document.querySelectorAll('.accordion-item');
             
@@ -1258,28 +1339,181 @@ $activeMenu = 'register-transaction';
         // Validação de formulário
         document.getElementById('transactionForm').addEventListener('submit', function(e) {
             const valorTotal = parseFloat(document.getElementById('valor_total').value) || 0;
-            const valorSaldoUsado = parseFloat(document.getElementById('valor_saldo_usado').value) || 0;
+            const valorSaldoUsado = parseFloat(document.getElementById('valor_saldo_usado_hidden').value) || 0;
+            const valorPago = valorTotal - valorSaldoUsado;
             const minValue = <?php echo MIN_TRANSACTION_VALUE; ?>;
             
-            if ((valorTotal - valorSaldoUsado) < 0) {
+            if (valorTotal <= 0) {
+                e.preventDefault();
+                alert('Por favor, informe o valor total da venda');
+                document.getElementById('valor_total').focus();
+                return;
+            }
+            
+            if (valorSaldoUsado > 0 && valorPago < 0) {
                 e.preventDefault();
                 alert('O valor do saldo usado não pode ser maior que o valor total da venda');
                 return;
             }
             
-            if (valorTotal < minValue) {
-                e.preventDefault();
-                alert(`O valor mínimo para transação é R$ ${minValue.toFixed(2).replace('.', ',')}`);
-                document.getElementById('valor_total').focus();
-                return;
-            }
-            
             if (!clientData) {
                 e.preventDefault();
-                alert('Por favor, busque o cliente antes de registrar a venda');
+                alert('Por favor, busque e selecione um cliente antes de registrar a venda');
                 return;
             }
         });
     </script>
+    <style>
+        .saldo-section {
+            background-color: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .saldo-section h3 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            color: #28a745;
+        }
+        
+        .saldo-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .saldo-disponivel {
+            font-size: 1.1rem;
+        }
+        
+        .saldo-value {
+            font-weight: bold;
+            color: #28a745;
+        }
+        
+        .usar-saldo-toggle {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+        }
+        
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 24px;
+        }
+        
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .toggle-slider {
+            background-color: #FF7A00;
+        }
+        
+        input:checked + .toggle-slider:before {
+            transform: translateX(26px);
+        }
+        
+        .saldo-controls {
+            border-top: 1px solid #dee2e6;
+            padding-top: 15px;
+        }
+        
+        .saldo-buttons {
+            display: flex;
+            gap: 10px;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+        
+        .btn-saldo {
+            padding: 8px 16px;
+            border: 1px solid #FF7A00;
+            background-color: white;
+            color: #FF7A00;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-saldo:hover {
+            background-color: #FF7A00;
+            color: white;
+        }
+        
+        .calculo-preview {
+            background-color: white;
+            border-radius: 8px;
+            padding: 15px;
+            border: 1px solid #dee2e6;
+        }
+        
+        .calculo-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        
+        .calculo-item.valor-final {
+            font-weight: bold;
+            font-size: 1.1rem;
+            border-top: 1px solid #dee2e6;
+            padding-top: 8px;
+            margin-top: 8px;
+        }
+        
+        .cashback-item.saldo-row {
+            background-color: #e8f5e9;
+        }
+        
+        @media (max-width: 768px) {
+            .saldo-info {
+                flex-direction: column;
+                gap: 15px;
+                align-items: flex-start;
+            }
+            
+            .saldo-buttons {
+                justify-content: space-between;
+            }
+            
+            .btn-saldo {
+                flex: 1;
+                text-align: center;
+            }
+        }
+    </style>
 </body>
 </html>
