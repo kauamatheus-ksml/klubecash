@@ -1,683 +1,712 @@
 <?php
 // views/admin/transaction-details.php
-// Verificar se o usuário está autenticado
-session_start();
+// Definir o menu ativo na sidebar
+$activeMenu = 'compras';
+
+// Incluir conexão com o banco de dados e arquivos necessários
+require_once '../../config/database.php';
 require_once '../../config/constants.php';
 require_once '../../controllers/AuthController.php';
+require_once '../../controllers/AdminController.php';
 
-// Verificar autenticação e tipo de usuário
-if (!AuthController::isAuthenticated() || !AuthController::isAdmin()) {
-    header('Location: ' . LOGIN_URL);
+// Iniciar sessão
+session_start();
+
+// Verificar se o usuário está logado e é administrador
+if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION['user_type'] !== USER_TYPE_ADMIN) {
+    header("Location: " . LOGIN_URL . "?error=acesso_restrito");
     exit;
 }
 
-// Obter ID da transação da URL
+// Obter ID da transação
 $transactionId = isset($_GET['id']) ? intval($_GET['id']) : 0;
 
 if ($transactionId <= 0) {
-    header('Location: ' . ADMIN_TRANSACTIONS_URL);
+    header("Location: " . ADMIN_TRANSACTIONS_URL . "?error=transacao_invalida");
     exit;
 }
 
-$activeMenu = 'transacoes';
+try {
+    // Obter detalhes da transação com informações de saldo
+    $result = AdminController::getTransactionDetailsWithBalance($transactionId);
+    
+    if (!$result['status']) {
+        $hasError = true;
+        $errorMessage = $result['message'];
+        $transaction = null;
+    } else {
+        $hasError = false;
+        $transaction = $result['data'];
+    }
+} catch (Exception $e) {
+    $hasError = true;
+    $errorMessage = "Erro ao carregar dados da transação: " . $e->getMessage();
+    $transaction = null;
+}
+
+// Função para formatar data
+function formatDate($date) {
+    return date('d/m/Y H:i:s', strtotime($date));
+}
+
+// Função para formatar valor
+function formatCurrency($value) {
+    return 'R$ ' . number_format($value, 2, ',', '.');
+}
+
+// Função para formatar status
+function getStatusBadge($status) {
+    $badges = [
+        'pendente' => ['class' => 'status-pending', 'text' => 'Pendente'],
+        'aprovado' => ['class' => 'status-approved', 'text' => 'Aprovado'],
+        'cancelado' => ['class' => 'status-canceled', 'text' => 'Cancelado'],
+        'pagamento_pendente' => ['class' => 'status-payment', 'text' => 'Aguardando Pagamento']
+    ];
+    
+    $badge = $badges[$status] ?? ['class' => 'status-pending', 'text' => ucfirst($status)];
+    return '<span class="status-badge ' . $badge['class'] . '">' . $badge['text'] . '</span>';
+}
 ?>
+
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Detalhes da Transação - Klube Cash Admin</title>
+    <title>Detalhes da Transação #<?php echo $transactionId; ?> - Klube Cash</title>
+    <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
     <link rel="stylesheet" href="../../assets/css/views/admin/dashboard.css">
-</head>
-<body>
-    <?php include '../components/sidebar.php'; ?>
     
-    <div class="main-content">
-        <div class="dashboard-wrapper">
-            <!-- Cabeçalho -->
-            <div class="dashboard-header">
-                <h1>Detalhes da Transação #<span id="transaction-number"><?php echo $transactionId; ?></span></h1>
-                <div class="action-buttons">
-                    <button class="btn btn-secondary" onclick="history.back()">
-                        <i class="icon-arrow-left"></i> Voltar
-                    </button>
-                    <button class="btn btn-primary" id="btn-edit-status" onclick="editTransactionStatus()">
-                        <i class="icon-edit"></i> Alterar Status
-                    </button>
-                </div>
-            </div>
-
-            <!-- Loading -->
-            <div id="loading" class="loading-container" style="display: none;">
-                <div class="loading-spinner"></div>
-            </div>
-
-            <!-- Conteúdo principal -->
-            <div id="transaction-content" style="display: none;">
-                
-                <!-- Cards de informações básicas -->
-                <div class="stats-container">
-                    <div class="stat-card">
-                        <div class="stat-card-title">Valor Total</div>
-                        <div class="stat-card-value" id="valor-total">--</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-card-title">Cashback Cliente</div>
-                        <div class="stat-card-value" id="cashback-cliente">--</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-card-title">Comissão Admin</div>
-                        <div class="stat-card-value" id="comissao-admin">--</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-card-title">Status</div>
-                        <div class="stat-card-value">
-                            <span id="status-badge" class="status-badge">--</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Duas colunas de informações -->
-                <div class="two-column-layout">
-                    <!-- Informações da Transação -->
-                    <div class="card">
-                        <div class="card-header">
-                            <h3 class="card-title">Informações da Transação</h3>
-                        </div>
-                        <div class="transaction-details">
-                            <div class="detail-row">
-                                <span class="detail-label">ID da Transação:</span>
-                                <span class="detail-value" id="detail-id">--</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="detail-label">Código da Transação:</span>
-                                <span class="detail-value" id="detail-codigo">--</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="detail-label">Data da Transação:</span>
-                                <span class="detail-value" id="detail-data">--</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="detail-label">Descrição:</span>
-                                <span class="detail-value" id="detail-descricao">--</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="detail-label">Status Atual:</span>
-                                <span class="detail-value">
-                                    <span id="detail-status" class="status-badge">--</span>
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Informações de Valores -->
-                    <div class="card">
-                        <div class="card-header">
-                            <h3 class="card-title">Distribuição de Valores</h3>
-                        </div>
-                        <div class="value-distribution">
-                            <div class="detail-row">
-                                <span class="detail-label">Valor Original da Venda:</span>
-                                <span class="detail-value" id="valor-original">--</span>
-                            </div>
-                            <div class="detail-row has-balance" id="saldo-row" style="display: none;">
-                                <span class="detail-label">Saldo Usado pelo Cliente:</span>
-                                <span class="detail-value text-warning" id="saldo-usado">--</span>
-                            </div>
-                            <div class="detail-row has-balance" id="valor-liquido-row" style="display: none;">
-                                <span class="detail-label">Valor Efetivamente Pago:</span>
-                                <span class="detail-value" id="valor-liquido">--</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="detail-label">Total de Cashback (10%):</span>
-                                <span class="detail-value" id="total-cashback">--</span>
-                            </div>
-                            <div class="detail-row indent">
-                                <span class="detail-label">• Cashback para Cliente (5%):</span>
-                                <span class="detail-value text-success" id="cashback-detail">--</span>
-                            </div>
-                            <div class="detail-row indent">
-                                <span class="detail-label">• Comissão da Klube Cash (5%):</span>
-                                <span class="detail-value text-primary" id="comissao-detail">--</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Informações do Cliente e Loja -->
-                <div class="two-column-layout">
-                    <!-- Dados do Cliente -->
-                    <div class="card">
-                        <div class="card-header">
-                            <h3 class="card-title">Dados do Cliente</h3>
-                        </div>
-                        <div class="client-info">
-                            <div class="detail-row">
-                                <span class="detail-label">Nome:</span>
-                                <span class="detail-value" id="cliente-nome">--</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="detail-label">Email:</span>
-                                <span class="detail-value" id="cliente-email">--</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="detail-label">ID do Cliente:</span>
-                                <span class="detail-value" id="cliente-id">--</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Dados da Loja -->
-                    <div class="card">
-                        <div class="card-header">
-                            <h3 class="card-title">Dados da Loja</h3>
-                        </div>
-                        <div class="store-info">
-                            <div class="detail-row">
-                                <span class="detail-label">Nome Fantasia:</span>
-                                <span class="detail-value" id="loja-nome">--</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="detail-label">Razão Social:</span>
-                                <span class="detail-value" id="loja-razao">--</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="detail-label">ID da Loja:</span>
-                                <span class="detail-value" id="loja-id">--</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Histórico de Status -->
-                <div class="card">
-                    <div class="card-header">
-                        <h3 class="card-title">Histórico de Status</h3>
-                    </div>
-                    <div class="table-responsive">
-                        <table class="table" id="status-history-table">
-                            <thead>
-                                <tr>
-                                    <th>Data/Hora</th>
-                                    <th>Status Anterior</th>
-                                    <th>Status Novo</th>
-                                    <th>Observação</th>
-                                    <th>Alterado por</th>
-                                </tr>
-                            </thead>
-                            <tbody id="status-history-content">
-                                <!-- Conteúdo carregado dinamicamente -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Mensagem de erro -->
-            <div id="error-message" class="card" style="display: none;">
-                <div class="notification-empty text-center">
-                    <h3>Transação não encontrada</h3>
-                    <p>A transação solicitada não foi encontrada ou você não tem permissão para acessá-la.</p>
-                    <button class="btn btn-primary" onclick="history.back()">Voltar</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal para alterar status -->
-    <div id="edit-status-modal" class="modal" style="display: none;">
-        <div class="modal-overlay" onclick="closeModal()"></div>
-        <div class="modal-container">
-            <div class="modal-header">
-                <h3>Alterar Status da Transação</h3>
-                <button class="modal-close" onclick="closeModal()">×</button>
-            </div>
-            <div class="modal-body">
-                <form id="status-form">
-                    <div class="form-group">
-                        <label for="new-status">Novo Status:</label>
-                        <select id="new-status" name="status" class="form-control" required>
-                            <option value="">Selecione...</option>
-                            <option value="pendente">Pendente</option>
-                            <option value="aprovado">Aprovado</option>
-                            <option value="cancelado">Cancelado</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="status-observacao">Observação:</label>
-                        <textarea id="status-observacao" name="observacao" 
-                                  class="form-control" rows="3" 
-                                  placeholder="Motivo da alteração (opcional)"></textarea>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
-                <button class="btn btn-primary" onclick="updateStatus()">Confirmar</button>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        let transactionData = null;
-
-        // Carregar dados da transação
-        document.addEventListener('DOMContentLoaded', function() {
-            loadTransactionDetails();
-        });
-
-        async function loadTransactionDetails() {
-            const loadingElement = document.getElementById('loading');
-            const contentElement = document.getElementById('transaction-content');
-            const errorElement = document.getElementById('error-message');
-
-            try {
-                loadingElement.style.display = 'block';
-                contentElement.style.display = 'none';
-                errorElement.style.display = 'none';
-
-                const response = await fetch('../../controllers/AdminController.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                    body: 'action=transaction_details_with_balance&transaction_id=' + <?php echo $transactionId; ?>
-                });
-
-                const data = await response.json();
-
-                if (data.status) {
-                    transactionData = data.data;
-                    populateTransactionDetails(transactionData);
-                    contentElement.style.display = 'block';
-                } else {
-                    throw new Error(data.message || 'Erro ao carregar transação');
-                }
-            } catch (error) {
-                console.error('Erro:', error);
-                errorElement.style.display = 'block';
-            } finally {
-                loadingElement.style.display = 'none';
-            }
-        }
-
-        function populateTransactionDetails(data) {
-            // Função para formatar valores monetários
-            const formatMoney = (value) => {
-                return 'R$ ' + parseFloat(value || 0).toLocaleString('pt-BR', {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
-                });
-            };
-
-            // Função para formatar data
-            const formatDate = (dateString) => {
-                const date = new Date(dateString);
-                return date.toLocaleString('pt-BR');
-            };
-
-            // Função para obter classe do status
-            const getStatusClass = (status) => {
-                switch (status) {
-                    case 'aprovado': return 'status-approved';
-                    case 'pendente': return 'status-pending';
-                    case 'cancelado': return 'status-cancelled';
-                    case 'pagamento_pendente': return 'status-payment-pending';
-                    default: return 'status-pending';
-                }
-            };
-
-            // Função para obter label do status
-            const getStatusLabel = (status) => {
-                switch (status) {
-                    case 'aprovado': return 'Aprovado';
-                    case 'pendente': return 'Pendente';
-                    case 'cancelado': return 'Cancelado';
-                    case 'pagamento_pendente': return 'Pagamento Pendente';
-                    default: return status;
-                }
-            };
-
-            // Popular cards superiores
-            document.getElementById('valor-total').textContent = formatMoney(data.valor_total);
-            document.getElementById('cashback-cliente').textContent = formatMoney(data.valor_cliente);
-            document.getElementById('comissao-admin').textContent = formatMoney(data.valor_admin);
-            
-            const statusBadges = document.querySelectorAll('#status-badge, #detail-status');
-            statusBadges.forEach(badge => {
-                badge.textContent = getStatusLabel(data.status);
-                badge.className = 'status-badge ' + getStatusClass(data.status);
-            });
-
-            // Popular informações da transação
-            document.getElementById('detail-id').textContent = data.id;
-            document.getElementById('detail-codigo').textContent = data.codigo_transacao || 'N/A';
-            document.getElementById('detail-data').textContent = formatDate(data.data_transacao);
-            document.getElementById('detail-descricao').textContent = data.descricao || 'N/A';
-
-            // Popular distribuição de valores
-            document.getElementById('valor-original').textContent = formatMoney(data.valor_total);
-            document.getElementById('total-cashback').textContent = formatMoney(data.valor_cashback);
-            document.getElementById('cashback-detail').textContent = formatMoney(data.valor_cliente);
-            document.getElementById('comissao-detail').textContent = formatMoney(data.valor_admin);
-
-            // Exibir informações de saldo se houver
-            if (data.saldo_usado && parseFloat(data.saldo_usado) > 0) {
-                const valorLiquido = parseFloat(data.valor_total) - parseFloat(data.saldo_usado);
-                document.getElementById('saldo-usado').textContent = formatMoney(data.saldo_usado);
-                document.getElementById('valor-liquido').textContent = formatMoney(valorLiquido);
-                document.getElementById('saldo-row').style.display = 'flex';
-                document.getElementById('valor-liquido-row').style.display = 'flex';
-            }
-
-            // Popular dados do cliente
-            document.getElementById('cliente-nome').textContent = data.cliente_nome || 'N/A';
-            document.getElementById('cliente-email').textContent = data.cliente_email || 'N/A';
-            document.getElementById('cliente-id').textContent = data.usuario_id;
-
-            // Popular dados da loja
-            document.getElementById('loja-nome').textContent = data.loja_nome || 'N/A';
-            document.getElementById('loja-razao').textContent = data.loja_razao_social || 'N/A';
-            document.getElementById('loja-id').textContent = data.loja_id;
-
-            // Popular histórico de status
-            if (data.historico_status && data.historico_status.length > 0) {
-                const tbody = document.getElementById('status-history-content');
-                tbody.innerHTML = data.historico_status.map(item => `
-                    <tr>
-                        <td>${formatDate(item.data_alteracao)}</td>
-                        <td><span class="status-badge ${getStatusClass(item.status_anterior)}">${getStatusLabel(item.status_anterior)}</span></td>
-                        <td><span class="status-badge ${getStatusClass(item.status_novo)}">${getStatusLabel(item.status_novo)}</span></td>
-                        <td>${item.observacao || 'N/A'}</td>
-                        <td>${item.usuario_nome || 'Sistema'}</td>
-                    </tr>
-                `).join('');
-            } else {
-                document.getElementById('status-history-content').innerHTML = `
-                    <tr>
-                        <td colspan="5" class="text-center">Nenhum histórico disponível</td>
-                    </tr>
-                `;
-            }
-        }
-
-        function editTransactionStatus() {
-            if (!transactionData) return;
-            
-            const modal = document.getElementById('edit-status-modal');
-            const statusSelect = document.getElementById('new-status');
-            
-            // Definir status atual como selecionado
-            statusSelect.value = transactionData.status;
-            
-            modal.style.display = 'block';
-        }
-
-        function closeModal() {
-            document.getElementById('edit-status-modal').style.display = 'none';
-            document.getElementById('status-form').reset();
-        }
-
-        async function updateStatus() {
-            const newStatus = document.getElementById('new-status').value;
-            const observacao = document.getElementById('status-observacao').value;
-
-            if (!newStatus) {
-                alert('Selecione o novo status');
-                return;
-            }
-
-            if (newStatus === transactionData.status) {
-                alert('O status selecionado é o mesmo status atual');
-                return;
-            }
-
-            try {
-                const response = await fetch('../../controllers/AdminController.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                    body: `action=update_transaction_status&transaction_id=${transactionData.id}&status=${newStatus}&observacao=${encodeURIComponent(observacao)}`
-                });
-
-                const data = await response.json();
-
-                if (data.status) {
-                    alert('Status atualizado com sucesso!');
-                    closeModal();
-                    // Recarregar os dados
-                    loadTransactionDetails();
-                } else {
-                    throw new Error(data.message || 'Erro ao atualizar status');
-                }
-            } catch (error) {
-                console.error('Erro:', error);
-                alert('Erro ao atualizar status: ' + error.message);
-            }
-        }
-
-        // Fechar modal clicando fora dele
-        window.onclick = function(event) {
-            const modal = document.getElementById('edit-status-modal');
-            if (event.target === modal) {
-                closeModal();
-            }
-        }
-    </script>
-
     <style>
-        /* Estilos específicos para esta página */
-        .action-buttons {
+        .transaction-details {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .detail-header {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            border: 1px solid #FFD9B3;
+        }
+        
+        .detail-header h1 {
+            color: var(--primary-color);
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        
+        .detail-header .transaction-code {
+            font-size: 18px;
+            color: var(--medium-gray);
+            margin-bottom: 15px;
+        }
+        
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .detail-card {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            border: 1px solid #FFD9B3;
+        }
+        
+        .detail-card h3 {
+            color: var(--primary-color);
+            font-size: 18px;
+            margin-bottom: 15px;
             display: flex;
+            align-items: center;
             gap: 10px;
         }
-
-        .detail-row {
+        
+        .detail-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 8px 0;
+            padding: 10px 0;
             border-bottom: 1px solid #f0f0f0;
         }
-
-        .detail-row:last-child {
+        
+        .detail-item:last-child {
             border-bottom: none;
         }
-
+        
         .detail-label {
             font-weight: 600;
-            color: var(--medium-gray);
-            flex: 1;
+            color: var(--dark-gray);
         }
-
+        
         .detail-value {
-            flex: 1;
-            text-align: right;
-            font-weight: 500;
-        }
-
-        .detail-row.indent .detail-label {
-            padding-left: 20px;
             color: var(--medium-gray);
-            font-size: 0.9em;
+            text-align: right;
         }
-
-        .detail-row.has-balance {
-            background-color: #fff9e6;
-            padding: 12px;
-            margin: 5px -10px;
-            border-radius: 8px;
-            border: 1px solid #ffd700;
+        
+        .financial-breakdown {
+            background: #f8fff8;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+            border-left: 4px solid #28a745;
         }
-
-        .status-badge {
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 0.85em;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .status-approved { background-color: #d4edda; color: #155724; }
-        .status-pending { background-color: #fff3cd; color: #856404; }
-        .status-cancelled { background-color: #f8d7da; color: #721c24; }
-        .status-payment-pending { background-color: #d1ecf1; color: #0c5460; }
-
-        .text-success { color: var(--success-color); }
-        .text-warning { color: var(--warning-color); }
-        .text-primary { color: var(--primary-color); }
-
-        .loading-container {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 50px;
-        }
-
-        .loading-spinner {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid var(--primary-color);
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        /* Modal */
-        .modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 1000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .modal-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-        }
-
-        .modal-container {
-            background-color: var(--white);
-            border-radius: var(--border-radius);
-            box-shadow: var(--shadow);
-            max-width: 500px;
-            width: 90%;
-            max-height: 80vh;
-            overflow-y: auto;
-            position: relative;
-            z-index: 1001;
-        }
-
-        .modal-header {
+        
+        .breakdown-item {
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            padding: 20px 24px;
-            border-bottom: 1px solid #eee;
-        }
-
-        .modal-header h3 {
-            margin: 0;
-            color: var(--dark-gray);
-        }
-
-        .modal-close {
-            background: none;
-            border: none;
-            font-size: 24px;
-            cursor: pointer;
-            color: var(--medium-gray);
-            padding: 0;
-            width: 30px;
-            height: 30px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .modal-close:hover {
-            color: var(--dark-gray);
-        }
-
-        .modal-body {
-            padding: 24px;
-        }
-
-        .modal-footer {
-            padding: 20px 24px;
-            border-top: 1px solid #eee;
-            display: flex;
-            justify-content: flex-end;
-            gap: 10px;
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: 600;
-            color: var(--dark-gray);
-        }
-
-        .form-control {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
+            padding: 8px 0;
             font-size: 14px;
         }
-
-        .form-control:focus {
-            outline: none;
-            border-color: var(--primary-color);
-            box-shadow: 0 0 0 2px rgba(255, 122, 0, 0.1);
+        
+        .breakdown-item.total {
+            border-top: 2px solid #28a745;
+            margin-top: 10px;
+            padding-top: 15px;
+            font-weight: 700;
+            font-size: 16px;
         }
-
+        
+        .breakdown-item .value {
+            font-weight: 600;
+        }
+        
+        .saldo-highlight {
+            background: #e8f5e9;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            border-left: 4px solid #4caf50;
+        }
+        
+        .saldo-highlight h4 {
+            color: #2e7d32;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .action-buttons {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            border: 1px solid #FFD9B3;
+            margin-top: 20px;
+        }
+        
+        .btn-group {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+            border: none;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .btn-primary {
+            background: var(--primary-color);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #e06e00;
+        }
+        
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background: #218838;
+        }
+        
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #c82333;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+        
+        .status-badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .status-pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .status-approved {
+            background: #d1e7dd;
+            color: #0f5132;
+        }
+        
+        .status-canceled {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .status-payment {
+            background: #cce6ff;
+            color: #0056b3;
+        }
+        
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid #f5c2c7;
+        }
+        
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--primary-color);
+            text-decoration: none;
+            font-weight: 600;
+            margin-bottom: 20px;
+            transition: color 0.3s ease;
+        }
+        
+        .back-link:hover {
+            color: #e06e00;
+        }
+        
+        .value-highlight {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--primary-color);
+        }
+        
+        .economy-badge {
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+        
         /* Responsividade */
         @media (max-width: 768px) {
-            .action-buttons {
-                flex-direction: column;
-                align-items: stretch;
-            }
-
-            .two-column-layout {
+            .detail-grid {
                 grid-template-columns: 1fr;
             }
-
-            .detail-row {
+            
+            .btn-group {
                 flex-direction: column;
-                align-items: flex-start;
-                gap: 4px;
             }
-
-            .detail-value {
+            
+            .btn {
+                width: 100%;
+                justify-content: center;
+            }
+            
+            .breakdown-item {
+                flex-direction: column;
                 text-align: left;
-            }
-
-            .modal-container {
-                width: 95%;
-                margin: 20px;
+                gap: 5px;
             }
         }
     </style>
+</head>
+<body>
+    <?php include_once '../components/sidebar.php'; ?>
+    
+    <div class="main-content" id="mainContent">
+        <div class="page-wrapper">
+            <div class="transaction-details">
+                <!-- Voltar -->
+                <a href="<?php echo ADMIN_TRANSACTIONS_URL; ?>" class="back-link">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 12H5"/>
+                        <path d="M12 19l-7-7 7-7"/>
+                    </svg>
+                    Voltar às Transações
+                </a>
+                
+                <?php if ($hasError): ?>
+                    <div class="error-message">
+                        <strong>Erro:</strong> <?php echo htmlspecialchars($errorMessage); ?>
+                    </div>
+                    
+                    <div class="action-buttons">
+                        <div class="btn-group">
+                            <a href="<?php echo ADMIN_TRANSACTIONS_URL; ?>" class="btn btn-secondary">
+                                Voltar às Transações
+                            </a>
+                        </div>
+                    </div>
+                <?php else: ?>
+                    <!-- Cabeçalho da Transação -->
+                    <div class="detail-header">
+                        <h1>Transação #<?php echo $transaction['id']; ?></h1>
+                        <div class="transaction-code">
+                            <?php if ($transaction['codigo_transacao']): ?>
+                                Código: <?php echo htmlspecialchars($transaction['codigo_transacao']); ?>
+                            <?php endif; ?>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Status:</span>
+                            <span class="detail-value">
+                                <?php echo getStatusBadge($transaction['status']); ?>
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <!-- Cards de Detalhes -->
+                    <div class="detail-grid">
+                        <!-- Informações Básicas -->
+                        <div class="detail-card">
+                            <h3>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                    <polyline points="14,2 14,8 20,8"/>
+                                    <line x1="16" y1="13" x2="8" y2="13"/>
+                                    <line x1="16" y1="17" x2="8" y2="17"/>
+                                    <polyline points="10,9 9,9 8,9"/>
+                                </svg>
+                                Informações Básicas
+                            </h3>
+                            
+                            <div class="detail-item">
+                                <span class="detail-label">Data da Transação:</span>
+                                <span class="detail-value"><?php echo formatDate($transaction['data_transacao']); ?></span>
+                            </div>
+                            
+                            <div class="detail-item">
+                                <span class="detail-label">Cliente:</span>
+                                <span class="detail-value">
+                                    <?php echo htmlspecialchars($transaction['cliente_nome']); ?>
+                                    <?php if ($transaction['saldo_usado'] > 0): ?>
+                                        <span class="economy-badge">Usou Saldo</span>
+                                    <?php endif; ?>
+                                </span>
+                            </div>
+                            
+                            <div class="detail-item">
+                                <span class="detail-label">Email do Cliente:</span>
+                                <span class="detail-value"><?php echo htmlspecialchars($transaction['cliente_email']); ?></span>
+                            </div>
+                            
+                            <div class="detail-item">
+                                <span class="detail-label">Loja:</span>
+                                <span class="detail-value"><?php echo htmlspecialchars($transaction['loja_nome']); ?></span>
+                            </div>
+                            
+                            <?php if ($transaction['descricao']): ?>
+                            <div class="detail-item">
+                                <span class="detail-label">Descrição:</span>
+                                <span class="detail-value"><?php echo htmlspecialchars($transaction['descricao']); ?></span>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                        
+                        <!-- Informações Financeiras -->
+                        <div class="detail-card">
+                            <h3>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="12" y1="1" x2="12" y2="23"/>
+                                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                                </svg>
+                                Informações Financeiras
+                            </h3>
+                            
+                            <?php 
+                            $saldoUsado = floatval($transaction['saldo_usado'] ?? 0);
+                            $valorOriginal = floatval($transaction['valor_total']);
+                            $valorPago = $valorOriginal - $saldoUsado;
+                            ?>
+                            
+                            <div class="detail-item">
+                                <span class="detail-label">Valor Original:</span>
+                                <span class="detail-value value-highlight"><?php echo formatCurrency($valorOriginal); ?></span>
+                            </div>
+                            
+                            <?php if ($saldoUsado > 0): ?>
+                            <div class="saldo-highlight">
+                                <h4>
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="10"/>
+                                        <path d="M16 12l-4-4-4 4"/>
+                                        <path d="M12 16V8"/>
+                                    </svg>
+                                    Uso de Saldo
+                                </h4>
+                                
+                                <div class="detail-item">
+                                    <span class="detail-label">Saldo Usado:</span>
+                                    <span class="detail-value" style="color: #4caf50; font-weight: 600;">
+                                        -<?php echo formatCurrency($saldoUsado); ?>
+                                    </span>
+                                </div>
+                                
+                                <div class="detail-item">
+                                    <span class="detail-label">Valor Efetivamente Pago:</span>
+                                    <span class="detail-value value-highlight"><?php echo formatCurrency($valorPago); ?></span>
+                                </div>
+                                
+                                <div class="detail-item">
+                                    <span class="detail-label">Economia do Cliente:</span>
+                                    <span class="detail-value" style="color: #4caf50; font-weight: 600;">
+                                        <?php echo formatCurrency($saldoUsado); ?>
+                                    </span>
+                                </div>
+                            </div>
+                            <?php endif; ?>
+                            
+                            <div class="financial-breakdown">
+                                <h4 style="margin-bottom: 10px; color: #2e7d32;">Distribuição de Cashback</h4>
+                                
+                                <div class="breakdown-item">
+                                    <span>Cashback do Cliente:</span>
+                                    <span class="value"><?php echo formatCurrency($transaction['valor_cliente']); ?></span>
+                                </div>
+                                
+                                <div class="breakdown-item">
+                                    <span>Comissão Klube Cash:</span>
+                                    <span class="value"><?php echo formatCurrency($transaction['valor_admin']); ?></span>
+                                </div>
+                                
+                                <div class="breakdown-item">
+                                    <span>Valor Loja:</span>
+                                    <span class="value"><?php echo formatCurrency($transaction['valor_loja']); ?></span>
+                                </div>
+                                
+                                <div class="breakdown-item total">
+                                    <span>Total de Cashback:</span>
+                                    <span class="value"><?php echo formatCurrency($transaction['valor_cashback']); ?></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <?php if ($saldoUsado > 0): ?>
+                    <!-- Impacto do Sistema de Saldo -->
+                    <div class="detail-card" style="margin-bottom: 20px;">
+                        <h3>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+                                <point cx="12" cy="17"/>
+                            </svg>
+                            💰 Análise do Uso de Saldo
+                        </h3>
+                        
+                        <div style="background: #f8fff8; padding: 15px; border-radius: 10px; border-left: 4px solid #4caf50;">
+                            <div class="detail-item">
+                                <span class="detail-label">Impacto na Receita da Loja:</span>
+                                <span class="detail-value">
+                                    Redução de <?php echo formatCurrency($saldoUsado); ?> 
+                                    (<?php echo number_format(($saldoUsado / $valorOriginal) * 100, 1); ?>%)
+                                </span>
+                            </div>
+                            
+                            <div class="detail-item">
+                                <span class="detail-label">Impacto na Comissão Klube Cash:</span>
+                                <span class="detail-value">
+                                    Redução de <?php echo formatCurrency($saldoUsado * 0.1); ?> (10% do saldo usado)
+                                </span>
+                            </div>
+                            
+                            <div class="detail-item">
+                                <span class="detail-label">Benefício:</span>
+                                <span class="detail-value">Cliente economiza e loja mantém fidelidade</span>
+                            </div>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+                    
+                    <!-- Botões de Ação -->
+                    <div class="action-buttons">
+                        <h3 style="margin-bottom: 15px; color: var(--primary-color);">Ações</h3>
+                        <div class="btn-group">
+                            <?php if ($transaction['status'] === 'pendente'): ?>
+                                <button class="btn btn-success" onclick="updateTransactionStatus(<?php echo $transaction['id']; ?>, 'aprovado')">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="20 6 9 17 4 12"/>
+                                    </svg>
+                                    Aprovar Transação
+                                </button>
+                                
+                                <button class="btn btn-danger" onclick="updateTransactionStatus(<?php echo $transaction['id']; ?>, 'cancelado')">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <line x1="18" y1="6" x2="6" y2="18"/>
+                                        <line x1="6" y1="6" x2="18" y2="18"/>
+                                    </svg>
+                                    Cancelar Transação
+                                </button>
+                            <?php endif; ?>
+                            
+                            <a href="<?php echo ADMIN_TRANSACTIONS_URL; ?>?loja_id=<?php echo $transaction['loja_id']; ?>" class="btn btn-secondary">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                                    <line x1="9" y1="9" x2="15" y2="15"/>
+                                    <line x1="15" y1="9" x2="9" y2="15"/>
+                                </svg>
+                                Ver Outras Transações desta Loja
+                            </a>
+                            
+                            <a href="<?php echo ADMIN_USERS_URL; ?>?search=<?php echo urlencode($transaction['cliente_email']); ?>" class="btn btn-secondary">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                                    <circle cx="12" cy="7" r="4"/>
+                                </svg>
+                                Ver Perfil do Cliente
+                            </a>
+                            
+                            <button class="btn btn-primary" onclick="exportTransaction(<?php echo $transaction['id']; ?>)">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                    <polyline points="7 10 12 15 17 10"/>
+                                    <line x1="12" y1="15" x2="12" y2="3"/>
+                                </svg>
+                                Exportar Dados
+                            </button>
+                        </div>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal de Confirmação -->
+    <div id="confirmModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 10px; max-width: 400px; width: 90%;">
+            <h3 id="modalTitle" style="margin-bottom: 15px; color: var(--primary-color);"></h3>
+            <p id="modalMessage" style="margin-bottom: 20px; color: var(--medium-gray);"></p>
+            <div>
+                <label for="modalObservacao" style="display: block; margin-bottom: 5px; font-weight: 600;">Observação (opcional):</label>
+                <textarea id="modalObservacao" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; min-height: 80px;"></textarea>
+            </div>
+            <div style="margin-top: 20px; text-align: right;">
+                <button onclick="closeModal()" style="margin-right: 10px; padding: 8px 16px; background: #6c757d; color: white; border: none; border-radius: 5px; cursor: pointer;">Cancelar</button>
+                <button id="confirmButton" style="padding: 8px 16px; background: var(--primary-color); color: white; border: none; border-radius: 5px; cursor: pointer;">Confirmar</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let currentTransactionId = null;
+        let currentAction = null;
+        
+        function updateTransactionStatus(transactionId, newStatus) {
+            currentTransactionId = transactionId;
+            currentAction = newStatus;
+            
+            const modal = document.getElementById('confirmModal');
+            const title = document.getElementById('modalTitle');
+            const message = document.getElementById('modalMessage');
+            const confirmBtn = document.getElementById('confirmButton');
+            
+            if (newStatus === 'aprovado') {
+                title.textContent = 'Aprovar Transação';
+                message.textContent = 'Tem certeza que deseja aprovar esta transação? O cashback será liberado para o cliente.';
+                confirmBtn.style.background = '#28a745';
+                confirmBtn.textContent = 'Aprovar';
+            } else if (newStatus === 'cancelado') {
+                title.textContent = 'Cancelar Transação';
+                message.textContent = 'Tem certeza que deseja cancelar esta transação? Esta ação não pode ser desfeita.';
+                confirmBtn.style.background = '#dc3545';
+                confirmBtn.textContent = 'Cancelar Transação';
+            }
+            
+            modal.style.display = 'block';
+        }
+        
+        function closeModal() {
+            document.getElementById('confirmModal').style.display = 'none';
+            document.getElementById('modalObservacao').value = '';
+            currentTransactionId = null;
+            currentAction = null;
+        }
+        
+        function exportTransaction(transactionId) {
+            // Implementar exportação da transação
+            const url = '../../controllers/AdminController.php';
+            const params = new URLSearchParams({
+                action: 'export_transaction',
+                transaction_id: transactionId
+            });
+            
+            window.open(url + '?' + params.toString(), '_blank');
+        }
+        
+        // Confirmar ação
+        document.getElementById('confirmButton').addEventListener('click', function() {
+            if (!currentTransactionId || !currentAction) return;
+            
+            const observacao = document.getElementById('modalObservacao').value;
+            
+            fetch('../../controllers/AdminController.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `action=update_transaction_status&transaction_id=${currentTransactionId}&status=${currentAction}&observacao=${encodeURIComponent(observacao)}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status) {
+                    alert('Status da transação atualizado com sucesso!');
+                    window.location.reload();
+                } else {
+                    alert('Erro: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                alert('Erro ao atualizar status da transação.');
+            })
+            .finally(() => {
+                closeModal();
+            });
+        });
+        
+        // Fechar modal ao clicar fora
+        document.getElementById('confirmModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeModal();
+            }
+        });
+    </script>
 </body>
 </html>
