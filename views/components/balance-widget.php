@@ -2,7 +2,10 @@
 // views/components/balance-widget.php
 /**
  * Widget para exibir e usar saldo de cashback
- * Deve ser incluído em telas onde o cliente pode usar seu saldo
+ * Deve ser incluído em telas onde o cliente pode usar seu saldo de cashback recebido
+ * 
+ * IMPORTANTE: O saldo só pode ser usado na mesma loja que gerou o cashback
+ * A loja não recebe cashback - ela apenas paga 10% de comissão (5% cliente + 5% admin)
  * 
  * @param int $userId ID do usuário
  * @param int $storeId ID da loja (opcional, para filtrar saldo específico)
@@ -20,7 +23,7 @@ require_once __DIR__ . '/../../models/CashbackBalance.php';
 $balanceModel = new CashbackBalance();
 
 if (isset($storeId)) {
-    // Saldo específico de uma loja
+    // Saldo específico de uma loja - APENAS o que o cliente tem disponível
     $storeBalance = $balanceModel->getStoreBalance($userId, $storeId);
     $balances = [];
     if ($storeBalance > 0) {
@@ -35,14 +38,15 @@ if (isset($storeId)) {
             'loja_id' => $storeId,
             'nome_fantasia' => $storeData['nome_fantasia'],
             'logo' => $storeData['logo'],
-            'saldo_disponivel' => $storeBalance
+            'saldo_disponivel' => $storeBalance // Saldo que o CLIENTE pode usar
         ]];
     }
 } else {
-    // Todos os saldos do usuário
+    // Todos os saldos do usuário - APENAS o que o cliente recebeu/pode usar
     $balances = $balanceModel->getAllUserBalances($userId);
 }
 
+// Total disponível para o cliente
 $totalBalance = $balanceModel->getTotalBalance($userId);
 $allowUse = $allowUse ?? false;
 $useCallback = $useCallback ?? 'onBalanceUsed';
@@ -57,6 +61,15 @@ $useCallback = $useCallback ?? 'onBalanceUsed';
             </svg>
             Seu Saldo de Cashback
         </h4>
+
+        <!-- ADICIONADO: Informação importante -->
+        <?php if (!isset($storeId)): ?>
+        <div class="balance-info-text">
+            <small class="text-muted">
+                💡 Seu saldo só pode ser usado na loja onde foi gerado
+            </small>
+        </div>
+        <?php endif; ?>
         
         <?php if (!isset($storeId)): ?>
         <div class="balance-total">
@@ -74,7 +87,18 @@ $useCallback = $useCallback ?? 'onBalanceUsed';
                     <line x1="12" y1="8" x2="12" y2="12"></line>
                     <line x1="12" y1="16" x2="12.01" y2="16"></line>
                 </svg>
-                <p>Você não possui saldo de cashback<?php echo isset($storeId) ? ' nesta loja' : ''; ?></p>
+                <p>
+                    Você não possui saldo de cashback<?php echo isset($storeId) ? ' nesta loja' : ''; ?>
+                    <?php if (!isset($storeId)): ?>
+                    <br><small class="text-muted">Faça compras nas lojas parceiras para receber cashback!</small>
+                    <?php endif; ?>
+                </p>
+            </div>
+            <!-- ADICIONADO: Informação sobre como funciona o cashback -->
+            <div class="cashback-info">
+                <small class="info-text">
+                    💡 Você recebe 5% de cashback nas compras desta loja (pode variar por loja)
+                </small>
             </div>
         <?php else: ?>
             <div class="balance-stores">
@@ -323,6 +347,32 @@ $useCallback = $useCallback ?? 'onBalanceUsed';
 
 .use-balance-btn {
     padding: 6px 12px;
+    font-size: 0.8rem;
+}
+/* ADICIONADO: Estilo para informação do widget */
+.balance-info-text {
+    padding: 8px 12px;
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    margin-bottom: 12px;
+    text-align: center;
+}
+
+.balance-info-text .text-muted {
+    color: #6c757d;
+    font-size: 0.875rem;
+}
+
+.cashback-info {
+    margin-top: 8px;
+    padding: 6px 8px;
+    background-color: #e7f3ff;
+    border-radius: 4px;
+    text-align: center;
+}
+
+.cashback-info .info-text {
+    color: #2c5aa0;
     font-size: 0.8rem;
 }
 

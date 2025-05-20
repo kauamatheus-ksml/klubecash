@@ -5,6 +5,9 @@
  * Este componente cria uma sidebar responsiva para todas as páginas
  * do painel da loja parceira.
  * 
+ * IMPORTANTE: Lojas não recebem cashback - elas pagam 10% de comissão
+ * (5% para cliente + 5% para admin)
+ * 
  * @param string $activeMenu - O ID do menu ativo atual
  */
 require_once '../../config/constants.php';
