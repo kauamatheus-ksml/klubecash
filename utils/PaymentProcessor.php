@@ -278,12 +278,12 @@ class PaymentProcessor {
     }
     
     /**
-     * Calcula o valor total das comissões para transações
-     * 
-     * @param array $transactionIds IDs das transações
-     * @param int $storeId ID da loja
-     * @return array Resultado com valor total e detalhes
-     */
+    * Calcula o valor total das comissões para transações
+    * 
+    * @param array $transactionIds IDs das transações
+    * @param int $storeId ID da loja
+    * @return array Resultado com valor total e detalhes
+    */
     public function calculateTotalCommissions($transactionIds, $storeId) {
         try {
             if (empty($transactionIds)) {
@@ -299,10 +299,11 @@ class PaymentProcessor {
             // Construir placeholders para a query
             $placeholders = implode(',', array_fill(0, count($transactionIds), '?'));
             
-            // Preparar query para obter valores das transações
+            // CORREÇÃO: Buscar apenas valor_cliente (o que a loja deve pagar)
+            // A loja paga o cashback do cliente, não recebe comissão
             $query = "
                 SELECT 
-                    id, valor_total, valor_cashback, codigo_transacao 
+                    id, valor_total, valor_cliente as valor_comissao, codigo_transacao 
                 FROM transacoes_cashback 
                 WHERE id IN ($placeholders) AND loja_id = ? AND status = ?
             ";
@@ -320,7 +321,6 @@ class PaymentProcessor {
             // Obter resultados
             $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
-            // Verificar se todas as transações foram encontradas
             if (count($transactions) !== count($transactionIds)) {
                 return [
                     'status' => false,
@@ -328,20 +328,20 @@ class PaymentProcessor {
                 ];
             }
             
-            // Calcular valor total das comissões
+            // CORREÇÃO: Calcular apenas o que a loja deve pagar (cashback dos clientes)
             $totalValue = 0;
-            $totalCommission = 0;
+            $totalCommission = 0; // Valor que a loja deve pagar
             $transactionDetails = [];
             
             foreach ($transactions as $transaction) {
                 $totalValue += $transaction['valor_total'];
-                $totalCommission += $transaction['valor_cashback'];
+                $totalCommission += $transaction['valor_comissao']; // valor_cliente
                 
                 $transactionDetails[] = [
                     'id' => $transaction['id'],
                     'codigo' => $transaction['codigo_transacao'],
                     'valor_total' => $transaction['valor_total'],
-                    'valor_cashback' => $transaction['valor_cashback']
+                    'valor_a_pagar' => $transaction['valor_comissao'] // O que a loja deve pagar
                 ];
             }
             
@@ -350,7 +350,7 @@ class PaymentProcessor {
                 'data' => [
                     'total_transacoes' => count($transactions),
                     'valor_total_vendas' => $totalValue,
-                    'valor_total_comissoes' => $totalCommission,
+                    'valor_total_a_pagar' => $totalCommission, // O que a loja deve pagar
                     'transacoes' => $transactionDetails
                 ]
             ];

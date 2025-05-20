@@ -965,23 +965,23 @@ class ClientController {
             $porcentagemTotal = isset($config['porcentagem_total']) ? $config['porcentagem_total'] : DEFAULT_CASHBACK_TOTAL;
             $porcentagemCliente = isset($config['porcentagem_cliente']) ? $config['porcentagem_cliente'] : DEFAULT_CASHBACK_CLIENT;
             $porcentagemAdmin = isset($config['porcentagem_admin']) ? $config['porcentagem_admin'] : DEFAULT_CASHBACK_ADMIN;
-            $porcentagemLoja = isset($config['porcentagem_loja']) ? $config['porcentagem_loja'] : DEFAULT_CASHBACK_STORE;
-            
+            // CORREÇÃO: Loja sempre recebe 0%
+            $porcentagemLoja = 0.00;
             // Verificar se a loja tem porcentagem específica
             if (isset($store['porcentagem_cashback']) && $store['porcentagem_cashback'] > 0) {
                 $porcentagemTotal = $store['porcentagem_cashback'];
-                // Ajustar proporcionalmente
+                // Ajustar proporcionalmente mas loja continua em 0%
                 $fator = $porcentagemTotal / DEFAULT_CASHBACK_TOTAL;
                 $porcentagemCliente = DEFAULT_CASHBACK_CLIENT * $fator;
                 $porcentagemAdmin = DEFAULT_CASHBACK_ADMIN * $fator;
-                $porcentagemLoja = DEFAULT_CASHBACK_STORE * $fator;
+                $porcentagemLoja = 0.00; // Loja sempre 0%
             }
             
             // Calcular valores
             $valorCashbackTotal = ($data['valor_total'] * $porcentagemTotal) / 100;
             $valorCashbackCliente = ($data['valor_total'] * $porcentagemCliente) / 100;
             $valorCashbackAdmin = ($data['valor_total'] * $porcentagemAdmin) / 100;
-            $valorCashbackLoja = ($data['valor_total'] * $porcentagemLoja) / 100;
+            $valorCashbackLoja = 0.00; // CORREÇÃO: Loja não recebe nada
             
             // Iniciar transação
             $db->beginTransaction();
@@ -1023,7 +1023,7 @@ class ClientController {
                 
                 $tipoAdmin = USER_TYPE_ADMIN;
                 $adminStmt->bindParam(':tipo_usuario', $tipoAdmin);
-                $adminId = 1; // Administrador padrão (ajustar conforme necessário)
+                $adminId = 1; // Administrador padrão
                 $adminStmt->bindParam(':usuario_id', $adminId);
                 $adminStmt->bindParam(':loja_id', $data['loja_id']);
                 $adminStmt->bindParam(':transacao_id', $transactionId);

@@ -1900,11 +1900,11 @@ public static function getAvailableStores() {
         }
     }
     /**
-     * Atualiza configurações do sistema
-     * 
-     * @param array $data Novas configurações
-     * @return array Resultado da operação
-     */
+    * Atualiza configurações do sistema
+    * 
+    * @param array $data Novas configurações
+    * @return array Resultado da operação
+    */
     public static function updateSettings($data) {
         try {
             // Verificar se é um administrador
@@ -1912,8 +1912,8 @@ public static function getAvailableStores() {
                 return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
             }
             
-            // Validar dados
-            $requiredFields = ['porcentagem_total', 'porcentagem_cliente', 'porcentagem_admin', 'porcentagem_loja'];
+            // CORREÇÃO: Validar apenas cliente e admin, loja sempre será 0
+            $requiredFields = ['porcentagem_cliente', 'porcentagem_admin'];
             foreach ($requiredFields as $field) {
                 if (!isset($data[$field]) || !is_numeric($data[$field])) {
                     return ['status' => false, 'message' => 'Campos inválidos ou incompletos.'];
@@ -1928,10 +1928,15 @@ public static function getAvailableStores() {
                 }
             }
             
-            // Verificar se a soma das porcentagens é igual à porcentagem total
-            $soma = $data['porcentagem_cliente'] + $data['porcentagem_admin'] + $data['porcentagem_loja'];
-            if (abs($soma - $data['porcentagem_total']) > 0.01) { // Tolerância de 0.01 para problemas de arredondamento
-                return ['status' => false, 'message' => 'A soma das porcentagens (cliente, admin, loja) deve ser igual à porcentagem total.'];
+            // CORREÇÃO: Forçar porcentagem da loja como 0
+            $data['porcentagem_loja'] = 0.00;
+            
+            // CORREÇÃO: Calcular total apenas com cliente + admin
+            $porcentagemTotal = $data['porcentagem_cliente'] + $data['porcentagem_admin'];
+            
+            // Verificar se a soma das porcentagens é válida
+            if ($porcentagemTotal <= 0 || $porcentagemTotal > 100) {
+                return ['status' => false, 'message' => 'A soma das porcentagens deve estar entre 0 e 100.'];
             }
             
             $db = Database::getConnection();
@@ -1944,14 +1949,13 @@ public static function getAvailableStores() {
                 INSERT INTO configuracoes_cashback (
                     porcentagem_total, porcentagem_cliente, porcentagem_admin, porcentagem_loja, data_atualizacao
                 ) VALUES (
-                    :porcentagem_total, :porcentagem_cliente, :porcentagem_admin, :porcentagem_loja, NOW()
+                    :porcentagem_total, :porcentagem_cliente, :porcentagem_admin, 0.00, NOW()
                 )
             ");
             
-            $stmt->bindParam(':porcentagem_total', $data['porcentagem_total']);
+            $stmt->bindParam(':porcentagem_total', $porcentagemTotal);
             $stmt->bindParam(':porcentagem_cliente', $data['porcentagem_cliente']);
             $stmt->bindParam(':porcentagem_admin', $data['porcentagem_admin']);
-            $stmt->bindParam(':porcentagem_loja', $data['porcentagem_loja']);
             $stmt->execute();
             
             return ['status' => true, 'message' => 'Configurações atualizadas com sucesso.'];
@@ -2701,7 +2705,9 @@ public static function getAvailableStores() {
             $valorCashbackTotal = ($data['valor_total'] * $porcentagemTotal) / 100;
             $valorCashbackCliente = ($data['valor_total'] * $porcentagemCliente) / 100;
             $valorCashbackAdmin = ($data['valor_total'] * $porcentagemAdmin) / 100;
-            $valorCashbackLoja = ($data['valor_total'] * $porcentagemLoja) / 100;
+            // CORREÇÃO: Loja não recebe cashback
+            $valorCashbackLoja = 0.00;
+
             
             // Iniciar transação
             $db->beginTransaction();
