@@ -971,36 +971,41 @@ $activeMenu = 'dashboard';
             
             <!-- Adicionar novo card informativo sobre o fluxo de cashback -->
             <div class="info-card">
-                <h3>Como Funciona o Cashback no Klube Cash</h3>
+                <h3>Como Funciona o Sistema de Comissão no Klube Cash</h3>
                 <div class="info-content">
                     <div class="info-item">
                         <span class="info-number">1</span>
                         <div>
                             <h4>Registro da Venda</h4>
-                            <p>Você registra suas vendas no sistema com o valor total e o cliente</p>
+                            <p>Você registra suas vendas no sistema com o valor total e identificação do cliente</p>
                         </div>
                     </div>
                     <div class="info-item">
                         <span class="info-number">2</span>
                         <div>
                             <h4>Pagamento da Comissão</h4>
-                            <p>Você paga a comissão de 10% sobre o valor da venda</p>
+                            <p>Você paga 10% de comissão sobre o valor efetivamente cobrado (descontando saldo usado)</p>
                         </div>
                     </div>
                     <div class="info-item">
                         <span class="info-number">3</span>
                         <div>
-                            <h4>Distribuição do Cashback</h4>
-                            <p>5% vai para o cliente como cashback e 5% fica com a plataforma</p>
+                            <h4>Distribuição dos 10%</h4>
+                            <p>5% vira cashback para o cliente e 5% fica como receita do Klube Cash</p>
                         </div>
                     </div>
                     <div class="info-item">
                         <span class="info-number">4</span>
                         <div>
-                            <h4>Liberação para o Cliente</h4>
-                            <p>O cashback é liberado para o cliente após a aprovação do pagamento</p>
+                            <h4>Liberação do Cashback</h4>
+                            <p>Após aprovação do seu pagamento, o cashback é liberado para o cliente usar na sua loja</p>
                         </div>
                     </div>
+                </div>
+                
+                <!-- ADICIONADO: Informação importante -->
+                <div class="info-highlight">
+                    <strong>💡 Importante:</strong> Sua loja não recebe cashback. O saldo do cliente só pode ser usado na sua própria loja, gerando uma nova comissão sobre o valor efetivamente pago.
                 </div>
             </div>
         </div>
@@ -1037,5 +1042,18 @@ $activeMenu = 'dashboard';
             }
         });
     </script>
+
+    <style>
+    /* Adicione no final do CSS existente */
+    .info-highlight {
+        margin-top: 20px;
+        padding: 15px;
+        background-color: #fff3e0;
+        border-left: 4px solid #FF7A00;
+        border-radius: 8px;
+        color: #e65100;
+        font-size: 0.9rem;
+    }
+    </style>
 </body>
 </html>

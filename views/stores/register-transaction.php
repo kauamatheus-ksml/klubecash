@@ -932,14 +932,14 @@ $activeMenu = 'register-transaction';
                         </div>
                         
                         <div class="cashback-calculator">
-                            <h3>Simulação de Cashback</h3>
+                            <h3>Simulação de Comissão e Cashback</h3>
                             <div class="cashback-details">
                                 <div class="cashback-item">
                                     <span class="cashback-label">Valor da Venda:</span>
                                     <span class="cashback-value" id="display-valor-venda">R$ 0,00</span>
                                 </div>
                                 <div class="cashback-item saldo-row" id="cashback-saldo-row" style="display: none;">
-                                    <span class="cashback-label">Saldo Usado:</span>
+                                    <span class="cashback-label">Saldo Usado pelo Cliente:</span>
                                     <span class="cashback-value" id="display-saldo-usado">R$ 0,00</span>
                                 </div>
                                 <div class="cashback-item">
@@ -947,21 +947,22 @@ $activeMenu = 'register-transaction';
                                     <span class="cashback-value" id="display-valor-pago">R$ 0,00</span>
                                 </div>
                                 <div class="cashback-item">
-                                    <span class="cashback-label">Cashback do Cliente (<?php echo DEFAULT_CASHBACK_CLIENT; ?>%):</span>
+                                    <span class="cashback-label">Cashback do Cliente (5%):</span>
                                     <span class="cashback-value" id="display-valor-cliente">R$ 0,00</span>
                                 </div>
                                 <div class="cashback-item">
-                                    <span class="cashback-label">Comissão Klube Cash (<?php echo DEFAULT_CASHBACK_ADMIN; ?>%):</span>
+                                    <span class="cashback-label">Receita Klube Cash (5%):</span>
                                     <span class="cashback-value" id="display-valor-admin">R$ 0,00</span>
                                 </div>
                                 <div class="cashback-item total">
-                                    <span class="cashback-label">Valor Total a Pagar (<?php echo DEFAULT_CASHBACK_TOTAL; ?>%):</span>
+                                    <span class="cashback-label">Comissão Total a Pagar (10%):</span>
                                     <span class="cashback-value" id="display-valor-total">R$ 0,00</span>
                                 </div>
                             </div>
                             <div class="cashback-note">
-                                <p>* O valor de cashback será liberado para o cliente após o pagamento da comissão.</p>
-                                <p id="cashback-note-saldo" style="display: none;">* A comissão é calculada apenas sobre o valor efetivamente pago (após desconto do saldo).</p>
+                                <p>* A comissão é calculada sobre o valor efetivamente pago (após desconto do saldo usado).</p>
+                                <p>* O cashback será liberado para o cliente após o pagamento e aprovação da comissão.</p>
+                                <p>* Sua loja não recebe cashback - você paga 10% que são distribuídos: 5% cliente + 5% Klube Cash.</p>
                             </div>
                         </div>
                         
@@ -1282,6 +1283,7 @@ $activeMenu = 'register-transaction';
         }
         
         // Função para calcular e atualizar a simulação
+      
         function atualizarSimulacao() {
             const valorInput = document.getElementById('valor_total');
             const displayValorVenda = document.getElementById('display-valor-venda');
@@ -1303,16 +1305,14 @@ $activeMenu = 'register-transaction';
             if (usarSaldo && valorSaldoUsado > 0) {
                 valorPago = Math.max(0, valorTotal - valorSaldoUsado);
                 saldoRow.style.display = 'flex';
-                noteSaldo.style.display = 'block';
             } else {
                 saldoRow.style.display = 'none';
-                noteSaldo.style.display = 'none';
             }
             
-            // Porcentagens de cashback
-            const porcentagemCliente = <?php echo DEFAULT_CASHBACK_CLIENT; ?>;
-            const porcentagemAdmin = <?php echo DEFAULT_CASHBACK_ADMIN; ?>;
-            const porcentagemTotal = <?php echo DEFAULT_CASHBACK_TOTAL; ?>;
+            // CORREÇÃO: Porcentagens fixas conforme especificação
+            const porcentagemCliente = 5.00;  // Cliente sempre recebe 5%
+            const porcentagemAdmin = 5.00;    // Admin sempre recebe 5%
+            const porcentagemTotal = 10.00;   // Total sempre 10%
             
             // Calcular cashback sobre o valor PAGO (não sobre o valor total)
             const valorCliente = valorPago * porcentagemCliente / 100;

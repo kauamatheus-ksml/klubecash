@@ -301,27 +301,39 @@ if ($result['status'] && isset($result['data']['totais'])) {
                     <div class="info-section">
                         <h4>📊 Como são calculadas as comissões:</h4>
                         <ul>
-                            <li>A comissão é calculada apenas sobre o valor efetivamente cobrado do cliente</li>
-                            <li>Se o cliente usou saldo, o valor é descontado antes do cálculo</li>
-                            <li>Exemplo: Venda de R$ 100,00 - Saldo usado R$ 20,00 = Comissão sobre R$ 80,00</li>
+                            <li>A comissão é de <strong>10%</strong> calculada apenas sobre o valor efetivamente cobrado do cliente</li>
+                            <li>Se o cliente usou saldo, o valor é descontado antes do cálculo da comissão</li>
+                            <li>Exemplo: Venda de R$ 100,00 - Saldo usado R$ 20,00 = Comissão sobre R$ 80,00 (R$ 8,00)</li>
+                            <li><strong>Sua loja não recebe cashback</strong> - você apenas paga a comissão</li>
                         </ul>
                     </div>
                     
                     <div class="info-section">
-                        <h4>💰 Sobre o uso de saldo:</h4>
+                        <h4>💰 Sobre o uso de saldo pelo cliente:</h4>
                         <ul>
-                            <li>Clientes podem usar seu saldo de cashback para desconto em novas compras</li>
+                            <li>Clientes podem usar o cashback recebido para desconto em novas compras <strong>na sua loja</strong></li>
                             <li>O saldo usado é identificado pelo ícone 💰 ao lado do nome do cliente</li>
-                            <li>Isso não afeta o cashback que será gerado para o cliente na nova compra</li>
+                            <li>O cliente ainda recebe cashback normal sobre o valor que ele efetivamente pagou</li>
+                            <li>Você paga comissão apenas sobre o valor que efetivamente recebeu</li>
                         </ul>
                     </div>
                     
                     <div class="info-section">
-                        <h4>🔔 Processo de pagamento:</h4>
+                        <h4>🔔 Distribuição dos 10% de comissão:</h4>
+                        <ul>
+                            <li><strong>5% para o cliente:</strong> Vira cashback disponível para usar na sua loja</li>
+                            <li><strong>5% para o Klube Cash:</strong> Nossa receita pela plataforma</li>
+                            <li><strong>0% para sua loja:</strong> Você não recebe cashback, apenas oferece o benefício</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="info-section">
+                        <h4>🔄 Processo de pagamento:</h4>
                         <ul>
                             <li>Selecione as transações que deseja quitar</li>
                             <li>O valor total será a soma das comissões de todas as transações selecionadas</li>
                             <li>Após o pagamento e aprovação, o cashback será liberado para os clientes</li>
+                            <li>Clientes poderão usar o cashback apenas na sua loja</li>
                         </ul>
                     </div>
                 </div>

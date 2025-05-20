@@ -576,10 +576,32 @@ $estados = [
                 
                 <h2 class="section-title">Configurações de Cashback</h2>
                 
-                <div class="form-group">
-                    <label class="form-label" for="porcentagem_cashback">Porcentagem de Cashback (%)</label>
-                    <input type="number" id="porcentagem_cashback" name="porcentagem_cashback" class="form-control" step="0.01" min="0" max="30" value="<?php echo isset($data['porcentagem_cashback']) ? htmlspecialchars($data['porcentagem_cashback']) : DEFAULT_CASHBACK_TOTAL; ?>">
-                    <small class="form-text">Porcentagem que será devolvida aos clientes (padrão: <?php echo DEFAULT_CASHBACK_TOTAL; ?>%). Quanto maior a porcentagem, mais atrativa sua loja fica para os clientes.</small>
+                <!-- REMOVIDO: Campo de porcentagem customizada -->
+                <!-- Todas as lojas pagam 10% (5% cliente + 5% admin) -->
+
+                <div class="form-info">
+                    <h3>📊 Informações sobre Comissão</h3>
+                    <div class="commission-info">
+                        <div class="commission-item">
+                            <span class="commission-icon">💳</span>
+                            <div class="commission-details">
+                                <strong>Comissão: 10% por venda</strong>
+                                <p>Você paga 10% sobre cada venda que será distribuído:</p>
+                                <ul>
+                                    <li>5% para o cliente (cashback)</li>
+                                    <li>5% para o Klube Cash (nossa receita)</li>
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <div class="commission-item">
+                            <span class="commission-icon">🔄</span>
+                            <div class="commission-details">
+                                <strong>Saldo do cliente</strong>
+                                <p>O cashback que o cliente recebe só pode ser usado na sua loja, gerando fidelização e novas vendas.</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 
                 <div class="form-group">
@@ -918,5 +940,50 @@ $estados = [
             this.style.borderColor = '';
         });
     </script>
+    <style>
+/* Adicione no final do CSS existente */
+.form-info {
+    background-color: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    margin: 20px 0;
+}
+
+.commission-info {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.commission-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px;
+    background-color: white;
+    border-radius: 6px;
+    border-left: 3px solid #FF7A00;
+}
+
+.commission-icon {
+    font-size: 1.5rem;
+    margin-top: 2px;
+}
+
+.commission-details strong {
+    color: #2A3F54;
+    display: block;
+    margin-bottom: 5px;
+}
+
+.commission-details ul {
+    margin: 8px 0 0 20px;
+    padding: 0;
+}
+
+.commission-details li {
+    margin-bottom: 4px;
+}
+</style>
 </body>
 </html>
