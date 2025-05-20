@@ -316,12 +316,13 @@ class TransactionController {
             $countStmt->execute();
             $totalCount = $countStmt->fetch(PDO::FETCH_ASSOC)['total'];
             
-            // Query para totais
+            // Query para totais - CORRIGIDA
             $totalsQuery = "
                 SELECT 
                     COUNT(*) as total_transacoes,
                     SUM(t.valor_total) as total_valor_vendas_originais,
-                    SUM(t.valor_cashback) as total_valor_comissoes,
+                    -- CORREÇÃO: Comissão total = valor_cliente + valor_admin (toda a comissão que a loja deve pagar)
+                    SUM(t.valor_cliente + t.valor_admin) as total_valor_comissoes,
                     COALESCE(SUM(
                         (SELECT SUM(cm.valor) 
                         FROM cashback_movimentacoes cm 
@@ -915,28 +916,87 @@ class TransactionController {
                 return ['status' => false, 'message' => 'Dados obrigatórios faltando'];
             }
             
+            // Verificar se o usuário está autenticado e é loja ou admin
+            if (!AuthController::isAuthenticated()) {
+                return ['status' => false, 'message' => 'Usuário não autenticado.'];
+            }
+            
+            if (!AuthController::isStore() && !AuthController::isAdmin()) {
+                return ['status' => false, 'message' => 'Apenas lojas e administradores podem registrar pagamentos.'];
+            }
+            
             $db = Database::getConnection();
             
             // Converter transações para array se necessário
             $transactionIds = is_array($data['transacoes']) ? $data['transacoes'] : explode(',', $data['transacoes']);
             $transactionIds = array_map('intval', $transactionIds);
             
+            if (empty($transactionIds)) {
+                return ['status' => false, 'message' => 'Nenhuma transação selecionada'];
+            }
+            
             error_log("registerPayment - IDs: " . implode(',', $transactionIds));
             
-            // Iniciar transação
+            // CORREÇÃO: Validar se todas as transações existem e calcular valor total correto
+            $placeholders = implode(',', array_fill(0, count($transactionIds), '?'));
+            $validateStmt = $db->prepare("
+                SELECT 
+                    id,
+                    (valor_cliente + valor_admin) as comissao_total,
+                    status,
+                    loja_id
+                FROM transacoes_cashback 
+                WHERE id IN ($placeholders) AND loja_id = ? AND status = ?
+            ");
+            
+            $validateParams = array_merge($transactionIds, [$data['loja_id'], TRANSACTION_PENDING]);
+            $validateStmt->execute($validateParams);
+            $transactions = $validateStmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            // Verificar se todas as transações foram encontradas
+            if (count($transactions) !== count($transactionIds)) {
+                return [
+                    'status' => false, 
+                    'message' => 'Algumas transações não foram encontradas ou não estão pendentes. Esperado: ' . count($transactionIds) . ', Encontrado: ' . count($transactions)
+                ];
+            }
+            
+            // CORREÇÃO: Calcular valor total correto (soma das comissões totais)
+            $totalCalculated = 0;
+            foreach ($transactions as $transaction) {
+                $totalCalculated += $transaction['comissao_total'];
+            }
+            
+            // Validar se o valor informado bate com o calculado
+            $valorInformado = floatval($data['valor_total']);
+            if (abs($totalCalculated - $valorInformado) > 0.01) {
+                error_log("registerPayment - Erro valor: Calculado=$totalCalculated, Informado=$valorInformado");
+                return [
+                    'status' => false, 
+                    'message' => 'Valor total informado (R$ ' . number_format($valorInformado, 2, ',', '.') . 
+                    ') não confere com o valor das transações selecionadas (R$ ' . number_format($totalCalculated, 2, ',', '.') . ')'
+                ];
+            }
+            
+            // Validar valores numéricos
+            if ($valorInformado <= 0) {
+                return ['status' => false, 'message' => 'Valor total deve ser maior que zero'];
+            }
+            
+            // Iniciar transação no banco de dados
             $db->beginTransaction();
             
             try {
                 // 1. Inserir o pagamento
                 $stmt = $db->prepare("
                     INSERT INTO pagamentos_comissao 
-                    (loja_id, valor_total, metodo_pagamento, numero_referencia, comprovante, observacao, status) 
-                    VALUES (?, ?, ?, ?, ?, ?, 'pendente')
+                    (loja_id, valor_total, metodo_pagamento, numero_referencia, comprovante, observacao, status, data_registro) 
+                    VALUES (?, ?, ?, ?, ?, ?, 'pendente', NOW())
                 ");
                 
                 $result = $stmt->execute([
                     $data['loja_id'],
-                    $data['valor_total'],
+                    $totalCalculated, // Usar valor calculado para garantir precisão
                     $data['metodo_pagamento'] ?? 'pix',
                     $data['numero_referencia'] ?? '',
                     $data['comprovante'] ?? '',
@@ -950,7 +1010,7 @@ class TransactionController {
                 $paymentId = $db->lastInsertId();
                 error_log("registerPayment - Payment ID criado: $paymentId");
                 
-                // 2. Associar transações
+                // 2. Associar transações ao pagamento
                 $assocStmt = $db->prepare("INSERT INTO pagamentos_transacoes (pagamento_id, transacao_id) VALUES (?, ?)");
                 
                 foreach ($transactionIds as $transId) {
@@ -970,28 +1030,52 @@ class TransactionController {
                     throw new Exception('Erro ao atualizar status das transações');
                 }
                 
-                // Commit
+                // 4. Criar notificação para admin
+                self::createNotification(
+                    1, // Admin padrão
+                    'Novo pagamento registrado',
+                    'Nova solicitação de pagamento de comissão de R$ ' . number_format($totalCalculated, 2, ',', '.') . ' aguardando aprovação.',
+                    'info'
+                );
+                
+                // 5. Log de sucesso
+                error_log("registerPayment - Pagamento registrado com sucesso: ID=$paymentId, Valor=$totalCalculated, Transações=" . implode(',', $transactionIds));
+                
+                // Commit da transação
                 $db->commit();
                 error_log("registerPayment - Sucesso total!");
                 
                 return [
                     'status' => true,
-                    'message' => 'Pagamento registrado com sucesso!',
-                    'data' => ['payment_id' => $paymentId]
+                    'message' => 'Pagamento registrado com sucesso! Aguardando aprovação da administração.',
+                    'data' => [
+                        'payment_id' => $paymentId,
+                        'valor_total' => $totalCalculated,
+                        'total_transacoes' => count($transactionIds)
+                    ]
                 ];
                 
             } catch (Exception $e) {
+                // Rollback em caso de erro
                 if ($db->inTransaction()) {
                     $db->rollBack();
                 }
+                error_log("registerPayment - Erro durante transação: " . $e->getMessage());
                 throw $e;
             }
             
         } catch (Exception $e) {
             error_log("registerPayment - ERRO: " . $e->getMessage());
-            return ['status' => false, 'message' => $e->getMessage()];
+            return [
+                'status' => false, 
+                'message' => 'Erro ao registrar pagamento: ' . $e->getMessage()
+            ];
         }
     }
+    
+
+
+
     
     /**
      * Aprova um pagamento de comissão

@@ -118,8 +118,9 @@ if ($result['status'] && isset($result['data']['totais'])) {
                 
                 <div class="stat-card">
                     <div class="stat-card-title">Valor Total de Comissões</div>
+                    <!-- CORREÇÃO: Mostrar comissão total (10%) -->
                     <div class="stat-card-value">R$ <?php echo number_format($totalValorComissoes, 2, ',', '.'); ?></div>
-                    <div class="stat-card-subtitle">Valor a pagar ao Klube Cash</div>
+                    <div class="stat-card-subtitle">Valor a pagar ao Klube Cash (10%)</div>
                 </div>
             </div>
             
@@ -184,7 +185,7 @@ if ($result['status'] && isset($result['data']['totais'])) {
                                         <th>Valor Original</th>
                                         <th>Saldo Usado</th>
                                         <th>Valor Cobrado</th>
-                                        <th>Comissão</th>
+                                        <th>Comissão Total</th>
                                         <th>Cashback Cliente</th>
                                     </tr>
                                 </thead>
@@ -194,12 +195,14 @@ if ($result['status'] && isset($result['data']['totais'])) {
                                         $valorOriginal = $transaction['valor_total'];
                                         $saldoUsado = $transaction['saldo_usado'] ?? 0;
                                         $valorCobrado = $valorOriginal - $saldoUsado;
+                                        // CORREÇÃO: Comissão total = valor_cliente + valor_admin
+                                        $comissaoTotal = $transaction['valor_cliente'] + $transaction['valor_admin'];
                                         ?>
                                         <tr>
                                             <td>
                                                 <input type="checkbox" name="transacoes[]" value="<?php echo $transaction['id']; ?>" 
-                                                       class="transaction-checkbox" 
-                                                       data-value="<?php echo $transaction['valor_cashback']; ?>">
+                                                    class="transaction-checkbox" 
+                                                    data-value="<?php echo $comissaoTotal; ?>">
                                             </td>
                                             <td><?php echo htmlspecialchars($transaction['codigo_transacao'] ?? 'N/A'); ?></td>
                                             <td>
@@ -223,7 +226,9 @@ if ($result['status'] && isset($result['data']['totais'])) {
                                                     <small class="desconto">(com desconto)</small>
                                                 <?php endif; ?>
                                             </td>
-                                            <td>R$ <?php echo number_format($transaction['valor_cashback'], 2, ',', '.'); ?></td>
+                                            <!-- CORREÇÃO: Mostrar comissão total (10%) -->
+                                            <td>R$ <?php echo number_format($comissaoTotal, 2, ',', '.'); ?></td>
+                                            <!-- CORREÇÃO: Mostrar apenas o cashback do cliente (5%) -->
                                             <td>R$ <?php echo number_format($transaction['valor_cliente'], 2, ',', '.'); ?></td>
                                         </tr>
                                     <?php endforeach; ?>
@@ -383,7 +388,7 @@ if ($result['status'] && isset($result['data']['totais'])) {
                     const balanceUsed = balanceUsedElement ? 
                         parseFloat(balanceUsedElement.textContent.replace('R$ ', '').replace('.', '').replace(',', '.')) : 0;
                     
-                    // Comissão
+                    // CORREÇÃO: Comissão total (coluna 7, não mais coluna 6)
                     const commissionText = cells[7].textContent.replace('R$ ', '').replace('.', '').replace(',', '.');
                     const commission = parseFloat(commissionText);
                     
