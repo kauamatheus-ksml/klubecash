@@ -444,8 +444,8 @@ try {
         }
         
         // Função para exibir detalhes da transação
+        // Função para exibir detalhes da transação - CORRIGIDA
         function verDetalhes(transacaoId) {
-            // Em um cenário real, seria feita uma requisição AJAX para buscar os detalhes da transação
             fetch(`<?php echo SITE_URL; ?>/controllers/ClientController.php?action=transaction&transaction_id=${transacaoId}`, {
                 method: 'POST',
                 headers: {
@@ -471,12 +471,11 @@ try {
                     document.getElementById('transacao-saldo-usado').textContent = saldoUsado > 0 ? 'R$ ' + formatarValor(saldoUsado) : 'Não usado';
                     document.getElementById('transacao-valor-pago').textContent = 'R$ ' + formatarValor(valorPago);
                     
-                    // Valores tradicionais
-                    document.getElementById('transacao-valor').textContent = 'R$ ' + formatarValor(transacao.valor_total);
-                    document.getElementById('transacao-cashback').textContent = 'R$ ' + formatarValor(transacao.valor_cashback);
+                    // CORREÇÃO: Mostrar o cashback que o CLIENTE recebeu
+                    document.getElementById('transacao-cashback').textContent = 'R$ ' + formatarValor(transacao.valor_cliente);
                     
-                    // Calcular percentual
-                    const percentual = (transacao.valor_cashback / transacao.valor_total) * 100;
+                    // Calcular percentual baseado no valor do cliente, não valor total de cashback
+                    const percentual = (transacao.valor_cliente / transacao.valor_total) * 100;
                     document.getElementById('transacao-percentual').textContent = formatarValor(percentual) + '%';
                     
                     // Status com formatação adequada

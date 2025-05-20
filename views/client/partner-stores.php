@@ -372,7 +372,7 @@ function formatDate($date) {
                                 Cashback: <span><?php echo number_format($loja['porcentagem_cashback'], 2); ?>%</span>
                             </p>
                             
-                            <!-- Informações de saldo e uso -->
+                            <!-- Informações de saldo e uso - CORRIGIDO -->
                             <div class="balance-info">
                                 <?php if ($loja['cashback_pendente'] > 0): ?>
                                     <div class="balance-pending">
@@ -396,14 +396,13 @@ function formatDate($date) {
                                     </div>
                                 <?php endif; ?>
                             </div>
-                            
-                            <!-- Informações tradicionais -->
-                            <?php if (!empty($loja['website'])): ?>
-                                <p style="font-size: 14px; color: var(--medium-gray); margin-top: 10px;">
-                                    Website: <a href="<?php echo htmlspecialchars($loja['website']); ?>" target="_blank" style="color: var(--primary-color);"><?php echo htmlspecialchars($loja['website']); ?></a>
-                                </p>
-                            <?php endif; ?>
-                        </div>
+
+                            <!-- ADICIONADO: Informação sobre como funciona o cashback -->
+                            <div class="cashback-info">
+                                <small class="info-text">
+                                    💡 Você recebe <?php echo number_format($loja['porcentagem_cashback'] / 2, 1); ?>% de cashback nas compras desta loja.
+                                </small>
+                            </div>
                         
                         <div class="store-footer">
                             <div class="store-actions">

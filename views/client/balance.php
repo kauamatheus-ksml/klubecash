@@ -362,6 +362,7 @@ function formatMonth($yearMonth) {
                             <div class="balance-label">Saldo disponível</div>
                         </div>
                         
+                        <!-- Store balance card - CORRIGIDO -->
                         <div class="store-stats">
                             <div class="store-stat">
                                 <span class="stat-icon">
@@ -369,7 +370,8 @@ function formatMonth($yearMonth) {
                                         <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
                                     </svg>
                                 </span>
-                                <span class="stat-text"><?php echo formatCurrency($loja['total_creditado']); ?> creditado</span>
+                                <!-- CORREÇÃO: Mostrar apenas o total creditado para o cliente -->
+                                <span class="stat-text"><?php echo formatCurrency($loja['total_creditado']); ?> ganho</span>
                             </div>
                             <div class="store-stat">
                                 <span class="stat-icon">
@@ -390,6 +392,14 @@ function formatMonth($yearMonth) {
                                     Última movimentação: <?php echo formatDate($loja['ultima_movimentacao']); ?>
                                 </span>
                             </div>
+                        </div>
+
+                        <!-- ADICIONADO: Informação sobre a loja -->
+                        <div class="store-actions">
+                            <button class="btn btn-outline btn-sm" onclick="viewStoreDetails(<?php echo $loja['loja_id']; ?>)">
+                                Ver detalhes
+                            </button>
+                            <span class="cashback-rate"><?php echo number_format($loja['porcentagem_cashback'] / 2, 1); ?>% seu cashback</span>
                         </div>
                         
                         <div class="store-actions">

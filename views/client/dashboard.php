@@ -127,8 +127,8 @@ try {
             l.nome_fantasia as loja_nome,
             COALESCE(
                 (SELECT SUM(cm.valor) 
-                 FROM cashback_movimentacoes cm 
-                 WHERE cm.transacao_uso_id = t.id AND cm.tipo_operacao = 'uso'), 0
+                FROM cashback_movimentacoes cm 
+                WHERE cm.transacao_uso_id = t.id AND cm.tipo_operacao = 'uso'), 0
             ) as saldo_usado
         FROM transacoes_cashback t
         JOIN lojas l ON t.loja_id = l.id
@@ -272,7 +272,7 @@ function formatDateTime($dateTime) {
                                     <th>Valor Original</th>
                                     <th>Saldo Usado</th>
                                     <th>Valor Pago</th>
-                                    <th>Cashback</th>
+                                    <th>Cashback Recebido</th>
                                     <th>Status</th>
                                 </tr>
                             </thead>
@@ -300,7 +300,8 @@ function formatDateTime($dateTime) {
                                                 <?php endif; ?>
                                             </td>
                                             <td><?php echo formatCurrency($valorPago); ?></td>
-                                            <td><?php echo formatCurrency($transacao['valor_cashback']); ?></td>
+                                            <!-- CORREÇÃO: Mostrar o cashback que o CLIENTE vai receber, não o da loja -->
+                                            <td><?php echo formatCurrency($transacao['valor_cliente']); ?></td>
                                             <td>
                                                 <?php 
                                                 $statusClass = '';
