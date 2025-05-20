@@ -292,28 +292,31 @@ class CashbackConfig {
     }
     
     /**
-     * Atualiza todas as porcentagens de uma vez
-     * 
-     * @param float $porcentagemCliente Porcentagem para o cliente
-     * @param float $porcentagemAdmin Porcentagem para o administrador
-     * @param float $porcentagemLoja Porcentagem para a loja
-     * @return bool Verdadeiro se as porcentagens foram atualizadas com sucesso
-     */
-    public function atualizarPorcentagens($porcentagemCliente, $porcentagemAdmin, $porcentagemLoja) {
+    * Atualiza todas as porcentagens de uma vez
+    * 
+    * @param float $porcentagemCliente Porcentagem para o cliente
+    * @param float $porcentagemAdmin Porcentagem para o administrador
+    * @param float $porcentagemLoja Porcentagem para a loja (sempre será 0)
+    * @return bool Verdadeiro se as porcentagens foram atualizadas com sucesso
+    */
+    public function atualizarPorcentagens($porcentagemCliente, $porcentagemAdmin, $porcentagemLoja = 0.00) {
         // Validar que todas as porcentagens são positivas
-        if ($porcentagemCliente < 0 || $porcentagemAdmin < 0 || $porcentagemLoja < 0) {
+        if ($porcentagemCliente < 0 || $porcentagemAdmin < 0) {
             return false;
         }
         
+        // Forçar porcentagem da loja como 0
+        $porcentagemLoja = 0.00;
+        
         // Validar que a soma não ultrapassa 100%
-        $total = $porcentagemCliente + $porcentagemAdmin + $porcentagemLoja;
+        $total = $porcentagemCliente + $porcentagemAdmin; // Não incluir loja
         if ($total > 100) {
             return false;
         }
         
         $this->porcentagemCliente = $porcentagemCliente;
         $this->porcentagemAdmin = $porcentagemAdmin;
-        $this->porcentagemLoja = $porcentagemLoja;
+        $this->porcentagemLoja = 0.00; // Sempre 0
         
         return true;
     }

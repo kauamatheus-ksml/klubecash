@@ -1113,11 +1113,11 @@ class CommissionController {
     }
     
     /**
-     * Atualiza as configurações de distribuição de comissões
-     * 
-     * @param array $data Novos valores de configuração
-     * @return array Resultado da operação
-     */
+    * Atualiza as configurações de distribuição de comissões
+    * 
+    * @param array $data Novos valores de configuração
+    * @return array Resultado da operação
+    */
     public static function updateCommissionSettings($data) {
         try {
             // Verificar se o usuário está autenticado e é administrador
@@ -1125,15 +1125,17 @@ class CommissionController {
                 return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
             }
             
-            // Validar dados
+            // Validar dados - remover validação da loja pois sempre será 0
             if (!isset($data['porcentagem_cliente']) || !is_numeric($data['porcentagem_cliente']) ||
-                !isset($data['porcentagem_admin']) || !is_numeric($data['porcentagem_admin']) ||
-                !isset($data['porcentagem_loja']) || !is_numeric($data['porcentagem_loja'])) {
+                !isset($data['porcentagem_admin']) || !is_numeric($data['porcentagem_admin'])) {
                 return ['status' => false, 'message' => 'Valores de porcentagem inválidos.'];
             }
             
+            // Forçar porcentagem da loja como 0
+            $data['porcentagem_loja'] = 0.00;
+            
             // Calcular total
-            $porcentagemTotal = $data['porcentagem_cliente'] + $data['porcentagem_admin'] + $data['porcentagem_loja'];
+            $porcentagemTotal = $data['porcentagem_cliente'] + $data['porcentagem_admin'];
             
             // Validar total
             if ($porcentagemTotal <= 0 || $porcentagemTotal > 100) {
@@ -1154,7 +1156,7 @@ class CommissionController {
                         porcentagem_total DECIMAL(5,2) NOT NULL,
                         porcentagem_cliente DECIMAL(5,2) NOT NULL,
                         porcentagem_admin DECIMAL(5,2) NOT NULL,
-                        porcentagem_loja DECIMAL(5,2) NOT NULL,
+                        porcentagem_loja DECIMAL(5,2) NOT NULL DEFAULT 0.00,
                         data_atualizacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
                 ";
@@ -1166,14 +1168,13 @@ class CommissionController {
                 INSERT INTO configuracoes_cashback (
                     porcentagem_total, porcentagem_cliente, porcentagem_admin, porcentagem_loja
                 ) VALUES (
-                    :porcentagem_total, :porcentagem_cliente, :porcentagem_admin, :porcentagem_loja
+                    :porcentagem_total, :porcentagem_cliente, :porcentagem_admin, 0.00
                 )
             ");
             
             $insertStmt->bindParam(':porcentagem_total', $porcentagemTotal);
             $insertStmt->bindParam(':porcentagem_cliente', $data['porcentagem_cliente']);
             $insertStmt->bindParam(':porcentagem_admin', $data['porcentagem_admin']);
-            $insertStmt->bindParam(':porcentagem_loja', $data['porcentagem_loja']);
             $insertStmt->execute();
             
             return [
@@ -1183,7 +1184,7 @@ class CommissionController {
                     'porcentagem_total' => $porcentagemTotal,
                     'porcentagem_cliente' => $data['porcentagem_cliente'],
                     'porcentagem_admin' => $data['porcentagem_admin'],
-                    'porcentagem_loja' => $data['porcentagem_loja']
+                    'porcentagem_loja' => 0.00
                 ]
             ];
             

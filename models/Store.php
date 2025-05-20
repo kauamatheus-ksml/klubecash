@@ -302,11 +302,11 @@ class Store {
     }
     
     /**
-     * Obtém estatísticas da loja
-     * 
-     * @param array $filters Filtros para as estatísticas
-     * @return array Estatísticas da loja
-     */
+    * Obtém estatísticas da loja
+    * 
+    * @param array $filters Filtros para as estatísticas
+    * @return array Estatísticas da loja
+    */
     public function getEstatisticas($filters = []) {
         try {
             $query = "
@@ -314,7 +314,8 @@ class Store {
                     COUNT(*) as total_transacoes,
                     SUM(valor_total) as total_vendas,
                     SUM(valor_cashback) as total_cashback,
-                    SUM(valor_loja) as total_recebido,
+                    SUM(valor_cliente) as total_cashback_clientes,
+                    0.00 as total_recebido,
                     AVG(valor_total) as ticket_medio
                 FROM transacoes_cashback
                 WHERE loja_id = :loja_id

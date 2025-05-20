@@ -204,11 +204,15 @@ class StoreController {
             $insertStmt->bindParam(':email', $data['email']);
             $insertStmt->bindParam(':telefone', $data['telefone']);
             $categoria = $data['categoria'] ?? 'Outros';
-            $porcentagemCashback = isset($data['porcentagem_cashback']) ? $data['porcentagem_cashback'] : DEFAULT_CASHBACK_TOTAL;
+            
+            // CORREÇÃO: Sempre usar a configuração padrão do sistema (10%)
+            // Não permitir que a loja defina porcentagem customizada
+            $porcentagemCashback = DEFAULT_CASHBACK_TOTAL; // Sempre 10%
+            
+            $insertStmt->bindParam(':categoria', $categoria);
             $insertStmt->bindParam(':porcentagem_cashback', $porcentagemCashback);
             $descricao = $data['descricao'] ?? '';
             $website = $data['website'] ?? '';
-            $insertStmt->bindParam(':categoria', $categoria);
             $insertStmt->bindParam(':descricao', $descricao);
             $insertStmt->bindParam(':website', $website);
             $insertStmt->bindParam(':senha_hash', $senhaHash);
@@ -228,8 +232,40 @@ class StoreController {
             $insertStmt->execute();
             $storeId = $db->lastInsertId();
             
-            // Restante do código permanece igual (endereço, email, etc.)
-            // ... [código do endereço e notificações permanece o mesmo]
+            // Processar endereço se fornecido
+            if (isset($data['endereco']) && is_array($data['endereco'])) {
+                $endereco = $data['endereco'];
+                $enderecoStmt = $db->prepare("
+                    INSERT INTO lojas_endereco (
+                        loja_id, cep, logradouro, numero, complemento, bairro, cidade, estado
+                    ) VALUES (
+                        :loja_id, :cep, :logradouro, :numero, :complemento, :bairro, :cidade, :estado
+                    )
+                ");
+                
+                $enderecoStmt->bindParam(':loja_id', $storeId);
+                $enderecoStmt->bindParam(':cep', $endereco['cep'] ?? '');
+                $enderecoStmt->bindParam(':logradouro', $endereco['logradouro'] ?? '');
+                $enderecoStmt->bindParam(':numero', $endereco['numero'] ?? '');
+                $enderecoStmt->bindParam(':complemento', $endereco['complemento'] ?? '');
+                $enderecoStmt->bindParam(':bairro', $endereco['bairro'] ?? '');
+                $enderecoStmt->bindParam(':cidade', $endereco['cidade'] ?? '');
+                $enderecoStmt->bindParam(':estado', $endereco['estado'] ?? '');
+                $enderecoStmt->execute();
+            }
+            
+            // Enviar email de notificação
+            if (!empty($data['email'])) {
+                $subject = 'Cadastro Recebido - Klube Cash';
+                $message = "
+                    <h3>Olá, {$data['nome_fantasia']}!</h3>
+                    <p>Recebemos sua solicitação para se tornar uma loja parceira do Klube Cash.</p>
+                    <p>Sua solicitação está " . ($initialStatus == STORE_APPROVED ? 'aprovada' : 'sob análise') . ".</p>
+                    " . ($initialStatus == STORE_PENDING ? '<p>Em breve entraremos em contato.</p>' : '<p>Você já pode começar a registrar vendas!</p>') . "
+                    <p>Atenciosamente,<br>Equipe Klube Cash</p>
+                ";
+                Email::send($data['email'], $subject, $message, $data['nome_fantasia']);
+            }
             
             return [
                 'status' => true, 
