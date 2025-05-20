@@ -316,13 +316,11 @@ class TransactionController {
             $countStmt->execute();
             $totalCount = $countStmt->fetch(PDO::FETCH_ASSOC)['total'];
             
-            // Query para totais - CORRIGIDA
+            // Query para totais - COMPLETAMENTE CORRIGIDA
             $totalsQuery = "
                 SELECT 
                     COUNT(*) as total_transacoes,
                     SUM(t.valor_total) as total_valor_vendas_originais,
-                    -- CORREÇÃO: Comissão total = valor_cliente + valor_admin (toda a comissão que a loja deve pagar)
-                    SUM(t.valor_cliente + t.valor_admin) as total_valor_comissoes,
                     COALESCE(SUM(
                         (SELECT SUM(cm.valor) 
                         FROM cashback_movimentacoes cm 
@@ -330,7 +328,18 @@ class TransactionController {
                         AND cm.loja_id = t.loja_id 
                         AND cm.tipo_operacao = 'uso'
                         AND cm.transacao_uso_id = t.id)
-                    ), 0) as total_saldo_usado
+                    ), 0) as total_saldo_usado,
+                    -- CORREÇÃO: Calcular comissão total como 10% do valor efetivamente cobrado
+                    SUM(
+                        (t.valor_total - COALESCE(
+                            (SELECT SUM(cm.valor) 
+                            FROM cashback_movimentacoes cm 
+                            WHERE cm.usuario_id = t.usuario_id 
+                            AND cm.loja_id = t.loja_id 
+                            AND cm.tipo_operacao = 'uso'
+                            AND cm.transacao_uso_id = t.id), 0
+                        )) * 0.10
+                    ) as total_valor_comissoes
                 FROM transacoes_cashback t
                 JOIN usuarios u ON t.usuario_id = u.id
                 $whereClause

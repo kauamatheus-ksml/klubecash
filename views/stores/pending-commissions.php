@@ -70,8 +70,11 @@ $totalSaldoUsado = 0;
 if ($result['status'] && isset($result['data']['totais'])) {
     $totalTransacoes = $result['data']['totais']['total_transacoes'];
     $totalValorVendas = $result['data']['totais']['total_valor_vendas_originais'];
-    $totalValorComissoes = $result['data']['totais']['total_valor_comissoes'];
     $totalSaldoUsado = $result['data']['totais']['total_saldo_usado'];
+    
+    // CORREÇÃO: Calcular manualmente para garantir 10% sobre valor efetivo
+    $valorEfetivo = $totalValorVendas - $totalSaldoUsado;
+    $totalValorComissoes = $valorEfetivo * 0.10; // 10% fixo
 }
 ?>
 
@@ -190,48 +193,55 @@ if ($result['status'] && isset($result['data']['totais'])) {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <?php foreach ($result['data']['transacoes'] as $transaction): ?>
-                                        <?php 
-                                        $valorOriginal = $transaction['valor_total'];
-                                        $saldoUsado = $transaction['saldo_usado'] ?? 0;
-                                        $valorCobrado = $valorOriginal - $saldoUsado;
-                                        // CORREÇÃO: Comissão total = valor_cliente + valor_admin
-                                        $comissaoTotal = $transaction['valor_cliente'] + $transaction['valor_admin'];
-                                        ?>
+                                    <?php if (empty($result['data']['transacoes'])): ?>
                                         <tr>
-                                            <td>
-                                                <input type="checkbox" name="transacoes[]" value="<?php echo $transaction['id']; ?>" 
-                                                    class="transaction-checkbox" 
-                                                    data-value="<?php echo $comissaoTotal; ?>">
-                                            </td>
-                                            <td><?php echo htmlspecialchars($transaction['codigo_transacao'] ?? 'N/A'); ?></td>
-                                            <td>
-                                                <?php echo htmlspecialchars($transaction['cliente_nome']); ?>
-                                                <?php if ($saldoUsado > 0): ?>
-                                                    <span class="balance-used-badge" title="Cliente usou saldo">💰</span>
-                                                <?php endif; ?>
-                                            </td>
-                                            <td><?php echo date('d/m/Y H:i', strtotime($transaction['data_transacao'])); ?></td>
-                                            <td>R$ <?php echo number_format($valorOriginal, 2, ',', '.'); ?></td>
-                                            <td>
-                                                <?php if ($saldoUsado > 0): ?>
-                                                    <span class="saldo-usado">R$ <?php echo number_format($saldoUsado, 2, ',', '.'); ?></span>
-                                                <?php else: ?>
-                                                    <span class="sem-saldo">-</span>
-                                                <?php endif; ?>
-                                            </td>
-                                            <td>
-                                                <strong>R$ <?php echo number_format($valorCobrado, 2, ',', '.'); ?></strong>
-                                                <?php if ($valorCobrado < $valorOriginal): ?>
-                                                    <small class="desconto">(com desconto)</small>
-                                                <?php endif; ?>
-                                            </td>
-                                            <!-- CORREÇÃO: Mostrar comissão total (10%) -->
-                                            <td>R$ <?php echo number_format($comissaoTotal, 2, ',', '.'); ?></td>
-                                            <!-- CORREÇÃO: Mostrar apenas o cashback do cliente (5%) -->
-                                            <td>R$ <?php echo number_format($transaction['valor_cliente'], 2, ',', '.'); ?></td>
+                                            <td colspan="9" style="text-align: center;">Nenhuma transação encontrada</td>
                                         </tr>
-                                    <?php endforeach; ?>
+                                    <?php else: ?>
+                                        <?php foreach ($result['data']['transacoes'] as $transaction): ?>
+                                            <?php 
+                                            $valorOriginal = floatval($transaction['valor_total']);
+                                            $saldoUsado = floatval($transaction['saldo_usado'] ?? 0);
+                                            $valorCobrado = $valorOriginal - $saldoUsado;
+                                            
+                                            // CORREÇÃO: Força recálculo com valores corretos
+                                            $comissaoTotal = $valorCobrado * 0.10;  // 10% sobre valor cobrado
+                                            $cashbackCliente = $valorCobrado * 0.05; // 5% sobre valor cobrado
+                                            ?>
+                                            <tr>
+                                                <td>
+                                                    <input type="checkbox" name="transacoes[]" value="<?php echo $transaction['id']; ?>" 
+                                                        class="transaction-checkbox" 
+                                                        data-value="<?php echo number_format($comissaoTotal, 2, '.', ''); ?>">
+                                                </td>
+                                                <td><?php echo htmlspecialchars($transaction['codigo_transacao'] ?? 'N/A'); ?></td>
+                                                <td>
+                                                    <?php echo htmlspecialchars($transaction['cliente_nome']); ?>
+                                                    <?php if ($saldoUsado > 0): ?>
+                                                        <span class="balance-used-badge" title="Cliente usou saldo">💰</span>
+                                                    <?php endif; ?>
+                                                </td>
+                                                <td><?php echo date('d/m/Y H:i', strtotime($transaction['data_transacao'])); ?></td>
+                                                <td>R$ <?php echo number_format($valorOriginal, 2, ',', '.'); ?></td>
+                                                <td>
+                                                    <?php if ($saldoUsado > 0): ?>
+                                                        <span class="saldo-usado">R$ <?php echo number_format($saldoUsado, 2, ',', '.'); ?></span>
+                                                    <?php else: ?>
+                                                        <span class="sem-saldo">-</span>
+                                                    <?php endif; ?>
+                                                </td>
+                                                <td>
+                                                    <strong>R$ <?php echo number_format($valorCobrado, 2, ',', '.'); ?></strong>
+                                                    <?php if ($valorCobrado < $valorOriginal): ?>
+                                                        <small class="desconto">(com desconto)</small>
+                                                    <?php endif; ?>
+                                                </td>
+                                                <!-- CORREÇÃO: Valores recalculados corretamente -->
+                                                <td><strong>R$ <?php echo number_format($comissaoTotal, 2, ',', '.'); ?></strong></td>
+                                                <td>R$ <?php echo number_format($cashbackCliente, 2, ',', '.'); ?></td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
                                 </tbody>
                             </table>
                         </div>
@@ -368,6 +378,7 @@ if ($result['status'] && isset($result['data']['totais'])) {
             }
             
             // Função para atualizar resumo de pagamento
+            // Função para atualizar resumo de pagamento
             function updatePaymentSummary() {
                 const selectedCheckboxes = document.querySelectorAll('.transaction-checkbox:checked');
                 const selectedCount = selectedCheckboxes.length;
@@ -376,41 +387,51 @@ if ($result['status'] && isset($result['data']['totais'])) {
                 let totalBalanceUsed = 0;
                 
                 selectedCheckboxes.forEach(checkbox => {
+                    // CORREÇÃO: Usar data-value do checkbox que agora tem o valor correto
+                    const commission = parseFloat(checkbox.getAttribute('data-value'));
+                    totalCommission += commission;
+                    
                     const row = checkbox.closest('tr');
                     const cells = row.querySelectorAll('td');
                     
-                    // Valor original da venda
-                    const originalValueText = cells[4].textContent.replace('R$ ', '').replace('.', '').replace(',', '.');
+                    // Valor original da venda (coluna 4)
+                    const originalValueText = cells[4].textContent.replace('R$ ', '').replace(/\./g, '').replace(',', '.');
                     const originalValue = parseFloat(originalValueText);
                     
-                    // Saldo usado
+                    // Saldo usado (coluna 5)
                     const balanceUsedElement = cells[5].querySelector('.saldo-usado');
                     const balanceUsed = balanceUsedElement ? 
-                        parseFloat(balanceUsedElement.textContent.replace('R$ ', '').replace('.', '').replace(',', '.')) : 0;
-                    
-                    // CORREÇÃO: Comissão total (coluna 7, não mais coluna 6)
-                    const commissionText = cells[7].textContent.replace('R$ ', '').replace('.', '').replace(',', '.');
-                    const commission = parseFloat(commissionText);
+                        parseFloat(balanceUsedElement.textContent.replace('R$ ', '').replace(/\./g, '').replace(',', '.')) : 0;
                     
                     totalSalesValue += originalValue;
                     totalBalanceUsed += balanceUsed;
-                    totalCommission += commission;
                 });
                 
-                selectedCountElement.textContent = selectedCount;
-                totalSalesValueElement.textContent = formatCurrency(totalSalesValue);
-                totalBalanceUsedElement.textContent = formatCurrency(totalBalanceUsed);
-                totalCommissionValueElement.textContent = formatCurrency(totalCommission);
+                document.getElementById('selectedCount').textContent = selectedCount;
+                document.getElementById('totalSalesValue').textContent = formatCurrency(totalSalesValue);
+                document.getElementById('totalBalanceUsed').textContent = formatCurrency(totalBalanceUsed);
+                document.getElementById('totalCommissionValue').textContent = formatCurrency(totalCommission);
                 
                 // Habilitar/desabilitar botão de pagamento
+                const paySelectedBtn = document.getElementById('paySelectedBtn');
                 paySelectedBtn.disabled = selectedCount === 0;
                 
                 // Mostrar/esconder resumo de pagamento
+                const paymentSummary = document.getElementById('paymentSummary');
                 if (selectedCount > 0) {
                     paymentSummary.style.display = 'block';
                 } else {
                     paymentSummary.style.display = 'none';
                 }
+            }
+
+            // Função para formatar moeda
+            function formatCurrency(value) {
+                return value.toLocaleString('pt-BR', {
+                    style: 'currency',
+                    currency: 'BRL',
+                    minimumFractionDigits: 2
+                });
             }
             
             // Evento para selecionar/deselecionar todos
