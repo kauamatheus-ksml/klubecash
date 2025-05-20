@@ -330,15 +330,21 @@ try {
                                 <small class="form-text">Parte do cashback que vai para a plataforma (comissão)</small>
                             </div>
                             
-                            <div class="form-group">
-                                <label class="form-label" for="porcentagemLoja">Porcentagem para a Loja</label>
-                                <input type="number" step="0.01" min="0" max="100" class="form-control" id="porcentagemLoja" name="porcentagem_loja" value="<?php echo $settings['porcentagem_loja']; ?>" required>
-                                <small class="form-text">Parte do cashback que vai para a loja parceira</small>
+                            <!-- REMOVIDO: Campo da porcentagem da loja -->
+                            <!-- A loja não recebe cashback, apenas paga a comissão -->
+                        </div>
+
+                        <!-- ADICIONADO: Informação sobre a loja -->
+                        <div class="info-box">
+                            <div class="info-icon">ℹ️</div>
+                            <div class="info-content">
+                                <strong>Informação importante:</strong> A loja parceira não recebe cashback. 
+                                Ela paga uma comissão de 10% sobre cada venda, que é distribuída entre cliente (5%) e plataforma (5%).
                             </div>
                         </div>
                         
                         <p class="form-text" id="somaInfo">
-                            A soma das porcentagens deve ser igual à porcentagem total.
+                            A soma das porcentagens (cliente + admin) deve ser igual à porcentagem total.
                             <strong>Soma atual: <span id="somaAtual">0.00</span>%</strong>
                         </p>
                         
@@ -577,12 +583,13 @@ try {
     
     <script>
         // Atualizar soma das porcentagens em tempo real
+        // Atualizar soma das porcentagens em tempo real
         function updateSoma() {
             const porcentagemCliente = parseFloat(document.getElementById('porcentagemCliente').value) || 0;
             const porcentagemAdmin = parseFloat(document.getElementById('porcentagemAdmin').value) || 0;
-            const porcentagemLoja = parseFloat(document.getElementById('porcentagemLoja').value) || 0;
+            // REMOVIDO: porcentagemLoja
             
-            const soma = porcentagemCliente + porcentagemAdmin + porcentagemLoja;
+            const soma = porcentagemCliente + porcentagemAdmin; // Apenas cliente + admin
             document.getElementById('somaAtual').textContent = soma.toFixed(2);
             
             // Verificar se soma é igual à porcentagem total
@@ -595,25 +602,26 @@ try {
                 somaInfo.style.color = 'var(--success-color)';
             }
         }
-        
+
         // Adicionar eventos para campos de porcentagem
         document.getElementById('porcentagemTotal').addEventListener('input', updateSoma);
         document.getElementById('porcentagemCliente').addEventListener('input', updateSoma);
         document.getElementById('porcentagemAdmin').addEventListener('input', updateSoma);
-        document.getElementById('porcentagemLoja').addEventListener('input', updateSoma);
+        // REMOVIDO: evento para porcentagemLoja
         
         // Inicializar soma
         document.addEventListener('DOMContentLoaded', updateSoma);
         
         // Validar formulário de cashback antes de enviar
+        // Validar formulário de cashback antes de enviar
         document.getElementById('cashbackForm').addEventListener('submit', function(event) {
             const porcentagemTotal = parseFloat(document.getElementById('porcentagemTotal').value);
             const porcentagemCliente = parseFloat(document.getElementById('porcentagemCliente').value);
             const porcentagemAdmin = parseFloat(document.getElementById('porcentagemAdmin').value);
-            const porcentagemLoja = parseFloat(document.getElementById('porcentagemLoja').value);
+            // REMOVIDO: porcentagemLoja
             
             // Verificar se valores são válidos
-            if (isNaN(porcentagemTotal) || isNaN(porcentagemCliente) || isNaN(porcentagemAdmin) || isNaN(porcentagemLoja)) {
+            if (isNaN(porcentagemTotal) || isNaN(porcentagemCliente) || isNaN(porcentagemAdmin)) {
                 alert('Por favor, preencha todos os campos com valores numéricos válidos.');
                 event.preventDefault();
                 return false;
@@ -622,17 +630,16 @@ try {
             // Verificar se porcentagens estão entre 0 e 100
             if (porcentagemTotal < 0 || porcentagemTotal > 100 || 
                 porcentagemCliente < 0 || porcentagemCliente > 100 || 
-                porcentagemAdmin < 0 || porcentagemAdmin > 100 || 
-                porcentagemLoja < 0 || porcentagemLoja > 100) {
+                porcentagemAdmin < 0 || porcentagemAdmin > 100) {
                 alert('As porcentagens devem estar entre 0 e 100.');
                 event.preventDefault();
                 return false;
             }
             
-            // Verificar se a soma das porcentagens é igual à porcentagem total
-            const soma = porcentagemCliente + porcentagemAdmin + porcentagemLoja;
+            // CORREÇÃO: Verificar se a soma das porcentagens (apenas cliente + admin) é igual à porcentagem total
+            const soma = porcentagemCliente + porcentagemAdmin;
             if (Math.abs(soma - porcentagemTotal) > 0.01) {
-                alert('A soma das porcentagens (cliente, admin e loja) deve ser igual à porcentagem total.');
+                alert('A soma das porcentagens (cliente + admin) deve ser igual à porcentagem total.');
                 event.preventDefault();
                 return false;
             }
@@ -676,5 +683,33 @@ try {
             toggleDependentFields();
         });
     </script>
+    <style>
+        /* Adicione este CSS no final do arquivo, antes de </head> */
+        .info-box {
+            background-color: #e7f3ff;
+            border: 1px solid #b3d7ff;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .info-icon {
+            font-size: 1.2rem;
+            margin-top: 2px;
+        }
+
+        .info-content {
+            flex: 1;
+            color: #2c5aa0;
+            line-height: 1.5;
+        }
+
+        .info-content strong {
+            color: #1a4480;
+        }
+    </style>
 </body>
 </html>
