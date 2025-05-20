@@ -142,18 +142,23 @@ class CashbackConfig {
     }
     
     /**
-     * Valida se as porcentagens estão corretas
-     * 
-     * @return bool Verdadeiro se as porcentagens são válidas
-     */
+    * Valida se as porcentagens estão corretas
+    * 
+    * @return bool Verdadeiro se as porcentagens são válidas
+    */
     private function validarPorcentagens() {
         // Verificar se todas as porcentagens são números positivos
         if ($this->porcentagemCliente < 0 || $this->porcentagemAdmin < 0 || $this->porcentagemLoja < 0) {
             return false;
         }
         
-        // Verificar se a soma não ultrapassa 100%
-        $total = $this->porcentagemCliente + $this->porcentagemAdmin + $this->porcentagemLoja;
+        // Porcentagem da loja deve sempre ser 0
+        if ($this->porcentagemLoja != 0) {
+            return false;
+        }
+        
+        // Verificar se a soma cliente + admin não ultrapassa 100%
+        $total = $this->porcentagemCliente + $this->porcentagemAdmin;
         return $total <= 100;
     }
     

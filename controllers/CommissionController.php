@@ -574,12 +574,12 @@ class CommissionController {
     }
     
     /**
-     * Calcula a distribuição de comissões para uma transação
-     * 
-     * @param float $valorTotal Valor total da transação
-     * @param float $porcentagemCashback Porcentagem de cashback da loja (opcional)
-     * @return array Valores calculados (cliente, admin, loja)
-     */
+    * Calcula a distribuição de comissões para uma transação
+    * 
+    * @param float $valorTotal Valor total da transação
+    * @param float $porcentagemCashback Porcentagem de cashback da loja (opcional)
+    * @return array Valores calculados (cliente, admin, loja)
+    */
     public static function calculateCommissionDistribution($valorTotal, $porcentagemCashback = null) {
         try {
             $db = Database::getConnection();
@@ -590,27 +590,27 @@ class CommissionController {
             $config = $configStmt->fetch(PDO::FETCH_ASSOC);
             
             // Usar valores padrão se não encontrar configurações
-            $porcentagemTotal = isset($config['porcentagem_total']) ? $config['porcentagem_total'] : DEFAULT_CASHBACK_TOTAL;
+            $porcentagemTotal = DEFAULT_CASHBACK_TOTAL; // Sempre 10%
             $porcentagemCliente = isset($config['porcentagem_cliente']) ? $config['porcentagem_cliente'] : DEFAULT_CASHBACK_CLIENT;
             $porcentagemAdmin = isset($config['porcentagem_admin']) ? $config['porcentagem_admin'] : DEFAULT_CASHBACK_ADMIN;
-            $porcentagemLoja = isset($config['porcentagem_loja']) ? $config['porcentagem_loja'] : DEFAULT_CASHBACK_STORE;
+            $porcentagemLoja = 0.00; // Loja sempre recebe 0%
             
             // Usar porcentagem específica da loja se fornecida
             if ($porcentagemCashback !== null && $porcentagemCashback > 0) {
                 $porcentagemTotal = $porcentagemCashback;
                 
-                // Calcular proporcionalmente
+                // Calcular proporcionalmente mas mantendo loja em 0%
                 $fator = $porcentagemTotal / DEFAULT_CASHBACK_TOTAL;
                 $porcentagemCliente = DEFAULT_CASHBACK_CLIENT * $fator;
                 $porcentagemAdmin = DEFAULT_CASHBACK_ADMIN * $fator;
-                $porcentagemLoja = DEFAULT_CASHBACK_STORE * $fator;
+                $porcentagemLoja = 0.00; // Loja continua sem receber nada
             }
             
             // Calcular valores
             $valorCashbackTotal = ($valorTotal * $porcentagemTotal) / 100;
             $valorCashbackCliente = ($valorTotal * $porcentagemCliente) / 100;
             $valorCashbackAdmin = ($valorTotal * $porcentagemAdmin) / 100;
-            $valorCashbackLoja = ($valorTotal * $porcentagemLoja) / 100;
+            $valorCashbackLoja = 0.00; // Loja não recebe cashback
             
             return [
                 'valor_total' => $valorTotal,
@@ -650,8 +650,8 @@ class CommissionController {
                         'valor' => ($valorTotal * DEFAULT_CASHBACK_ADMIN) / 100
                     ],
                     'loja' => [
-                        'porcentagem' => DEFAULT_CASHBACK_STORE,
-                        'valor' => ($valorTotal * DEFAULT_CASHBACK_STORE) / 100
+                        'porcentagem' => 0.00,
+                        'valor' => 0.00
                     ]
                 ]
             ];

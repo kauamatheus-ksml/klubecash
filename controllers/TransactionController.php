@@ -484,23 +484,25 @@ class TransactionController {
             $config = $configStmt->fetch(PDO::FETCH_ASSOC);
             
             // CORREÇÃO 4: Calcular valores de cashback sobre o valor EFETIVAMENTE PAGO
-            $porcentagemTotal = isset($config['porcentagem_total']) ? $config['porcentagem_total'] : 10.00;
-            $porcentagemCliente = isset($config['porcentagem_cliente']) ? $config['porcentagem_cliente'] : 5.00;
-            $porcentagemAdmin = isset($config['porcentagem_admin']) ? $config['porcentagem_admin'] : 5.00;
-            
+            $porcentagemTotal = DEFAULT_CASHBACK_TOTAL; // Sempre 10%
+            $porcentagemCliente = isset($config['porcentagem_cliente']) ? $config['porcentagem_cliente'] : DEFAULT_CASHBACK_CLIENT;
+            $porcentagemAdmin = isset($config['porcentagem_admin']) ? $config['porcentagem_admin'] : DEFAULT_CASHBACK_ADMIN;
+
             // Verificar se a loja tem porcentagem específica
             if (isset($store['porcentagem_cashback']) && $store['porcentagem_cashback'] > 0) {
                 $porcentagemTotal = $store['porcentagem_cashback'];
-                // Ajustar proporcionalmente
-                $fator = $porcentagemTotal / 10.00;
-                $porcentagemCliente = 5.00 * $fator;
-                $porcentagemAdmin = 5.00 * $fator;
+                // Ajustar proporcionalmente mantendo que loja não recebe nada
+                $fator = $porcentagemTotal / DEFAULT_CASHBACK_TOTAL;
+                $porcentagemCliente = DEFAULT_CASHBACK_CLIENT * $fator;
+                $porcentagemAdmin = DEFAULT_CASHBACK_ADMIN * $fator;
             }
             
             // Calcular valores de cashback sobre o valor EFETIVAMENTE PAGO
             $valorCashbackTotal = ($valorEfetivamentePago * $porcentagemTotal) / 100;
             $valorCashbackCliente = ($valorEfetivamentePago * $porcentagemCliente) / 100;
             $valorCashbackAdmin = ($valorEfetivamentePago * $porcentagemAdmin) / 100;
+            // Valor da loja sempre zero
+            $valorLoja = 0.00;
             
             // Iniciar transação no banco de dados
             $db->beginTransaction();
@@ -534,8 +536,7 @@ class TransactionController {
                 $stmt->bindParam(':valor_cashback', $valorCashbackTotal);
                 $stmt->bindParam(':valor_cliente', $valorCashbackCliente);
                 $stmt->bindParam(':valor_admin', $valorCashbackAdmin);
-                $valorLoja = 0; // Loja não recebe percentual por padrão
-                $stmt->bindParam(':valor_loja', $valorLoja);
+                $stmt->bindParam(':valor_loja', $valorLoja); // Sempre 0.00
                 $stmt->bindParam(':codigo_transacao', $data['codigo_transacao']);
                 
                 $dataTransacao = isset($data['data_transacao']) ? $data['data_transacao'] : date('Y-m-d H:i:s');

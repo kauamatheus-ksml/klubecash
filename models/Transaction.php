@@ -76,14 +76,14 @@ class Transaction {
     }
     
     /**
-     * Calcula a distribuição do cashback entre cliente, admin e loja
-     * 
-     * @param float $porcentagemTotal Porcentagem total de cashback
-     * @param float $porcentagemCliente Porcentagem destinada ao cliente
-     * @param float $porcentagemAdmin Porcentagem destinada ao admin
-     * @param float $porcentagemLoja Porcentagem destinada à loja
-     * @return bool Verdadeiro se o cálculo foi realizado com sucesso
-     */
+    * Calcula a distribuição do cashback entre cliente, admin e loja
+    * 
+    * @param float $porcentagemTotal Porcentagem total de cashback
+    * @param float $porcentagemCliente Porcentagem destinada ao cliente
+    * @param float $porcentagemAdmin Porcentagem destinada ao admin
+    * @param float $porcentagemLoja Porcentagem destinada à loja
+    * @return bool Verdadeiro se o cálculo foi realizado com sucesso
+    */
     public function calcularDistribuicao($porcentagemTotal = null, $porcentagemCliente = null, $porcentagemAdmin = null, $porcentagemLoja = null) {
         try {
             // Se nenhuma porcentagem específica foi informada, usa as configurações padrão
@@ -94,10 +94,10 @@ class Transaction {
                 $stmt = $this->db->query("SELECT * FROM configuracoes_cashback ORDER BY id DESC LIMIT 1");
                 $config = $stmt->fetch(PDO::FETCH_ASSOC);
                 
-                $porcentagemTotal = $porcentagemTotal ?? DEFAULT_CASHBACK_TOTAL;
-                $porcentagemCliente = $porcentagemCliente ?? $config['porcentagem_cliente'] ?? DEFAULT_CASHBACK_CLIENT;
-                $porcentagemAdmin = $porcentagemAdmin ?? $config['porcentagem_admin'] ?? DEFAULT_CASHBACK_ADMIN;
-                $porcentagemLoja = $porcentagemLoja ?? $config['porcentagem_loja'] ?? DEFAULT_CASHBACK_STORE;
+                $porcentagemTotal = DEFAULT_CASHBACK_TOTAL;
+                $porcentagemCliente = isset($config['porcentagem_cliente']) ? $config['porcentagem_cliente'] : DEFAULT_CASHBACK_CLIENT;
+                $porcentagemAdmin = isset($config['porcentagem_admin']) ? $config['porcentagem_admin'] : DEFAULT_CASHBACK_ADMIN;
+                $porcentagemLoja = 0.00; // Loja sempre recebe 0%
             }
             
             // Calcular valor total de cashback
@@ -106,7 +106,7 @@ class Transaction {
             // Calcular a distribuição
             $this->valorCliente = round($this->valorTotal * ($porcentagemCliente / 100), 2);
             $this->valorAdmin = round($this->valorTotal * ($porcentagemAdmin / 100), 2);
-            $this->valorLoja = round($this->valorTotal * ($porcentagemLoja / 100), 2);
+            $this->valorLoja = 0.00; // Loja não recebe cashback
             
             return true;
         } catch (Exception $e) {

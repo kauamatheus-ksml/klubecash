@@ -535,11 +535,11 @@ class Commission {
     }
 
     /**
-     * Obtém os valores de distribuição de comissão padrão ou específicos da loja
-     * 
-     * @param int $loja_id ID da loja (opcional)
-     * @return array Valores de porcentagem para distribuição
-     */
+    * Obtém os valores de distribuição de comissão padrão ou específicos da loja
+    * 
+    * @param int $loja_id ID da loja (opcional)
+    * @return array Valores de porcentagem para distribuição
+    */
     public static function getCommissionDistribution($loja_id = null) {
         try {
             $db = Database::getConnection();
@@ -551,10 +551,10 @@ class Commission {
             if ($configStmt->rowCount() > 0) {
                 $config = $configStmt->fetch(PDO::FETCH_ASSOC);
                 $distribution = [
-                    'porcentagem_total' => $config['porcentagem_total'] ?? DEFAULT_CASHBACK_TOTAL,
+                    'porcentagem_total' => ($config['porcentagem_cliente'] ?? DEFAULT_CASHBACK_CLIENT) + ($config['porcentagem_admin'] ?? DEFAULT_CASHBACK_ADMIN),
                     'porcentagem_cliente' => $config['porcentagem_cliente'] ?? DEFAULT_CASHBACK_CLIENT,
                     'porcentagem_admin' => $config['porcentagem_admin'] ?? DEFAULT_CASHBACK_ADMIN,
-                    'porcentagem_loja' => $config['porcentagem_loja'] ?? DEFAULT_CASHBACK_STORE
+                    'porcentagem_loja' => 0.00 // Loja sempre 0%
                 ];
             } else {
                 // Usar valores padrão
@@ -562,7 +562,7 @@ class Commission {
                     'porcentagem_total' => DEFAULT_CASHBACK_TOTAL,
                     'porcentagem_cliente' => DEFAULT_CASHBACK_CLIENT,
                     'porcentagem_admin' => DEFAULT_CASHBACK_ADMIN,
-                    'porcentagem_loja' => DEFAULT_CASHBACK_STORE
+                    'porcentagem_loja' => 0.00 // Loja sempre 0%
                 ];
             }
             
@@ -576,14 +576,14 @@ class Commission {
                     $store = $storeStmt->fetch(PDO::FETCH_ASSOC);
                     
                     if ($store['porcentagem_cashback'] > 0) {
-                        // Recalcular proporcionalmente
+                        // Recalcular proporcionalmente mas mantendo loja em 0%
                         $fator = $store['porcentagem_cashback'] / DEFAULT_CASHBACK_TOTAL;
                         
                         $distribution = [
                             'porcentagem_total' => $store['porcentagem_cashback'],
                             'porcentagem_cliente' => DEFAULT_CASHBACK_CLIENT * $fator,
                             'porcentagem_admin' => DEFAULT_CASHBACK_ADMIN * $fator,
-                            'porcentagem_loja' => DEFAULT_CASHBACK_STORE * $fator
+                            'porcentagem_loja' => 0.00 // Loja sempre 0%
                         ];
                     }
                 }
@@ -599,7 +599,7 @@ class Commission {
                 'porcentagem_total' => DEFAULT_CASHBACK_TOTAL,
                 'porcentagem_cliente' => DEFAULT_CASHBACK_CLIENT,
                 'porcentagem_admin' => DEFAULT_CASHBACK_ADMIN,
-                'porcentagem_loja' => DEFAULT_CASHBACK_STORE
+                'porcentagem_loja' => 0.00 // Loja sempre 0%
             ];
         }
     }
