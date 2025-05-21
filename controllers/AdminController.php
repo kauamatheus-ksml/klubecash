@@ -1899,6 +1899,104 @@ public static function getAvailableStores() {
             ];
         }
     }
+
+    /**
+    * Obtém os dados de saldo do administrador
+    * 
+    * @return array Dados do saldo do administrador
+    */
+    public static function getAdminBalance() {
+        try {
+            // Verificar se é um administrador
+            if (!self::validateAdmin()) {
+                return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
+            }
+            
+            $db = Database::getConnection();
+            
+            // Obter saldo total (comissões aprovadas)
+            $totalBalanceStmt = $db->query("
+                SELECT SUM(valor_comissao) as total
+                FROM transacoes_comissao
+                WHERE tipo_usuario = 'admin' AND status = 'aprovado'
+            ");
+            $totalBalance = $totalBalanceStmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0;
+            
+            // Obter saldo pendente (comissões pendentes)
+            $pendingBalanceStmt = $db->query("
+                SELECT SUM(valor_comissao) as total
+                FROM transacoes_comissao
+                WHERE tipo_usuario = 'admin' AND status = 'pendente'
+            ");
+            $pendingBalance = $pendingBalanceStmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0;
+            
+            // Obter histórico de comissões
+            $historyStmt = $db->query("
+                SELECT 
+                    tc.id,
+                    tc.valor_comissao,
+                    tc.status,
+                    tc.data_transacao,
+                    t.codigo_transacao,
+                    t.valor_total as valor_venda,
+                    l.nome_fantasia as loja_nome,
+                    u.nome as cliente_nome
+                FROM transacoes_comissao tc
+                JOIN transacoes_cashback t ON tc.transacao_id = t.id
+                JOIN lojas l ON tc.loja_id = l.id
+                JOIN usuarios u ON t.usuario_id = u.id
+                WHERE tc.tipo_usuario = 'admin'
+                ORDER BY tc.data_transacao DESC
+                LIMIT 50
+            ");
+            $history = $historyStmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            // Obter estatísticas por mês
+            $monthlyStmt = $db->query("
+                SELECT 
+                    DATE_FORMAT(tc.data_transacao, '%Y-%m') as mes,
+                    SUM(tc.valor_comissao) as total,
+                    COUNT(tc.id) as quantidade
+                FROM transacoes_comissao tc
+                WHERE tc.tipo_usuario = 'admin'
+                GROUP BY DATE_FORMAT(tc.data_transacao, '%Y-%m')
+                ORDER BY mes DESC
+                LIMIT 12
+            ");
+            $monthly = $monthlyStmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            // Obter top 5 lojas que mais geraram comissões
+            $topStoresStmt = $db->query("
+                SELECT 
+                    l.nome_fantasia,
+                    SUM(tc.valor_comissao) as total,
+                    COUNT(tc.id) as quantidade
+                FROM transacoes_comissao tc
+                JOIN lojas l ON tc.loja_id = l.id
+                WHERE tc.tipo_usuario = 'admin' AND tc.status = 'aprovado'
+                GROUP BY l.id
+                ORDER BY total DESC
+                LIMIT 5
+            ");
+            $topStores = $topStoresStmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            return [
+                'status' => true,
+                'data' => [
+                    'saldo_total' => $totalBalance,
+                    'saldo_pendente' => $pendingBalance,
+                    'historico' => $history,
+                    'mensal' => $monthly,
+                    'top_lojas' => $topStores
+                ]
+            ];
+            
+        } catch (PDOException $e) {
+            error_log('Erro ao obter saldo do administrador: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro ao carregar dados do saldo. Tente novamente.'];
+        }
+    }
+
     /**
     * Atualiza configurações do sistema
     * 

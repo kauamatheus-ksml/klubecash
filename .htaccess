@@ -70,6 +70,8 @@ RewriteRule ^admin/usuarios/?$ views/admin/users.php [L]
 RewriteRule ^admin/lojas/?$ views/admin/stores.php [L]
 RewriteRule ^admin/transacoes/?$ views/admin/purchases.php [L]
 RewriteRule ^admin/configuracoes/?$ views/admin/settings.php [L]
+# Rota para saldo do administrador
+RewriteRule ^admin/saldo/?$ views/admin/balance.php [L]
 
 # Reescrever URLs amigáveis para lojas
 RewriteRule ^lojas/cadastro/?$ views/stores/register.php [L]

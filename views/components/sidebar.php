@@ -63,6 +63,15 @@ $activeMenu = $activeMenu ?? 'painel';
             </a>
         </li>
         <li>
+            <a href="<?php echo ADMIN_BALANCE_URL; ?>" class="sidebar-nav-item <?php echo ($activeMenu == 'saldo') ? 'active' : ''; ?>">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="1" x2="12" y2="23"></line>
+                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                </svg>
+                Saldo
+            </a>
+        </li>
+        <li>
             <a href="<?php echo ADMIN_STORES_URL; ?>" class="sidebar-nav-item <?php echo ($activeMenu == 'lojas') ? 'active' : ''; ?>">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M3 3h18v18H3zM21 9H3M21 15H3M12 3v18"></path>

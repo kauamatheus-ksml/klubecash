@@ -87,6 +87,7 @@ define('ADMIN_TRANSACTION_DETAILS_URL', SITE_URL . '/admin/transacao');
 define('ADMIN_REPORTS_URL', SITE_URL . '/admin/relatorios');
 define('ADMIN_COMMISSIONS_URL', SITE_URL . '/admin/comissoes');
 define('ADMIN_PAYMENTS_URL', SITE_URL . '/admin/pagamentos');
+define('ADMIN_BALANCE_URL', SITE_URL . '/admin/saldo');
 
 // URLs de loja
 define('STORE_REGISTER_URL', SITE_URL . '/lojas/cadastro');
