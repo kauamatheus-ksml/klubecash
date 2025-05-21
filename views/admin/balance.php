@@ -86,7 +86,80 @@ try {
                     <div class="stat-card-subtitle">Total de transações</div>
                 </div>
             </div>
-            
+            <!-- Saldo da Klube Cash -->
+            <div class="card klubecash-balance-card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
+                            <line x1="9" y1="9" x2="9.01" y2="9"></line>
+                            <line x1="15" y1="9" x2="15.01" y2="9"></line>
+                        </svg>
+                        Saldo da Klube Cash
+                    </div>
+                </div>
+                <div class="klubecash-balance-container">
+                    <div class="balance-item">
+                        <div class="balance-label">Saldo Disponível</div>
+                        <div class="balance-value">R$ <?php echo number_format($balanceData['saldo_admin']['valor_disponivel'], 2, ',', '.'); ?></div>
+                    </div>
+                    
+                    <div class="balance-item">
+                        <div class="balance-label">Saldo Pendente</div>
+                        <div class="balance-value">R$ <?php echo number_format($balanceData['saldo_admin']['valor_pendente'], 2, ',', '.'); ?></div>
+                    </div>
+                    
+                    <div class="balance-item total">
+                        <div class="balance-label">Saldo Total</div>
+                        <div class="balance-value">R$ <?php echo number_format($balanceData['saldo_admin']['valor_total'], 2, ',', '.'); ?></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Histórico de Movimentações -->
+            <div class="card transactions-container">
+                <div class="card-header">
+                    <div class="card-title">Movimentações do Saldo</div>
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Descrição</th>
+                                <th>Tipo</th>
+                                <th>Valor</th>
+                                <th>Código Transação</th>
+                                <th>Loja</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if (empty($balanceData['movimentacoes'])): ?>
+                                <tr>
+                                    <td colspan="6" style="text-align: center;">Nenhuma movimentação encontrada</td>
+                                </tr>
+                            <?php else: ?>
+                                <?php foreach ($balanceData['movimentacoes'] as $mov): ?>
+                                    <tr>
+                                        <td><?php echo date('d/m/Y H:i', strtotime($mov['data_operacao'])); ?></td>
+                                        <td><?php echo htmlspecialchars($mov['descricao']); ?></td>
+                                        <td>
+                                            <span class="badge badge-<?php echo $mov['tipo'] == 'credito' ? 'success' : 'danger'; ?>">
+                                                <?php echo ucfirst($mov['tipo']); ?>
+                                            </span>
+                                        </td>
+                                        <td>R$ <?php echo number_format($mov['valor'], 2, ',', '.'); ?></td>
+                                        <td><?php echo htmlspecialchars($mov['codigo_transacao'] ?? 'N/A'); ?></td>
+                                        <td><?php echo htmlspecialchars($mov['loja_nome'] ?? 'N/A'); ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
             <!-- Gráficos e estatísticas -->
             <div class="two-column-layout">
                 <!-- Gráfico mensal -->
@@ -296,6 +369,66 @@ try {
         font-size: 0.9rem;
         color: #6c757d;
     }
+    /* Estilos para o card de saldo da Klube Cash */
+.klubecash-balance-card {
+    margin-bottom: 30px;
+}
+
+.klubecash-balance-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    padding: 15px 20px;
+}
+
+.balance-item {
+    flex: 1;
+    min-width: 150px;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-radius: 10px;
+    text-align: center;
+}
+
+.balance-item.total {
+    background-color: #FFF0E6;
+}
+
+.balance-label {
+    font-size: 0.9rem;
+    color: #666;
+    margin-bottom: 8px;
+}
+
+.balance-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #FF7A00;
+}
+
+.badge {
+    display: inline-block;
+    padding: 5px 10px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.badge-success {
+    background-color: #e6f7ee;
+    color: #0d6832;
+}
+
+.badge-danger {
+    background-color: #ffe6e6;
+    color: #c10000;
+}
+
+@media (max-width: 768px) {
+    .klubecash-balance-container {
+        flex-direction: column;
+    }
+}
     </style>
 </body>
 </html>

@@ -1097,12 +1097,12 @@ class TransactionController {
 
     
     /**
-     * Aprova um pagamento de comissão
-     * 
-     * @param int $paymentId ID do pagamento
-     * @param string $observacao Observação opcional
-     * @return array Resultado da operação
-     */
+    * Aprova um pagamento de comissão
+    * 
+    * @param int $paymentId ID do pagamento
+    * @param string $observacao Observação opcional
+    * @return array Resultado da operação
+    */
     public static function approvePayment($paymentId, $observacao = '') {
         try {
             // Verificar se o usuário está autenticado e é administrador
@@ -1189,6 +1189,7 @@ class TransactionController {
                 
                 // 4. Creditar saldos FORA da transação principal para evitar conflitos
                 require_once __DIR__ . '/../models/CashbackBalance.php';
+                require_once __DIR__ . '/AdminController.php';
                 $balanceModel = new CashbackBalance();
                 $saldosCreditados = 0;
                 
@@ -1213,6 +1214,27 @@ class TransactionController {
                             error_log("APROVAÇÃO: ERRO ao creditar saldo - Transação: {$transaction['id']}");
                             // Continuamos mesmo se um crédito falhar
                         }
+                    }
+                }
+                
+                // Atualizar saldo do administrador
+                foreach ($transactions as $transaction) {
+                    // Obter valor da comissão do admin para esta transação
+                    $adminComissionStmt = $db->prepare("
+                        SELECT valor_comissao 
+                        FROM transacoes_comissao 
+                        WHERE transacao_id = ? AND tipo_usuario = 'admin'
+                    ");
+                    $adminComissionStmt->execute([$transaction['id']]);
+                    $adminComission = $adminComissionStmt->fetch(PDO::FETCH_ASSOC);
+                    
+                    if ($adminComission && !empty($adminComission['valor_comissao'])) {
+                        $descricao = "Comissão da transação #{$transaction['id']} - Pagamento #{$paymentId}";
+                        AdminController::updateAdminBalance(
+                            $adminComission['valor_comissao'],
+                            $transaction['id'],
+                            $descricao
+                        );
                     }
                 }
                 

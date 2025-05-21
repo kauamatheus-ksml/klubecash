@@ -1899,7 +1899,77 @@ public static function getAvailableStores() {
             ];
         }
     }
-
+    /**
+    * Atualiza o saldo do administrador
+    * 
+    * @param float $valor Valor a ser adicionado
+    * @param int $transacaoId ID da transação relacionada
+    * @param string $descricao Descrição da operação
+    * @return bool Sucesso da operação
+    */
+    public static function updateAdminBalance($valor, $transacaoId = null, $descricao = '') {
+        try {
+            if ($valor == 0) {
+                return true; // Nada a fazer
+            }
+            
+            $db = Database::getConnection();
+            
+            // Iniciar transação
+            $db->beginTransaction();
+            
+            // Verificar se já existe registro de saldo
+            $checkStmt = $db->query("SELECT COUNT(*) as total FROM admin_saldo");
+            $exists = $checkStmt->fetch(PDO::FETCH_ASSOC)['total'] > 0;
+            
+            if (!$exists) {
+                // Criar registro inicial
+                $initStmt = $db->prepare("
+                    INSERT INTO admin_saldo (valor_total, valor_disponivel, valor_pendente)
+                    VALUES (0, 0, 0)
+                ");
+                $initStmt->execute();
+            }
+            
+            // Determinar tipo de operação
+            $tipo = $valor > 0 ? 'credito' : 'debito';
+            $valorAbs = abs($valor);
+            
+            // Atualizar saldo
+            $updateStmt = $db->prepare("
+                UPDATE admin_saldo
+                SET valor_total = valor_total + :valor,
+                    valor_disponivel = valor_disponivel + :valor
+                WHERE id = 1
+            ");
+            $updateStmt->bindParam(':valor', $valor);
+            $updateStmt->execute();
+            
+            // Registrar movimentação
+            $movStmt = $db->prepare("
+                INSERT INTO admin_saldo_movimentacoes 
+                (transacao_id, valor, tipo, descricao)
+                VALUES (:transacao_id, :valor, :tipo, :descricao)
+            ");
+            $movStmt->bindParam(':transacao_id', $transacaoId);
+            $movStmt->bindParam(':valor', $valorAbs);
+            $movStmt->bindParam(':tipo', $tipo);
+            $movStmt->bindParam(':descricao', $descricao);
+            $movStmt->execute();
+            
+            // Commit
+            $db->commit();
+            return true;
+            
+        } catch (Exception $e) {
+            // Rollback em caso de erro
+            if (isset($db) && $db->inTransaction()) {
+                $db->rollBack();
+            }
+            error_log('Erro ao atualizar saldo admin: ' . $e->getMessage());
+            return false;
+        }
+    }
     /**
     * Obtém os dados de saldo do administrador
     * 
@@ -1914,7 +1984,7 @@ public static function getAvailableStores() {
             
             $db = Database::getConnection();
             
-            // Obter saldo total (comissões aprovadas)
+            // Obter dados de comissões (como já estava)
             $totalBalanceStmt = $db->query("
                 SELECT SUM(valor_comissao) as total
                 FROM transacoes_comissao
@@ -1922,7 +1992,6 @@ public static function getAvailableStores() {
             ");
             $totalBalance = $totalBalanceStmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0;
             
-            // Obter saldo pendente (comissões pendentes)
             $pendingBalanceStmt = $db->query("
                 SELECT SUM(valor_comissao) as total
                 FROM transacoes_comissao
@@ -1930,7 +1999,33 @@ public static function getAvailableStores() {
             ");
             $pendingBalance = $pendingBalanceStmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0;
             
-            // Obter histórico de comissões
+            // Obter saldo real da Klube Cash (novo)
+            $adminBalanceStmt = $db->query("SELECT * FROM admin_saldo WHERE id = 1");
+            $adminBalance = $adminBalanceStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$adminBalance) {
+                $adminBalance = [
+                    'valor_total' => 0,
+                    'valor_disponivel' => 0,
+                    'valor_pendente' => 0
+                ];
+            }
+            
+            // Obter movimentações do saldo
+            $movimentacoesStmt = $db->query("
+                SELECT 
+                    asm.*,
+                    tc.codigo_transacao,
+                    l.nome_fantasia as loja_nome
+                FROM admin_saldo_movimentacoes asm
+                LEFT JOIN transacoes_cashback tc ON asm.transacao_id = tc.id
+                LEFT JOIN lojas l ON tc.loja_id = l.id
+                ORDER BY asm.data_operacao DESC
+                LIMIT 50
+            ");
+            $movimentacoes = $movimentacoesStmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            // O resto permanece igual...
             $historyStmt = $db->query("
                 SELECT 
                     tc.id,
@@ -1951,7 +2046,6 @@ public static function getAvailableStores() {
             ");
             $history = $historyStmt->fetchAll(PDO::FETCH_ASSOC);
             
-            // Obter estatísticas por mês
             $monthlyStmt = $db->query("
                 SELECT 
                     DATE_FORMAT(tc.data_transacao, '%Y-%m') as mes,
@@ -1965,7 +2059,6 @@ public static function getAvailableStores() {
             ");
             $monthly = $monthlyStmt->fetchAll(PDO::FETCH_ASSOC);
             
-            // Obter top 5 lojas que mais geraram comissões
             $topStoresStmt = $db->query("
                 SELECT 
                     l.nome_fantasia,
@@ -1985,6 +2078,8 @@ public static function getAvailableStores() {
                 'data' => [
                     'saldo_total' => $totalBalance,
                     'saldo_pendente' => $pendingBalance,
+                    'saldo_admin' => $adminBalance, // Novo campo
+                    'movimentacoes' => $movimentacoes, // Novo campo
                     'historico' => $history,
                     'mensal' => $monthly,
                     'top_lojas' => $topStores
