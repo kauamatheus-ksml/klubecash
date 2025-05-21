@@ -589,22 +589,31 @@ class CommissionController {
             $configStmt->execute();
             $config = $configStmt->fetch(PDO::FETCH_ASSOC);
             
-            // Usar valores padrão se não encontrar configurações
+            // Usar valores padrão: 10% total, divididos em 5% cliente e 5% admin
             $porcentagemTotal = DEFAULT_CASHBACK_TOTAL; // Sempre 10%
-            $porcentagemCliente = isset($config['porcentagem_cliente']) ? $config['porcentagem_cliente'] : DEFAULT_CASHBACK_CLIENT;
-            $porcentagemAdmin = isset($config['porcentagem_admin']) ? $config['porcentagem_admin'] : DEFAULT_CASHBACK_ADMIN;
+            $porcentagemCliente = DEFAULT_CASHBACK_CLIENT; // 5%
+            $porcentagemAdmin = DEFAULT_CASHBACK_ADMIN; // 5%
             $porcentagemLoja = 0.00; // Loja sempre recebe 0%
             
-            // Usar porcentagem específica da loja se fornecida
-            if ($porcentagemCashback !== null && $porcentagemCashback > 0) {
-                $porcentagemTotal = $porcentagemCashback;
+            // Se existirem configurações personalizadas, usar elas
+            if ($config && isset($config['porcentagem_cliente']) && isset($config['porcentagem_admin'])) {
+                $porcentagemCliente = $config['porcentagem_cliente'];
+                $porcentagemAdmin = $config['porcentagem_admin'];
                 
-                // Calcular proporcionalmente mas mantendo loja em 0%
-                $fator = $porcentagemTotal / DEFAULT_CASHBACK_TOTAL;
-                $porcentagemCliente = DEFAULT_CASHBACK_CLIENT * $fator;
-                $porcentagemAdmin = DEFAULT_CASHBACK_ADMIN * $fator;
-                $porcentagemLoja = 0.00; // Loja continua sem receber nada
+                // Recalcular porcentagem total (deve ser sempre 10%)
+                $porcentagemTotal = $porcentagemCliente + $porcentagemAdmin;
+                
+                // Se o total for diferente de 10%, ajustar proporcionalmente
+                if ($porcentagemTotal != 10.00) {
+                    $fator = 10.00 / $porcentagemTotal;
+                    $porcentagemCliente = $porcentagemCliente * $fator;
+                    $porcentagemAdmin = $porcentagemAdmin * $fator;
+                    $porcentagemTotal = 10.00;
+                }
             }
+            
+            // CORREÇÃO: Ignorar porcentagem específica da loja, sempre usar 10% total
+            // A divisão é sempre proporcional entre cliente e admin, loja sempre 0%
             
             // Calcular valores
             $valorCashbackTotal = ($valorTotal * $porcentagemTotal) / 100;
@@ -1131,15 +1140,27 @@ class CommissionController {
                 return ['status' => false, 'message' => 'Valores de porcentagem inválidos.'];
             }
             
+            // Converter para float para evitar problemas com strings
+            $porcentagemCliente = floatval($data['porcentagem_cliente']);
+            $porcentagemAdmin = floatval($data['porcentagem_admin']);
+            
             // Forçar porcentagem da loja como 0
             $data['porcentagem_loja'] = 0.00;
             
             // Calcular total
-            $porcentagemTotal = $data['porcentagem_cliente'] + $data['porcentagem_admin'];
+            $porcentagemTotal = $porcentagemCliente + $porcentagemAdmin;
             
-            // Validar total
-            if ($porcentagemTotal <= 0 || $porcentagemTotal > 100) {
-                return ['status' => false, 'message' => 'A soma das porcentagens deve estar entre 0 e 100%.'];
+            // CORREÇÃO: Validar que o total seja 10%
+            if (abs($porcentagemTotal - 10.00) > 0.01) {
+                // Ajustar proporcionalmente para somar 10%
+                $fator = 10.00 / $porcentagemTotal;
+                $porcentagemCliente = round($porcentagemCliente * $fator, 2);
+                $porcentagemAdmin = round($porcentagemAdmin * $fator, 2);
+                $porcentagemTotal = 10.00;
+                
+                // Atualizar os valores no array de dados
+                $data['porcentagem_cliente'] = $porcentagemCliente;
+                $data['porcentagem_admin'] = $porcentagemAdmin;
             }
             
             $db = Database::getConnection();

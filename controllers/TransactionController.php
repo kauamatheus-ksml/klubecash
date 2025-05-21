@@ -375,12 +375,12 @@ class TransactionController {
         }
     }
     /**
-     * Registra uma nova transação de cashback
-     * 
-     * @param array $data Dados da transação
-     * @return array Resultado da operação
-     */
-        public static function registerTransaction($data) {
+    * Registra uma nova transação de cashback
+    * 
+    * @param array $data Dados da transação
+    * @return array Resultado da operação
+    */
+    public static function registerTransaction($data) {
         try {
             // Validar dados obrigatórios
             $requiredFields = ['loja_id', 'usuario_id', 'valor_total', 'codigo_transacao'];
@@ -493,18 +493,28 @@ class TransactionController {
             $configStmt->execute();
             $config = $configStmt->fetch(PDO::FETCH_ASSOC);
             
-            // CORREÇÃO 4: Calcular valores de cashback sobre o valor EFETIVAMENTE PAGO
+            // CORREÇÃO 4: Sempre usar 10% como valor total de cashback (comissão da loja)
             $porcentagemTotal = DEFAULT_CASHBACK_TOTAL; // Sempre 10%
-            $porcentagemCliente = isset($config['porcentagem_cliente']) ? $config['porcentagem_cliente'] : DEFAULT_CASHBACK_CLIENT;
-            $porcentagemAdmin = isset($config['porcentagem_admin']) ? $config['porcentagem_admin'] : DEFAULT_CASHBACK_ADMIN;
-
-            // Verificar se a loja tem porcentagem específica
-            if (isset($store['porcentagem_cashback']) && $store['porcentagem_cashback'] > 0) {
-                $porcentagemTotal = $store['porcentagem_cashback'];
-                // Ajustar proporcionalmente mantendo que loja não recebe nada
-                $fator = $porcentagemTotal / DEFAULT_CASHBACK_TOTAL;
-                $porcentagemCliente = DEFAULT_CASHBACK_CLIENT * $fator;
-                $porcentagemAdmin = DEFAULT_CASHBACK_ADMIN * $fator;
+            
+            // CORREÇÃO: Garantir que a divisão é sempre 5% cliente, 5% admin
+            $porcentagemCliente = DEFAULT_CASHBACK_CLIENT; // 5%
+            $porcentagemAdmin = DEFAULT_CASHBACK_ADMIN; // 5%
+            
+            // CORREÇÃO: Remover qualquer personalização de porcentagem por loja
+            // Se a configuração do sistema for diferente do padrão, aplicar ajuste proporcional
+            if (isset($config['porcentagem_cliente']) && isset($config['porcentagem_admin'])) {
+                // Verificar se o total configurado é 10%
+                $configTotal = $config['porcentagem_cliente'] + $config['porcentagem_admin'];
+                
+                if ($configTotal == 10.00) {
+                    $porcentagemCliente = $config['porcentagem_cliente'];
+                    $porcentagemAdmin = $config['porcentagem_admin'];
+                } else {
+                    // Ajustar proporcionalmente para manter a soma em 10%
+                    $fator = 10.00 / $configTotal;
+                    $porcentagemCliente = $config['porcentagem_cliente'] * $fator;
+                    $porcentagemAdmin = $config['porcentagem_admin'] * $fator;
+                }
             }
             
             // Calcular valores de cashback sobre o valor EFETIVAMENTE PAGO

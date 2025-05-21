@@ -1934,9 +1934,13 @@ public static function getAvailableStores() {
             // CORREÇÃO: Calcular total apenas com cliente + admin
             $porcentagemTotal = $data['porcentagem_cliente'] + $data['porcentagem_admin'];
             
-            // Verificar se a soma das porcentagens é válida
-            if ($porcentagemTotal <= 0 || $porcentagemTotal > 100) {
-                return ['status' => false, 'message' => 'A soma das porcentagens deve estar entre 0 e 100.'];
+            // CORREÇÃO: Validar que o total seja 10%
+            if (abs($porcentagemTotal - 10.00) > 0.01) {
+                // Ajustar proporcionalmente para somar 10%
+                $fator = 10.00 / $porcentagemTotal;
+                $data['porcentagem_cliente'] = round($data['porcentagem_cliente'] * $fator, 2);
+                $data['porcentagem_admin'] = round($data['porcentagem_admin'] * $fator, 2);
+                $porcentagemTotal = 10.00;
             }
             
             $db = Database::getConnection();
