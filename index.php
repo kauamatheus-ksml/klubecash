@@ -4,7 +4,9 @@
 require_once './config/constants.php';
 require_once './config/database.php';
 // Iniciar sessão
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // Verificar se o usuário está logado
 $isLoggedIn = isset($_SESSION['user_id']);

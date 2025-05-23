@@ -14,8 +14,8 @@
     --klube-secondary-light: #4A4A4A;
     --klube-secondary-dark: #1F1F1F;
 
-    --klube-accent-color: #00BFA6; /* Um verde complementar para destaques */
-    --klube-accent-dark: #00A08C;
+    --klube-accent-color: #FF7A00; /* Um verde complementar para destaques */
+    --klube-accent-dark: #FF7A00;
 
     --klube-white: #FFFFFF;
     --klube-light-gray: #F8F9FA;
@@ -87,8 +87,7 @@ body {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     overflow-x: hidden; /* Prevenir scroll horizontal */
-    padding-top: var(--klube-header-height);
-    
+    padding-top: var(--klube-header-height); /* <<---- CORREÇÃO ADICIONADA AQUI */
 }
 
 .container { /* Estilizando a classe .container existente */
@@ -98,6 +97,8 @@ body {
     margin-right: auto;
     padding-left: 20px;
     padding-right: 20px;
+    margin-top: 10px;
+    
 }
 
 img, svg {
@@ -347,13 +348,14 @@ p { margin-bottom: 1em; }
 .hero {
     background: var(--klube-gradient-hero);
     color: var(--klube-white);
-    padding-top: calc(var(--klube-header-height) + 80px); /* Espaço para header fixo */
+   
     padding-bottom: 120px; /* Espaço antes da onda */
     position: relative;
     overflow: hidden; /* Para conter as formas e a onda */
     min-height: 70vh;
     display: flex;
     align-items: center;
+    padding-top: 80px;
 }
 
 .hero-bg-shapes { /* Elemento de fundo decorativo */
