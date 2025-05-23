@@ -1300,131 +1300,133 @@ if ($isLoggedIn) {
     <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // Inicializa AOS (Animate On Scroll)
-            if (typeof AOS !== 'undefined') {
-                AOS.init({
-                    once: true,
-                    offset: 80, // Ajustado para melhor timing
-                    duration: 800,
-                    easing: 'ease-in-out-quad', // Easing mais suave
-                });
-            }
+        // Inicializa AOS (Animate On Scroll)
+        if (typeof AOS !== 'undefined') {
+            AOS.init({
+                once: true,
+                offset: 80, // Ajustado para melhor timing
+                duration: 800,
+                easing: 'ease-in-out-quad', // Easing mais suave
+            });
+        }
 
-            // Menu Mobile
-            const hamburger = document.getElementById('hamburger');
-            const navMenu = document.getElementById('nav-menu');
-            const navLinks = navMenu.querySelectorAll('.nav-link');
+        // Menu Mobile
+        const hamburger = document.getElementById('hamburger');
+        const navMenu = document.getElementById('nav-menu');
+        const navLinks = navMenu.querySelectorAll('.nav-link'); // Pega todos os links do menu
 
-            if (hamburger && navMenu) {
-                hamburger.addEventListener('click', () => {
-                    const isExpanded = hamburger.getAttribute('aria-expanded') === 'true' || false;
-                    hamburger.setAttribute('aria-expanded', !isExpanded);
-                    hamburger.classList.toggle('active');
-                    navMenu.classList.toggle('active');
-                    document.body.style.overflow = navMenu.classList.contains('active') ? 'hidden' : '';
-                });
-
-                navLinks.forEach(link => {
-                    link.addEventListener('click', () => {
-                        if (navMenu.classList.contains('active')) {
-                            hamburger.classList.remove('active');
-                            hamburger.setAttribute('aria-expanded', 'false');
-                            navMenu.classList.remove('active');
-                            document.body.style.overflow = '';
-                        }
-                    });
-                });
-            }
-
-            // Accordion FAQ
-            const accordionItems = document.querySelectorAll('.accordion-item');
-            accordionItems.forEach(item => {
-                const header = item.querySelector('.accordion-header');
-                const content = item.querySelector('.accordion-content');
-
-                if (header && content) {
-                    content.style.maxHeight = "0px";
-                    header.setAttribute('aria-expanded', 'false');
-                    content.setAttribute('aria-hidden', 'true');
-
-                    header.addEventListener('click', () => {
-                        const isActive = item.classList.contains('active');
-
-                        accordionItems.forEach(otherItem => {
-                            if (otherItem !== item) {
-                                otherItem.classList.remove('active');
-                                otherItem.querySelector('.accordion-content').style.maxHeight = "0px";
-                                otherItem.querySelector('.accordion-header').setAttribute('aria-expanded', 'false');
-                                otherItem.querySelector('.accordion-content').setAttribute('aria-hidden', 'true');
-                             }
-                        });
-
-                        if (!isActive) {
-                            item.classList.add('active');
-                            content.style.maxHeight = content.scrollHeight + "px";
-                            header.setAttribute('aria-expanded', 'true');
-                            content.setAttribute('aria-hidden', 'false');
-                        } else {
-                            item.classList.remove('active');
-                            content.style.maxHeight = "0px";
-                            header.setAttribute('aria-expanded', 'false');
-                            content.setAttribute('aria-hidden', 'true');
-                        }
-                    });
-                }
+        if (hamburger && navMenu) {
+            hamburger.addEventListener('click', () => {
+                hamburger.classList.toggle('active');
+                navMenu.classList.toggle('active');
+                // Trava o scroll do body quando o menu estiver aberto
+                document.body.style.overflow = navMenu.classList.contains('active') ? 'hidden' : '';
             });
 
-            // Smooth Scroll para links de navegação interna
-            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-                anchor.addEventListener('click', function (e) {
-                    const hrefAttribute = this.getAttribute('href');
-                    if (hrefAttribute && hrefAttribute.length > 1) {
-                        const targetElement = document.querySelector(hrefAttribute);
-                        if (targetElement) {
-                            e.preventDefault();
-                            const headerOffset = document.getElementById('header')?.offsetHeight || 70;
-                            const elementPosition = targetElement.getBoundingClientRect().top;
-                            const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
-
-                            window.scrollTo({
-                                top: offsetPosition,
-                                behavior: 'smooth'
-                            });
-                        }
+            // Fecha o menu mobile ao clicar em um link
+            navLinks.forEach(link => {
+                link.addEventListener('click', () => {
+                    if (navMenu.classList.contains('active')) {
+                        hamburger.classList.remove('active');
+                        navMenu.classList.remove('active');
+                        document.body.style.overflow = '';
                     }
                 });
             });
+        }
 
-            // Adiciona classe ao header durante o scroll
-            const header = document.getElementById('header');
-            if (header) {
-                const scrollThreshold = 50;
-                window.addEventListener('scroll', function() {
-                    if (window.scrollY > scrollThreshold) {
-                        header.classList.add('scrolled');
+        // Accordion FAQ
+        const accordionItems = document.querySelectorAll('.accordion-item');
+        accordionItems.forEach(item => {
+            const header = item.querySelector('.accordion-header');
+            const content = item.querySelector('.accordion-content');
+
+            if (header && content) {
+                // Garantir que o conteúdo comece fechado e com acessibilidade
+                content.style.maxHeight = "0px";
+                header.setAttribute('aria-expanded', 'false');
+                content.setAttribute('aria-hidden', 'true');
+
+                header.addEventListener('click', () => {
+                    const isActive = item.classList.contains('active');
+
+                    // Fechar todos os outros itens
+                    accordionItems.forEach(otherItem => {
+                        if (otherItem !== item) {
+                            otherItem.classList.remove('active');
+                            otherItem.querySelector('.accordion-content').style.maxHeight = "0px";
+                            otherItem.querySelector('.accordion-header').setAttribute('aria-expanded', 'false');
+                            otherItem.querySelector('.accordion-content').setAttribute('aria-hidden', 'true');
+                        }
+                    });
+
+                    // Abrir/Fechar o item clicado
+                    if (!isActive) {
+                        item.classList.add('active');
+                        content.style.maxHeight = content.scrollHeight + "px";
+                        header.setAttribute('aria-expanded', 'true');
+                        content.setAttribute('aria-hidden', 'false');
                     } else {
-                        header.classList.remove('scrolled');
+                        item.classList.remove('active');
+                        content.style.maxHeight = "0px";
+                        header.setAttribute('aria-expanded', 'false');
+                        content.setAttribute('aria-hidden', 'true');
                     }
-                }, { passive: true });
-            }
-
-            // Lazy loading para Lottie player (se existir)
-            const lottiePlayer = document.querySelector('lottie-player');
-            if (lottiePlayer && 'IntersectionObserver' in window) {
-                const observer = new IntersectionObserver((entries) => {
-                    entries.forEach(entry => {
-                        if (entry.isIntersecting) {
-                            if (lottiePlayer.hasAttribute('data-src')) {
-                               lottiePlayer.load(lottiePlayer.getAttribute('data-src'));
-                            }
-                            lottiePlayer.play();
-                            observer.unobserve(lottiePlayer);
-                        }
-                    });
-                }, { threshold: 0.1 });
-                observer.observe(lottiePlayer);
+                });
             }
         });
+
+        // Smooth Scroll para links de navegação interna
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                const hrefAttribute = this.getAttribute('href');
+                if (hrefAttribute && hrefAttribute.length > 1) { // Garante que não é apenas "#"
+                    const targetElement = document.querySelector(hrefAttribute);
+                    if (targetElement) {
+                        e.preventDefault();
+                        const headerOffset = document.getElementById('header')?.offsetHeight || 70;
+                        const elementPosition = targetElement.getBoundingClientRect().top;
+                        const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+
+                        window.scrollTo({
+                            top: offsetPosition,
+                            behavior: 'smooth'
+                        });
+                    }
+                }
+            });
+        });
+
+        // Adiciona classe ao header durante o scroll
+        const header = document.getElementById('header');
+        if (header) {
+            const scrollThreshold = 50; // Distância de scroll para ativar o efeito
+            window.addEventListener('scroll', function() {
+                if (window.scrollY > scrollThreshold) {
+                    header.classList.add('scrolled');
+                } else {
+                    header.classList.remove('scrolled');
+                }
+            }, { passive: true }); // Melhora performance
+        }
+
+        // Lazy loading para Lottie player (se existir)
+        const lottiePlayer = document.querySelector('lottie-player');
+        if (lottiePlayer && 'IntersectionObserver' in window) {
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        if (lottiePlayer.hasAttribute('data-src')) {
+                        lottiePlayer.load(lottiePlayer.getAttribute('data-src'));
+                        }
+                        lottiePlayer.play();
+                        observer.unobserve(lottiePlayer);
+                    }
+                });
+            }, { threshold: 0.1 });
+            observer.observe(lottiePlayer);
+        }
+    });
     </script>
 </body>
 </html>
