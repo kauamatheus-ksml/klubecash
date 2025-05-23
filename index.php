@@ -1030,7 +1030,7 @@ if ($isLoggedIn) {
                     <?php endif; ?>
                 </div>
                 <div class="hero-image-container" data-aos="fade-left" data-aos-delay="200">
-                    <img src="assets/images/hero-image.png" alt="Pessoas felizes economizando com cashback Klube Cash" class="hero-image">
+                    
                 </div>
             </div>
             <div class="hero-wave">
