@@ -683,33 +683,6 @@ try {
             toggleDependentFields();
         });
     </script>
-    <style>
-        /* Adicione este CSS no final do arquivo, antes de </head> */
-        .info-box {
-            background-color: #e7f3ff;
-            border: 1px solid #b3d7ff;
-            border-radius: 8px;
-            padding: 15px;
-            margin: 20px 0;
-            display: flex;
-            align-items: flex-start;
-            gap: 12px;
-        }
-
-        .info-icon {
-            font-size: 1.2rem;
-            margin-top: 2px;
-        }
-
-        .info-content {
-            flex: 1;
-            color: #2c5aa0;
-            line-height: 1.5;
-        }
-
-        .info-content strong {
-            color: #1a4480;
-        }
-    </style>
+    
 </body>
 </html>
