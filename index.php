@@ -2,7 +2,7 @@
 // index.php
 // Incluir configurações do sistema
 require_once './config/constants.php';
-
+require_once './config/database.php';
 // Iniciar sessão
 session_start();
 
