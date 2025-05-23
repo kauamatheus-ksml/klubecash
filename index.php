@@ -386,52 +386,41 @@ try {
     </footer>
     
     <script>
-        /* Animações AOS - Suporte e ajustes se necessário */
-        [data-aos] {
-            /* Você pode adicionar estilos base para elementos com data-aos aqui se quiser */
-            /* Por exemplo, para evitar 'flashing' de conteúdo antes da animação */
-            opacity: 0;
-            transition-property: opacity, transform;
-        }
-        [data-aos].aos-animate {
-            opacity: 1;
-        }
-
-        /* Adicionando um script JS básico para o header e accordion, caso você não tenha */
-        /* Coloque isso em uma tag <script> no final do seu <body> */
-
-        document.addEventListener('DOMContentLoaded', () => {
-            // Header scroll
-            const header = document.getElementById('header');
+        document.addEventListener('DOMContentLoaded', function () {
+            // Header Scrolled
+            const header = document.getElementById('header'); // Usando o ID do seu HTML
             if (header) {
-                window.addEventListener('scroll', () => {
+                window.addEventListener('scroll', function () {
                     if (window.scrollY > 50) {
-                        header.classList.add('kc-scrolled');
+                        header.classList.add('klube-scrolled');
                     } else {
-                        header.classList.remove('kc-scrolled');
+                        header.classList.remove('klube-scrolled');
                     }
                 });
             }
 
-            // Hamburger menu
-            const hamburger = document.getElementById('hamburger');
-            const navMenu = document.getElementById('nav-menu');
+            // Hamburger Menu
+            const hamburger = document.getElementById('hamburger'); // Usando o ID do seu HTML
+            const navMenu = document.getElementById('nav-menu'); // Usando o ID do seu HTML
+
             if (hamburger && navMenu) {
-                hamburger.addEventListener('click', () => {
-                    hamburger.classList.toggle('kc-active');
-                    navMenu.classList.toggle('kc-active');
+                hamburger.addEventListener('click', function () {
+                    hamburger.classList.toggle('klube-active');
+                    navMenu.classList.toggle('klube-active');
                     // Travar scroll do body quando o menu estiver aberto
-                    document.body.style.overflow = navMenu.classList.contains('kc-active') ? 'hidden' : '';
-                    // ARIA
+                    document.body.style.overflow = navMenu.classList.contains('klube-active') ? 'hidden' : '';
+                    // Mudar aria-expanded
                     const isExpanded = hamburger.getAttribute('aria-expanded') === 'true' || false;
                     hamburger.setAttribute('aria-expanded', !isExpanded);
                 });
-                // Fechar menu ao clicar em um link (para SPAs ou navegação na mesma página)
-                navMenu.querySelectorAll('.nav-link').forEach(link => {
+
+                // Fechar menu ao clicar em um link (opcional)
+                const navLinks = navMenu.querySelectorAll('.nav-link');
+                navLinks.forEach(link => {
                     link.addEventListener('click', () => {
-                        if (navMenu.classList.contains('kc-active')) {
-                            hamburger.classList.remove('kc-active');
-                            navMenu.classList.remove('kc-active');
+                        if (navMenu.classList.contains('klube-active')) {
+                            hamburger.classList.remove('klube-active');
+                            navMenu.classList.remove('klube-active');
                             document.body.style.overflow = '';
                             hamburger.setAttribute('aria-expanded', 'false');
                         }
@@ -441,43 +430,61 @@ try {
 
             // Accordion
             const accordionItems = document.querySelectorAll('.accordion-item');
-            accordionItems.forEach(item => {
-                const header = item.querySelector('.accordion-header');
-                const content = item.querySelector('.accordion-content');
-                if (header && content) {
-                    header.addEventListener('click', () => {
-                        const isActive = item.classList.contains('kc-active');
-                        // Opcional: Fechar outros itens abertos
-                        // accordionItems.forEach(otherItem => {
-                        //     if (otherItem !== item && otherItem.classList.contains('kc-active')) {
-                        //         otherItem.classList.remove('kc-active');
-                        //         otherItem.querySelector('.accordion-content').style.maxHeight = null;
-                        //         otherItem.querySelector('.accordion-header').setAttribute('aria-expanded', 'false');
-                        //     }
-                        // });
+            if (accordionItems.length > 0) {
+                accordionItems.forEach(item => {
+                    const header = item.querySelector('.accordion-header');
+                    const content = item.querySelector('.accordion-content');
 
-                        item.classList.toggle('kc-active');
-                        header.setAttribute('aria-expanded', !isActive);
-                        if (item.classList.contains('kc-active')) {
-                            content.style.maxHeight = content.scrollHeight + "px";
-                            // Adiciona padding após a animação de altura para suavizar
-                            setTimeout(() => {
-                                if(item.classList.contains('kc-active')) { // Checa novamente se ainda está ativo
-                                content.style.paddingTop = '0'; // Ou o valor original do padding-top
-                                content.style.paddingBottom = '1.5rem'; // Ou o valor original do padding-bottom
-                                }
-                            }, 300); // Deve ser um pouco menor que a transição de max-height
-                        } else {
-                            content.style.maxHeight = null;
-                            content.style.paddingTop = '0';
-                            content.style.paddingBottom = '0';
-                        }
-                    });
-                }
-            });
+                    if (header && content) {
+                        header.addEventListener('click', () => {
+                            const isActive = item.classList.contains('klube-active');
+                            
+                            // Fechar todos os outros itens (opcional, se quiser apenas um aberto)
+                            // accordionItems.forEach(otherItem => {
+                            //     if (otherItem !== item && otherItem.classList.contains('klube-active')) {
+                            //         otherItem.classList.remove('klube-active');
+                            //         otherItem.querySelector('.accordion-content').style.maxHeight = null;
+                            //         otherItem.querySelector('.accordion-header').setAttribute('aria-expanded', 'false');
+                            //     }
+                            // });
+
+                            item.classList.toggle('klube-active');
+                            header.setAttribute('aria-expanded', !isActive);
+                            
+                            if (item.classList.contains('klube-active')) {
+                                content.style.maxHeight = content.scrollHeight + "px";
+                                content.setAttribute('aria-hidden', 'false');
+                            } else {
+                                content.style.maxHeight = null;
+                                content.setAttribute('aria-hidden', 'true');
+                            }
+                        });
+                    }
+                });
+            }
+
+            // Animação de entrada suave (AOS já faz isso, mas como exemplo)
+            // Se você remover AOS, pode usar algo assim com Intersection Observer:
+            // const animatedElements = document.querySelectorAll('[data-aos]');
+            // const observer = new IntersectionObserver((entries) => {
+            //     entries.forEach(entry => {
+            //         if (entry.isIntersecting) {
+            //             entry.target.style.opacity = 1;
+            //             entry.target.style.transform = 'translateY(0)';
+            //             // Adicionar classes de animação aqui
+            //             observer.unobserve(entry.target); // Para animar apenas uma vez
+            //         }
+            //     });
+            // }, { threshold: 0.1 });
+
+            // animatedElements.forEach(el => {
+            //     el.style.opacity = 0;
+            //     el.style.transform = 'translateY(20px)';
+            //     el.style.transition = 'opacity 0.6s ease-out, transform 0.6s ease-out';
+            //     observer.observe(el);
+            // });
         });
-
-    </script>
+</script>
     
 </body>
 </html>
