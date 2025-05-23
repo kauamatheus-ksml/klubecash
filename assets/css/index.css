@@ -88,6 +88,7 @@ body {
     -moz-osx-font-smoothing: grayscale;
     overflow-x: hidden; /* Prevenir scroll horizontal */
     padding-top: var(--klube-header-height);
+    
 }
 
 .container { /* Estilizando a classe .container existente */
