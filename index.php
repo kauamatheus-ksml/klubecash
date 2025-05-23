@@ -22,6 +22,21 @@ if ($isLoggedIn) {
         $dashboardURL = STORE_DASHBOARD_URL;
     }
 }
+
+
+// Buscar lojas parceiras aprovadas
+$partnerStores = [];
+try {
+    $db = Database::getConnection(); // Função do seu arquivo database.php
+    // Selecionar apenas lojas aprovadas e, opcionalmente, com logo
+    // Você pode adicionar mais critérios, como lojas em destaque, etc.
+    $stmt = $db->query("SELECT nome_fantasia, logo FROM lojas WHERE status = 'aprovado' ORDER BY RAND() LIMIT 6");
+    $partnerStores = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    // Em caso de erro, pode logar ou tratar como preferir.
+    // Por enquanto, a seção de parceiros simplesmente não mostrará lojas.
+    error_log("Erro ao buscar lojas parceiras para index.php: " . $e->getMessage());
+}
 ?>
 
 <!DOCTYPE html>
@@ -1111,14 +1126,20 @@ if ($isLoggedIn) {
                 </div>
                 
                 <div class="partners-grid" data-aos="fade-up" data-aos-delay="100">
-                    <?php for ($i = 1; $i <= 6; $i++): ?>
-                    <div class="partner-card">
-                        <div class="partner-logo-container">
-                             <div class="partner-logo">LOGO</div>
+                    <?php if (!empty($partnerStores)): ?>
+                        <?php foreach ($partnerStores as $store): ?>
+                        <div class="partner-card">
+                            <div class="partner-logo-container">
+                                <?php if (!empty($store['logo'])): ?>
+                                    <div class="partner-logo"><?php echo htmlspecialchars(strtoupper(substr($store['nome_fantasia'], 0, 1))); ?></div> <?php else: ?>
+                                    <div class="partner-logo"><?php echo htmlspecialchars(strtoupper(substr($store['nome_fantasia'], 0, 1))); ?></div> <?php endif; ?>
+                            </div>
+                            <h4><?php echo htmlspecialchars($store['nome_fantasia']); ?></h4>
                         </div>
-                        <h4>Loja <?php echo $i; ?></h4>
-                    </div>
-                    <?php endfor; ?>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <p style="grid-column: 1 / -1; text-align: center; color: var(--medium-gray);">Nenhuma loja parceira encontrada no momento.</p>
+                    <?php endif; ?>
                 </div>
                 
                 <div class="partners-cta" data-aos="fade-up" data-aos-delay="200">
