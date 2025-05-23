@@ -83,6 +83,9 @@ if ($isLoggedIn) {
             -moz-osx-font-smoothing: grayscale;
             overflow-x: hidden;
         }
+        body.menu-open-no-scroll { /* Classe para travar scroll quando menu mobile aberto */
+            overflow: hidden;
+        }
 
         .container {
             width: 100%;
@@ -287,7 +290,7 @@ if ($isLoggedIn) {
             padding: 0.5rem;
             background: transparent;
             border: none;
-            z-index: 1001;
+            z-index: 1001; /* Acima do menu mobile */
         }
 
         .hamburger-line {
@@ -316,15 +319,18 @@ if ($isLoggedIn) {
         .hero {
             background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
             color: var(--white);
-            padding: calc(var(--header-height) + 4rem) 0 8rem;
+            padding: calc(var(--header-height) + 5rem) 0 8rem; /* Aumentado padding superior */
             text-align: center;
             position: relative;
             overflow: hidden;
+            min-height: 60vh; /* Altura mínima para melhor visualização */
+            display: flex; /* Para centralizar conteúdo verticalmente */
+            align-items: center; /* Para centralizar conteúdo verticalmente */
         }
 
         .hero .container {
-            display: grid; /* Changed to grid for better layout control */
-            grid-template-columns: 1fr; /* Default to single column */
+            /* display: grid; removido para simplificar, já que a imagem foi removida */
+            /* grid-template-columns: 1fr; */
             align-items: center;
             gap: 2rem;
             position: relative;
@@ -332,58 +338,54 @@ if ($isLoggedIn) {
         }
 
         .hero-content {
-            max-width: 650px;
+            max-width: 750px; /* Aumentado para ocupar mais espaço */
             margin-left: auto;
             margin-right: auto;
         }
 
         .hero-title {
-            font-size: clamp(2.5rem, 5vw, 3.8rem);
+            font-size: clamp(2.8rem, 6vw, 4.2rem); /* Aumentado e mais responsivo */
             font-weight: 700;
-            margin-bottom: 1rem;
+            margin-bottom: 1.2rem;
             color: var(--white);
-            line-height: 1.2;
+            line-height: 1.15; /* Ajustado para títulos maiores */
         }
 
         .hero-title .highlight {
             color: var(--primary-light);
-            text-shadow: 0 0 10px rgba(0,0,0,0.2);
+            text-shadow: 0 0 15px rgba(0,0,0,0.25); /* Sombra mais pronunciada */
         }
 
         .hero-subtitle {
-            font-size: clamp(1rem, 2.5vw, 1.25rem);
-            margin-bottom: 2rem;
-            opacity: 0.9;
-            max-width: 550px;
+            font-size: clamp(1.1rem, 2.8vw, 1.35rem); /* Aumentado e responsivo */
+            margin-bottom: 2.5rem;
+            opacity: 0.95; /* Um pouco menos transparente */
+            max-width: 600px;
             margin-left: auto;
             margin-right: auto;
         }
 
         .hero-buttons {
             display: flex;
-            gap: 1rem;
+            gap: 1.2rem; /* Maior espaçamento */
             justify-content: center;
         }
-
-        .hero-image-container {
-            margin-top: 2rem;
-            max-width: 450px; /* Ajustado */
-            width: 70%;
-            margin-left: auto;
-            margin-right: auto;
-        }
-
-        .hero-image {
-            border-radius: var(--border-radius-md);
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
-            animation: subtleFloat 6s ease-in-out infinite;
-        }
-
-        @keyframes subtleFloat {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-10px); }
-        }
         
+        /* Animação sutil para os botões do hero */
+        .hero-buttons .btn {
+            animation: pulseButton 2s infinite ease-in-out;
+        }
+        .hero-buttons .btn:nth-child(2) {
+            animation-delay: 0.3s;
+        }
+
+        @keyframes pulseButton {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.03); }
+            100% { transform: scale(1); }
+        }
+
+
         .hero-bg-shapes {
             content: "";
             position: absolute;
@@ -391,10 +393,18 @@ if ($isLoggedIn) {
             width: 100%; height: 100%;
             background-image:
                 radial-gradient(circle at 10% 20%, rgba(255,255,255,0.08) 0%, transparent 30%),
-                radial-gradient(circle at 80% 70%, rgba(255,255,255,0.06) 0%, transparent 25%);
+                radial-gradient(circle at 80% 70%, rgba(255,255,255,0.06) 0%, transparent 25%),
+                radial-gradient(circle at 50% 90%, rgba(255,255,255,0.05) 0%, transparent 20%); /* Adicionada uma forma */
             z-index: 0;
             pointer-events: none;
+            animation: subtleBgShift 20s linear infinite alternate; /* Animação sutil no background */
         }
+
+        @keyframes subtleBgShift {
+            from { background-position: 0% 0%; }
+            to { background-position: 20% 20%; }
+        }
+
 
         .hero-wave {
             position: absolute;
@@ -412,7 +422,7 @@ if ($isLoggedIn) {
         /* === Estilos de Seção === */
         .section {
             padding: 5rem 0;
-            position: relative; /* Para pseudo-elementos decorativos */
+            position: relative;
         }
 
         .section-title {
@@ -439,7 +449,7 @@ if ($isLoggedIn) {
             margin-bottom: 0.8rem;
         }
 
-        .section-title .line { /* Linha decorativa abaixo do título */
+        .section-title .line {
             width: 70px;
             height: 4px;
             background-color: var(--primary-color);
@@ -469,7 +479,7 @@ if ($isLoggedIn) {
             text-align: center;
             box-shadow: var(--shadow-sm);
             transition: transform var(--transition-speed) ease, box-shadow var(--transition-speed) ease;
-            border: 1px solid #eee; /* Borda sutil */
+            border: 1px solid #eee;
         }
 
         .step-card:hover {
@@ -506,7 +516,7 @@ if ($isLoggedIn) {
 
         /* Benefícios Section */
         .benefits {
-            background-color: var(--light-gray); /* Fundo suave para contraste */
+            background-color: var(--light-gray);
         }
 
         .benefits-container {
@@ -525,7 +535,7 @@ if ($isLoggedIn) {
             border: 1px solid #eee;
             display: flex;
             flex-direction: column;
-            align-items: center; /* Centraliza ícone e texto */
+            align-items: center;
             text-align: center;
         }
 
@@ -571,7 +581,7 @@ if ($isLoggedIn) {
             position: relative;
             overflow: hidden;
         }
-        .cta::before { /* Efeito de background sutil */
+        .cta::before {
             content: "";
             position: absolute;
             top: 0; left: 0;
@@ -583,7 +593,7 @@ if ($isLoggedIn) {
 
 
         .cta-content {
-            position: relative; /* Para ficar acima do ::before */
+            position: relative;
             z-index: 1;
         }
 
@@ -621,30 +631,30 @@ if ($isLoggedIn) {
         }
 
         .partner-card:hover {
-            transform: translateY(-8px) scale(1.03); /* Efeito de leve elevação e zoom */
+            transform: translateY(-8px) scale(1.03);
             box-shadow: var(--shadow-md);
         }
 
         .partner-logo-container {
-            height: 80px; /* Altura fixa para os logos */
+            height: 80px;
             display: flex;
             align-items: center;
             justify-content: center;
             margin-bottom: 1rem;
-            background-color: var(--light-gray); /* Fundo para placeholders */
+            background-color: var(--light-gray);
             border-radius: var(--border-radius-sm);
-            overflow: hidden; /* Garante que o logo não ultrapasse */
+            overflow: hidden;
         }
 
-        .partner-logo { /* Estilo para o texto "LOGO" */
+        .partner-logo {
             font-size: 1.2rem;
             font-weight: 600;
             color: var(--medium-gray);
         }
-         .partner-card img { /* Se for usar imagens reais para os logos */
+         .partner-card img {
             max-height: 100%;
             max-width: 100%;
-            object-fit: contain; /* Para logos não distorcerem */
+            object-fit: contain;
         }
 
         .partner-card h4 {
@@ -674,13 +684,13 @@ if ($isLoggedIn) {
             margin-bottom: 1rem;
             box-shadow: var(--shadow-sm);
             transition: box-shadow var(--transition-speed) ease;
-            border: 1px solid #eee; /* Borda sutil */
+            border: 1px solid #eee;
         }
 
         .accordion-item:hover {
             box-shadow: var(--shadow-md);
         }
-        .accordion-item.active { /* Destaque para item ativo */
+        .accordion-item.active {
             border-left: 3px solid var(--primary-color);
         }
 
@@ -694,62 +704,65 @@ if ($isLoggedIn) {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            background: transparent; /* Removido fundo para melhor efeito de hover */
+            background: transparent;
             border: none;
             text-align: left;
             color: var(--secondary-color);
             transition: background-color var(--transition-speed) ease;
         }
         .accordion-header:hover {
-            background-color: var(--primary-light); /* Efeito sutil no hover */
+            background-color: var(--primary-light);
         }
         .accordion-item.active .accordion-header {
-            color: var(--primary-color); /* Cor do texto quando ativo */
+            color: var(--primary-color);
         }
 
         .accordion-icon {
             transition: transform var(--transition-speed) ease;
-            color: var(--primary-color); /* Ícone sempre laranja */
+            color: var(--primary-color);
+        }
+        .accordion-icon svg { transition: transform 0.2s ease-in-out; }
+
+
+        .accordion-item.active .accordion-icon svg {
+            transform: rotate(180deg); /* Muda o ícone para "menos" ou seta para cima */
         }
 
-        .accordion-item.active .accordion-icon {
-            transform: rotate(45deg); /* Efeito de "X" */
-        }
 
         .accordion-content {
             max-height: 0;
             overflow: hidden;
             transition: max-height 0.3s ease-out, padding 0.3s ease-out;
         }
-        .accordion-item.active .accordion-content { /* Adiciona padding quando ativo */
+        .accordion-item.active .accordion-content {
              padding: 0 1.5rem 1.5rem;
         }
 
         .accordion-content-inner p {
             font-size: 0.95rem;
             color: var(--medium-gray);
-            line-height: 1.8; /* Melhora a legibilidade */
+            line-height: 1.8;
         }
 
 
         /* === Footer === */
         .footer {
             background-color: var(--secondary-color);
-            color: rgba(255, 255, 255, 0.8); /* Texto um pouco mais opaco */
-            padding-top: 5rem; /* Espaçamento para a onda */
-            position: relative; /* Para a onda SVG */
+            color: rgba(255, 255, 255, 0.8);
+            padding-top: 5rem;
+            position: relative;
         }
 
         .footer-wave {
             position: absolute;
-            top: -1px; /* Ajuste para sobrepor a borda da seção anterior */
+            top: -1px;
             left: 0;
             width: 100%;
-            line-height: 0; /* Remove espaço extra do SVG */
-            transform: scaleY(-1); /* Inverte a onda */
+            line-height: 0;
+            transform: scaleY(-1);
         }
         .footer-wave svg path{
-            fill: var(--secondary-color); /* Cor do footer */
+            fill: var(--secondary-color);
         }
 
 
@@ -757,8 +770,8 @@ if ($isLoggedIn) {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
             gap: 2.5rem;
-            padding: 3rem 0; /* Espaçamento interno do conteúdo do footer */
-            position: relative; /* Para garantir que o conteúdo fique acima da onda */
+            padding: 3rem 0;
+            position: relative;
             z-index: 1;
         }
 
@@ -790,7 +803,7 @@ if ($isLoggedIn) {
 
         .footer-link a:hover, .footer-link a:focus {
             color: var(--primary-color);
-            padding-left: 5px; /* Efeito sutil de deslocamento */
+            padding-left: 5px;
         }
 
         .contact-info {
@@ -801,7 +814,7 @@ if ($isLoggedIn) {
             font-size: 0.9rem;
         }
         .contact-icon svg {
-            color: var(--primary-color); /* Destaca o ícone */
+            color: var(--primary-color);
         }
 
         .social-icons {
@@ -834,12 +847,12 @@ if ($isLoggedIn) {
             padding: 2rem 0;
             border-top: 1px solid rgba(255, 255, 255, 0.1);
             font-size: 0.85rem;
-            position: relative; /* Para garantir que o conteúdo fique acima da onda */
+            position: relative;
             z-index: 1;
         }
 
         /* === Animações === */
-        @keyframes pulse { /* Animação sutil para ícones */
+        @keyframes pulse {
             0% { transform: scale(1); opacity: 0.5; }
             50% { transform: scale(1.15); opacity: 0.2; }
             100% { transform: scale(1); opacity: 0.5; }
@@ -848,85 +861,57 @@ if ($isLoggedIn) {
 
         /* === Media Queries para Responsividade === */
 
-        @media (min-width: 993px) { /* Telas maiores: Hero section com imagem ao lado */
-            .hero .container {
-                grid-template-columns: 1.2fr 1fr; /* Coluna de texto maior */
-                text-align: left; /* Alinha texto à esquerda */
-                gap: 3rem;
-            }
-            .hero-content {
-                margin-left: 0;
-                margin-right: 0;
-                align-items: flex-start; /* Alinha itens do conteúdo à esquerda */
-            }
-             .hero-title {
-                text-align: left;
-            }
-            .hero-subtitle {
-                margin-left: 0;
-                 text-align: left;
-            }
-            .hero-buttons {
-                justify-content: flex-start; /* Alinha botões à esquerda */
-            }
-            .hero-image-container {
-                order: 2; /* Imagem à direita */
-                margin-top: 0;
-                width: 100%; /* Ocupa a coluna do grid */
-                max-width: 500px; /* Mantém um tamanho máximo razoável */
-            }
-        }
-
-
-        @media (max-width: 992px) {
+        @media (max-width: 992px) { /* Ajustes para Tablet e Mobile */
             .nav-menu {
-                display: none; /* Esconde o menu normal */
+                display: none;
                 flex-direction: column;
-                align-items: flex-start; /* Alinha itens à esquerda no menu mobile */
-                position: fixed; /* Alterado para fixed para melhor comportamento */
-                top: 0; /* Começa do topo */
-                left: -100%; /* Começa fora da tela */
-                width: 80%; /* Largura do menu mobile */
-                max-width: 300px; /* Largura máxima */
-                height: 100vh;
+                align-items: stretch; /* Alinha itens para ocupar toda a largura */
+                position: fixed;
+                top: 0; /* Navbar suspensa começa do topo */
+                left: 0; /* Começa da esquerda */
+                width: 100%; /* Ocupa 100% da largura */
+                height: 100vh; /* Ocupa 100% da altura */
                 background-color: var(--white);
-                box-shadow: var(--shadow-lg); /* Sombra mais pronunciada */
-                padding: calc(var(--header-height) + 1rem) 1.5rem 1.5rem; /* Espaçamento interno */
-                transition: left var(--transition-speed) cubic-bezier(0.77, 0, 0.175, 1);
+                box-shadow: 0 8px 16px rgba(0,0,0,0.15); /* Sombra para destacar */
+                padding-top: var(--header-height); /* Espaço para o header fixo */
+                transform: translateX(-100%); /* Começa fora da tela à esquerda */
+                transition: transform var(--transition-speed) cubic-bezier(0.77, 0, 0.175, 1);
                 overflow-y: auto;
-                z-index: 999; /* Abaixo do hamburger */
+                z-index: 999; /* Abaixo do hamburger e header */
             }
 
             .nav-menu.active {
-                left: 0; /* Menu desliza da esquerda */
+                transform: translateX(0%); /* Menu desliza para a tela */
             }
 
             .nav-item {
                 margin: 0;
-                width: 100%;
+                width: 100%; /* Ocupa toda a largura */
             }
 
             .nav-link {
                 display: block;
-                padding: 0.8rem 0; /* Padding vertical nos links */
+                padding: 1rem 1.5rem; /* Padding maior para toque */
                 width: 100%;
-                border-bottom: 1px solid var(--light-gray); /* Separador entre links */
-                font-size: 1rem;
+                border-bottom: 1px solid var(--primary-light); /* Separador mais sutil */
+                font-size: 1.1rem; /* Fonte maior */
+                text-align: left; /* Alinhamento à esquerda */
             }
             .nav-link:last-child { border-bottom: none; }
 
-            .nav-link.btn { /* Estilo do botão no menu mobile */
-                margin-top: 1rem;
+            .nav-link.btn {
+                margin: 1rem 1.5rem;
+                width: calc(100% - 3rem);
                 text-align: center;
-                width: 100%;
             }
             .nav-link::after { display: none; }
 
             .hamburger {
                 display: block;
             }
+            .hero .container { text-align: center; }
+            .hero-content { align-items: center; }
             .hero-title { font-size: clamp(2rem, 6vw, 2.8rem); }
-
         }
 
         @media (max-width: 768px) {
@@ -945,7 +930,7 @@ if ($isLoggedIn) {
         @media (max-width: 480px) {
             :root { --header-height: 60px; }
             .container { padding: 0 1rem; }
-             .nav-menu { padding-top: calc(var(--header-height) + 0.5rem); }
+            .nav-menu { padding-top: calc(var(--header-height) + 0.5rem); }
             .nav-link.btn { margin-top: 0.8rem; }
             .hero-title { font-size: 1.8rem; }
             .hero-subtitle { font-size: 1rem; }
@@ -966,7 +951,7 @@ if ($isLoggedIn) {
         .btn:focus-visible, .nav-link:focus-visible, .accordion-header:focus-visible, .social-icon:focus-visible, .hamburger:focus-visible {
             outline: 3px solid var(--primary-dark);
             outline-offset: 2px;
-            box-shadow: 0 0 0 4px rgba(255, 122, 0, 0.3); /* Sombra de foco mais visível */
+            box-shadow: 0 0 0 4px rgba(255, 122, 0, 0.3);
         }
     </style>
 </head>
@@ -1029,10 +1014,7 @@ if ($isLoggedIn) {
                         </div>
                     <?php endif; ?>
                 </div>
-                <div class="hero-image-container" data-aos="fade-left" data-aos-delay="200">
-                    
                 </div>
-            </div>
             <div class="hero-wave">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 180">
                     <path fill="#ffffff" fill-opacity="1" d="M0,128L48,138.7C96,149,192,171,288,170.7C384,171,480,149,576,128C672,107,768,85,864,90.7C960,96,1056,128,1152,133.3C1248,139,1344,117,1392,106.7L1440,96L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path>
@@ -1132,7 +1114,8 @@ if ($isLoggedIn) {
                     <?php for ($i = 1; $i <= 6; $i++): ?>
                     <div class="partner-card">
                         <div class="partner-logo-container">
-                            <div class="partner-logo">LOGO</div> </div>
+                             <div class="partner-logo">LOGO</div>
+                        </div>
                         <h4>Loja <?php echo $i; ?></h4>
                     </div>
                     <?php endfor; ?>
@@ -1300,133 +1283,139 @@ if ($isLoggedIn) {
     <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-        // Inicializa AOS (Animate On Scroll)
-        if (typeof AOS !== 'undefined') {
-            AOS.init({
-                once: true,
-                offset: 80, // Ajustado para melhor timing
-                duration: 800,
-                easing: 'ease-in-out-quad', // Easing mais suave
-            });
-        }
-
-        // Menu Mobile
-        const hamburger = document.getElementById('hamburger');
-        const navMenu = document.getElementById('nav-menu');
-        const navLinks = navMenu.querySelectorAll('.nav-link'); // Pega todos os links do menu
-
-        if (hamburger && navMenu) {
-            hamburger.addEventListener('click', () => {
-                hamburger.classList.toggle('active');
-                navMenu.classList.toggle('active');
-                // Trava o scroll do body quando o menu estiver aberto
-                document.body.style.overflow = navMenu.classList.contains('active') ? 'hidden' : '';
-            });
-
-            // Fecha o menu mobile ao clicar em um link
-            navLinks.forEach(link => {
-                link.addEventListener('click', () => {
-                    if (navMenu.classList.contains('active')) {
-                        hamburger.classList.remove('active');
-                        navMenu.classList.remove('active');
-                        document.body.style.overflow = '';
-                    }
-                });
-            });
-        }
-
-        // Accordion FAQ
-        const accordionItems = document.querySelectorAll('.accordion-item');
-        accordionItems.forEach(item => {
-            const header = item.querySelector('.accordion-header');
-            const content = item.querySelector('.accordion-content');
-
-            if (header && content) {
-                // Garantir que o conteúdo comece fechado e com acessibilidade
-                content.style.maxHeight = "0px";
-                header.setAttribute('aria-expanded', 'false');
-                content.setAttribute('aria-hidden', 'true');
-
-                header.addEventListener('click', () => {
-                    const isActive = item.classList.contains('active');
-
-                    // Fechar todos os outros itens
-                    accordionItems.forEach(otherItem => {
-                        if (otherItem !== item) {
-                            otherItem.classList.remove('active');
-                            otherItem.querySelector('.accordion-content').style.maxHeight = "0px";
-                            otherItem.querySelector('.accordion-header').setAttribute('aria-expanded', 'false');
-                            otherItem.querySelector('.accordion-content').setAttribute('aria-hidden', 'true');
-                        }
-                    });
-
-                    // Abrir/Fechar o item clicado
-                    if (!isActive) {
-                        item.classList.add('active');
-                        content.style.maxHeight = content.scrollHeight + "px";
-                        header.setAttribute('aria-expanded', 'true');
-                        content.setAttribute('aria-hidden', 'false');
-                    } else {
-                        item.classList.remove('active');
-                        content.style.maxHeight = "0px";
-                        header.setAttribute('aria-expanded', 'false');
-                        content.setAttribute('aria-hidden', 'true');
-                    }
+            // Inicializa AOS (Animate On Scroll)
+            if (typeof AOS !== 'undefined') {
+                AOS.init({
+                    once: true,
+                    offset: 80,
+                    duration: 800,
+                    easing: 'ease-in-out-quad',
                 });
             }
-        });
 
-        // Smooth Scroll para links de navegação interna
-        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-            anchor.addEventListener('click', function (e) {
-                const hrefAttribute = this.getAttribute('href');
-                if (hrefAttribute && hrefAttribute.length > 1) { // Garante que não é apenas "#"
-                    const targetElement = document.querySelector(hrefAttribute);
-                    if (targetElement) {
-                        e.preventDefault();
-                        const headerOffset = document.getElementById('header')?.offsetHeight || 70;
-                        const elementPosition = targetElement.getBoundingClientRect().top;
-                        const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+            // Menu Mobile
+            const hamburger = document.getElementById('hamburger');
+            const navMenu = document.getElementById('nav-menu');
+            const navLinks = navMenu.querySelectorAll('.nav-link');
+            const bodyEl = document.body; // Referência ao body
 
-                        window.scrollTo({
-                            top: offsetPosition,
-                            behavior: 'smooth'
+            if (hamburger && navMenu) {
+                hamburger.addEventListener('click', () => {
+                    const isExpanded = hamburger.getAttribute('aria-expanded') === 'true' || false;
+                    hamburger.setAttribute('aria-expanded', !isExpanded);
+                    hamburger.classList.toggle('active');
+                    navMenu.classList.toggle('active');
+                    // Adiciona/remove classe no body para travar scroll
+                    bodyEl.classList.toggle('menu-open-no-scroll', navMenu.classList.contains('active'));
+                });
+
+                navLinks.forEach(link => {
+                    link.addEventListener('click', () => {
+                        if (navMenu.classList.contains('active')) {
+                            hamburger.classList.remove('active');
+                            hamburger.setAttribute('aria-expanded', 'false');
+                            navMenu.classList.remove('active');
+                            bodyEl.classList.remove('menu-open-no-scroll'); // Libera scroll
+                        }
+                    });
+                });
+            }
+
+            // Accordion FAQ
+            const accordionItems = document.querySelectorAll('.accordion-item');
+            accordionItems.forEach(item => {
+                const header = item.querySelector('.accordion-header');
+                const content = item.querySelector('.accordion-content');
+                const iconSvg = header.querySelector('.accordion-icon svg'); // Pega o SVG dentro do span
+
+                if (header && content) {
+                    content.style.maxHeight = "0px";
+                    header.setAttribute('aria-expanded', 'false');
+                    content.setAttribute('aria-hidden', 'true');
+
+                    header.addEventListener('click', () => {
+                        const isActive = item.classList.contains('active');
+
+                        accordionItems.forEach(otherItem => {
+                            if (otherItem !== item) {
+                                otherItem.classList.remove('active');
+                                otherItem.querySelector('.accordion-content').style.maxHeight = "0px";
+                                otherItem.querySelector('.accordion-header').setAttribute('aria-expanded', 'false');
+                                otherItem.querySelector('.accordion-content').setAttribute('aria-hidden', 'true');
+                                // Reseta a rotação do ícone dos outros itens
+                                const otherIconSvg = otherItem.querySelector('.accordion-icon svg');
+                                if (otherIconSvg) otherIconSvg.style.transform = 'rotate(0deg)';
+                            }
                         });
-                    }
+
+                        if (!isActive) {
+                            item.classList.add('active');
+                            content.style.maxHeight = content.scrollHeight + "px";
+                            header.setAttribute('aria-expanded', 'true');
+                            content.setAttribute('aria-hidden', 'false');
+                            if (iconSvg) iconSvg.style.transform = 'rotate(45deg)'; // Rotaciona ícone para "+" para "-" (ou X)
+                        } else {
+                            item.classList.remove('active');
+                            content.style.maxHeight = "0px";
+                            header.setAttribute('aria-expanded', 'false');
+                            content.setAttribute('aria-hidden', 'true');
+                            if (iconSvg) iconSvg.style.transform = 'rotate(0deg)'; // Volta ícone para "+"
+                        }
+                    });
                 }
             });
-        });
 
-        // Adiciona classe ao header durante o scroll
-        const header = document.getElementById('header');
-        if (header) {
-            const scrollThreshold = 50; // Distância de scroll para ativar o efeito
-            window.addEventListener('scroll', function() {
-                if (window.scrollY > scrollThreshold) {
-                    header.classList.add('scrolled');
-                } else {
-                    header.classList.remove('scrolled');
-                }
-            }, { passive: true }); // Melhora performance
-        }
+            // Smooth Scroll para links de navegação interna
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function (e) {
+                    const hrefAttribute = this.getAttribute('href');
+                    if (hrefAttribute && hrefAttribute.length > 1) {
+                        const targetElement = document.querySelector(hrefAttribute);
+                        if (targetElement) {
+                            e.preventDefault();
+                            const headerOffset = document.getElementById('header')?.offsetHeight || 70;
+                            const elementPosition = targetElement.getBoundingClientRect().top;
+                            const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
 
-        // Lazy loading para Lottie player (se existir)
-        const lottiePlayer = document.querySelector('lottie-player');
-        if (lottiePlayer && 'IntersectionObserver' in window) {
-            const observer = new IntersectionObserver((entries) => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting) {
-                        if (lottiePlayer.hasAttribute('data-src')) {
-                        lottiePlayer.load(lottiePlayer.getAttribute('data-src'));
+                            window.scrollTo({
+                                top: offsetPosition,
+                                behavior: 'smooth'
+                            });
                         }
-                        lottiePlayer.play();
-                        observer.unobserve(lottiePlayer);
                     }
                 });
-            }, { threshold: 0.1 });
-            observer.observe(lottiePlayer);
-        }
-    });
+            });
+
+            // Adiciona classe ao header durante o scroll
+            const header = document.getElementById('header');
+            if (header) {
+                const scrollThreshold = 50;
+                window.addEventListener('scroll', function() {
+                    if (window.scrollY > scrollThreshold) {
+                        header.classList.add('scrolled');
+                    } else {
+                        header.classList.remove('scrolled');
+                    }
+                }, { passive: true });
+            }
+
+            // Lazy loading para Lottie player (se existir)
+            const lottiePlayer = document.querySelector('lottie-player');
+            if (lottiePlayer && 'IntersectionObserver' in window) {
+                const observer = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            if (lottiePlayer.hasAttribute('data-src')) {
+                               lottiePlayer.load(lottiePlayer.getAttribute('data-src'));
+                            }
+                            // Removido lottiePlayer.play(); para permitir controle manual se necessário
+                            observer.unobserve(lottiePlayer);
+                        }
+                    });
+                }, { threshold: 0.1 });
+                observer.observe(lottiePlayer);
+            }
+        });
     </script>
 </body>
 </html>
