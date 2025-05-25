@@ -11,9 +11,9 @@
     --dark-gray: #343A40; /* Para texto principal e títulos */
     --text-muted: #718096; /* Cinza mais suave para texto secundário */
     --border-color: #E2E8F0; /* Cor de borda sutil */
-    --success-color: #4CAF50; /* Verde KlubeCash */
-    --warning-color: #FFC107; /* Amarelo KlubeCash */
-    --danger-color: #F44336;  /* Vermelho KlubeCash */
+    --success-color: #4CAF50;
+    --warning-color: #FFC107;
+    --danger-color: #F44336;
 
     --font-family: 'Poppins', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     --font-size-base: 16px;
@@ -183,6 +183,9 @@ a:hover {
     box-shadow: var(--shadow-md);
     transition: transform var(--transition-medium), box-shadow var(--transition-medium);
     border: 1px solid var(--border-color);
+    display: flex; /* Adicionado para controle interno */
+    flex-direction: column; /* Adicionado para controle interno */
+    overflow: hidden; /* Impede conteúdo de vazar antes do scroll */
 }
 
 .card:hover {
@@ -240,10 +243,7 @@ a:hover {
 /* ::::::::::::: TABELA DE TRANSAÇÕES :::::::::::::: */
 .table-container {
     overflow-x: auto; /* Scroll horizontal para tabelas largas */
-    background-color: var(--white);
-    border-radius: var(--border-radius-lg);
-    box-shadow: var(--shadow-md);
-    border: 1px solid var(--border-color);
+    /* Removido background-color, border-radius e shadow para aplicar no .card */
 }
 
 .table {
@@ -290,29 +290,30 @@ a:hover {
 .badge-danger { background-color: #FFEAE6; color: var(--danger-color); }
 
 /* ::::::::::::: GRÁFICOS :::::::::::::: */
-.chart-container {
+.chart-container { /* O card já tem esses estilos */
     position: relative;
     height: 280px; /* Altura ajustada */
-    background-color: var(--white);
-    padding: 20px;
-    border-radius: var(--border-radius-lg);
-    box-shadow: var(--shadow-md);
-    border: 1px solid var(--border-color);
+    /* background-color, padding, border-radius, shadow, border já estão no .card */
 }
 
 /* ::::::::::::: LISTAS (MOVIMENTAÇÕES, SALDOS POR LOJA) :::::::::::::: */
 .movements-list,
 .balance-by-store {
-    max-height: 380px; /* Altura máxima com scroll */
+    max-height: 350px; /* Altura máxima com scroll */
     overflow-y: auto;
     padding-right: 8px; /* Espaço para scrollbar, se visível */
 }
+/* Adicionado para o card "Histórico de Cashback" que contém o gráfico */
+.card.chart-card { /* Estilo específico se o card for para gráfico */
+    /* O card já tem padding, não precisa de padding aqui a menos que queira mais */
+}
+
 
 .movement-item,
 .store-balance-item {
     display: flex;
     align-items: center;
-    padding: 10px 0;
+    padding: 10px 0; /* Ajuste para remover padding lateral, já que o card tem */
     border-bottom: 1px solid var(--border-color);
 }
 
@@ -406,14 +407,14 @@ a:hover {
 }
 
 .notification-title {
-    font-weight: 600;
+    font-weight: 600; /* Aumentado para dar mais destaque */
     margin-bottom: 5px;
-    color: var(--primary-dark);
+    color: var(--primary-dark); /* Escurecido para melhor contraste */
 }
 
 .notification-text {
     font-size: var(--font-size-sm);
-    color: var(--dark-gray);
+    color: var(--dark-gray); /* Texto um pouco mais escuro */
     line-height: 1.5;
 }
 
@@ -438,13 +439,13 @@ a:hover {
 .see-all {
     display: block;
     text-align: center;
-    padding: 10px;
+    padding: 10px; /* Padding ajustado */
     color: var(--primary-color);
     text-decoration: none;
     font-weight: 500;
     font-size: var(--font-size-sm);
     margin-top: 15px;
-    border-radius: var(--border-radius-sm);
+    border-radius: var(--border-radius-sm); /* Borda mais suave */
     transition: background-color var(--transition-fast);
 }
 
@@ -498,7 +499,7 @@ a:hover {
     }
 
     .summary-cards {
-        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); /* Cards menores */
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); /* Cards menores e mais flexíveis */
         gap: 15px;
     }
 
@@ -507,29 +508,46 @@ a:hover {
     }
 
     .card-value {
-        font-size: 1.5rem; /* Valor do card menor */
+        font-size: 1.3rem; /* Valor do card menor */
     }
 
     .table th,
     .table td {
         padding: 10px 8px; /* Menor padding na tabela */
         font-size: 0.8rem; /* Fonte menor na tabela */
+        white-space: normal; /* Permitir quebra de linha em mobile para nomes longos */
     }
+    .table th:nth-child(3), /* Ocultar colunas menos importantes se necessário */
+    .table td:nth-child(3) {
+        /* display: none; */ /* Descomente para ocultar colunas */
+    }
+
 
     .movement-item,
     .store-balance-item {
         padding: 8px 0;
+        flex-direction: column; /* Empilhar itens em mobile */
+        align-items: flex-start; /* Alinhar à esquerda */
+        gap: 5px;
     }
-
+    
     .movement-icon,
     .store-balance-item .store-logo {
         width: 32px;
         height: 32px;
-        margin-right: 10px;
+        margin-right: 0; /* Remover margem */
+        margin-bottom: 5px; /* Adicionar margem abaixo */
         font-size: var(--font-size-sm);
     }
 
     .movement-icon svg { width: 16px; height: 16px; }
+
+    .movement-amount,
+    .store-balance-item .store-stats {
+        margin-left: 0; /* Remover margem */
+        text-align: left; /* Alinhar à esquerda */
+        width: 100%; /* Ocupar largura */
+    }
 }
 
 @media (max-width: 480px) {
@@ -540,12 +558,19 @@ a:hover {
         padding-top: calc(var(--navbar-height) + 5px);
     }
     .dashboard-header h1 {
-        font-size: 1.3rem;
+        font-size: 1.2rem; /* Título ainda menor */
     }
     .summary-cards {
         grid-template-columns: 1fr; /* Uma coluna para cards */
     }
+    .card-value {
+        font-size: 1.2rem;
+    }
     .chart-container {
-        height: 250px; /* Gráfico menor */
+        height: 220px; /* Gráfico menor */
+    }
+    .btn {
+        padding: 8px 15px; /* Botões menores */
+        font-size: var(--font-size-sm);
     }
 }
