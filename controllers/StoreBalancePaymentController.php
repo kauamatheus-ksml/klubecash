@@ -12,12 +12,12 @@ require_once __DIR__ . '/AuthController.php';
 class StoreBalancePaymentController {
     
     /**
-     * Obtém pagamentos de saldo pendentes para lojas
-     * 
-     * @param array $filters Filtros para a listagem
-     * @param int $page Página atual
-     * @return array Lista de pagamentos pendentes
-     */
+    * Obtém pagamentos de saldo pendentes para lojas (VERSÃO CORRIGIDA)
+    * 
+    * A correção principal está na lógica da consulta SQL. Agora buscamos
+    * diretamente as movimentações de uso de saldo, independentemente de 
+    * já estarem vinculadas a um pagamento ou não.
+    */
     public static function getPendingStoreBalancePayments($filters = [], $page = 1) {
         try {
             // Verificar se o usuário está autenticado e é administrador
@@ -30,7 +30,7 @@ class StoreBalancePaymentController {
             $offset = ($page - 1) * $limit;
             
             // Construir condições WHERE
-            $whereConditions = ["1=1"]; // Condição inicial sempre verdadeira
+            $whereConditions = ["cm.tipo_operacao = 'uso'", "cm.transacao_uso_id IS NOT NULL"];
             $params = [];
             
             // Aplicar filtros
@@ -49,17 +49,22 @@ class StoreBalancePaymentController {
                 $params[':data_fim'] = $filters['data_fim'];
             }
             
+            // CORREÇÃO PRINCIPAL: Filtrar por status de pagamento de forma mais inteligente
             if (!empty($filters['status_pagamento'])) {
-                $whereConditions[] = "COALESCE(sbp.status, 'pendente') = :status_pagamento";
-                $params[':status_pagamento'] = $filters['status_pagamento'];
+                if ($filters['status_pagamento'] === 'pendente') {
+                    $whereConditions[] = "(sbp.status IS NULL OR sbp.status = 'pendente')";
+                } else {
+                    $whereConditions[] = "sbp.status = :status_pagamento";
+                    $params[':status_pagamento'] = $filters['status_pagamento'];
+                }
             } else {
-                // Por padrão, mostrar apenas pendentes e em processamento
-                $whereConditions[] = "(COALESCE(sbp.status, 'pendente') = 'pendente' OR COALESCE(sbp.status, 'pendente') = 'em_processamento')";
+                // Por padrão, mostrar pendentes (incluindo os sem pagamento)
+                $whereConditions[] = "(sbp.status IS NULL OR sbp.status IN ('pendente', 'em_processamento'))";
             }
             
             $whereClause = "WHERE " . implode(" AND ", $whereConditions);
             
-            // Query para obter pagamentos pendentes agrupados por loja
+            // CONSULTA SQL CORRIGIDA: Agrupa por loja e mostra o que precisa ser pago
             $query = "
                 SELECT 
                     cm.loja_id,
@@ -69,18 +74,19 @@ class StoreBalancePaymentController {
                     SUM(cm.valor) as valor_total_saldo,
                     MIN(cm.data_operacao) as data_mais_antiga,
                     MAX(cm.data_operacao) as data_mais_recente,
-                    COALESCE(sbp.id, 0) as pagamento_id,
-                    COALESCE(sbp.status, 'pendente') as status_pagamento,
-                    COALESCE(sbp.data_criacao, NULL) as data_pagamento
+                    -- Informações do pagamento (se existir)
+                    MAX(COALESCE(sbp.id, 0)) as pagamento_id,
+                    MAX(COALESCE(sbp.status, 'pendente')) as status_pagamento,
+                    MAX(sbp.data_criacao) as data_pagamento,
+                    -- Contar quantas movimentações ainda não têm pagamento
+                    COUNT(CASE WHEN cm.pagamento_id IS NULL THEN 1 END) as movimentacoes_sem_pagamento
                 FROM cashback_movimentacoes cm
                 JOIN lojas l ON cm.loja_id = l.id
-                LEFT JOIN store_balance_payments sbp ON 
-                    (cm.loja_id = sbp.loja_id AND 
-                     cm.id = sbp.movimentacao_id)
+                LEFT JOIN store_balance_payments sbp ON cm.pagamento_id = sbp.id
                 $whereClause
-                AND cm.tipo_operacao = 'uso'
-                AND cm.transacao_uso_id IS NOT NULL
-                GROUP BY cm.loja_id, COALESCE(sbp.id, 0)
+                GROUP BY cm.loja_id, l.nome_fantasia, l.email
+                -- Mostrar apenas lojas que têm movimentações pendentes
+                HAVING valor_total_saldo > 0
                 ORDER BY data_mais_recente DESC, valor_total_saldo DESC
                 LIMIT :limit OFFSET :offset
             ";
@@ -90,12 +96,8 @@ class StoreBalancePaymentController {
                 SELECT COUNT(DISTINCT cm.loja_id) as total
                 FROM cashback_movimentacoes cm
                 JOIN lojas l ON cm.loja_id = l.id
-                LEFT JOIN store_balance_payments sbp ON 
-                    (cm.loja_id = sbp.loja_id AND 
-                     cm.id = sbp.movimentacao_id)
+                LEFT JOIN store_balance_payments sbp ON cm.pagamento_id = sbp.id
                 $whereClause
-                AND cm.tipo_operacao = 'uso'
-                AND cm.transacao_uso_id IS NOT NULL
             ";
             
             // Executar query de contagem
@@ -117,19 +119,24 @@ class StoreBalancePaymentController {
             
             $payments = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
-            // Calcular totais gerais
+            // CONSULTA DE ESTATÍSTICAS CORRIGIDA
             $totalQuery = "
                 SELECT 
                     COUNT(DISTINCT cm.loja_id) as total_lojas,
                     COUNT(DISTINCT cm.id) as total_transacoes,
-                    SUM(cm.valor) as valor_total_pendente,
-                    COUNT(DISTINCT CASE WHEN sbp.status = 'aprovado' THEN cm.loja_id END) as total_lojas_pagas,
-                    SUM(CASE WHEN sbp.status = 'aprovado' THEN cm.valor ELSE 0 END) as valor_total_pago
+                    SUM(CASE 
+                        WHEN sbp.status IS NULL OR sbp.status IN ('pendente', 'em_processamento') 
+                        THEN cm.valor 
+                        ELSE 0 
+                    END) as valor_total_pendente,
+                    SUM(CASE 
+                        WHEN sbp.status = 'aprovado' 
+                        THEN cm.valor 
+                        ELSE 0 
+                    END) as valor_total_pago
                 FROM cashback_movimentacoes cm
                 JOIN lojas l ON cm.loja_id = l.id
-                LEFT JOIN store_balance_payments sbp ON 
-                    (cm.loja_id = sbp.loja_id AND 
-                     cm.id = sbp.movimentacao_id)
+                LEFT JOIN store_balance_payments sbp ON cm.pagamento_id = sbp.id
                 WHERE cm.tipo_operacao = 'uso'
                 AND cm.transacao_uso_id IS NOT NULL
             ";
