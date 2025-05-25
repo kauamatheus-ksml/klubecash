@@ -6,6 +6,12 @@ require_once __DIR__ . '/../config/constants.php';
 /**
  * Modelo para gestão de saldo de cashback por loja
  * Controla créditos, usos e histórico do saldo de cada cliente por loja específica
+ * 
+ * FUNCIONALIDADES PRINCIPAIS:
+ * - Gerenciar saldo de cashback por loja
+ * - Controlar uso de saldo em compras
+ * - Gerar registros de reembolso para lojas automaticamente
+ * - Manter histórico completo de movimentações
  */
 class CashbackBalance {
     private $db;
@@ -17,13 +23,16 @@ class CashbackBalance {
     /**
      * Obtém o saldo disponível de um usuário em uma loja específica
      * 
+     * Este método é fundamental pois o cashback no Klube Cash é isolado por loja.
+     * Um cliente pode ter R$ 100 na Loja A e R$ 50 na Loja B, mas não pode
+     * usar o saldo da Loja A para comprar na Loja B.
+     * 
      * @param int $userId ID do usuário
      * @param int $storeId ID da loja
-     * @return float Saldo disponível
+     * @return float Saldo disponível nesta loja específica
      */
     public function getStoreBalance($userId, $storeId) {
         try {
-            // Debug log
             error_log("DEBUG: Consultando saldo - Usuario: {$userId}, Loja: {$storeId}");
             
             $stmt = $this->db->prepare("
@@ -38,9 +47,7 @@ class CashbackBalance {
             $result = $stmt->fetch(PDO::FETCH_ASSOC);
             $saldo = $result ? floatval($result['saldo_disponivel']) : 0.00;
             
-            // Debug log
             error_log("DEBUG: Saldo encontrado: R$ {$saldo}");
-            
             return $saldo;
             
         } catch (PDOException $e) {
@@ -51,6 +58,9 @@ class CashbackBalance {
     
     /**
      * Obtém todos os saldos de um usuário agrupados por loja
+     * 
+     * Útil para mostrar no dashboard do cliente uma visão completa
+     * de todos os seus saldos disponíveis em diferentes lojas.
      * 
      * @param int $userId ID do usuário
      * @return array Saldos detalhados por loja
@@ -84,8 +94,11 @@ class CashbackBalance {
     /**
      * Obtém o saldo total consolidado de um usuário (soma de todas as lojas)
      * 
+     * Mesmo que o saldo seja isolado por loja, às vezes é útil mostrar
+     * o valor total que o cliente possui no sistema.
+     * 
      * @param int $userId ID do usuário
-     * @return float Saldo total
+     * @return float Saldo total consolidado
      */
     public function getTotalBalance($userId) {
         try {
@@ -109,6 +122,10 @@ class CashbackBalance {
     /**
      * Adiciona saldo de cashback para um usuário em uma loja específica
      * 
+     * Este método é chamado quando uma transação é aprovada e o cashback
+     * é liberado para o cliente. Utiliza a técnica de INSERT ON DUPLICATE KEY
+     * para criar ou atualizar o registro de saldo em uma única operação.
+     * 
      * @param int $userId ID do usuário
      * @param int $storeId ID da loja
      * @param float $amount Valor a ser creditado
@@ -131,10 +148,12 @@ class CashbackBalance {
             
             error_log("CASHBACK: Saldo atual: {$currentBalance}, Novo saldo: {$newBalance}");
             
-            // Iniciar transação
+            // Iniciar transação do banco de dados
             $this->db->beginTransaction();
             
-            // 1. Atualizar/inserir saldo usando INSERT ... ON DUPLICATE KEY UPDATE
+            // 1. Atualizar/inserir saldo usando INSERT ON DUPLICATE KEY UPDATE
+            // Esta técnica permite criar um novo registro ou atualizar um existente
+            // em uma única operação, evitando problemas de concorrência
             $balanceStmt = $this->db->prepare("
                 INSERT INTO cashback_saldos (usuario_id, loja_id, saldo_disponivel, total_creditado)
                 VALUES (?, ?, ?, ?)
@@ -152,7 +171,8 @@ class CashbackBalance {
                 return false;
             }
             
-            // 2. Registrar movimentação
+            // 2. Registrar movimentação no histórico
+            // Mantemos um log detalhado de todas as operações para auditoria
             $movStmt = $this->db->prepare("
                 INSERT INTO cashback_movimentacoes (
                     usuario_id, loja_id, tipo_operacao, valor,
@@ -196,11 +216,21 @@ class CashbackBalance {
     /**
      * Usa saldo de cashback em uma compra na loja específica
      * 
+     * CORREÇÃO PRINCIPAL: Este método agora também cria automaticamente
+     * um registro de reembolso pendente para a loja, resolvendo o problema
+     * onde os pagamentos de saldo às lojas não apareciam.
+     * 
+     * FLUXO COMPLETO:
+     * 1. Verifica se há saldo suficiente
+     * 2. Debita o saldo do cliente
+     * 3. Registra a movimentação no histórico
+     * 4. NOVO: Cria registro de reembolso para a loja
+     * 
      * @param int $userId ID do usuário
      * @param int $storeId ID da loja
      * @param float $amount Valor a ser usado
      * @param string $description Descrição da operação
-     * @param int|null $transactionId ID da transação de uso
+     * @param int|null $useTransactionId ID da transação de uso
      * @return bool Sucesso da operação
      */
     public function useBalance($userId, $storeId, $amount, $description = '', $useTransactionId = null) {
@@ -223,7 +253,7 @@ class CashbackBalance {
             $newBalance = $currentBalance - $amount;
             error_log("CASHBACK USE: Saldo atual: {$currentBalance}, Novo saldo: {$newBalance}");
             
-            // CORREÇÃO: Detectar se já estamos em uma transação
+            // Detectar se já estamos em uma transação (importante para compatibilidade)
             $isInTransaction = $this->db->inTransaction();
             
             // Se não estamos em transação, iniciar uma
@@ -232,7 +262,7 @@ class CashbackBalance {
             }
             
             try {
-                // 1. Debitar saldo
+                // 1. Debitar saldo do cliente
                 $updateStmt = $this->db->prepare("
                     UPDATE cashback_saldos 
                     SET saldo_disponivel = saldo_disponivel - ?,
@@ -256,7 +286,7 @@ class CashbackBalance {
                 
                 error_log("CASHBACK USE: UPDATE executado - {$rowsAffected} linhas afetadas");
                 
-                // 2. Registrar movimentação
+                // 2. Registrar movimentação no histórico
                 $movStmt = $this->db->prepare("
                     INSERT INTO cashback_movimentacoes (
                         usuario_id, loja_id, tipo_operacao, valor,
@@ -283,6 +313,10 @@ class CashbackBalance {
                 
                 error_log("CASHBACK USE: Movimentação registrada com sucesso");
                 
+                // 3. CORREÇÃO PRINCIPAL: Criar registro de reembolso para a loja
+                // Esta é a funcionalidade que estava faltando!
+                $this->createStoreReimbursementRecord($storeId, $amount, $useTransactionId, $userId);
+                
                 // Se iniciamos a transação, fazer commit
                 if (!$isInTransaction) {
                     $this->db->commit();
@@ -306,7 +340,90 @@ class CashbackBalance {
     }
     
     /**
+     * MÉTODO NOVO: Cria registro de reembolso pendente para a loja
+     * 
+     * Este é o método que resolve o problema principal! Quando um cliente
+     * usa saldo, a loja precisa receber o reembolso da plataforma, pois
+     * efetivamente a loja está "perdendo" esse valor na venda.
+     * 
+     * EXEMPLO PRÁTICO:
+     * - Cliente compra R$ 1000, usa R$ 50 de saldo
+     * - Cliente paga apenas R$ 950 para a loja
+     * - Loja deve receber R$ 50 de reembolso da plataforma
+     * - Este método cria esse registro de R$ 50 pendente
+     * 
+     * @param int $storeId ID da loja que deve receber o reembolso
+     * @param float $amount Valor a ser reembolsado
+     * @param int|null $transactionId ID da transação onde o saldo foi usado
+     * @param int $userId ID do cliente que usou o saldo
+     * @return void
+     */
+    private function createStoreReimbursementRecord($storeId, $amount, $transactionId, $userId) {
+        try {
+            error_log("REEMBOLSO: Criando registro - Loja: {$storeId}, Valor: {$amount}");
+            
+            // Verificar se já existe um registro pendente para esta loja
+            // Isso permite agrupar múltiplos usos de saldo em um único pagamento
+            $checkStmt = $this->db->prepare("
+                SELECT id, valor_total FROM store_balance_payments 
+                WHERE loja_id = ? AND status = 'pendente'
+                ORDER BY data_criacao DESC LIMIT 1
+            ");
+            $checkStmt->execute([$storeId]);
+            $existingPayment = $checkStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($existingPayment) {
+                // Se já existe um pagamento pendente, somar o valor
+                // Isso é mais eficiente que criar múltiplos pagamentos pequenos
+                $updateStmt = $this->db->prepare("
+                    UPDATE store_balance_payments 
+                    SET valor_total = valor_total + ?,
+                        observacao = CONCAT(COALESCE(observacao, ''), '\nReembolso adicional - Transação #', ?)
+                    WHERE id = ?
+                ");
+                $updateStmt->execute([$amount, $transactionId, $existingPayment['id']]);
+                
+                $paymentId = $existingPayment['id'];
+                error_log("REEMBOLSO: Valor adicionado ao pagamento existente - ID: {$paymentId}, Novo total: " . ($existingPayment['valor_total'] + $amount));
+            } else {
+                // Criar novo registro de pagamento pendente
+                $insertStmt = $this->db->prepare("
+                    INSERT INTO store_balance_payments 
+                    (loja_id, valor_total, metodo_pagamento, observacao, status, data_criacao)
+                    VALUES (?, ?, 'reembolso_saldo', ?, 'pendente', NOW())
+                ");
+                
+                $observacao = "Reembolso de saldo usado pelo cliente - Transação #{$transactionId}";
+                $insertStmt->execute([$storeId, $amount, $observacao]);
+                
+                $paymentId = $this->db->lastInsertId();
+                error_log("REEMBOLSO: Novo registro criado - ID: {$paymentId}, Valor: {$amount}");
+            }
+            
+            // Vincular a movimentação de uso ao pagamento
+            // Isso permite rastrear quais usos de saldo estão incluídos em cada pagamento
+            $updateMovStmt = $this->db->prepare("
+                UPDATE cashback_movimentacoes 
+                SET pagamento_id = ?
+                WHERE transacao_uso_id = ? AND usuario_id = ? AND loja_id = ? AND tipo_operacao = 'uso'
+                ORDER BY data_operacao DESC LIMIT 1
+            ");
+            $updateMovStmt->execute([$paymentId, $transactionId, $userId, $storeId]);
+            
+            error_log("REEMBOLSO: Movimentação vinculada ao pagamento {$paymentId}");
+            
+        } catch (Exception $e) {
+            error_log('REEMBOLSO: Erro ao criar registro - ' . $e->getMessage());
+            // IMPORTANTE: Não falhar a transação principal por causa de erro no reembolso
+            // O uso do saldo é mais crítico que o registro do reembolso
+        }
+    }
+    
+    /**
      * Estorna o uso de saldo (reverter operação de uso)
+     * 
+     * Útil quando uma transação é cancelada e precisamos devolver
+     * o saldo que foi usado pelo cliente.
      * 
      * @param int $userId ID do usuário
      * @param int $storeId ID da loja
@@ -327,7 +444,7 @@ class CashbackBalance {
             $currentBalance = $this->getStoreBalance($userId, $storeId);
             $newBalance = $currentBalance + $amount;
             
-            // Atualizar saldo
+            // Atualizar saldo (adicionar de volta o valor estornado)
             $stmt = $this->db->prepare("
                 UPDATE cashback_saldos 
                 SET saldo_disponivel = saldo_disponivel + :amount,
@@ -343,7 +460,7 @@ class CashbackBalance {
                 throw new Exception('Erro ao atualizar saldo');
             }
             
-            // Registrar movimentação
+            // Registrar movimentação de estorno
             $this->recordMovement($userId, $storeId, 'estorno', $amount, $currentBalance, $newBalance, $description, null, $transactionId);
             
             $this->db->commit();
@@ -359,16 +476,19 @@ class CashbackBalance {
     /**
      * Registra uma movimentação no histórico
      * 
+     * Método auxiliar para manter consistência no registro de movimentações.
+     * Todas as operações (crédito, uso, estorno) são registradas aqui.
+     * 
      * @param int $userId
      * @param int $storeId
-     * @param string $type
-     * @param float $amount
-     * @param float $previousBalance
-     * @param float $newBalance
-     * @param string $description
-     * @param int|null $originTransactionId
-     * @param int|null $useTransactionId
-     * @return bool
+     * @param string $type Tipo da operação (credito, uso, estorno)
+     * @param float $amount Valor da operação
+     * @param float $previousBalance Saldo anterior
+     * @param float $newBalance Novo saldo após a operação
+     * @param string $description Descrição da operação
+     * @param int|null $originTransactionId ID da transação origem (para créditos)
+     * @param int|null $useTransactionId ID da transação de uso (para débitos)
+     * @return bool Sucesso da operação
      */
     private function recordMovement($userId, $storeId, $type, $amount, $previousBalance, $newBalance, $description = '', $originTransactionId = null, $useTransactionId = null) {
         try {
@@ -409,12 +529,15 @@ class CashbackBalance {
             
         } catch (PDOException $e) {
             error_log('CASHBACK DEBUG: Exceção ao registrar movimentação: ' . $e->getMessage());
-            return true;
+            return true; // Não falhar por causa de erro no log
         }
     }
     
     /**
      * Obtém o histórico de movimentações de um usuário em uma loja
+     * 
+     * Retorna um histórico detalhado com informações das transações
+     * relacionadas para facilitar a auditoria e o entendimento do cliente.
      * 
      * @param int $userId ID do usuário
      * @param int $storeId ID da loja
@@ -458,9 +581,12 @@ class CashbackBalance {
     /**
      * Obtém estatísticas de uso do cashback por loja
      * 
+     * Fornece informações úteis para análise do comportamento
+     * do cliente e performance do sistema de cashback.
+     * 
      * @param int $userId ID do usuário
      * @param int $storeId ID da loja
-     * @return array Estatísticas
+     * @return array Estatísticas detalhadas
      */
     public function getBalanceStatistics($userId, $storeId) {
         try {
@@ -493,7 +619,9 @@ class CashbackBalance {
     
     /**
      * Sincroniza saldos com base nas transações aprovadas
-     * Útil para correções ou migrações de dados
+     * 
+     * Método útil para correções ou migrações de dados.
+     * Recalcula todos os saldos baseado nas transações efetivamente aprovadas.
      * 
      * @param int|null $userId ID do usuário específico (null para todos)
      * @return bool Sucesso da operação

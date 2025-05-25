@@ -1,18 +1,18 @@
-
 <?php
 // scripts/fix_missing_reimbursements.php
 require_once '../config/database.php';
 
+echo "🔧 Iniciando correção de reembolsos faltantes...\n\n";
+
 try {
     $db = Database::getConnection();
     
-    echo "Iniciando correção de reembolsos faltantes...\n";
-    
     // Buscar todas as movimentações de uso de saldo sem pagamento vinculado
     $stmt = $db->query("
-        SELECT cm.*, l.nome_fantasia 
+        SELECT cm.*, l.nome_fantasia, u.nome as cliente_nome
         FROM cashback_movimentacoes cm
         JOIN lojas l ON cm.loja_id = l.id
+        JOIN usuarios u ON cm.usuario_id = u.id
         WHERE cm.tipo_operacao = 'uso' 
         AND cm.transacao_uso_id IS NOT NULL
         AND cm.pagamento_id IS NULL
@@ -21,12 +21,14 @@ try {
     
     $movimentacoes = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    echo "Encontradas " . count($movimentacoes) . " movimentações sem reembolso.\n";
+    echo "📊 Encontradas " . count($movimentacoes) . " movimentações sem reembolso.\n\n";
     
     foreach ($movimentacoes as $mov) {
-        echo "\nProcessando movimentação ID {$mov['id']}:\n";
-        echo "- Loja: {$mov['nome_fantasia']}\n";
-        echo "- Valor: R$ " . number_format($mov['valor'], 2, ',', '.') . "\n";
+        echo "🔄 Processando movimentação ID {$mov['id']}:\n";
+        echo "   • Loja: {$mov['nome_fantasia']}\n";
+        echo "   • Cliente: {$mov['cliente_nome']}\n";
+        echo "   • Valor: R$ " . number_format($mov['valor'], 2, ',', '.') . "\n";
+        echo "   • Data: {$mov['data_operacao']}\n";
         
         // Verificar se já existe pagamento pendente para esta loja
         $checkStmt = $db->prepare("
@@ -41,10 +43,11 @@ try {
             // Atualizar pagamento existente
             $updateStmt = $db->prepare("
                 UPDATE store_balance_payments 
-                SET valor_total = valor_total + ?
+                SET valor_total = valor_total + ?,
+                    observacao = CONCAT(COALESCE(observacao, ''), '\n• Transação #', ?, ' - R$ ', ?, ' (Correção automática)')
                 WHERE id = ?
             ");
-            $updateStmt->execute([$mov['valor'], $existingPayment['id']]);
+            $updateStmt->execute([$mov['valor'], $mov['transacao_uso_id'], number_format($mov['valor'], 2, ',', '.'), $existingPayment['id']]);
             
             // Vincular movimentação ao pagamento
             $linkStmt = $db->prepare("
@@ -54,7 +57,7 @@ try {
             ");
             $linkStmt->execute([$existingPayment['id'], $mov['id']]);
             
-            echo "- Adicionado ao pagamento existente ID {$existingPayment['id']}\n";
+            echo "   ✅ Adicionado ao pagamento existente ID {$existingPayment['id']}\n";
         } else {
             // Criar novo pagamento
             $insertStmt = $db->prepare("
@@ -63,7 +66,7 @@ try {
                 VALUES (?, ?, 'reembolso_saldo', ?, 'pendente', ?)
             ");
             
-            $observacao = "Reembolso de saldo usado - Transação #{$mov['transacao_uso_id']} (Correção automática)";
+            $observacao = "Reembolso de saldo usado pelos clientes\n• Transação #{$mov['transacao_uso_id']} - R$ " . number_format($mov['valor'], 2, ',', '.') . " (Correção automática)";
             $insertStmt->execute([
                 $mov['loja_id'], 
                 $mov['valor'], 
@@ -81,13 +84,15 @@ try {
             ");
             $linkStmt->execute([$paymentId, $mov['id']]);
             
-            echo "- Criado novo pagamento ID $paymentId\n";
+            echo "   ✅ Criado novo pagamento ID $paymentId\n";
         }
+        echo "\n";
     }
     
-    echo "\nCorreção concluída com sucesso!\n";
+    echo "🎉 Correção concluída com sucesso!\n";
+    echo "💡 Agora verifique a aba 'Pagamentos de Saldo às Lojas' no painel administrativo.\n";
     
 } catch (Exception $e) {
-    echo "Erro durante a correção: " . $e->getMessage() . "\n";
+    echo "❌ Erro durante a correção: " . $e->getMessage() . "\n";
 }
 ?>
