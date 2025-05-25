@@ -1,22 +1,38 @@
 <?php
-// views/stores/register.php
-// Incluir arquivos de configuração
-require_once '../../config/constants.php';
-require_once '../../config/database.php';
-require_once '../../config/email.php';
-require_once '../../controllers/StoreController.php';
-require_once '../../utils/Validator.php';
+// Ativar debug temporário
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
+// Definir o diretório raiz do projeto
+define('ROOT_PATH', dirname(dirname(__DIR__)));
+
+// Incluir arquivos de configuração com caminhos absolutos
+try {
+    require_once ROOT_PATH . '/config/constants.php';
+    require_once ROOT_PATH . '/config/database.php';
+    require_once ROOT_PATH . '/config/email.php';
+    require_once ROOT_PATH . '/controllers/StoreController.php';
+    require_once ROOT_PATH . '/utils/Validator.php';
+} catch (Exception $e) {
+    die("Erro ao carregar arquivos: " . $e->getMessage());
+}
 
 // Verificar se já existe uma sessão ativa
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 $isLoggedIn = isset($_SESSION['user_id']);
-$isAdmin = $isLoggedIn && $_SESSION['user_type'] == USER_TYPE_ADMIN;
+$isAdmin = $isLoggedIn && isset($_SESSION['user_type']) && $_SESSION['user_type'] == USER_TYPE_ADMIN;
 
 // Processar o formulário de cadastro de loja
 $error = '';
 $success = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Debug: verificar se o POST está chegando
+    error_log("POST recebido: " . print_r($_POST, true));
+    
     // Capturar e sanitizar dados do formulário
     $data = [
         'nome_fantasia' => filter_input(INPUT_POST, 'nome_fantasia', FILTER_SANITIZE_STRING),
@@ -29,7 +45,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'categoria' => filter_input(INPUT_POST, 'categoria', FILTER_SANITIZE_STRING),
         'descricao' => filter_input(INPUT_POST, 'descricao', FILTER_SANITIZE_STRING),
         'website' => filter_input(INPUT_POST, 'website', FILTER_SANITIZE_URL),
-        'porcentagem_cashback' => filter_input(INPUT_POST, 'porcentagem_cashback', FILTER_SANITIZE_NUMBER_FLOAT, FILTER_FLAG_ALLOW_FRACTION),
         'endereco' => [
             'cep' => filter_input(INPUT_POST, 'cep', FILTER_SANITIZE_STRING),
             'logradouro' => filter_input(INPUT_POST, 'logradouro', FILTER_SANITIZE_STRING),
@@ -40,6 +55,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'estado' => filter_input(INPUT_POST, 'estado', FILTER_SANITIZE_STRING)
         ]
     ];
+    
+    // Debug: verificar dados processados
+    error_log("Dados processados: " . print_r($data, true));
     
     // Validar campos obrigatórios manualmente para dar mensagens mais específicas
     $errors = [];
@@ -108,23 +126,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     // Se não houver erros, prosseguir com o cadastro
     if (empty($errors)) {
-        // Formatar CNPJ (remover caracteres especiais)
-        $data['cnpj'] = preg_replace('/[^0-9]/', '', $data['cnpj']);
-        
-        // Registrar a loja
-        $result = StoreController::registerStore($data);
-        
-        if ($result['status']) {
-            $success = $result['message'];
+        try {
+            // Formatar CNPJ (remover caracteres especiais)
+            $data['cnpj'] = preg_replace('/[^0-9]/', '', $data['cnpj']);
             
-            // Limpar dados do formulário se cadastro bem-sucedido
-            if (isset($result['data']['awaiting_approval']) && $result['data']['awaiting_approval']) {
-                // Manter dados se está aguardando aprovação (para casos onde o admin pode ver)
-            } else {
-                $data = [];
+            // Debug: verificar se o método existe
+            if (!method_exists('StoreController', 'registerStore')) {
+                throw new Exception('Método StoreController::registerStore não encontrado');
             }
-        } else {
-            $error = $result['message'];
+            
+            // Registrar a loja
+            $result = StoreController::registerStore($data);
+            
+            // Debug: verificar resultado
+            error_log("Resultado do cadastro: " . print_r($result, true));
+            
+            if ($result['status']) {
+                $success = $result['message'];
+                
+                // Limpar dados do formulário se cadastro bem-sucedido
+                if (isset($result['data']['awaiting_approval']) && $result['data']['awaiting_approval']) {
+                    // Se está aguardando aprovação, manter dados para referência
+                } else {
+                    $data = [];
+                }
+            } else {
+                $error = $result['message'];
+            }
+        } catch (Exception $e) {
+            error_log("Erro no cadastro: " . $e->getMessage());
+            $error = "Erro interno: " . $e->getMessage();
         }
     } else {
         $error = implode('<br>', $errors);
@@ -423,7 +454,15 @@ $estados = [
 </head>
 <body>
     <!-- Incluir navbar -->
-    <?php include_once '../components/navbar.php'; ?>
+    <!-- Incluir navbar com verificação -->
+    <?php 
+    $navbar_path = ROOT_PATH . '/views/components/navbar.php';
+    if (file_exists($navbar_path)) {
+        include_once $navbar_path; 
+    } else {
+        echo "<!-- Navbar não encontrada: $navbar_path -->";
+    }
+    ?>
     
     <div class="container">
         <div class="page-header">
