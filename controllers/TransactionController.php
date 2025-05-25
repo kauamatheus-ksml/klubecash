@@ -1218,6 +1218,7 @@ class TransactionController {
                 }
                 
                 // Atualizar saldo do administrador
+                // Atualizar saldo do administrador
                 foreach ($transactions as $transaction) {
                     // Obter valor da comissão do admin para esta transação
                     $adminComissionStmt = $db->prepare("
@@ -1230,11 +1231,21 @@ class TransactionController {
                     
                     if ($adminComission && !empty($adminComission['valor_comissao'])) {
                         $descricao = "Comissão da transação #{$transaction['id']} - Pagamento #{$paymentId}";
-                        AdminController::updateAdminBalance(
+                        
+                        // Log para debug
+                        error_log("APROVAÇÃO: Atualizando saldo admin - Valor: {$adminComission['valor_comissao']}");
+                        
+                        $updateResult = AdminController::updateAdminBalance(
                             $adminComission['valor_comissao'],
                             $transaction['id'],
                             $descricao
                         );
+                        
+                        if ($updateResult) {
+                            error_log("APROVAÇÃO: Saldo admin atualizado com sucesso");
+                        } else {
+                            error_log("APROVAÇÃO: ERRO ao atualizar saldo admin");
+                        }
                     }
                 }
                 

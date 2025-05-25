@@ -1910,7 +1910,7 @@ public static function getAvailableStores() {
     public static function updateAdminBalance($valor, $transacaoId = null, $descricao = '') {
         try {
             if ($valor == 0) {
-                return true; // Nada a fazer
+                return true; // Nada a fazer se o valor for zero
             }
             
             $db = Database::getConnection();
@@ -1919,46 +1919,60 @@ public static function getAvailableStores() {
             $db->beginTransaction();
             
             // Verificar se já existe registro de saldo
-            $checkStmt = $db->query("SELECT COUNT(*) as total FROM admin_saldo");
+            $checkStmt = $db->query("SELECT COUNT(*) as total FROM admin_saldo WHERE id = 1");
             $exists = $checkStmt->fetch(PDO::FETCH_ASSOC)['total'] > 0;
             
             if (!$exists) {
-                // Criar registro inicial
+                // Criar registro inicial se não existir
                 $initStmt = $db->prepare("
-                    INSERT INTO admin_saldo (valor_total, valor_disponivel, valor_pendente)
-                    VALUES (0, 0, 0)
+                    INSERT INTO admin_saldo (id, valor_total, valor_disponivel, valor_pendente)
+                    VALUES (1, 0.00, 0.00, 0.00)
                 ");
                 $initStmt->execute();
+                error_log("SALDO ADMIN: Registro inicial criado");
             }
             
             // Determinar tipo de operação
             $tipo = $valor > 0 ? 'credito' : 'debito';
             $valorAbs = abs($valor);
             
-            // Atualizar saldo
+            // Atualizar saldo - sempre adiciona ao disponível quando é crédito de comissão
             $updateStmt = $db->prepare("
                 UPDATE admin_saldo
                 SET valor_total = valor_total + :valor,
-                    valor_disponivel = valor_disponivel + :valor
+                    valor_disponivel = valor_disponivel + :valor,
+                    ultima_atualizacao = NOW()
                 WHERE id = 1
             ");
             $updateStmt->bindParam(':valor', $valor);
-            $updateStmt->execute();
+            $updateResult = $updateStmt->execute();
+            
+            if (!$updateResult) {
+                throw new Exception('Erro ao atualizar saldo do admin');
+            }
             
             // Registrar movimentação
             $movStmt = $db->prepare("
                 INSERT INTO admin_saldo_movimentacoes 
-                (transacao_id, valor, tipo, descricao)
-                VALUES (:transacao_id, :valor, :tipo, :descricao)
+                (transacao_id, valor, tipo, descricao, data_operacao)
+                VALUES (:transacao_id, :valor, :tipo, :descricao, NOW())
             ");
             $movStmt->bindParam(':transacao_id', $transacaoId);
             $movStmt->bindParam(':valor', $valorAbs);
             $movStmt->bindParam(':tipo', $tipo);
             $movStmt->bindParam(':descricao', $descricao);
-            $movStmt->execute();
+            $movResult = $movStmt->execute();
             
-            // Commit
+            if (!$movResult) {
+                throw new Exception('Erro ao registrar movimentação');
+            }
+            
+            // Commit da transação
             $db->commit();
+            
+            // Log de sucesso
+            error_log("SALDO ADMIN: Atualizado com sucesso - Valor: $valor, Tipo: $tipo, Descrição: $descricao");
+            
             return true;
             
         } catch (Exception $e) {
@@ -1966,7 +1980,7 @@ public static function getAvailableStores() {
             if (isset($db) && $db->inTransaction()) {
                 $db->rollBack();
             }
-            error_log('Erro ao atualizar saldo admin: ' . $e->getMessage());
+            error_log('SALDO ADMIN: Erro ao atualizar saldo - ' . $e->getMessage());
             return false;
         }
     }
@@ -1984,7 +1998,7 @@ public static function getAvailableStores() {
             
             $db = Database::getConnection();
             
-            // Obter dados de comissões (como já estava)
+            // Obter dados de comissões (método antigo)
             $totalBalanceStmt = $db->query("
                 SELECT SUM(valor_comissao) as total
                 FROM transacoes_comissao
@@ -1999,16 +2013,28 @@ public static function getAvailableStores() {
             ");
             $pendingBalance = $pendingBalanceStmt->fetch(PDO::FETCH_ASSOC)['total'] ?? 0;
             
-            // Obter saldo real da Klube Cash (novo)
+            // Obter saldo real da Klube Cash (novo método)
             $adminBalanceStmt = $db->query("SELECT * FROM admin_saldo WHERE id = 1");
             $adminBalance = $adminBalanceStmt->fetch(PDO::FETCH_ASSOC);
             
+            // Log para debug
+            error_log("SALDO ADMIN DEBUG: Dados recuperados - " . print_r($adminBalance, true));
+            
             if (!$adminBalance) {
+                // Se não existir, criar registro inicial
+                $createStmt = $db->prepare("
+                    INSERT INTO admin_saldo (id, valor_total, valor_disponivel, valor_pendente)
+                    VALUES (1, 0.00, 0.00, 0.00)
+                ");
+                $createStmt->execute();
+                
                 $adminBalance = [
-                    'valor_total' => 0,
-                    'valor_disponivel' => 0,
-                    'valor_pendente' => 0
+                    'valor_total' => 0.00,
+                    'valor_disponivel' => 0.00,
+                    'valor_pendente' => 0.00
                 ];
+                
+                error_log("SALDO ADMIN DEBUG: Registro criado com valores zerados");
             }
             
             // Obter movimentações do saldo
@@ -2025,7 +2051,7 @@ public static function getAvailableStores() {
             ");
             $movimentacoes = $movimentacoesStmt->fetchAll(PDO::FETCH_ASSOC);
             
-            // O resto permanece igual...
+            // Obter histórico de comissões
             $historyStmt = $db->query("
                 SELECT 
                     tc.id,
@@ -2046,6 +2072,7 @@ public static function getAvailableStores() {
             ");
             $history = $historyStmt->fetchAll(PDO::FETCH_ASSOC);
             
+            // Estatísticas mensais
             $monthlyStmt = $db->query("
                 SELECT 
                     DATE_FORMAT(tc.data_transacao, '%Y-%m') as mes,
@@ -2059,6 +2086,7 @@ public static function getAvailableStores() {
             ");
             $monthly = $monthlyStmt->fetchAll(PDO::FETCH_ASSOC);
             
+            // Top lojas
             $topStoresStmt = $db->query("
                 SELECT 
                     l.nome_fantasia,
@@ -2078,8 +2106,8 @@ public static function getAvailableStores() {
                 'data' => [
                     'saldo_total' => $totalBalance,
                     'saldo_pendente' => $pendingBalance,
-                    'saldo_admin' => $adminBalance, // Novo campo
-                    'movimentacoes' => $movimentacoes, // Novo campo
+                    'saldo_admin' => $adminBalance,
+                    'movimentacoes' => $movimentacoes,
                     'historico' => $history,
                     'mensal' => $monthly,
                     'top_lojas' => $topStores
