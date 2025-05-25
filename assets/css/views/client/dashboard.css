@@ -664,23 +664,35 @@ body {
 }
 
 @media (max-width: 767px) {
+    /* Remover qualquer padding horizontal que possa causar overflow */
     .container {
-        padding: 15px;
+        padding-left: 10px;
+        padding-right: 10px;
     }
     
-    .dashboard-header {
-        text-align: center;
+    /* Garantir que tabelas não ultrapassem */
+    .table-container {
+        margin: 0;
+        padding: 0;
     }
     
+    /* Ajustar cards para não terem margin que cause overflow */
+    .card {
+        margin: 0;
+    }
+    
+    /* Garantir que botões não ultrapassem em linha */
     .header-actions {
-        width: 100%;
-        justify-content: center;
+        justify-content: stretch;
     }
     
     .header-actions .btn {
         flex: 1;
-        min-width: 120px;
+        min-width: 0;
+        padding: 8px 12px;
+        font-size: 12px;
     }
+
     
     .summary-cards {
         grid-template-columns: 1fr;
