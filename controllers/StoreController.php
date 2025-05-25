@@ -200,10 +200,10 @@ class StoreController {
             
             // IMPORTANTE: Usuário criado como INATIVO até loja ser aprovada
             $tipoUsuario = USER_TYPE_STORE;
-            $statusUsuario = USER_INACTIVE; // Inativo até aprovação da loja
-            
-            $userInsertStmt->bindParam(':tipo', $tipoUsuario);
-            $userInsertStmt->bindParam(':status', $statusUsuario);
+            $statusUsuario = USER_INACTIVE;
+
+            $stmt->bindParam(':tipo', $tipoUsuario);
+            $stmt->bindParam(':status', $statusUsuario);
             
             if (!$userInsertStmt->execute()) {
                 $db->rollBack();

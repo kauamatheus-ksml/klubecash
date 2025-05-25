@@ -69,25 +69,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     try {
         // Como um filtro de água que remove impurezas, vamos limpar e validar cada campo
+        // Capturar e sanitizar dados - usando métodos modernos como um sistema de segurança atualizado
         $data = [
-            'nome_fantasia' => trim(filter_input(INPUT_POST, 'nome_fantasia', FILTER_SANITIZE_STRING) ?? ''),
-            'razao_social' => trim(filter_input(INPUT_POST, 'razao_social', FILTER_SANITIZE_STRING) ?? ''),
-            'cnpj' => trim(filter_input(INPUT_POST, 'cnpj', FILTER_SANITIZE_STRING) ?? ''),
-            'email' => trim(filter_input(INPUT_POST, 'email', FILTER_SANITIZE_EMAIL) ?? ''),
-            'telefone' => trim(filter_input(INPUT_POST, 'telefone', FILTER_SANITIZE_STRING) ?? ''),
-            'senha' => $_POST['senha'] ?? '',
+            'nome_fantasia' => trim(htmlspecialchars($_POST['nome_fantasia'] ?? '', ENT_QUOTES, 'UTF-8')),
+            'razao_social' => trim(htmlspecialchars($_POST['razao_social'] ?? '', ENT_QUOTES, 'UTF-8')),
+            'cnpj' => trim(htmlspecialchars($_POST['cnpj'] ?? '', ENT_QUOTES, 'UTF-8')),
+            'email' => trim(filter_var($_POST['email'] ?? '', FILTER_SANITIZE_EMAIL)),
+            'telefone' => trim(htmlspecialchars($_POST['telefone'] ?? '', ENT_QUOTES, 'UTF-8')),
+            'senha' => $_POST['senha'] ?? '', // Senhas não devem ser sanitizadas para preservar caracteres especiais
             'confirma_senha' => $_POST['confirma_senha'] ?? '',
-            'categoria' => trim(filter_input(INPUT_POST, 'categoria', FILTER_SANITIZE_STRING) ?? ''),
-            'descricao' => trim(filter_input(INPUT_POST, 'descricao', FILTER_SANITIZE_STRING) ?? ''),
-            'website' => trim(filter_input(INPUT_POST, 'website', FILTER_SANITIZE_URL) ?? ''),
+            'categoria' => trim(htmlspecialchars($_POST['categoria'] ?? '', ENT_QUOTES, 'UTF-8')),
+            'descricao' => trim(htmlspecialchars($_POST['descricao'] ?? '', ENT_QUOTES, 'UTF-8')),
+            'website' => trim(filter_var($_POST['website'] ?? '', FILTER_SANITIZE_URL)),
             'endereco' => [
-                'cep' => trim(filter_input(INPUT_POST, 'cep', FILTER_SANITIZE_STRING) ?? ''),
-                'logradouro' => trim(filter_input(INPUT_POST, 'logradouro', FILTER_SANITIZE_STRING) ?? ''),
-                'numero' => trim(filter_input(INPUT_POST, 'numero', FILTER_SANITIZE_STRING) ?? ''),
-                'complemento' => trim(filter_input(INPUT_POST, 'complemento', FILTER_SANITIZE_STRING) ?? ''),
-                'bairro' => trim(filter_input(INPUT_POST, 'bairro', FILTER_SANITIZE_STRING) ?? ''),
-                'cidade' => trim(filter_input(INPUT_POST, 'cidade', FILTER_SANITIZE_STRING) ?? ''),
-                'estado' => trim(filter_input(INPUT_POST, 'estado', FILTER_SANITIZE_STRING) ?? '')
+                'cep' => trim(htmlspecialchars($_POST['cep'] ?? '', ENT_QUOTES, 'UTF-8')),
+                'logradouro' => trim(htmlspecialchars($_POST['logradouro'] ?? '', ENT_QUOTES, 'UTF-8')),
+                'numero' => trim(htmlspecialchars($_POST['numero'] ?? '', ENT_QUOTES, 'UTF-8')),
+                'complemento' => trim(htmlspecialchars($_POST['complemento'] ?? '', ENT_QUOTES, 'UTF-8')),
+                'bairro' => trim(htmlspecialchars($_POST['bairro'] ?? '', ENT_QUOTES, 'UTF-8')),
+                'cidade' => trim(htmlspecialchars($_POST['cidade'] ?? '', ENT_QUOTES, 'UTF-8')),
+                'estado' => trim(htmlspecialchars($_POST['estado'] ?? '', ENT_QUOTES, 'UTF-8'))
             ]
         ];
         
