@@ -1,23 +1,89 @@
 <?php
-// Ativar debug temporário
+// views/stores/register.php - Versão corrigida
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-// Definir o diretório raiz do projeto
-define('ROOT_PATH', dirname(dirname(__DIR__)));
+echo "<!-- Debug: Iniciando carregamento da página -->\n";
 
-// Incluir arquivos de configuração com caminhos absolutos
-try {
-    require_once ROOT_PATH . '/config/constants.php';
-    require_once ROOT_PATH . '/config/database.php';
-    require_once ROOT_PATH . '/config/email.php';
-    require_once ROOT_PATH . '/controllers/StoreController.php';
-    require_once ROOT_PATH . '/utils/Validator.php';
-} catch (Exception $e) {
-    die("Erro ao carregar arquivos: " . $e->getMessage());
+// Estratégia múltipla para encontrar os arquivos
+function smart_include($relative_path) {
+    // Lista de possíveis caminhos base
+    $base_paths = [
+        dirname(dirname(__DIR__)), // Dois níveis acima (/klube-cash/)
+        $_SERVER['DOCUMENT_ROOT'], // Raiz do servidor web
+        dirname(dirname(dirname(__FILE__))) // Três níveis acima via __FILE__
+    ];
+    
+    foreach ($base_paths as $base) {
+        $full_path = $base . '/' . $relative_path;
+        if (file_exists($full_path)) {
+            require_once $full_path;
+            echo "<!-- Debug: Carregado $relative_path de $full_path -->\n";
+            return true;
+        }
+    }
+    
+    // Se não encontrou, mostrar erro detalhado
+    echo "<!-- Erro: Não foi possível encontrar $relative_path -->\n";
+    echo "<!-- Tentou nos caminhos: " . implode(', ', array_map(function($base) use ($relative_path) {
+        return $base . '/' . $relative_path;
+    }, $base_paths)) . " -->\n";
+    
+    return false;
 }
 
-// Verificar se já existe uma sessão ativa
+// Carregar arquivos essenciais
+echo "<!-- Debug: Carregando arquivos de configuração -->\n";
+
+$required_files = [
+    'config/constants.php',
+    'config/database.php',
+    'config/email.php',
+    'controllers/StoreController.php',
+    'utils/Validator.php'
+];
+
+$missing_files = [];
+foreach ($required_files as $file) {
+    if (!smart_include($file)) {
+        $missing_files[] = $file;
+    }
+}
+
+// Se algum arquivo essencial não foi encontrado, mostrar erro amigável
+if (!empty($missing_files)) {
+    ?>
+    <!DOCTYPE html>
+    <html lang="pt-BR">
+    <head>
+        <meta charset="UTF-8">
+        <title>Erro de Configuração</title>
+        <style>
+            body { font-family: Arial; padding: 20px; background: #f5f5f5; }
+            .error-box { background: #fff; border-left: 4px solid #dc3545; padding: 20px; margin: 20px 0; }
+            .file-list { background: #f8f9fa; padding: 10px; margin: 10px 0; }
+        </style>
+    </head>
+    <body>
+        <h1>Erro de Configuração do Sistema</h1>
+        <div class="error-box">
+            <h3>Arquivos não encontrados:</h3>
+            <div class="file-list">
+                <?php foreach ($missing_files as $file): ?>
+                    <div>❌ <?php echo htmlspecialchars($file); ?></div>
+                <?php endforeach; ?>
+            </div>
+            <p><strong>Solução:</strong> Verifique se os arquivos existem na estrutura do projeto e se os caminhos estão corretos.</p>
+        </div>
+    </body>
+    </html>
+    <?php
+    exit;
+}
+
+echo "<!-- Debug: Todos os arquivos carregados com sucesso -->\n";
+
+// Iniciar sessão de forma segura
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -25,13 +91,23 @@ if (session_status() === PHP_SESSION_NONE) {
 $isLoggedIn = isset($_SESSION['user_id']);
 $isAdmin = $isLoggedIn && isset($_SESSION['user_type']) && $_SESSION['user_type'] == USER_TYPE_ADMIN;
 
+// Verificar se as classes foram carregadas
+if (!class_exists('StoreController')) {
+    die("Erro: Classe StoreController não foi carregada corretamente.");
+}
+
+if (!class_exists('Validator')) {
+    die("Erro: Classe Validator não foi carregada corretamente.");
+}
+
+echo "<!-- Debug: Classes verificadas com sucesso -->\n";
+
 // Processar o formulário de cadastro de loja
 $error = '';
 $success = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Debug: verificar se o POST está chegando
-    error_log("POST recebido: " . print_r($_POST, true));
+    echo "<!-- Debug: Processando POST -->\n";
     
     // Capturar e sanitizar dados do formulário
     $data = [
@@ -40,8 +116,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'cnpj' => filter_input(INPUT_POST, 'cnpj', FILTER_SANITIZE_STRING),
         'email' => filter_input(INPUT_POST, 'email', FILTER_SANITIZE_EMAIL),
         'telefone' => filter_input(INPUT_POST, 'telefone', FILTER_SANITIZE_STRING),
-        'senha' => $_POST['senha'] ?? '', // Não sanitizar senha para preservar caracteres especiais
-        'confirma_senha' => $_POST['confirma_senha'] ?? '', // Não sanitizar para comparação
+        'senha' => $_POST['senha'] ?? '',
+        'confirma_senha' => $_POST['confirma_senha'] ?? '',
         'categoria' => filter_input(INPUT_POST, 'categoria', FILTER_SANITIZE_STRING),
         'descricao' => filter_input(INPUT_POST, 'descricao', FILTER_SANITIZE_STRING),
         'website' => filter_input(INPUT_POST, 'website', FILTER_SANITIZE_URL),
@@ -56,119 +132,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ]
     ];
     
-    // Debug: verificar dados processados
-    error_log("Dados processados: " . print_r($data, true));
-    
-    // Validar campos obrigatórios manualmente para dar mensagens mais específicas
+    // Validação básica
     $errors = [];
     
-    if (empty($data['nome_fantasia'])) {
-        $errors[] = 'Nome fantasia é obrigatório';
-    }
-    
-    if (empty($data['razao_social'])) {
-        $errors[] = 'Razão social é obrigatória';
-    }
-    
-    if (empty($data['cnpj'])) {
-        $errors[] = 'CNPJ é obrigatório';
-    }
-    
-    if (empty($data['email']) || !filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
-        $errors[] = 'Email inválido';
-    }
-    
-    if (empty($data['telefone'])) {
-        $errors[] = 'Telefone é obrigatório';
-    }
-    
-    // Validação específica da senha
-    if (empty($data['senha'])) {
-        $errors[] = 'Senha é obrigatória';
-    } elseif (strlen($data['senha']) < 8) {
-        $errors[] = 'A senha deve ter pelo menos 8 caracteres';
-    }
-    
-    if (empty($data['confirma_senha'])) {
-        $errors[] = 'Confirmação de senha é obrigatória';
-    } elseif ($data['senha'] !== $data['confirma_senha']) {
-        $errors[] = 'As senhas não coincidem';
-    }
-    
-    if (empty($data['categoria'])) {
-        $errors[] = 'Categoria é obrigatória';
-    }
+    if (empty($data['nome_fantasia'])) $errors[] = 'Nome fantasia é obrigatório';
+    if (empty($data['razao_social'])) $errors[] = 'Razão social é obrigatória';
+    if (empty($data['cnpj'])) $errors[] = 'CNPJ é obrigatório';
+    if (empty($data['email']) || !filter_var($data['email'], FILTER_VALIDATE_EMAIL)) $errors[] = 'Email inválido';
+    if (empty($data['telefone'])) $errors[] = 'Telefone é obrigatório';
+    if (empty($data['senha'])) $errors[] = 'Senha é obrigatória';
+    if (strlen($data['senha']) < 8) $errors[] = 'A senha deve ter pelo menos 8 caracteres';
+    if ($data['senha'] !== $data['confirma_senha']) $errors[] = 'As senhas não coincidem';
+    if (empty($data['categoria'])) $errors[] = 'Categoria é obrigatória';
     
     // Validações de endereço
-    if (empty($data['endereco']['cep'])) {
-        $errors[] = 'CEP é obrigatório';
-    }
+    if (empty($data['endereco']['cep'])) $errors[] = 'CEP é obrigatório';
+    if (empty($data['endereco']['logradouro'])) $errors[] = 'Logradouro é obrigatório';
+    if (empty($data['endereco']['numero'])) $errors[] = 'Número é obrigatório';
+    if (empty($data['endereco']['bairro'])) $errors[] = 'Bairro é obrigatório';
+    if (empty($data['endereco']['cidade'])) $errors[] = 'Cidade é obrigatória';
+    if (empty($data['endereco']['estado'])) $errors[] = 'Estado é obrigatório';
     
-    if (empty($data['endereco']['logradouro'])) {
-        $errors[] = 'Logradouro é obrigatório';
-    }
-    
-    if (empty($data['endereco']['numero'])) {
-        $errors[] = 'Número é obrigatório';
-    }
-    
-    if (empty($data['endereco']['bairro'])) {
-        $errors[] = 'Bairro é obrigatório';
-    }
-    
-    if (empty($data['endereco']['cidade'])) {
-        $errors[] = 'Cidade é obrigatória';
-    }
-    
-    if (empty($data['endereco']['estado'])) {
-        $errors[] = 'Estado é obrigatório';
-    }
-    
-    // Se não houver erros, prosseguir com o cadastro
     if (empty($errors)) {
         try {
-            // Formatar CNPJ (remover caracteres especiais)
+            // Formatar CNPJ
             $data['cnpj'] = preg_replace('/[^0-9]/', '', $data['cnpj']);
-            
-            // Debug: verificar se o método existe
-            if (!method_exists('StoreController', 'registerStore')) {
-                throw new Exception('Método StoreController::registerStore não encontrado');
-            }
             
             // Registrar a loja
             $result = StoreController::registerStore($data);
             
-            // Debug: verificar resultado
-            error_log("Resultado do cadastro: " . print_r($result, true));
-            
             if ($result['status']) {
                 $success = $result['message'];
-                
-                // Limpar dados do formulário se cadastro bem-sucedido
-                if (isset($result['data']['awaiting_approval']) && $result['data']['awaiting_approval']) {
-                    // Se está aguardando aprovação, manter dados para referência
-                } else {
-                    $data = [];
-                }
+                $data = []; // Limpar formulário
             } else {
                 $error = $result['message'];
             }
         } catch (Exception $e) {
-            error_log("Erro no cadastro: " . $e->getMessage());
             $error = "Erro interno: " . $e->getMessage();
+            error_log("Erro no cadastro de loja: " . $e->getMessage());
         }
     } else {
         $error = implode('<br>', $errors);
     }
 }
 
-// Carregar lista de categorias disponíveis
+// Dados para os selects
 $categorias = [
     'Alimentação', 'Vestuário', 'Eletrônicos', 'Casa e Decoração', 
     'Beleza e Saúde', 'Serviços', 'Educação', 'Entretenimento', 'Outros'
 ];
 
-// Carregar lista de estados brasileiros
 $estados = [
     'AC' => 'Acre', 'AL' => 'Alagoas', 'AP' => 'Amapá', 'AM' => 'Amazonas',
     'BA' => 'Bahia', 'CE' => 'Ceará', 'DF' => 'Distrito Federal', 'ES' => 'Espírito Santo',
@@ -179,6 +192,7 @@ $estados = [
     'SP' => 'São Paulo', 'SE' => 'Sergipe', 'TO' => 'Tocantins'
 ];
 
+echo "<!-- Debug: Página pronta para renderizar HTML -->\n";
 ?>
 
 <!DOCTYPE html>
