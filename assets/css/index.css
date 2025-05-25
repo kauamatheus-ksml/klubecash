@@ -664,44 +664,49 @@ p { margin-bottom: 1em; }
 /* Seção Lojas Parceiras (id="parceiros") */
 .partners-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: 25px;
-    margin-bottom: 50px;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 30px;
+    margin: 40px 0;
 }
 
 .partner-card {
-    background-color: var(--klube-white);
-    border-radius: var(--klube-border-radius-md);
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
+    background: white;
+    border-radius: 15px;
+    padding: 25px 20px;
     text-align: center;
-    box-shadow: var(--klube-shadow-xs);
-    transition: var(--klube-transition-medium);
-    min-height: 180px; /* Para alinhar verticalmente melhor */
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    border: 1px solid #f0f0f0;
 }
+
 .partner-card:hover {
-    transform: translateY(-8px) scale(1.05);
-    box-shadow: var(--klube-shadow-md);
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(255, 122, 0, 0.15);
+    border-color: var(--primary-color);
 }
 
 .partner-logo-container {
-    margin-bottom: 15px;
-    width: 80px; /* Tamanho fixo para o container do logo/inicial */
-    height: 80px;
     display: flex;
-    align-items: center;
     justify-content: center;
-    border-radius: var(--klube-border-radius-circle);
-    background-color: var(--klube-primary-light);
-    overflow: hidden; /* Caso a imagem seja maior */
+    align-items: center;
+    margin-bottom: 15px;
+    height: 80px; /* Altura fixa para consistência visual */
 }
-.partner-logo-container img { /* Se você usar <img> para logos */
-    max-width: 70%;
-    max-height: 70%;
-    object-fit: contain;
+
+/* Estilos para logos reais (imagens) */
+.partner-logo-img {
+    max-width: 70px;
+    max-height: 70px;
+    width: auto;
+    height: auto;
+    border-radius: 8px;
+    object-fit: contain; /* Mantém proporção sem distorcer */
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease;
+}
+
+.partner-card:hover .partner-logo-img {
+    transform: scale(1.05); /* Leve zoom no hover */
 }
 .partner-logo { /* Para a inicial, como no seu PHP */
     font-size: 2rem;
@@ -723,7 +728,61 @@ p { margin-bottom: 1em; }
 }
 /* partners-cta usa .btn-primary */
 
+.partner-logo-text {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    font-weight: bold;
+    color: white;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    transition: transform 0.3s ease;
+}
+.partner-card:hover .partner-logo-text {
+    transform: scale(1.1);
+}
+.partner-info {
+    text-align: center;
+}
+.partner-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--dark-gray);
+    margin: 0 0 8px 0;
+    line-height: 1.3;
+}
 
+.partner-category {
+    font-size: 12px;
+    color: var(--medium-gray);
+    background-color: var(--light-gray);
+    padding: 4px 8px;
+    border-radius: 12px;
+    display: inline-block;
+}
+
+.no-partners-message {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 40px 20px;
+    background: rgba(255, 122, 0, 0.05);
+    border-radius: 15px;
+    border: 2px dashed var(--primary-color);
+}
+
+.no-partners-message p {
+    margin: 10px 0;
+    color: var(--medium-gray);
+}
+
+.no-partners-message p:first-child {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--primary-color);
+}
 /* Seção FAQ (id="faq") */
 .accordion {
     max-width: 800px;
@@ -1103,18 +1162,29 @@ p { margin-bottom: 1em; }
     }
 
     .partners-grid {
-        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); /* 2 ou 3 colunas dependendo da tela */
-        gap: 15px;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 20px;
     }
+    
     .partner-card {
-        padding: 15px;
-        min-height: 140px;
+        padding: 20px 15px;
     }
+    
     .partner-logo-container {
-        width: 60px;
         height: 60px;
-        margin-bottom: 10px;
     }
+    
+    .partner-logo-img {
+        max-width: 50px;
+        max-height: 50px;
+    }
+    
+    .partner-logo-text {
+        width: 45px;
+        height: 45px;
+        font-size: 18px;
+    }
+
     .partner-logo {
         font-size: 1.5rem;
     }

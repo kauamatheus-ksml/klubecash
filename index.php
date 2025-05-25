@@ -3,6 +3,68 @@
 // Incluir configurações do sistema
 require_once './config/constants.php';
 require_once './config/database.php';
+/**
+ * Gera o HTML para exibir a logo de uma loja parceira
+ * Como um artista que decide se vai usar uma foto ou fazer um desenho
+ * 
+ * @param array $store Dados da loja
+ * @return string HTML da logo
+ */
+function renderStoreLogo($store) {
+    static $logoCache = []; // Cache estático para evitar verificações repetidas de arquivos
+    
+    $nomeFantasia = htmlspecialchars($store['nome_fantasia']);
+    $primeiraLetra = strtoupper(substr($nomeFantasia, 0, 1));
+    
+    if (!empty($store['logo'])) {
+        $logoFilename = $store['logo'];
+        
+        // Verificar cache primeiro - como perguntar ao assistente se ele já verificou este arquivo
+        if (!isset($logoCache[$logoFilename])) {
+            // Validação extra de segurança - verificar se o nome do arquivo é seguro
+            if (preg_match('/^[a-zA-Z0-9_.-]+\.(jpg|jpeg|png|gif)$/i', $logoFilename)) {
+                $fullPath = __DIR__ . '/uploads/store_logos/' . $logoFilename;
+                $logoCache[$logoFilename] = file_exists($fullPath);
+            } else {
+                $logoCache[$logoFilename] = false;
+                error_log("Nome de arquivo suspeito detectado: " . $logoFilename);
+            }
+        }
+        
+        if ($logoCache[$logoFilename]) {
+            $logoPath = '/uploads/store_logos/' . htmlspecialchars($logoFilename);
+            return '<img src="' . $logoPath . '" alt="Logo ' . $nomeFantasia . '" class="partner-logo-img" loading="lazy">';
+        }
+    }
+    
+    // Fallback melhorado
+    $corDeFundo = generateColorFromName($nomeFantasia);
+    return '<div class="partner-logo-text" style="background-color: ' . $corDeFundo . '" title="' . $nomeFantasia . '">' . $primeiraLetra . '</div>';
+}
+
+/**
+ * Gera uma cor consistente baseada no nome da loja
+ * Como um pintor que sempre usa as mesmas cores para o mesmo tema
+ * 
+ * @param string $name Nome da loja
+ * @return string Cor em formato hexadecimal
+ */
+function generateColorFromName($name) {
+    // Array de cores atrativas e profissionais
+    $colors = [
+        '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FECA57',
+        '#FF9FF3', '#54A0FF', '#5F27CD', '#FF3838', '#00D2D3',
+        '#FF6348', '#7bed9f', '#70a1ff', '#dda0dd', '#ffb142'
+    ];
+    
+    // Usar o hash do nome para sempre gerar a mesma cor para a mesma loja
+    // É como ter uma "impressão digital" colorida para cada loja
+    $hash = crc32($name);
+    $index = abs($hash) % count($colors);
+    
+    return $colors[$index];
+}
+
 // Iniciar sessão
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -29,15 +91,30 @@ if ($isLoggedIn) {
 // Buscar lojas parceiras aprovadas
 $partnerStores = [];
 try {
-    $db = Database::getConnection(); // Função do seu arquivo database.php
-    // Selecionar apenas lojas aprovadas e, opcionalmente, com logo
-    // Você pode adicionar mais critérios, como lojas em destaque, etc.
-    $stmt = $db->query("SELECT nome_fantasia, logo FROM lojas WHERE status = 'aprovado' ORDER BY RAND() LIMIT 6");
+    $db = Database::getConnection();
+    
+    // Consulta melhorada que busca informações mais completas das lojas
+    // É como pedir ao bibliotecário não apenas o título do livro, mas também a capa e o autor
+    $stmt = $db->query("
+        SELECT 
+            nome_fantasia, 
+            logo, 
+            categoria,
+            descricao
+        FROM lojas 
+        WHERE status = 'aprovado' 
+        ORDER BY RAND() 
+        LIMIT 6
+    ");
     $partnerStores = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Log para debug - como deixar pistas para você mesmo sobre o que está acontecendo
+    error_log("Lojas encontradas: " . count($partnerStores));
+    
 } catch (PDOException $e) {
-    // Em caso de erro, pode logar ou tratar como preferir.
-    // Por enquanto, a seção de parceiros simplesmente não mostrará lojas.
+    // Em caso de erro, registramos para investigação posterior
     error_log("Erro ao buscar lojas parceiras para index.php: " . $e->getMessage());
+    $partnerStores = []; // Garantir que a variável esteja sempre definida
 }
 ?>
 
@@ -216,15 +293,21 @@ try {
                         <?php foreach ($partnerStores as $store): ?>
                         <div class="partner-card">
                             <div class="partner-logo-container">
-                                <?php if (!empty($store['logo'])): ?>
-                                    <div class="partner-logo"><?php echo htmlspecialchars(strtoupper(substr($store['nome_fantasia'], 0, 1))); ?></div> <?php else: ?>
-                                    <div class="partner-logo"><?php echo htmlspecialchars(strtoupper(substr($store['nome_fantasia'], 0, 1))); ?></div> <?php endif; ?>
+                                <?php echo renderStoreLogo($store); ?>
                             </div>
-                            <h4><?php echo htmlspecialchars($store['nome_fantasia']); ?></h4>
+                            <div class="partner-info">
+                                <h4 class="partner-name"><?php echo htmlspecialchars($store['nome_fantasia']); ?></h4>
+                                <?php if (!empty($store['categoria'])): ?>
+                                    <span class="partner-category"><?php echo htmlspecialchars($store['categoria']); ?></span>
+                                <?php endif; ?>
+                            </div>
                         </div>
                         <?php endforeach; ?>
                     <?php else: ?>
-                        <p style="grid-column: 1 / -1; text-align: center; color: var(--medium-gray);">Nenhuma loja parceira encontrada no momento.</p>
+                        <div class="no-partners-message">
+                            <p>🏪 Nenhuma loja parceira encontrada no momento.</p>
+                            <p>Em breve teremos várias opções incríveis para você!</p>
+                        </div>
                     <?php endif; ?>
                 </div>
                 
