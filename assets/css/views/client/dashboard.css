@@ -608,7 +608,8 @@ body {
     }
 
     .card {
-        padding: 15px; /* Reduz o padding dos cards em telas muito pequenas */
+        padding: 15px;
+        width: 380px;
     }
     
     .card-title {
