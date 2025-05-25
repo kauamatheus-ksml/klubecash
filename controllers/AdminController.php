@@ -1447,7 +1447,209 @@ public static function getAvailableStores() {
             return ['status' => false, 'message' => 'Erro ao atualizar loja. Tente novamente.'];
         }
     }
-    
+    /**
+ * Obtém transações com saldo usado para repasse
+ * 
+ * @param int $lojaId ID da loja
+ * @return array Transações com saldo usado
+ */
+public static function getRepasseTransactions($lojaId) {
+    try {
+        if (!self::validateAdmin()) {
+            return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
+        }
+        
+        $db = Database::getConnection();
+        
+        // Buscar transações onde clientes usaram saldo nesta loja
+        $stmt = $db->prepare("
+            SELECT 
+                cm.id as movimentacao_id,
+                cm.valor as valor_saldo_usado,
+                cm.data_operacao,
+                t.id as transacao_id,
+                t.valor_total,
+                t.codigo_transacao,
+                t.data_transacao,
+                u.nome as cliente_nome
+            FROM cashback_movimentacoes cm
+            JOIN transacoes_cashback t ON cm.transacao_uso_id = t.id
+            JOIN usuarios u ON t.usuario_id = u.id
+            WHERE t.loja_id = ? 
+            AND cm.tipo_operacao = 'uso'
+            AND cm.status_repasse IS NULL
+            ORDER BY t.data_transacao DESC
+        ");
+        
+        $stmt->execute([$lojaId]);
+        $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        return [
+            'status' => true,
+            'data' => $transactions
+        ];
+        
+    } catch (Exception $e) {
+        error_log('Erro ao obter transações de repasse: ' . $e->getMessage());
+        return ['status' => false, 'message' => 'Erro ao obter transações.'];
+    }
+}
+
+    /**
+     * Processa repasse de saldo usado para loja
+     * 
+     * @param array $data Dados do repasse
+     * @return array Resultado da operação
+     */
+    public static function processStoreRepayment($data) {
+        try {
+            if (!self::validateAdmin()) {
+                return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
+            }
+            
+            // Validação básica
+            if (!isset($data['loja_id']) || !isset($data['valor_total']) || !isset($data['transacoes_saldo'])) {
+                return ['status' => false, 'message' => 'Dados obrigatórios faltando.'];
+            }
+            
+            $db = Database::getConnection();
+            
+            // Verificar se a loja existe
+            $lojaStmt = $db->prepare("SELECT nome_fantasia FROM lojas WHERE id = ?");
+            $lojaStmt->execute([$data['loja_id']]);
+            $loja = $lojaStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$loja) {
+                return ['status' => false, 'message' => 'Loja não encontrada.'];
+            }
+            
+            // Decodificar transações se for string JSON
+            $transacoesSaldo = is_string($data['transacoes_saldo']) ? 
+                json_decode($data['transacoes_saldo'], true) : $data['transacoes_saldo'];
+            
+            if (empty($transacoesSaldo)) {
+                return ['status' => false, 'message' => 'Nenhuma transação encontrada para repasse.'];
+            }
+            
+            // Verificar se não existe tabela de repasses, criar se necessário
+            $createTableStmt = $db->prepare("
+                CREATE TABLE IF NOT EXISTS pagamentos_repasse (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    loja_id INT NOT NULL,
+                    valor_total DECIMAL(10,2) NOT NULL,
+                    metodo_pagamento VARCHAR(50) NOT NULL,
+                    numero_referencia VARCHAR(100),
+                    observacao TEXT,
+                    data_pagamento TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (loja_id) REFERENCES lojas(id)
+                )
+            ");
+            $createTableStmt->execute();
+            
+            $createRelTableStmt = $db->prepare("
+                CREATE TABLE IF NOT EXISTS pagamentos_repasse_transacoes (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    pagamento_repasse_id INT NOT NULL,
+                    transacao_id INT NOT NULL,
+                    valor_saldo_usado DECIMAL(10,2) NOT NULL,
+                    FOREIGN KEY (pagamento_repasse_id) REFERENCES pagamentos_repasse(id),
+                    FOREIGN KEY (transacao_id) REFERENCES transacoes_cashback(id)
+                )
+            ");
+            $createRelTableStmt->execute();
+            
+            // Verificar se coluna status_repasse existe, criar se necessário
+            $alterTableStmt = $db->prepare("
+                ALTER TABLE cashback_movimentacoes 
+                ADD COLUMN IF NOT EXISTS status_repasse ENUM('pago', 'pendente') DEFAULT NULL
+            ");
+            $alterTableStmt->execute();
+            
+            // Iniciar transação
+            $db->beginTransaction();
+            
+            try {
+                // 1. Inserir registro do repasse
+                $insertRepasseStmt = $db->prepare("
+                    INSERT INTO pagamentos_repasse 
+                    (loja_id, valor_total, metodo_pagamento, numero_referencia, observacao)
+                    VALUES (?, ?, ?, ?, ?)
+                ");
+                
+                $insertRepasseStmt->execute([
+                    $data['loja_id'],
+                    $data['valor_total'],
+                    $data['metodo_pagamento'] ?? 'pix',
+                    $data['numero_referencia'] ?? '',
+                    $data['observacao'] ?? ''
+                ]);
+                
+                $repasseId = $db->lastInsertId();
+                
+                // 2. Associar transações ao repasse e marcar como pagas
+                $insertRelStmt = $db->prepare("
+                    INSERT INTO pagamentos_repasse_transacoes 
+                    (pagamento_repasse_id, transacao_id, valor_saldo_usado)
+                    VALUES (?, ?, ?)
+                ");
+                
+                $updateStatusStmt = $db->prepare("
+                    UPDATE cashback_movimentacoes 
+                    SET status_repasse = 'pago'
+                    WHERE transacao_uso_id = ? AND tipo_operacao = 'uso' AND status_repasse IS NULL
+                ");
+                
+                $totalProcessado = 0;
+                foreach ($transacoesSaldo as $transacao) {
+                    $transacaoId = $transacao['transacao_id'];
+                    $valorSaldoUsado = $transacao['valor_saldo_usado'];
+                    
+                    // Inserir relação
+                    $insertRelStmt->execute([$repasseId, $transacaoId, $valorSaldoUsado]);
+                    
+                    // Marcar movimentações como pagas
+                    $updateStatusStmt->execute([$transacaoId]);
+                    
+                    $totalProcessado += $valorSaldoUsado;
+                }
+                
+                // Validar se o total processado confere
+                if (abs($totalProcessado - $data['valor_total']) > 0.01) {
+                    throw new Exception('Total processado não confere com valor informado.');
+                }
+                
+                // 3. Atualizar saldo do admin (debitar o valor repassado)
+                $descricaoAdmin = "Repasse de saldo usado - Loja: " . $loja['nome_fantasia'] . " - Repasse #" . $repasseId;
+                $updateAdminResult = self::updateAdminBalance(-$data['valor_total'], null, $descricaoAdmin);
+                
+                if (!$updateAdminResult) {
+                    error_log("Erro ao debitar saldo do admin para repasse - Valor: {$data['valor_total']}");
+                    // Não falhar a transação por isso, mas logar
+                }
+                
+                // Commit
+                $db->commit();
+                
+                return [
+                    'status' => true,
+                    'message' => 'Repasse processado com sucesso!',
+                    'data' => [
+                        'repasse_id' => $repasseId,
+                        'valor_total' => $data['valor_total'],
+                        'transacoes_processadas' => count($transacoesSaldo)
+                    ]
+                ];
+                
+            } catch (Exception $e) {
+                $db->rollBack();
+                throw $e;
+            }
+            
+        } catch (Exception $e) {
+            error_log('Erro ao processar repasse de loja: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro ao processar repasse: ' . $e->getMessage()];
+        }
+    }
     /**
      * Gerencia transações do sistema
      * 
