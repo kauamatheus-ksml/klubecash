@@ -47,10 +47,8 @@ try {
 <body>
     <?php include_once '../components/sidebar.php'; ?>
     
-    <!-- Conteúdo Principal -->
     <div class="main-content" id="mainContent">
         <div class="dashboard-wrapper">
-            <!-- Cabeçalho -->
             <div class="dashboard-header">
                 <h1>Saldo da Administração</h1>
             </div>
@@ -61,7 +59,6 @@ try {
                 </div>
             <?php else: ?>
             
-            <!-- Cards de estatísticas principais -->
             <div class="stats-container">
                 <div class="stat-card">
                     <div class="stat-card-title">Saldo Total (Aprovado)</div>
@@ -87,7 +84,6 @@ try {
                     <div class="stat-card-subtitle">Total de transações</div>
                 </div>
             </div>
-            <!-- Saldo da Klube Cash -->
             <div class="card klubecash-balance-card">
                 <div class="card-header">
                     <div class="card-title">
@@ -118,7 +114,6 @@ try {
                 </div>
             </div>
 
-            <!-- Histórico de Movimentações -->
             <div class="card transactions-container">
                 <div class="card-header">
                     <div class="card-title">Movimentações do Saldo</div>
@@ -161,9 +156,7 @@ try {
                     </table>
                 </div>
             </div>
-            <!-- Gráficos e estatísticas -->
             <div class="two-column-layout">
-                <!-- Gráfico mensal -->
                 <div class="card">
                     <div class="card-header">
                         <div class="card-title">Comissões por Mês</div>
@@ -173,7 +166,6 @@ try {
                     </div>
                 </div>
                 
-                <!-- Top lojas -->
                 <div class="card">
                     <div class="card-header">
                         <div class="card-title">Top Lojas (Comissões Geradas)</div>
@@ -196,7 +188,6 @@ try {
                 </div>
             </div>
             
-            <!-- Histórico de comissões -->
             <div class="card transactions-container">
                 <div class="card-header">
                     <div class="card-title">Histórico de Comissões</div>
