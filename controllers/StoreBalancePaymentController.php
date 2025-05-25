@@ -545,5 +545,70 @@ class StoreBalancePaymentController {
             return false;
         }
     }
+    /**
+    * Obtém estatísticas gerais dos pagamentos de saldo
+    * 
+    * @return array Estatísticas consolidadas
+    */
+    public static function getBalanceStatistics() {
+        try {
+            // Verificar se o usuário está autenticado e é administrador
+            if (!AuthController::isAuthenticated() || !AuthController::isAdmin()) {
+                return [
+                    'total_lojas' => 0,
+                    'total_transacoes' => 0,
+                    'valor_total_pendente' => 0,
+                    'valor_total_pago' => 0
+                ];
+            }
+            
+            $db = Database::getConnection();
+            
+            // Query para obter estatísticas consolidadas
+            $query = "
+                SELECT 
+                    COUNT(DISTINCT cm.loja_id) as total_lojas,
+                    COUNT(DISTINCT cm.id) as total_transacoes,
+                    SUM(CASE 
+                        WHEN COALESCE(sbp.status, 'pendente') IN ('pendente', 'em_processamento') 
+                        THEN cm.valor 
+                        ELSE 0 
+                    END) as valor_total_pendente,
+                    SUM(CASE 
+                        WHEN sbp.status = 'aprovado' 
+                        THEN cm.valor 
+                        ELSE 0 
+                    END) as valor_total_pago
+                FROM cashback_movimentacoes cm
+                JOIN lojas l ON cm.loja_id = l.id
+                LEFT JOIN store_balance_payments sbp ON 
+                    (cm.loja_id = sbp.loja_id AND 
+                    cm.id = sbp.movimentacao_id)
+                WHERE cm.tipo_operacao = 'uso'
+                AND cm.transacao_uso_id IS NOT NULL
+            ";
+            
+            $stmt = $db->query($query);
+            $stats = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            // Garantir que os valores não sejam nulos
+            return [
+                'total_lojas' => intval($stats['total_lojas'] ?? 0),
+                'total_transacoes' => intval($stats['total_transacoes'] ?? 0),
+                'valor_total_pendente' => floatval($stats['valor_total_pendente'] ?? 0),
+                'valor_total_pago' => floatval($stats['valor_total_pago'] ?? 0)
+            ];
+            
+        } catch (PDOException $e) {
+            error_log('Erro ao obter estatísticas de saldo: ' . $e->getMessage());
+            // Retornar valores padrão em caso de erro
+            return [
+                'total_lojas' => 0,
+                'total_transacoes' => 0,
+                'valor_total_pendente' => 0,
+                'valor_total_pago' => 0
+            ];
+        }
+    }
 }
 ?>
