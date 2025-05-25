@@ -5,28 +5,66 @@
  * Klube Cash - Sistema de Cashback
  */
 
-// Configurações SMTP
-define('SMTP_HOST', 'smtp.hostinger.com');
-define('SMTP_PORT', 465);
-define('SMTP_USERNAME', 'klubecash@klubecash.com');
-define('SMTP_PASSWORD', 'Aaku_2004@'); // Substitua pela senha real - removi a senha por segurança
-define('SMTP_FROM_EMAIL', 'klubecash@klubecash.com');
-define('SMTP_FROM_NAME', 'Klube Cash');
+// Configurações SMTP - Como um sistema inteligente que verifica antes de definir
+if (!defined('SMTP_HOST')) {
+    define('SMTP_HOST', 'smtp.hostinger.com');
+}
+if (!defined('SMTP_PORT')) {
+    define('SMTP_PORT', 465);
+}
+if (!defined('SMTP_USERNAME')) {
+    define('SMTP_USERNAME', 'klubecash@klubecash.com');
+}
+if (!defined('SMTP_PASSWORD')) {
+    define('SMTP_PASSWORD', 'Aaku_2004@');
+}
+if (!defined('SMTP_FROM_EMAIL')) {
+    define('SMTP_FROM_EMAIL', 'klubecash@klubecash.com');
+}
+if (!defined('SMTP_FROM_NAME')) {
+    define('SMTP_FROM_NAME', 'Klube Cash');
+}
+if (!defined('SMTP_ENCRYPTION')) {
+    define('SMTP_ENCRYPTION', 'ssl');
+}
 
 // Certifique-se de que as constantes estejam definidas em algum lugar
-if (!defined('CLIENT_DASHBOARD_URL')) define('CLIENT_DASHBOARD_URL', '/klube-cash/views/client/dashboard.php');
-if (!defined('ADMIN_EMAIL')) define('ADMIN_EMAIL', 'contato@klubecash.com');
-if (!defined('SITE_URL')) define('SITE_URL', '/klube-cash');
-
+// Verificar constantes essenciais - como um checklist de segurança
+if (!defined('CLIENT_DASHBOARD_URL')) {
+    define('CLIENT_DASHBOARD_URL', SITE_URL . '/cliente/dashboard');
+}
+if (!defined('ADMIN_EMAIL')) {
+    define('ADMIN_EMAIL', 'contato@klubecash.com');
+}
+if (!defined('SITE_URL')) {
+    define('SITE_URL', 'https://klubecash.com');
+}
 // Importar PHPMailer
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\SMTP;
 use PHPMailer\PHPMailer\Exception;
 
-// Carregar PHPMailer
-require_once __DIR__ . '/../libs/PHPMailer/src/PHPMailer.php';
-require_once __DIR__ . '/../libs/PHPMailer/src/SMTP.php';
-require_once __DIR__ . '/../libs/PHPMailer/src/Exception.php';
+// Carregar PHPMailer - como verificar se temos as ferramentas antes de começar o trabalho
+$phpmailer_paths = [
+    __DIR__ . '/../libs/PHPMailer/src/',
+    __DIR__ . '/../vendor/phpmailer/phpmailer/src/'
+];
+
+$phpmailer_loaded = false;
+foreach ($phpmailer_paths as $path) {
+    if (file_exists($path . 'PHPMailer.php')) {
+        require_once $path . 'PHPMailer.php';
+        require_once $path . 'SMTP.php';
+        require_once $path . 'Exception.php';
+        $phpmailer_loaded = true;
+        break;
+    }
+}
+
+// Se PHPMailer não foi encontrado, registrar erro
+if (!$phpmailer_loaded) {
+    error_log('PHPMailer não encontrado nos caminhos esperados');
+}
 
 /**
  * Classe Email - Gerencia o envio de emails
