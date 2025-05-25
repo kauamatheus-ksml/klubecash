@@ -122,22 +122,3 @@ RewriteRule ^admin/pagamentos/?$ views/admin/payments.php [L]
 </IfModule>
 
 
-# Servir arquivos de upload de forma segura
-<Files ~ "\.php$">
-    Order Allow,Deny
-    Deny from all
-</Files>
-
-# Permitir acesso a imagens na pasta uploads
-<Directory "uploads/">
-    <Files ~ "\.(jpg|jpeg|png|gif)$">
-        Order Allow,Deny
-        Allow from all
-    </Files>
-</Directory>
-
-# Prevenir execução de scripts na pasta uploads
-<Directory "uploads/">
-    Options -ExecCGI
-    AddHandler cgi-script .php .pl .py .jsp .asp .sh .cgi
-</Directory>
