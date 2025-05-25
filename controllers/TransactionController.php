@@ -1217,8 +1217,7 @@ class TransactionController {
                     }
                 }
                 
-                // Atualizar saldo do administrador
-                // Atualizar saldo do administrador
+                // Atualizar saldo do administrador (após o commit principal)
                 foreach ($transactions as $transaction) {
                     // Obter valor da comissão do admin para esta transação
                     $adminComissionStmt = $db->prepare("
@@ -1229,11 +1228,8 @@ class TransactionController {
                     $adminComissionStmt->execute([$transaction['id']]);
                     $adminComission = $adminComissionStmt->fetch(PDO::FETCH_ASSOC);
                     
-                    if ($adminComission && !empty($adminComission['valor_comissao'])) {
-                        $descricao = "Comissão da transação #{$transaction['id']} - Pagamento #{$paymentId}";
-                        
-                        // Log para debug
-                        error_log("APROVAÇÃO: Atualizando saldo admin - Valor: {$adminComission['valor_comissao']}");
+                    if ($adminComission && $adminComission['valor_comissao'] > 0) {
+                        $descricao = "Comissão da transação #{$transaction['id']} - Pagamento #{$paymentId} aprovado";
                         
                         $updateResult = AdminController::updateAdminBalance(
                             $adminComission['valor_comissao'],
@@ -1241,10 +1237,8 @@ class TransactionController {
                             $descricao
                         );
                         
-                        if ($updateResult) {
-                            error_log("APROVAÇÃO: Saldo admin atualizado com sucesso");
-                        } else {
-                            error_log("APROVAÇÃO: ERRO ao atualizar saldo admin");
+                        if (!$updateResult) {
+                            error_log("APROVAÇÃO: Falha ao atualizar saldo admin para transação #{$transaction['id']}");
                         }
                     }
                 }
