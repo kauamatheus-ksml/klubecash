@@ -192,7 +192,7 @@ function formatDateTime($dateTime) {
 </head>
 <body>
     <!-- Incluir navegação sidebar e/ou navbar -->
-    <?php include_once '../components/navbar.php'; ?>
+    
     
     <div class="container" style="margin-top: 80px;">
         <!-- Cabeçalho do Dashboard -->

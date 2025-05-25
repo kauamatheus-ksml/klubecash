@@ -60,10 +60,7 @@ body {
     line-height: 1.65;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    overflow-x: hidden;
-    display: flex; /* Para o layout geral da página */
-    flex-direction: column; /* Para o layout geral da página */
-    min-height: 100vh; /* Para o layout geral da página */
+    overflow-x: hidden; /* Garante que o body não tenha scroll horizontal */
 }
 
 .container {
@@ -75,7 +72,6 @@ body {
     padding-right: var(--container-padding);
     padding-top: calc(var(--navbar-height) + 20px);
     padding-bottom: 40px;
-    flex-grow: 1; /* Para o layout geral da página */
 }
 
 img, svg {
@@ -120,7 +116,7 @@ a:hover {
     margin: 0;
 }
 
-.dashboard-header > div:last-child {
+.dashboard-header > div:last-child { /* Container dos botões */
     display: flex;
     flex-wrap: wrap;
     gap: 15px;
@@ -172,10 +168,10 @@ a:hover {
     color: var(--primary-dark);
 }
 
-/* ::::::::::::: CARDS :::::::::::::: */
+/* ::::::::::::: CARDS DE RESUMO :::::::::::::: */
 .summary-cards {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); /* Ajustado para cards menores */
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     gap: 20px;
     margin-bottom: 30px;
 }
@@ -189,8 +185,7 @@ a:hover {
     border: 1px solid var(--border-color);
     display: flex;
     flex-direction: column;
-    min-width: 0; /* Essencial para permitir que o card encolha em flex/grid */
-    /* overflow: hidden; Removido daqui, será mais específico */
+    overflow: hidden; /* Previne conteúdo de estourar o card SEM adicionar scroll ao card em si */
 }
 
 .card:hover {
@@ -198,7 +193,7 @@ a:hover {
     box-shadow: var(--shadow-lg);
 }
 
-.summary-card {
+.summary-card { /* Herda de .card, mas pode ter estilos específicos */
     gap: 8px;
 }
 
@@ -206,7 +201,7 @@ a:hover {
     font-size: var(--font-size-sm);
     color: var(--text-muted);
     font-weight: 500;
-    margin: 0 0 8px 0;
+    margin: 0 0 8px 0; /* Adicionado margem inferior */
 }
 
 .card-value {
@@ -222,7 +217,7 @@ a:hover {
     display: flex;
     align-items: center;
     gap: 5px;
-    margin-top: auto;
+    margin-top: auto; /* Empurra para o final do card se for flex column */
 }
 
 .card-change.positive { color: var(--success-color); }
@@ -245,16 +240,15 @@ a:hover {
 }
 
 /* ::::::::::::: TABELA DE TRANSAÇÕES (dentro de um card) :::::::::::::: */
-.card .table-container {
-    overflow-x: auto; /* Scroll horizontal APENAS para o container da tabela */
-    width: 100%;
-    -webkit-overflow-scrolling: touch; /* Para scroll suave em iOS */
+.card .table-container { /* Aplicar overflow ao container da tabela DENTRO do card */
+    overflow-x: auto;
+    width: 100%; /* Garante que o container não exceda o card */
 }
 
 .table {
     width: 100%;
     border-collapse: collapse;
-    /* min-width não é estritamente necessário aqui se .table-container cuida do scroll */
+    min-width: 600px; /* Se a tabela tiver menos que isso, não precisa de scroll */
 }
 
 .table th,
@@ -270,9 +264,6 @@ a:hover {
     background-color: var(--primary-light);
     font-weight: 600;
     color: var(--primary-dark);
-    position: sticky; /* Para cabeçalho fixo durante scroll horizontal, se necessário */
-    top: 0;            /* Para cabeçalho fixo durante scroll horizontal */
-    z-index: 1;        /* Para cabeçalho fixo durante scroll horizontal */
 }
 
 .table tr:last-child td {
@@ -298,38 +289,26 @@ a:hover {
 .badge-danger { background-color: #FFEAE6; color: var(--danger-color); }
 
 /* ::::::::::::: GRÁFICOS (dentro de um card) :::::::::::::: */
-/* O card "Histórico de Cashback" que contém o gráfico */
-.card.chart-card .chart-container {
+.card .chart-container { /* O card é o container principal */
     position: relative;
-    height: 280px; /* Altura fixa para o container do gráfico */
-    width: 100%;
-    overflow-x: auto; /* Permite rolagem se o gráfico renderizar maior que o container */
-    -webkit-overflow-scrolling: touch;
+    height: 280px;
+    width: 100%; /* Garante que o canvas não exceda o card */
 }
-
-/* O elemento canvas em si */
-.card.chart-card .chart-container canvas {
-    min-width: 300px; /* Garante uma largura mínima para o gráfico não ficar muito espremido */
-    max-width: 100%;  /* Tenta ocupar 100% do .chart-container */
-    height: auto !important; /* Chart.js controla a altura, mas ajuda na responsividade */
-}
-
 
 /* ::::::::::::: LISTAS (MOVIMENTAÇÕES, SALDOS POR LOJA - dentro de cards) :::::::::::::: */
 .card .movements-list,
 .card .balance-by-store {
     max-height: 350px;
-    overflow-y: auto;
-    width: 100%;
-    padding-right: 5px;
-    overflow-x: hidden; /* Impede rolagem horizontal dentro dessas listas específicas */
+    overflow-y: auto; /* Rolagem vertical se necessário */
+    width: 100%; /* Garante que a lista não exceda o card */
+    padding-right: 5px; /* Pequeno espaço para scrollbar */
 }
 
 .movement-item,
 .store-balance-item {
     display: flex;
     align-items: center;
-    padding: 10px 0;
+    padding: 10px 0; /* Padding vertical, o card já tem padding lateral */
     border-bottom: 1px solid var(--border-color);
 }
 
@@ -363,8 +342,7 @@ a:hover {
 .movement-details,
 .store-balance-item .store-info {
     flex: 1;
-    min-width: 0; /* Permite que o texto quebre */
-    overflow: hidden; /* Garante que o text-overflow funcione */
+    min-width: 0;
 }
 
 .movement-description,
@@ -409,7 +387,7 @@ a:hover {
 }
 
 /* ::::::::::::: NOTIFICAÇÕES :::::::::::::: */
-.notification { /* O card de notificações é um .card normal */
+.notification {
     padding: 15px;
     border-radius: var(--border-radius-md);
     margin-bottom: 10px;
@@ -433,8 +411,6 @@ a:hover {
     font-size: var(--font-size-sm);
     color: var(--dark-gray);
     line-height: 1.5;
-    word-break: break-word; /* Permite quebra de palavras longas */
-    white-space: normal;  /* Permite quebra de linha normal */
 }
 
 .notification-text a {
@@ -518,8 +494,8 @@ a:hover {
     }
 
     .summary-cards {
-        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); /* Cards menores ainda */
-        gap: 10px; /* Espaçamento menor */
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 15px;
     }
 
     .card {
@@ -527,72 +503,63 @@ a:hover {
     }
 
     .card-value {
-        font-size: 1.2rem; /* Valor do card ainda menor */
+        font-size: 1.3rem;
     }
 
     .table th,
     .table td {
-        padding: 8px 6px; /* Padding mínimo na tabela */
-        font-size: 0.75rem; /* Fonte bem pequena na tabela */
+        padding: 10px 8px;
+        font-size: 0.8rem;
+         /* white-space: normal; Removido para permitir rolagem, se necessário */
+    }
+
+    /* Para listas dentro de cards, como movimentações e saldos por loja */
+    .card .movements-list,
+    .card .balance-by-store {
+        /* A rolagem vertical já está configurada, não precisa de overflow-x aqui */
     }
 
     .movement-item,
     .store-balance-item {
         padding: 8px 0;
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 5px;
+        flex-direction: row; /* Manter em linha mas permitir quebrar se necessário */
+        align-items: center; /* Reajustar alinhamento */
+        gap: 10px; /* Espaço entre ícone e texto */
     }
     
-    .movement-icon,
-    .store-balance-item .store-logo {
-        width: 30px;
-        height: 30px;
-        margin-right: 0;
-        margin-bottom: 5px;
-        font-size: var(--font-size-sm);
-    }
-
-    .movement-icon svg { width: 14px; height: 14px; }
-
-    .movement-description,
-    .store-balance-item .store-name {
-        white-space: normal; /* Permitir quebra de linha para descrições */
+    .movement-details,
+    .store-balance-item .store-info {
+        /* Esses já são flex: 1 e min-width: 0, o que ajuda na quebra de texto */
     }
 
     .movement-amount,
     .store-balance-item .store-stats {
-        margin-left: 0;
-        text-align: left;
-        width: 100%;
-    }
-
-    .card .chart-container {
-        height: 200px; /* Altura do gráfico ainda menor */
+        margin-left: auto; /* Empurrar para a direita */
+        text-align: right;
     }
 }
 
 @media (max-width: 480px) {
     :root {
-        --font-size-base: 14px; /* Base de fonte ainda menor */
+        --font-size-base: 15px;
     }
     .container {
         padding-top: calc(var(--navbar-height) + 5px);
     }
     .dashboard-header h1 {
-        font-size: 1.1rem;
+        font-size: 1.2rem;
     }
     .summary-cards {
-        grid-template-columns: 1fr; /* Uma coluna para cards */
+        grid-template-columns: 1fr;
     }
     .card-value {
-        font-size: 1.1rem;
+        font-size: 1.2rem;
     }
     .chart-container {
-        height: 180px; /* Gráfico bem pequeno */
+        height: 220px;
     }
     .btn {
-        padding: 8px 12px; /* Botões menores */
+        padding: 8px 15px;
         font-size: var(--font-size-sm);
     }
 }
