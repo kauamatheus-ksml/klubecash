@@ -1908,78 +1908,130 @@ public static function getAvailableStores() {
     * @return bool Sucesso da operação
     */
     public static function updateAdminBalance($valor, $transacaoId = null, $descricao = '') {
+        echo "DEBUG: Iniciando updateAdminBalance - Valor: $valor\n";
+        
         try {
             if ($valor == 0) {
-                return true; // Nada a fazer se o valor for zero
+                echo "DEBUG: Valor é zero, retornando true\n";
+                return true;
             }
             
+            echo "DEBUG: Tentando obter conexão com banco\n";
             $db = Database::getConnection();
             
-            // Iniciar transação
-            $db->beginTransaction();
+            if (!$db) {
+                echo "DEBUG: ERRO - Não foi possível obter conexão com banco\n";
+                return false;
+            }
+            
+            echo "DEBUG: Conexão obtida com sucesso\n";
             
             // Verificar se já existe registro de saldo
+            echo "DEBUG: Verificando se registro existe\n";
             $checkStmt = $db->query("SELECT COUNT(*) as total FROM admin_saldo WHERE id = 1");
-            $exists = $checkStmt->fetch(PDO::FETCH_ASSOC)['total'] > 0;
+            $checkResult = $checkStmt->fetch(PDO::FETCH_ASSOC);
+            $exists = $checkResult['total'] > 0;
+            
+            echo "DEBUG: Registro existe? " . ($exists ? 'SIM' : 'NÃO') . "\n";
             
             if (!$exists) {
-                // Criar registro inicial se não existir
+                echo "DEBUG: Criando registro inicial\n";
                 $initStmt = $db->prepare("
                     INSERT INTO admin_saldo (id, valor_total, valor_disponivel, valor_pendente)
                     VALUES (1, 0.00, 0.00, 0.00)
                 ");
-                $initStmt->execute();
-                error_log("SALDO ADMIN: Registro inicial criado");
+                $initResult = $initStmt->execute();
+                
+                if (!$initResult) {
+                    echo "DEBUG: ERRO ao criar registro inicial\n";
+                    $errorInfo = $initStmt->errorInfo();
+                    echo "DEBUG: Erro SQL: " . print_r($errorInfo, true) . "\n";
+                    return false;
+                }
+                echo "DEBUG: Registro inicial criado com sucesso\n";
             }
+            
+            // Iniciar transação
+            echo "DEBUG: Iniciando transação do banco\n";
+            $db->beginTransaction();
             
             // Determinar tipo de operação
             $tipo = $valor > 0 ? 'credito' : 'debito';
             $valorAbs = abs($valor);
             
-            // Atualizar saldo - sempre adiciona ao disponível quando é crédito de comissão
+            echo "DEBUG: Tipo: $tipo, Valor absoluto: $valorAbs\n";
+            
+            // Atualizar saldo
+            echo "DEBUG: Preparando query de atualização\n";
             $updateStmt = $db->prepare("
                 UPDATE admin_saldo
-                SET valor_total = valor_total + :valor,
-                    valor_disponivel = valor_disponivel + :valor,
+                SET valor_total = valor_total + ?,
+                    valor_disponivel = valor_disponivel + ?,
                     ultima_atualizacao = NOW()
                 WHERE id = 1
             ");
-            $updateStmt->bindParam(':valor', $valor);
-            $updateResult = $updateStmt->execute();
+            
+            echo "DEBUG: Executando query de atualização\n";
+            $updateResult = $updateStmt->execute([$valor, $valor]);
             
             if (!$updateResult) {
-                throw new Exception('Erro ao atualizar saldo do admin');
+                echo "DEBUG: ERRO ao executar query de atualização\n";
+                $errorInfo = $updateStmt->errorInfo();
+                echo "DEBUG: Erro SQL UPDATE: " . print_r($errorInfo, true) . "\n";
+                $db->rollBack();
+                return false;
             }
             
+            echo "DEBUG: Query de atualização executada com sucesso\n";
+            
+            // Verificar se realmente atualizou
+            $rowsAffected = $updateStmt->rowCount();
+            echo "DEBUG: Linhas afetadas pela atualização: $rowsAffected\n";
+            
             // Registrar movimentação
+            echo "DEBUG: Preparando registro de movimentação\n";
             $movStmt = $db->prepare("
                 INSERT INTO admin_saldo_movimentacoes 
                 (transacao_id, valor, tipo, descricao, data_operacao)
-                VALUES (:transacao_id, :valor, :tipo, :descricao, NOW())
+                VALUES (?, ?, ?, ?, NOW())
             ");
-            $movStmt->bindParam(':transacao_id', $transacaoId);
-            $movStmt->bindParam(':valor', $valorAbs);
-            $movStmt->bindParam(':tipo', $tipo);
-            $movStmt->bindParam(':descricao', $descricao);
-            $movResult = $movStmt->execute();
+            
+            echo "DEBUG: Executando registro de movimentação\n";
+            $movResult = $movStmt->execute([$transacaoId, $valorAbs, $tipo, $descricao]);
             
             if (!$movResult) {
-                throw new Exception('Erro ao registrar movimentação');
+                echo "DEBUG: ERRO ao registrar movimentação\n";
+                $errorInfo = $movStmt->errorInfo();
+                echo "DEBUG: Erro SQL MOVIMENTAÇÃO: " . print_r($errorInfo, true) . "\n";
+                $db->rollBack();
+                return false;
             }
             
+            echo "DEBUG: Movimentação registrada com sucesso\n";
+            
             // Commit da transação
+            echo "DEBUG: Fazendo commit da transação\n";
             $db->commit();
             
-            // Log de sucesso
-            error_log("SALDO ADMIN: Atualizado com sucesso - Valor: $valor, Tipo: $tipo, Descrição: $descricao");
+            echo "DEBUG: Transação commitada com sucesso\n";
+            
+            // Verificar saldo final
+            $finalStmt = $db->query("SELECT * FROM admin_saldo WHERE id = 1");
+            $finalBalance = $finalStmt->fetch(PDO::FETCH_ASSOC);
+            echo "DEBUG: Saldo final - Total: {$finalBalance['valor_total']}, Disponível: {$finalBalance['valor_disponivel']}\n";
             
             return true;
             
         } catch (Exception $e) {
+            echo "DEBUG: EXCEÇÃO capturada: " . $e->getMessage() . "\n";
+            echo "DEBUG: Stack trace: " . $e->getTraceAsString() . "\n";
+            
             // Rollback em caso de erro
             if (isset($db) && $db->inTransaction()) {
+                echo "DEBUG: Fazendo rollback da transação\n";
                 $db->rollBack();
             }
+            
             error_log('SALDO ADMIN: Erro ao atualizar saldo - ' . $e->getMessage());
             return false;
         }
