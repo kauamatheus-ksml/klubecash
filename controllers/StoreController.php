@@ -12,11 +12,15 @@ require_once __DIR__ . '/AuthController.php';
 class StoreController {
     
     /**
-     * Aprova uma loja pendente
-     * 
-     * @param int $storeId ID da loja
-     * @return array Resultado da operação
-     */
+    * Aprova uma loja pendente E ativa o usuário associado
+    * 
+    * Esta função agora realiza uma operação dupla:
+    * 1. Aprova a loja (como antes)
+    * 2. Ativa o usuário associado (nova funcionalidade)
+    * 
+    * @param int $storeId ID da loja
+    * @return array Resultado da operação
+    */
     public static function approveStore($storeId) {
         try {
             // Verificar se é um administrador
@@ -26,8 +30,8 @@ class StoreController {
             
             $db = Database::getConnection();
             
-            // CORREÇÃO: Usar execute() direto com array é mais seguro
-            // Em vez de fazer bind individual, passamos todos os valores de uma vez
+            // PASSO 1: Buscar dados completos da loja, incluindo usuario_id
+            // Isso é como verificar se temos todos os documentos necessários
             $stmt = $db->prepare("SELECT * FROM lojas WHERE id = ? AND status = ?");
             $stmt->execute([$storeId, STORE_PENDING]);
             $store = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -36,37 +40,103 @@ class StoreController {
                 return ['status' => false, 'message' => 'Loja não encontrada ou não está pendente.'];
             }
             
-            // CORREÇÃO: Mesmo padrão para o UPDATE - valores diretos no execute()
-            $updateStmt = $db->prepare("UPDATE lojas SET status = ?, data_aprovacao = NOW() WHERE id = ?");
-            $updateStmt->execute([STORE_APPROVED, $storeId]);
+            // PASSO 2: INICIAR TRANSAÇÃO para garantir que ambas operações sejam feitas juntas
+            // Se uma falhar, ambas são canceladas - como um contrato que só vale se todas as partes concordarem
+            $db->beginTransaction();
             
-            // Enviar email de notificação (mantido como estava - funcionando)
+            // PASSO 3: Aprovar a loja (como antes)
+            $updateStoreStmt = $db->prepare("UPDATE lojas SET status = ?, data_aprovacao = NOW() WHERE id = ?");
+            $storeResult = $updateStoreStmt->execute([STORE_APPROVED, $storeId]);
+            
+            if (!$storeResult) {
+                $db->rollBack();
+                return ['status' => false, 'message' => 'Erro ao aprovar loja.'];
+            }
+            
+            // PASSO 4: Ativar o usuário associado (NOVA FUNCIONALIDADE)
+            // Aqui está a peça que estava faltando!
+            if (!empty($store['usuario_id'])) {
+                $updateUserStmt = $db->prepare("UPDATE usuarios SET status = ? WHERE id = ?");
+                $userResult = $updateUserStmt->execute([USER_ACTIVE, $store['usuario_id']]);
+                
+                if (!$userResult) {
+                    // Se não conseguir ativar o usuário, cancelar tudo
+                    $db->rollBack();
+                    return ['status' => false, 'message' => 'Erro ao ativar usuário da loja aprovada.'];
+                }
+            } else {
+                // Se não houver usuário associado, isso pode ser um problema
+                $db->rollBack();
+                return ['status' => false, 'message' => 'Loja não possui usuário associado para ativar.'];
+            }
+            
+            // PASSO 5: Confirmar todas as alterações
+            // Como assinar o contrato final - só agora as mudanças são permanentes
+            $db->commit();
+            
+            // PASSO 6: Enviar email de notificação (melhorado)
             if (!empty($store['email']) && class_exists('Email')) {
                 $subject = 'Loja Aprovada - Klube Cash';
                 $message = "
-                    <h3>Parabéns, {$store['nome_fantasia']}!</h3>
-                    <p>Sua loja foi aprovada no sistema Klube Cash!</p>
-                    <p>Agora seus clientes podem começar a receber cashback em suas compras.</p>
+                    <h3>🎉 Parabéns, {$store['nome_fantasia']}!</h3>
+                    <p>Sua loja foi <strong>aprovada</strong> no sistema Klube Cash!</p>
+                    
+                    <h4>✅ O que aconteceu agora:</h4>
+                    <ul>
+                        <li>Sua loja está <strong>ativa</strong> no sistema</li>
+                        <li>Sua conta de usuário foi <strong>ativada</strong></li>
+                        <li>Você já pode fazer login no sistema</li>
+                        <li>Sua loja será exibida para os clientes</li>
+                    </ul>
+                    
+                    <h4>🚀 Próximos passos:</h4>
+                    <ul>
+                        <li>Acesse o sistema com seu email e senha: <a href='" . LOGIN_URL . "'>Fazer Login</a></li>
+                        <li>Configure seu painel de controle</li>
+                        <li>Comece a registrar vendas e oferecer cashback</li>
+                    </ul>
+                    
+                    <p><strong>Dados de acesso:</strong></p>
+                    <ul>
+                        <li><strong>Email:</strong> {$store['email']}</li>
+                        <li><strong>Senha:</strong> A mesma que você cadastrou</li>
+                    </ul>
+                    
+                    <p>Agora seus clientes podem começar a receber cashback em suas compras!</p>
                     <p>Atenciosamente,<br>Equipe Klube Cash</p>
                 ";
                 Email::send($store['email'], $subject, $message, $store['nome_fantasia']);
             }
             
-            return ['status' => true, 'message' => 'Loja aprovada com sucesso.'];
+            return [
+                'status' => true, 
+                'message' => 'Loja aprovada e usuário ativado com sucesso!',
+                'data' => [
+                    'store_id' => $storeId,
+                    'user_id' => $store['usuario_id'],
+                    'store_status' => STORE_APPROVED,
+                    'user_status' => USER_ACTIVE
+                ]
+            ];
             
         } catch (PDOException $e) {
+            // Se algo der errado, cancelar todas as alterações
+            if (isset($db) && $db->inTransaction()) {
+                $db->rollBack();
+            }
+            
             error_log('Erro ao aprovar loja: ' . $e->getMessage());
             return ['status' => false, 'message' => 'Erro ao aprovar loja. Por favor, tente novamente.'];
         }
     }
     
     /**
-     * Rejeita uma loja pendente
-     * 
-     * @param int $storeId ID da loja
-     * @param string $observacao Motivo da rejeição
-     * @return array Resultado da operação
-     */
+    * Rejeita uma loja pendente e mantém o usuário inativo
+    * 
+    * @param int $storeId ID da loja
+    * @param string $observacao Motivo da rejeição
+    * @return array Resultado da operação
+    */
     public static function rejectStore($storeId, $observacao = '') {
         try {
             // Verificar se é um administrador
@@ -76,7 +146,7 @@ class StoreController {
             
             $db = Database::getConnection();
             
-            // CORREÇÃO: Usar execute() direto para evitar problemas de referência
+            // Buscar dados completos da loja
             $stmt = $db->prepare("SELECT * FROM lojas WHERE id = ? AND status = ?");
             $stmt->execute([$storeId, STORE_PENDING]);
             $store = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -85,32 +155,74 @@ class StoreController {
                 return ['status' => false, 'message' => 'Loja não encontrada ou não está pendente.'];
             }
             
-            // CORREÇÃO: Passar valores diretamente no execute()
-            $updateStmt = $db->prepare("UPDATE lojas SET status = ?, observacao = ? WHERE id = ?");
-            $updateStmt->execute([STORE_REJECTED, $observacao, $storeId]);
+            // INICIAR TRANSAÇÃO para operações em loja e usuário
+            $db->beginTransaction();
             
-            // Enviar email de notificação
+            // Rejeitar a loja
+            $updateStoreStmt = $db->prepare("UPDATE lojas SET status = ?, observacao = ? WHERE id = ?");
+            $storeResult = $updateStoreStmt->execute([STORE_REJECTED, $observacao, $storeId]);
+            
+            if (!$storeResult) {
+                $db->rollBack();
+                return ['status' => false, 'message' => 'Erro ao rejeitar loja.'];
+            }
+            
+            // OPCIONAL: Manter usuário inativo ou até mesmo bloqueá-lo
+            // Neste caso, vamos apenas garantir que ele permaneça inativo
+            if (!empty($store['usuario_id'])) {
+                $updateUserStmt = $db->prepare("UPDATE usuarios SET status = ? WHERE id = ?");
+                $userResult = $updateUserStmt->execute([USER_INACTIVE, $store['usuario_id']]);
+                
+                if (!$userResult) {
+                    $db->rollBack();
+                    return ['status' => false, 'message' => 'Erro ao atualizar status do usuário.'];
+                }
+            }
+            
+            // Confirmar alterações
+            $db->commit();
+            
+            // Enviar email de notificação (melhorado)
             if (!empty($store['email']) && class_exists('Email')) {
                 $subject = 'Solicitação de Loja Rejeitada - Klube Cash';
                 $message = "
                     <h3>Prezado(a), {$store['nome_fantasia']}!</h3>
-                    <p>Infelizmente, sua solicitação para se tornar uma loja parceira no Klube Cash foi rejeitada.</p>
+                    <p>Infelizmente, sua solicitação para se tornar uma loja parceira no Klube Cash foi <strong>rejeitada</strong>.</p>
                 ";
                 
                 if (!empty($observacao)) {
-                    $message .= "<p><strong>Motivo:</strong> " . nl2br(htmlspecialchars($observacao)) . "</p>";
+                    $message .= "<p><strong>Motivo da rejeição:</strong><br>" . nl2br(htmlspecialchars($observacao)) . "</p>";
                 }
                 
                 $message .= "
-                    <p>Se tiver dúvidas ou quiser mais informações, entre em contato com nosso suporte.</p>
+                    <h4>📧 Entre em contato conosco:</h4>
+                    <p>Se você tem dúvidas sobre esta decisão ou gostaria de mais informações para uma nova solicitação, entre em contato com nosso suporte:</p>
+                    <ul>
+                        <li><strong>Email:</strong> " . ADMIN_EMAIL . "</li>
+                        <li><strong>Assunto:</strong> Dúvida sobre Rejeição de Loja - {$store['nome_fantasia']}</li>
+                    </ul>
+                    
+                    <p>Agradecemos seu interesse em fazer parte do Klube Cash.</p>
                     <p>Atenciosamente,<br>Equipe Klube Cash</p>
                 ";
                 Email::send($store['email'], $subject, $message, $store['nome_fantasia']);
             }
             
-            return ['status' => true, 'message' => 'Loja rejeitada com sucesso.'];
+            return [
+                'status' => true, 
+                'message' => 'Loja rejeitada com sucesso.',
+                'data' => [
+                    'store_id' => $storeId,
+                    'user_id' => $store['usuario_id'],
+                    'reason' => $observacao
+                ]
+            ];
             
         } catch (PDOException $e) {
+            if (isset($db) && $db->inTransaction()) {
+                $db->rollBack();
+            }
+            
             error_log('Erro ao rejeitar loja: ' . $e->getMessage());
             return ['status' => false, 'message' => 'Erro ao rejeitar loja. Por favor, tente novamente.'];
         }
@@ -493,7 +605,6 @@ if (basename($_SERVER['PHP_SELF']) === 'StoreController.php') {
     
     switch ($action) {
         case 'approve':
-            // Verificar se é um administrador
             if (!AuthController::isAdmin()) {
                 echo json_encode(['status' => false, 'message' => 'Acesso restrito a administradores.']);
                 exit;
@@ -505,7 +616,6 @@ if (basename($_SERVER['PHP_SELF']) === 'StoreController.php') {
             break;
             
         case 'reject':
-            // Verificar se é um administrador
             if (!AuthController::isAdmin()) {
                 echo json_encode(['status' => false, 'message' => 'Acesso restrito a administradores.']);
                 exit;
@@ -531,7 +641,6 @@ if (basename($_SERVER['PHP_SELF']) === 'StoreController.php') {
             break;
             
         default:
-            // Acesso inválido ao controlador
             if (AuthController::isAdmin()) {
                 header('Location: ' . ADMIN_STORES_URL);
             } else {
