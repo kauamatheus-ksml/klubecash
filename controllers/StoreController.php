@@ -158,8 +158,8 @@ class StoreController {
             }
             
             // Validar força da senha
-            if (strlen($data['senha']) < 8) {
-                return ['status' => false, 'message' => 'A senha deve ter pelo menos 8 caracteres.'];
+            if (strlen($data['senha']) < PASSWORD_MIN_LENGTH) {
+                return ['status' => false, 'message' => 'A senha deve ter pelo menos ' . PASSWORD_MIN_LENGTH . ' caracteres.'];
             }
             
             $db = Database::getConnection();
@@ -173,66 +173,87 @@ class StoreController {
                 return ['status' => false, 'message' => 'Já existe uma loja cadastrada com este CNPJ.'];
             }
             
-            // Verificar se já existe uma loja com este email
-            $stmt = $db->prepare("SELECT id FROM lojas WHERE email = :email");
-            $stmt->bindParam(':email', $data['email']);
-            $stmt->execute();
+            // Verificar se já existe um usuário com este email
+            $userStmt = $db->prepare("SELECT id FROM usuarios WHERE email = :email");
+            $userStmt->bindParam(':email', $data['email']);
+            $userStmt->execute();
             
-            if ($stmt->rowCount() > 0) {
-                return ['status' => false, 'message' => 'Já existe uma loja cadastrada com este email.'];
+            if ($userStmt->rowCount() > 0) {
+                return ['status' => false, 'message' => 'Já existe um usuário cadastrado com este email.'];
             }
             
-            // Gerar hash da senha usando password_hash para segurança
+            // INICIAR TRANSAÇÃO PARA CRIAR USUÁRIO E LOJA JUNTOS
+            $db->beginTransaction();
+            
+            // 1. CRIAR O USUÁRIO PRIMEIRO
             $senhaHash = password_hash($data['senha'], PASSWORD_DEFAULT);
             
-            // Inserir nova loja com senha
-            $insertStmt = $db->prepare("
+            $userInsertStmt = $db->prepare("
+                INSERT INTO usuarios (nome, email, telefone, senha_hash, tipo, status, data_criacao)
+                VALUES (:nome, :email, :telefone, :senha_hash, :tipo, :status, NOW())
+            ");
+            
+            $userInsertStmt->bindParam(':nome', $data['nome_fantasia']); // Usar nome fantasia como nome do usuário
+            $userInsertStmt->bindParam(':email', $data['email']);
+            $userInsertStmt->bindParam(':telefone', $data['telefone']);
+            $userInsertStmt->bindParam(':senha_hash', $senhaHash);
+            
+            // IMPORTANTE: Usuário criado como INATIVO até loja ser aprovada
+            $tipoUsuario = USER_TYPE_STORE;
+            $statusUsuario = USER_INACTIVE; // Inativo até aprovação da loja
+            
+            $userInsertStmt->bindParam(':tipo', $tipoUsuario);
+            $userInsertStmt->bindParam(':status', $statusUsuario);
+            
+            if (!$userInsertStmt->execute()) {
+                $db->rollBack();
+                return ['status' => false, 'message' => 'Erro ao criar usuário da loja.'];
+            }
+            
+            $userId = $db->lastInsertId();
+            
+            // 2. CRIAR A LOJA VINCULADA AO USUÁRIO
+            $storeInsertStmt = $db->prepare("
                 INSERT INTO lojas (
                     nome_fantasia, razao_social, cnpj, email, telefone,
                     categoria, porcentagem_cashback, descricao, website,
-                    senha_hash, status, data_cadastro
+                    usuario_id, status, data_cadastro
                 ) VALUES (
                     :nome_fantasia, :razao_social, :cnpj, :email, :telefone,
                     :categoria, :porcentagem_cashback, :descricao, :website,
-                    :senha_hash, :status, NOW()
+                    :usuario_id, :status, NOW()
                 )
             ");
             
-            $insertStmt->bindParam(':nome_fantasia', $data['nome_fantasia']);
-            $insertStmt->bindParam(':razao_social', $data['razao_social']);
-            $insertStmt->bindParam(':cnpj', $data['cnpj']);
-            $insertStmt->bindParam(':email', $data['email']);
-            $insertStmt->bindParam(':telefone', $data['telefone']);
+            $storeInsertStmt->bindParam(':nome_fantasia', $data['nome_fantasia']);
+            $storeInsertStmt->bindParam(':razao_social', $data['razao_social']);
+            $storeInsertStmt->bindParam(':cnpj', $data['cnpj']);
+            $storeInsertStmt->bindParam(':email', $data['email']);
+            $storeInsertStmt->bindParam(':telefone', $data['telefone']);
+            
             $categoria = $data['categoria'] ?? 'Outros';
-            
-            // CORREÇÃO: Sempre usar a configuração padrão do sistema (10%)
-            // Não permitir que a loja defina porcentagem customizada
             $porcentagemCashback = DEFAULT_CASHBACK_TOTAL; // Sempre 10%
-            
-            $insertStmt->bindParam(':categoria', $categoria);
-            $insertStmt->bindParam(':porcentagem_cashback', $porcentagemCashback);
             $descricao = $data['descricao'] ?? '';
             $website = $data['website'] ?? '';
-            $insertStmt->bindParam(':descricao', $descricao);
-            $insertStmt->bindParam(':website', $website);
-            $insertStmt->bindParam(':senha_hash', $senhaHash);
             
-            // Status inicial - sempre pendente para cadastros pela página pública
+            $storeInsertStmt->bindParam(':categoria', $categoria);
+            $storeInsertStmt->bindParam(':porcentagem_cashback', $porcentagemCashback);
+            $storeInsertStmt->bindParam(':descricao', $descricao);
+            $storeInsertStmt->bindParam(':website', $website);
+            $storeInsertStmt->bindParam(':usuario_id', $userId); // VINCULAR USUÁRIO À LOJA
+            
+            // Status inicial sempre pendente
             $initialStatus = STORE_PENDING;
+            $storeInsertStmt->bindParam(':status', $initialStatus);
             
-            // Apenas se for um admin E estiver usando o painel administrativo
-            if (AuthController::isAdmin() && isset($_SERVER['HTTP_REFERER'])) {
-                $referer = $_SERVER['HTTP_REFERER'];
-                if (strpos($referer, '/admin/') !== false) {
-                    $initialStatus = STORE_APPROVED;
-                }
+            if (!$storeInsertStmt->execute()) {
+                $db->rollBack();
+                return ['status' => false, 'message' => 'Erro ao cadastrar loja.'];
             }
-            $insertStmt->bindParam(':status', $initialStatus);
             
-            $insertStmt->execute();
             $storeId = $db->lastInsertId();
             
-            // Processar endereço se fornecido
+            // 3. PROCESSAR ENDEREÇO SE FORNECIDO
             if (isset($data['endereco']) && is_array($data['endereco'])) {
                 $endereco = $data['endereco'];
                 $enderecoStmt = $db->prepare("
@@ -251,8 +272,15 @@ class StoreController {
                 $enderecoStmt->bindParam(':bairro', $endereco['bairro'] ?? '');
                 $enderecoStmt->bindParam(':cidade', $endereco['cidade'] ?? '');
                 $enderecoStmt->bindParam(':estado', $endereco['estado'] ?? '');
-                $enderecoStmt->execute();
+                
+                if (!$enderecoStmt->execute()) {
+                    $db->rollBack();
+                    return ['status' => false, 'message' => 'Erro ao cadastrar endereço da loja.'];
+                }
             }
+            
+            // CONFIRMAR TODAS AS OPERAÇÕES
+            $db->commit();
             
             // Enviar email de notificação
             if (!empty($data['email'])) {
@@ -260,8 +288,18 @@ class StoreController {
                 $message = "
                     <h3>Olá, {$data['nome_fantasia']}!</h3>
                     <p>Recebemos sua solicitação para se tornar uma loja parceira do Klube Cash.</p>
-                    <p>Sua solicitação está " . ($initialStatus == STORE_APPROVED ? 'aprovada' : 'sob análise') . ".</p>
-                    " . ($initialStatus == STORE_PENDING ? '<p>Em breve entraremos em contato.</p>' : '<p>Você já pode começar a registrar vendas!</p>') . "
+                    <p>Criamos sua conta de acesso com as seguintes informações:</p>
+                    <ul>
+                        <li><strong>Email:</strong> {$data['email']}</li>
+                        <li><strong>Tipo de conta:</strong> Loja Parceira</li>
+                    </ul>
+                    <p>Sua solicitação está sob análise. Assim que for aprovada:</p>
+                    <ul>
+                        <li>Sua conta será ativada automaticamente</li>
+                        <li>Você poderá fazer login no sistema</li>
+                        <li>Sua loja será exibida no catálogo para clientes</li>
+                    </ul>
+                    <p>Em breve entraremos em contato com o resultado da análise.</p>
                     <p>Atenciosamente,<br>Equipe Klube Cash</p>
                 ";
                 Email::send($data['email'], $subject, $message, $data['nome_fantasia']);
@@ -269,16 +307,22 @@ class StoreController {
             
             return [
                 'status' => true, 
-                'message' => 'Loja cadastrada com sucesso! Aguarde a aprovação.',
+                'message' => 'Loja e usuário cadastrados com sucesso! Aguarde a aprovação para acessar o sistema.',
                 'data' => [
                     'store_id' => $storeId,
-                    'awaiting_approval' => ($initialStatus == STORE_PENDING)
+                    'user_id' => $userId,
+                    'awaiting_approval' => true
                 ]
             ];
             
         } catch (PDOException $e) {
+            // Reverter todas as alterações em caso de erro
+            if (isset($db) && $db->inTransaction()) {
+                $db->rollBack();
+            }
+            
             error_log('Erro ao cadastrar loja: ' . $e->getMessage());
-            return ['status' => false, 'message' => 'Erro ao cadastrar loja. Tente novamente.'];
+            return ['status' => false, 'message' => 'Erro ao processar cadastro. Tente novamente.'];
         }
     }
     

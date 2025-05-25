@@ -1229,7 +1229,7 @@ public static function getAvailableStores() {
             
             $db = Database::getConnection();
             
-            // Verificar se a loja existe
+            // Buscar dados da loja incluindo usuario_id
             $checkStmt = $db->prepare("SELECT * FROM lojas WHERE id = :store_id");
             $checkStmt->bindParam(':store_id', $storeId);
             $checkStmt->execute();
@@ -1239,20 +1239,48 @@ public static function getAvailableStores() {
                 return ['status' => false, 'message' => 'Loja não encontrada.'];
             }
             
-            // Atualizar status
-            $updateStmt = $db->prepare("
+            // INICIAR TRANSAÇÃO PARA ATUALIZAR LOJA E USUÁRIO JUNTOS
+            $db->beginTransaction();
+            
+            // 1. ATUALIZAR STATUS DA LOJA
+            $updateStoreStmt = $db->prepare("
                 UPDATE lojas 
                 SET status = :status, observacao = :observacao, data_aprovacao = :data_aprovacao
                 WHERE id = :store_id
             ");
-            $updateStmt->bindParam(':status', $status);
-            $updateStmt->bindParam(':observacao', $observacao);
+            $updateStoreStmt->bindParam(':status', $status);
+            $updateStoreStmt->bindParam(':observacao', $observacao);
             $dataAprovacao = ($status === STORE_APPROVED) ? date('Y-m-d H:i:s') : null;
-            $updateStmt->bindParam(':data_aprovacao', $dataAprovacao);
-            $updateStmt->bindParam(':store_id', $storeId);
-            $updateStmt->execute();
+            $updateStoreStmt->bindParam(':data_aprovacao', $dataAprovacao);
+            $updateStoreStmt->bindParam(':store_id', $storeId);
             
-            // Notificar loja por email
+            if (!$updateStoreStmt->execute()) {
+                $db->rollBack();
+                return ['status' => false, 'message' => 'Erro ao atualizar status da loja.'];
+            }
+            
+            // 2. ATUALIZAR STATUS DO USUÁRIO CORRESPONDENTE
+            if ($store['usuario_id']) {
+                $userStatus = ($status === STORE_APPROVED) ? USER_ACTIVE : USER_INACTIVE;
+                
+                $updateUserStmt = $db->prepare("
+                    UPDATE usuarios 
+                    SET status = :status 
+                    WHERE id = :user_id
+                ");
+                $updateUserStmt->bindParam(':status', $userStatus);
+                $updateUserStmt->bindParam(':user_id', $store['usuario_id']);
+                
+                if (!$updateUserStmt->execute()) {
+                    $db->rollBack();
+                    return ['status' => false, 'message' => 'Erro ao atualizar status do usuário da loja.'];
+                }
+            }
+            
+            // CONFIRMAR TODAS AS ALTERAÇÕES
+            $db->commit();
+            
+            // Preparar notificação por email
             $statusLabels = [
                 STORE_APPROVED => 'aprovada',
                 STORE_REJECTED => 'rejeitada'
@@ -1265,7 +1293,18 @@ public static function getAvailableStores() {
             ";
             
             if ($status == STORE_APPROVED) {
-                $message .= "<p>Parabéns! Sua loja agora faz parte do programa de cashback Klube Cash. Seus clientes já podem começar a ganhar cashback em suas compras.</p>";
+                $message .= "
+                    <p>🎉 <strong>Parabéns! Sua loja foi aprovada!</strong></p>
+                    <p>A partir de agora você pode:</p>
+                    <ul>
+                        <li>Fazer login no sistema com seu email e senha</li>
+                        <li>Acessar seu painel de controle</li>
+                        <li>Registrar vendas e gerenciar cashback</li>
+                        <li>Sua loja já está visível para os clientes</li>
+                    </ul>
+                    <p><strong>Para acessar:</strong> <a href='" . LOGIN_URL . "'>Clique aqui para fazer login</a></p>
+                    <p>Use o mesmo email e senha que cadastrou durante o registro da loja.</p>
+                ";
             } else if ($status == STORE_REJECTED) {
                 $message .= "<p>Infelizmente, sua solicitação não foi aprovada neste momento.</p>";
                 
@@ -1280,9 +1319,14 @@ public static function getAvailableStores() {
             
             Email::send($store['email'], $subject, $message, $store['nome_fantasia']);
             
-            return ['status' => true, 'message' => 'Status da loja atualizado com sucesso.'];
+            return ['status' => true, 'message' => 'Status da loja e usuário atualizados com sucesso.'];
             
         } catch (PDOException $e) {
+            // Reverter alterações em caso de erro
+            if (isset($db) && $db->inTransaction()) {
+                $db->rollBack();
+            }
+            
             error_log('Erro ao atualizar status da loja: ' . $e->getMessage());
             return ['status' => false, 'message' => 'Erro ao atualizar status da loja. Tente novamente.'];
         }
