@@ -1448,59 +1448,59 @@ public static function getAvailableStores() {
         }
     }
     /**
- * Obtém transações com saldo usado para repasse
- * 
- * @param int $lojaId ID da loja
- * @return array Transações com saldo usado
- */
-public static function getRepasseTransactions($lojaId) {
-    try {
-        if (!self::validateAdmin()) {
-            return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
+    * Obtém transações com saldo usado para repasse (NOVO MÉTODO)
+    * 
+    * @param int $lojaId ID da loja
+    * @return array Transações com saldo usado
+    */
+    public static function getRepasseTransactions($lojaId) {
+        try {
+            if (!self::validateAdmin()) {
+                return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
+            }
+            
+            $db = Database::getConnection();
+            
+            // Buscar transações onde clientes usaram saldo nesta loja
+            $stmt = $db->prepare("
+                SELECT 
+                    cm.id as movimentacao_id,
+                    cm.valor as valor_saldo_usado,
+                    cm.data_operacao,
+                    t.id as transacao_id,
+                    t.valor_total,
+                    t.codigo_transacao,
+                    t.data_transacao,
+                    u.nome as cliente_nome
+                FROM cashback_movimentacoes cm
+                JOIN transacoes_cashback t ON cm.transacao_uso_id = t.id
+                JOIN usuarios u ON t.usuario_id = u.id
+                WHERE t.loja_id = ? 
+                AND cm.tipo_operacao = 'uso'
+                AND (cm.status_repasse IS NULL OR cm.status_repasse != 'pago')
+                ORDER BY t.data_transacao DESC
+            ");
+            
+            $stmt->execute([$lojaId]);
+            $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            return [
+                'status' => true,
+                'data' => $transactions
+            ];
+            
+        } catch (Exception $e) {
+            error_log('Erro ao obter transações de repasse: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro ao obter transações.'];
         }
-        
-        $db = Database::getConnection();
-        
-        // Buscar transações onde clientes usaram saldo nesta loja
-        $stmt = $db->prepare("
-            SELECT 
-                cm.id as movimentacao_id,
-                cm.valor as valor_saldo_usado,
-                cm.data_operacao,
-                t.id as transacao_id,
-                t.valor_total,
-                t.codigo_transacao,
-                t.data_transacao,
-                u.nome as cliente_nome
-            FROM cashback_movimentacoes cm
-            JOIN transacoes_cashback t ON cm.transacao_uso_id = t.id
-            JOIN usuarios u ON t.usuario_id = u.id
-            WHERE t.loja_id = ? 
-            AND cm.tipo_operacao = 'uso'
-            AND cm.status_repasse IS NULL
-            ORDER BY t.data_transacao DESC
-        ");
-        
-        $stmt->execute([$lojaId]);
-        $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        return [
-            'status' => true,
-            'data' => $transactions
-        ];
-        
-    } catch (Exception $e) {
-        error_log('Erro ao obter transações de repasse: ' . $e->getMessage());
-        return ['status' => false, 'message' => 'Erro ao obter transações.'];
     }
-}
 
     /**
-     * Processa repasse de saldo usado para loja
-     * 
-     * @param array $data Dados do repasse
-     * @return array Resultado da operação
-     */
+    * Processa repasse de saldo usado para loja (NOVO MÉTODO)
+    * 
+    * @param array $data Dados do repasse
+    * @return array Resultado da operação
+    */
     public static function processStoreRepayment($data) {
         try {
             if (!self::validateAdmin()) {
@@ -1508,7 +1508,7 @@ public static function getRepasseTransactions($lojaId) {
             }
             
             // Validação básica
-            if (!isset($data['loja_id']) || !isset($data['valor_total']) || !isset($data['transacoes_saldo'])) {
+            if (!isset($data['loja_id']) || !isset($data['valor_total'])) {
                 return ['status' => false, 'message' => 'Dados obrigatórios faltando.'];
             }
             
@@ -1521,14 +1521,6 @@ public static function getRepasseTransactions($lojaId) {
             
             if (!$loja) {
                 return ['status' => false, 'message' => 'Loja não encontrada.'];
-            }
-            
-            // Decodificar transações se for string JSON
-            $transacoesSaldo = is_string($data['transacoes_saldo']) ? 
-                json_decode($data['transacoes_saldo'], true) : $data['transacoes_saldo'];
-            
-            if (empty($transacoesSaldo)) {
-                return ['status' => false, 'message' => 'Nenhuma transação encontrada para repasse.'];
             }
             
             // Verificar se não existe tabela de repasses, criar se necessário
@@ -1559,11 +1551,45 @@ public static function getRepasseTransactions($lojaId) {
             $createRelTableStmt->execute();
             
             // Verificar se coluna status_repasse existe, criar se necessário
-            $alterTableStmt = $db->prepare("
-                ALTER TABLE cashback_movimentacoes 
-                ADD COLUMN IF NOT EXISTS status_repasse ENUM('pago', 'pendente') DEFAULT NULL
+            try {
+                $alterTableStmt = $db->prepare("
+                    ALTER TABLE cashback_movimentacoes 
+                    ADD COLUMN status_repasse ENUM('pago', 'pendente') DEFAULT NULL
+                ");
+                $alterTableStmt->execute();
+            } catch (PDOException $e) {
+                // Coluna já existe, ignorar erro
+            }
+            
+            // Obter transações pendentes de repasse para esta loja
+            $transacoesPendentesStmt = $db->prepare("
+                SELECT 
+                    cm.id as movimentacao_id,
+                    cm.valor as valor_saldo_usado,
+                    t.id as transacao_id
+                FROM cashback_movimentacoes cm
+                JOIN transacoes_cashback t ON cm.transacao_uso_id = t.id
+                WHERE t.loja_id = ? 
+                AND cm.tipo_operacao = 'uso'
+                AND (cm.status_repasse IS NULL OR cm.status_repasse != 'pago')
             ");
-            $alterTableStmt->execute();
+            $transacoesPendentesStmt->execute([$data['loja_id']]);
+            $transacoesPendentes = $transacoesPendentesStmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            if (empty($transacoesPendentes)) {
+                return ['status' => false, 'message' => 'Nenhuma transação encontrada para repasse.'];
+            }
+            
+            // Calcular total real
+            $totalReal = array_sum(array_column($transacoesPendentes, 'valor_saldo_usado'));
+            
+            // Validar valor
+            if (abs($totalReal - floatval($data['valor_total'])) > 0.01) {
+                return [
+                    'status' => false, 
+                    'message' => 'Valor informado não confere. Valor correto: R$ ' . number_format($totalReal, 2, ',', '.')
+                ];
+            }
             
             // Iniciar transação
             $db->beginTransaction();
@@ -1578,7 +1604,7 @@ public static function getRepasseTransactions($lojaId) {
                 
                 $insertRepasseStmt->execute([
                     $data['loja_id'],
-                    $data['valor_total'],
+                    $totalReal,
                     $data['metodo_pagamento'] ?? 'pix',
                     $data['numero_referencia'] ?? '',
                     $data['observacao'] ?? ''
@@ -1596,34 +1622,23 @@ public static function getRepasseTransactions($lojaId) {
                 $updateStatusStmt = $db->prepare("
                     UPDATE cashback_movimentacoes 
                     SET status_repasse = 'pago'
-                    WHERE transacao_uso_id = ? AND tipo_operacao = 'uso' AND status_repasse IS NULL
+                    WHERE id = ?
                 ");
                 
-                $totalProcessado = 0;
-                foreach ($transacoesSaldo as $transacao) {
-                    $transacaoId = $transacao['transacao_id'];
-                    $valorSaldoUsado = $transacao['valor_saldo_usado'];
-                    
+                foreach ($transacoesPendentes as $transacao) {
                     // Inserir relação
-                    $insertRelStmt->execute([$repasseId, $transacaoId, $valorSaldoUsado]);
+                    $insertRelStmt->execute([$repasseId, $transacao['transacao_id'], $transacao['valor_saldo_usado']]);
                     
-                    // Marcar movimentações como pagas
-                    $updateStatusStmt->execute([$transacaoId]);
-                    
-                    $totalProcessado += $valorSaldoUsado;
-                }
-                
-                // Validar se o total processado confere
-                if (abs($totalProcessado - $data['valor_total']) > 0.01) {
-                    throw new Exception('Total processado não confere com valor informado.');
+                    // Marcar movimentação como paga
+                    $updateStatusStmt->execute([$transacao['movimentacao_id']]);
                 }
                 
                 // 3. Atualizar saldo do admin (debitar o valor repassado)
                 $descricaoAdmin = "Repasse de saldo usado - Loja: " . $loja['nome_fantasia'] . " - Repasse #" . $repasseId;
-                $updateAdminResult = self::updateAdminBalance(-$data['valor_total'], null, $descricaoAdmin);
+                $updateAdminResult = self::updateAdminBalance(-$totalReal, null, $descricaoAdmin);
                 
                 if (!$updateAdminResult) {
-                    error_log("Erro ao debitar saldo do admin para repasse - Valor: {$data['valor_total']}");
+                    error_log("Erro ao debitar saldo do admin para repasse - Valor: {$totalReal}");
                     // Não falhar a transação por isso, mas logar
                 }
                 
@@ -1635,8 +1650,8 @@ public static function getRepasseTransactions($lojaId) {
                     'message' => 'Repasse processado com sucesso!',
                     'data' => [
                         'repasse_id' => $repasseId,
-                        'valor_total' => $data['valor_total'],
-                        'transacoes_processadas' => count($transacoesSaldo)
+                        'valor_total' => $totalReal,
+                        'transacoes_processadas' => count($transacoesPendentes)
                     ]
                 ];
                 
@@ -1650,6 +1665,7 @@ public static function getRepasseTransactions($lojaId) {
             return ['status' => false, 'message' => 'Erro ao processar repasse: ' . $e->getMessage()];
         }
     }
+
     /**
      * Gerencia transações do sistema
      * 
@@ -3511,6 +3527,12 @@ if (basename($_SERVER['PHP_SELF']) === 'AdminController.php') {
             $result = AdminController::getStoreByEmail($email);
             echo json_encode($result);
             break;
+        case 'get_repasse_transactions':
+            $lojaId = isset($_POST['loja_id']) ? intval($_POST['loja_id']) : 0;
+            $result = AdminController::getRepasseTransactions($lojaId);
+            echo json_encode($result);
+            break;
+            
         default:
             // Acesso inválido ao controlador
             header('Location: ' . ADMIN_DASHBOARD_URL);
