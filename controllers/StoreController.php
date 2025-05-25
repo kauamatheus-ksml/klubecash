@@ -202,8 +202,8 @@ class StoreController {
             $tipoUsuario = USER_TYPE_STORE;
             $statusUsuario = USER_INACTIVE;
 
-            $stmt->bindParam(':tipo', $tipoUsuario);
-            $stmt->bindParam(':status', $statusUsuario);
+            $userInsertStmt->bindParam(':tipo', $tipoUsuario);
+            $userInsertStmt->bindParam(':status', $statusUsuario);
             
             if (!$userInsertStmt->execute()) {
                 $db->rollBack();
