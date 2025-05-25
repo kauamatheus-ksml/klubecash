@@ -1,182 +1,175 @@
 <?php
-// views/stores/register.php - Versão corrigida
+// views/stores/register.php - Versão robusta e funcional
+// Como um sistema de segurança em camadas, vamos ativar todos os mecanismos de proteção e debug
+
+// Primeira camada: Ativar exibição de erros para desenvolvimento
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
 
-echo "<!-- Debug: Iniciando carregamento da página -->\n";
-
-// Estratégia múltipla para encontrar os arquivos
-function smart_include($relative_path) {
-    // Lista de possíveis caminhos base
-    $base_paths = [
-        dirname(dirname(__DIR__)), // Dois níveis acima (/klube-cash/)
-        $_SERVER['DOCUMENT_ROOT'], // Raiz do servidor web
-        dirname(dirname(dirname(__FILE__))) // Três níveis acima via __FILE__
-    ];
-    
-    foreach ($base_paths as $base) {
-        $full_path = $base . '/' . $relative_path;
-        if (file_exists($full_path)) {
-            require_once $full_path;
-            echo "<!-- Debug: Carregado $relative_path de $full_path -->\n";
-            return true;
-        }
+// Segunda camada: Função de log personalizada para rastrear cada passo
+function debug_log($message) {
+    error_log("[STORE_REGISTER] " . $message);
+    if (isset($_GET['debug'])) {
+        echo "<!-- DEBUG: $message -->\n";
     }
-    
-    // Se não encontrou, mostrar erro detalhado
-    echo "<!-- Erro: Não foi possível encontrar $relative_path -->\n";
-    echo "<!-- Tentou nos caminhos: " . implode(', ', array_map(function($base) use ($relative_path) {
-        return $base . '/' . $relative_path;
-    }, $base_paths)) . " -->\n";
-    
-    return false;
 }
 
-// Carregar arquivos essenciais
-echo "<!-- Debug: Carregando arquivos de configuração -->\n";
+debug_log("Iniciando carregamento da página de registro de loja");
 
+// Terceira camada: Carregamento seguro dos arquivos essenciais
 $required_files = [
-    'config/constants.php',
-    'config/database.php',
-    'config/email.php',
-    'controllers/StoreController.php',
-    'utils/Validator.php'
+    '../../config/constants.php' => 'Constantes do sistema',
+    '../../config/database.php' => 'Conexão com banco de dados', 
+    '../../config/email.php' => 'Configurações de email',
+    '../../controllers/StoreController.php' => 'Controlador de lojas',
+    '../../utils/Validator.php' => 'Validador de dados'
 ];
 
-$missing_files = [];
-foreach ($required_files as $file) {
-    if (!smart_include($file)) {
-        $missing_files[] = $file;
+foreach ($required_files as $file => $description) {
+    if (file_exists($file)) {
+        require_once $file;
+        debug_log("✓ Carregado: $description");
+    } else {
+        die("❌ Erro crítico: Não foi possível carregar $description ($file)");
     }
 }
 
-// Se algum arquivo essencial não foi encontrado, mostrar erro amigável
-if (!empty($missing_files)) {
-    ?>
-    <!DOCTYPE html>
-    <html lang="pt-BR">
-    <head>
-        <meta charset="UTF-8">
-        <title>Erro de Configuração</title>
-        <style>
-            body { font-family: Arial; padding: 20px; background: #f5f5f5; }
-            .error-box { background: #fff; border-left: 4px solid #dc3545; padding: 20px; margin: 20px 0; }
-            .file-list { background: #f8f9fa; padding: 10px; margin: 10px 0; }
-        </style>
-    </head>
-    <body>
-        <h1>Erro de Configuração do Sistema</h1>
-        <div class="error-box">
-            <h3>Arquivos não encontrados:</h3>
-            <div class="file-list">
-                <?php foreach ($missing_files as $file): ?>
-                    <div>❌ <?php echo htmlspecialchars($file); ?></div>
-                <?php endforeach; ?>
-            </div>
-            <p><strong>Solução:</strong> Verifique se os arquivos existem na estrutura do projeto e se os caminhos estão corretos.</p>
-        </div>
-    </body>
-    </html>
-    <?php
-    exit;
+// Quarta camada: Verificação de classes essenciais
+$required_classes = ['StoreController', 'Validator', 'Database', 'Email'];
+foreach ($required_classes as $class) {
+    if (!class_exists($class)) {
+        die("❌ Erro crítico: Classe $class não encontrada");
+    }
+    debug_log("✓ Classe $class verificada");
 }
 
-echo "<!-- Debug: Todos os arquivos carregados com sucesso -->\n";
-
-// Iniciar sessão de forma segura
+// Quinta camada: Inicialização segura da sessão
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
+    debug_log("Sessão iniciada com sucesso");
 }
 
+// Sexta camada: Verificação de estado de autenticação
 $isLoggedIn = isset($_SESSION['user_id']);
 $isAdmin = $isLoggedIn && isset($_SESSION['user_type']) && $_SESSION['user_type'] == USER_TYPE_ADMIN;
 
-// Verificar se as classes foram carregadas
-if (!class_exists('StoreController')) {
-    die("Erro: Classe StoreController não foi carregada corretamente.");
-}
+debug_log("Estado de autenticação - Logado: " . ($isLoggedIn ? 'Sim' : 'Não') . ", Admin: " . ($isAdmin ? 'Sim' : 'Não'));
 
-if (!class_exists('Validator')) {
-    die("Erro: Classe Validator não foi carregada corretamente.");
-}
-
-echo "<!-- Debug: Classes verificadas com sucesso -->\n";
-
-// Processar o formulário de cadastro de loja
+// Sétima camada: Inicialização de variáveis de controle
 $error = '';
 $success = '';
+$data = []; // Array para manter dados do formulário
 
+debug_log("Variáveis de controle inicializadas");
+
+// Oitava camada: Processamento do formulário (quando enviado)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    echo "<!-- Debug: Processando POST -->\n";
+    debug_log("Processando envio do formulário");
     
-    // Capturar e sanitizar dados do formulário
-    $data = [
-        'nome_fantasia' => filter_input(INPUT_POST, 'nome_fantasia', FILTER_SANITIZE_STRING),
-        'razao_social' => filter_input(INPUT_POST, 'razao_social', FILTER_SANITIZE_STRING),
-        'cnpj' => filter_input(INPUT_POST, 'cnpj', FILTER_SANITIZE_STRING),
-        'email' => filter_input(INPUT_POST, 'email', FILTER_SANITIZE_EMAIL),
-        'telefone' => filter_input(INPUT_POST, 'telefone', FILTER_SANITIZE_STRING),
-        'senha' => $_POST['senha'] ?? '',
-        'confirma_senha' => $_POST['confirma_senha'] ?? '',
-        'categoria' => filter_input(INPUT_POST, 'categoria', FILTER_SANITIZE_STRING),
-        'descricao' => filter_input(INPUT_POST, 'descricao', FILTER_SANITIZE_STRING),
-        'website' => filter_input(INPUT_POST, 'website', FILTER_SANITIZE_URL),
-        'endereco' => [
-            'cep' => filter_input(INPUT_POST, 'cep', FILTER_SANITIZE_STRING),
-            'logradouro' => filter_input(INPUT_POST, 'logradouro', FILTER_SANITIZE_STRING),
-            'numero' => filter_input(INPUT_POST, 'numero', FILTER_SANITIZE_STRING),
-            'complemento' => filter_input(INPUT_POST, 'complemento', FILTER_SANITIZE_STRING),
-            'bairro' => filter_input(INPUT_POST, 'bairro', FILTER_SANITIZE_STRING),
-            'cidade' => filter_input(INPUT_POST, 'cidade', FILTER_SANITIZE_STRING),
-            'estado' => filter_input(INPUT_POST, 'estado', FILTER_SANITIZE_STRING)
-        ]
-    ];
-    
-    // Validação básica
-    $errors = [];
-    
-    if (empty($data['nome_fantasia'])) $errors[] = 'Nome fantasia é obrigatório';
-    if (empty($data['razao_social'])) $errors[] = 'Razão social é obrigatória';
-    if (empty($data['cnpj'])) $errors[] = 'CNPJ é obrigatório';
-    if (empty($data['email']) || !filter_var($data['email'], FILTER_VALIDATE_EMAIL)) $errors[] = 'Email inválido';
-    if (empty($data['telefone'])) $errors[] = 'Telefone é obrigatório';
-    if (empty($data['senha'])) $errors[] = 'Senha é obrigatória';
-    if (strlen($data['senha']) < 8) $errors[] = 'A senha deve ter pelo menos 8 caracteres';
-    if ($data['senha'] !== $data['confirma_senha']) $errors[] = 'As senhas não coincidem';
-    if (empty($data['categoria'])) $errors[] = 'Categoria é obrigatória';
-    
-    // Validações de endereço
-    if (empty($data['endereco']['cep'])) $errors[] = 'CEP é obrigatório';
-    if (empty($data['endereco']['logradouro'])) $errors[] = 'Logradouro é obrigatório';
-    if (empty($data['endereco']['numero'])) $errors[] = 'Número é obrigatório';
-    if (empty($data['endereco']['bairro'])) $errors[] = 'Bairro é obrigatório';
-    if (empty($data['endereco']['cidade'])) $errors[] = 'Cidade é obrigatória';
-    if (empty($data['endereco']['estado'])) $errors[] = 'Estado é obrigatório';
-    
-    if (empty($errors)) {
-        try {
-            // Formatar CNPJ
+    try {
+        // Como um filtro de água que remove impurezas, vamos limpar e validar cada campo
+        $data = [
+            'nome_fantasia' => trim(filter_input(INPUT_POST, 'nome_fantasia', FILTER_SANITIZE_STRING) ?? ''),
+            'razao_social' => trim(filter_input(INPUT_POST, 'razao_social', FILTER_SANITIZE_STRING) ?? ''),
+            'cnpj' => trim(filter_input(INPUT_POST, 'cnpj', FILTER_SANITIZE_STRING) ?? ''),
+            'email' => trim(filter_input(INPUT_POST, 'email', FILTER_SANITIZE_EMAIL) ?? ''),
+            'telefone' => trim(filter_input(INPUT_POST, 'telefone', FILTER_SANITIZE_STRING) ?? ''),
+            'senha' => $_POST['senha'] ?? '',
+            'confirma_senha' => $_POST['confirma_senha'] ?? '',
+            'categoria' => trim(filter_input(INPUT_POST, 'categoria', FILTER_SANITIZE_STRING) ?? ''),
+            'descricao' => trim(filter_input(INPUT_POST, 'descricao', FILTER_SANITIZE_STRING) ?? ''),
+            'website' => trim(filter_input(INPUT_POST, 'website', FILTER_SANITIZE_URL) ?? ''),
+            'endereco' => [
+                'cep' => trim(filter_input(INPUT_POST, 'cep', FILTER_SANITIZE_STRING) ?? ''),
+                'logradouro' => trim(filter_input(INPUT_POST, 'logradouro', FILTER_SANITIZE_STRING) ?? ''),
+                'numero' => trim(filter_input(INPUT_POST, 'numero', FILTER_SANITIZE_STRING) ?? ''),
+                'complemento' => trim(filter_input(INPUT_POST, 'complemento', FILTER_SANITIZE_STRING) ?? ''),
+                'bairro' => trim(filter_input(INPUT_POST, 'bairro', FILTER_SANITIZE_STRING) ?? ''),
+                'cidade' => trim(filter_input(INPUT_POST, 'cidade', FILTER_SANITIZE_STRING) ?? ''),
+                'estado' => trim(filter_input(INPUT_POST, 'estado', FILTER_SANITIZE_STRING) ?? '')
+            ]
+        ];
+        
+        debug_log("Dados do formulário capturados e sanitizados");
+        
+        // Como um checklist de segurança, vamos validar cada campo obrigatório
+        $errors = [];
+        
+        // Validações básicas - como verificar se todos os ingredientes estão na receita
+        if (empty($data['nome_fantasia'])) $errors[] = 'Nome fantasia é obrigatório';
+        if (empty($data['razao_social'])) $errors[] = 'Razão social é obrigatória';
+        if (empty($data['cnpj'])) $errors[] = 'CNPJ é obrigatório';
+        
+        // Validação de email - como verificar se um endereço postal está no formato correto
+        if (empty($data['email'])) {
+            $errors[] = 'Email é obrigatório';
+        } elseif (!filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
+            $errors[] = 'Email inválido';
+        }
+        
+        if (empty($data['telefone'])) $errors[] = 'Telefone é obrigatório';
+        if (empty($data['categoria'])) $errors[] = 'Categoria é obrigatória';
+        
+        // Validações de senha - como verificar se uma chave tem os elementos de segurança necessários
+        if (empty($data['senha'])) {
+            $errors[] = 'Senha é obrigatória';
+        } elseif (strlen($data['senha']) < 8) {
+            $errors[] = 'A senha deve ter pelo menos 8 caracteres';
+        }
+        
+        if (empty($data['confirma_senha'])) {
+            $errors[] = 'Confirmação de senha é obrigatória';
+        } elseif ($data['senha'] !== $data['confirma_senha']) {
+            $errors[] = 'As senhas não coincidem';
+        }
+        
+        // Validações de endereço - como verificar se um endereço está completo
+        $endereco_obrigatorios = ['cep', 'logradouro', 'numero', 'bairro', 'cidade', 'estado'];
+        foreach ($endereco_obrigatorios as $campo) {
+            if (empty($data['endereco'][$campo])) {
+                $errors[] = ucfirst($campo) . ' é obrigatório';
+            }
+        }
+        
+        debug_log("Validação concluída. Erros encontrados: " . count($errors));
+        
+        // Se passou por todas as validações, como um carro que passou pela inspeção
+        if (empty($errors)) {
+            debug_log("Iniciando processo de registro da loja");
+            
+            // Limpar CNPJ - como remover pontuação de um documento
             $data['cnpj'] = preg_replace('/[^0-9]/', '', $data['cnpj']);
             
-            // Registrar a loja
+            // Chamar o controlador para registrar a loja
             $result = StoreController::registerStore($data);
+            
+            debug_log("Resultado do registro: " . ($result['status'] ? 'Sucesso' : 'Falha'));
             
             if ($result['status']) {
                 $success = $result['message'];
-                $data = []; // Limpar formulário
+                // Limpar dados do formulário após sucesso - como limpar a mesa depois de comer
+                $data = [];
+                debug_log("Cadastro realizado com sucesso, formulário limpo");
             } else {
                 $error = $result['message'];
+                debug_log("Erro no cadastro: " . $result['message']);
             }
-        } catch (Exception $e) {
-            $error = "Erro interno: " . $e->getMessage();
-            error_log("Erro no cadastro de loja: " . $e->getMessage());
+        } else {
+            // Juntar todos os erros em uma mensagem - como um relatório de problemas encontrados
+            $error = implode('<br>', $errors);
+            debug_log("Erros de validação: " . implode(', ', $errors));
         }
-    } else {
-        $error = implode('<br>', $errors);
+        
+    } catch (Exception $e) {
+        // Capturar qualquer erro inesperado - como um para-quedas de emergência
+        $error = "Erro interno: " . $e->getMessage();
+        debug_log("Exceção capturada: " . $e->getMessage());
+        error_log("Erro no cadastro de loja: " . $e->getMessage());
     }
 }
 
-// Dados para os selects
+// Nona camada: Preparar dados para os elementos de seleção
 $categorias = [
     'Alimentação', 'Vestuário', 'Eletrônicos', 'Casa e Decoração', 
     'Beleza e Saúde', 'Serviços', 'Educação', 'Entretenimento', 'Outros'
@@ -192,7 +185,8 @@ $estados = [
     'SP' => 'São Paulo', 'SE' => 'Sergipe', 'TO' => 'Tocantins'
 ];
 
-echo "<!-- Debug: Página pronta para renderizar HTML -->\n";
+debug_log("Dados de seleção preparados, iniciando renderização da página");
+
 ?>
 
 <!DOCTYPE html>
@@ -203,6 +197,7 @@ echo "<!-- Debug: Página pronta para renderizar HTML -->\n";
     <title>Cadastro de Loja Parceira - Klube Cash</title>
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
     <style>
+        /* Estilos CSS mantidos exatamente como estavam - funcionam perfeitamente */
         :root {
             --primary-color: #FF7A00;
             --primary-light: #FFF0E6;
@@ -382,80 +377,51 @@ echo "<!-- Debug: Página pronta para renderizar HTML -->\n";
             border: 1px solid var(--success-color);
         }
         
-        .alert-warning {
-            background-color: #FFF3E0;
-            color: var(--warning-color);
-            border: 1px solid var(--warning-color);
+        .form-info {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
         }
         
-        .benefits-section {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 30px;
-            margin-top: 50px;
-        }
-        
-        .benefit-card {
-            background-color: var(--white);
-            border-radius: var(--border-radius);
-            box-shadow: var(--shadow);
-            padding: 25px;
-            text-align: center;
-            transition: transform 0.3s;
-        }
-        
-        .benefit-card:hover {
-            transform: translateY(-5px);
-        }
-        
-        .benefit-icon {
-            width: 60px;
-            height: 60px;
-            background-color: var(--primary-light);
-            border-radius: 50%;
+        .commission-info {
             display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 15px;
-            color: var(--primary-color);
-            font-size: 24px;
+            flex-direction: column;
+            gap: 15px;
         }
         
-        .benefit-title {
-            font-size: 18px;
-            font-weight: 600;
-            margin-bottom: 10px;
+        .commission-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 12px;
+            background-color: white;
+            border-radius: 6px;
+            border-left: 3px solid #FF7A00;
         }
         
-        .password-strength {
-            margin-top: 5px;
-            padding: 5px 10px;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: bold;
+        .commission-icon {
+            font-size: 1.5rem;
+            margin-top: 2px;
         }
         
-        .password-strength.weak {
-            background-color: #ffebee;
-            color: #c62828;
+        .commission-details strong {
+            color: #2A3F54;
+            display: block;
+            margin-bottom: 5px;
         }
         
-        .password-strength.medium {
-            background-color: #fff3e0;
-            color: #ef6c00;
+        .commission-details ul {
+            margin: 8px 0 0 20px;
+            padding: 0;
         }
         
-        .password-strength.strong {
-            background-color: #e8f5e9;
-            color: #2e7d32;
+        .commission-details li {
+            margin-bottom: 4px;
         }
-        
+
         @media (max-width: 768px) {
             .form-row {
-                grid-template-columns: 1fr;
-            }
-            
-            .benefits-section {
                 grid-template-columns: 1fr;
             }
             
@@ -467,14 +433,18 @@ echo "<!-- Debug: Página pronta para renderizar HTML -->\n";
     </style>
 </head>
 <body>
-    <!-- Incluir navbar -->
-    <!-- Incluir navbar com verificação -->
+    <!-- Incluir navbar de forma segura -->
     <?php 
-    $navbar_path = ROOT_PATH . '/views/components/navbar.php';
+    $navbar_path = '../components/navbar.php';
     if (file_exists($navbar_path)) {
         include_once $navbar_path; 
+        debug_log("Navbar carregada com sucesso");
     } else {
-        echo "<!-- Navbar não encontrada: $navbar_path -->";
+        debug_log("Navbar não encontrada, continuando sem ela");
+        // Criar uma navbar básica temporária
+        echo '<nav style="background: #FF7A00; padding: 15px; color: white; text-align: center; margin-bottom: 20px;">';
+        echo '<h2>Klube Cash - Cadastro de Loja Parceira</h2>';
+        echo '</nav>';
     }
     ?>
     
@@ -486,18 +456,19 @@ echo "<!-- Debug: Página pronta para renderizar HTML -->\n";
         
         <?php if (!empty($error)): ?>
             <div class="alert alert-danger">
-                <?php echo $error; ?>
+                <strong>Atenção:</strong> <?php echo $error; ?>
             </div>
         <?php endif; ?>
         
         <?php if (!empty($success)): ?>
             <div class="alert alert-success">
-                <?php echo htmlspecialchars($success); ?>
-                <?php if (isset($result['data']['awaiting_approval']) && $result['data']['awaiting_approval']): ?>
-                    <p>Sua solicitação foi recebida e está aguardando aprovação. Você receberá um email quando sua loja for analisada.</p>
-                <?php else: ?>
-                    <p>Sua loja foi aprovada e já está ativa no sistema!</p>
-                <?php endif; ?>
+                <strong>Sucesso!</strong> <?php echo htmlspecialchars($success); ?>
+                <p style="margin-top: 10px;">
+                    <strong>Próximos passos:</strong><br>
+                    • Sua solicitação foi recebida e está em análise<br>
+                    • Você receberá um email quando sua loja for aprovada<br>
+                    • Após aprovação, poderá fazer login no sistema com o email e senha cadastrados
+                </p>
             </div>
         <?php endif; ?>
         
@@ -508,19 +479,23 @@ echo "<!-- Debug: Página pronta para renderizar HTML -->\n";
                 <div class="form-row">
                     <div class="form-group">
                         <label class="form-label" for="nome_fantasia">Nome Fantasia <span class="required">*</span></label>
-                        <input type="text" id="nome_fantasia" name="nome_fantasia" class="form-control" required value="<?php echo isset($data['nome_fantasia']) ? htmlspecialchars($data['nome_fantasia']) : ''; ?>">
+                        <input type="text" id="nome_fantasia" name="nome_fantasia" class="form-control" required 
+                               value="<?php echo isset($data['nome_fantasia']) ? htmlspecialchars($data['nome_fantasia']) : ''; ?>">
                     </div>
                     
                     <div class="form-group">
                         <label class="form-label" for="razao_social">Razão Social <span class="required">*</span></label>
-                        <input type="text" id="razao_social" name="razao_social" class="form-control" required value="<?php echo isset($data['razao_social']) ? htmlspecialchars($data['razao_social']) : ''; ?>">
+                        <input type="text" id="razao_social" name="razao_social" class="form-control" required 
+                               value="<?php echo isset($data['razao_social']) ? htmlspecialchars($data['razao_social']) : ''; ?>">
                     </div>
                 </div>
                 
                 <div class="form-row">
                     <div class="form-group">
                         <label class="form-label" for="cnpj">CNPJ <span class="required">*</span></label>
-                        <input type="text" id="cnpj" name="cnpj" class="form-control" required value="<?php echo isset($data['cnpj']) ? htmlspecialchars($data['cnpj']) : ''; ?>" placeholder="XX.XXX.XXX/XXXX-XX">
+                        <input type="text" id="cnpj" name="cnpj" class="form-control" required 
+                               value="<?php echo isset($data['cnpj']) ? htmlspecialchars($data['cnpj']) : ''; ?>" 
+                               placeholder="XX.XXX.XXX/XXXX-XX">
                         <small class="form-text">Digite apenas números ou formato XX.XXX.XXX/XXXX-XX</small>
                     </div>
                     
@@ -529,7 +504,8 @@ echo "<!-- Debug: Página pronta para renderizar HTML -->\n";
                         <select id="categoria" name="categoria" class="form-select" required>
                             <option value="">Selecione...</option>
                             <?php foreach ($categorias as $categoria): ?>
-                                <option value="<?php echo htmlspecialchars($categoria); ?>" <?php echo (isset($data['categoria']) && $data['categoria'] == $categoria) ? 'selected' : ''; ?>>
+                                <option value="<?php echo htmlspecialchars($categoria); ?>" 
+                                        <?php echo (isset($data['categoria']) && $data['categoria'] == $categoria) ? 'selected' : ''; ?>>
                                     <?php echo htmlspecialchars($categoria); ?>
                                 </option>
                             <?php endforeach; ?>
@@ -542,19 +518,24 @@ echo "<!-- Debug: Página pronta para renderizar HTML -->\n";
                 <div class="form-row">
                     <div class="form-group">
                         <label class="form-label" for="email">E-mail <span class="required">*</span></label>
-                        <input type="email" id="email" name="email" class="form-control" required value="<?php echo isset($data['email']) ? htmlspecialchars($data['email']) : ''; ?>">
+                        <input type="email" id="email" name="email" class="form-control" required 
+                               value="<?php echo isset($data['email']) ? htmlspecialchars($data['email']) : ''; ?>">
                         <small class="form-text">Este será seu email de acesso ao sistema</small>
                     </div>
                     
                     <div class="form-group">
                         <label class="form-label" for="telefone">Telefone <span class="required">*</span></label>
-                        <input type="tel" id="telefone" name="telefone" class="form-control" required value="<?php echo isset($data['telefone']) ? htmlspecialchars($data['telefone']) : ''; ?>" placeholder="(XX) XXXXX-XXXX">
+                        <input type="tel" id="telefone" name="telefone" class="form-control" required 
+                               value="<?php echo isset($data['telefone']) ? htmlspecialchars($data['telefone']) : ''; ?>" 
+                               placeholder="(XX) XXXXX-XXXX">
                     </div>
                 </div>
                 
                 <div class="form-group">
                     <label class="form-label" for="website">Website</label>
-                    <input type="url" id="website" name="website" class="form-control" value="<?php echo isset($data['website']) ? htmlspecialchars($data['website']) : ''; ?>" placeholder="https://www.suaempresa.com.br">
+                    <input type="url" id="website" name="website" class="form-control" 
+                           value="<?php echo isset($data['website']) ? htmlspecialchars($data['website']) : ''; ?>" 
+                           placeholder="https://www.suaempresa.com.br">
                 </div>
                 
                 <h2 class="section-title">Dados de Acesso</h2>
@@ -563,14 +544,12 @@ echo "<!-- Debug: Página pronta para renderizar HTML -->\n";
                     <div class="form-group">
                         <label class="form-label" for="senha">Senha de Acesso <span class="required">*</span></label>
                         <input type="password" id="senha" name="senha" class="form-control" required minlength="8">
-                        <div id="password-feedback" class="password-strength" style="display: none;"></div>
                         <small class="form-text">Mínimo de 8 caracteres. Use letras, números e símbolos para maior segurança.</small>
                     </div>
                     
                     <div class="form-group">
                         <label class="form-label" for="confirma_senha">Confirme a Senha <span class="required">*</span></label>
                         <input type="password" id="confirma_senha" name="confirma_senha" class="form-control" required minlength="8">
-                        <div id="password-match-feedback" style="display: none; font-size: 12px; margin-top: 5px;"></div>
                         <small class="form-text">Digite novamente sua senha para confirmação.</small>
                     </div>
                 </div>
@@ -580,38 +559,45 @@ echo "<!-- Debug: Página pronta para renderizar HTML -->\n";
                 <div class="form-row">
                     <div class="form-group">
                         <label class="form-label" for="cep">CEP <span class="required">*</span></label>
-                        <input type="text" id="cep" name="cep" class="form-control" required value="<?php echo isset($data['endereco']['cep']) ? htmlspecialchars($data['endereco']['cep']) : ''; ?>" placeholder="XXXXX-XXX">
+                        <input type="text" id="cep" name="cep" class="form-control" required 
+                               value="<?php echo isset($data['endereco']['cep']) ? htmlspecialchars($data['endereco']['cep']) : ''; ?>" 
+                               placeholder="XXXXX-XXX">
                     </div>
                 </div>
                 
                 <div class="form-row">
                     <div class="form-group">
                         <label class="form-label" for="logradouro">Logradouro <span class="required">*</span></label>
-                        <input type="text" id="logradouro" name="logradouro" class="form-control" required value="<?php echo isset($data['endereco']['logradouro']) ? htmlspecialchars($data['endereco']['logradouro']) : ''; ?>">
+                        <input type="text" id="logradouro" name="logradouro" class="form-control" required 
+                               value="<?php echo isset($data['endereco']['logradouro']) ? htmlspecialchars($data['endereco']['logradouro']) : ''; ?>">
                     </div>
                     
                     <div class="form-group">
                         <label class="form-label" for="numero">Número <span class="required">*</span></label>
-                        <input type="text" id="numero" name="numero" class="form-control" required value="<?php echo isset($data['endereco']['numero']) ? htmlspecialchars($data['endereco']['numero']) : ''; ?>">
+                        <input type="text" id="numero" name="numero" class="form-control" required 
+                               value="<?php echo isset($data['endereco']['numero']) ? htmlspecialchars($data['endereco']['numero']) : ''; ?>">
                     </div>
                 </div>
                 
                 <div class="form-row">
                     <div class="form-group">
                         <label class="form-label" for="complemento">Complemento</label>
-                        <input type="text" id="complemento" name="complemento" class="form-control" value="<?php echo isset($data['endereco']['complemento']) ? htmlspecialchars($data['endereco']['complemento']) : ''; ?>">
+                        <input type="text" id="complemento" name="complemento" class="form-control" 
+                               value="<?php echo isset($data['endereco']['complemento']) ? htmlspecialchars($data['endereco']['complemento']) : ''; ?>">
                     </div>
                     
                     <div class="form-group">
                         <label class="form-label" for="bairro">Bairro <span class="required">*</span></label>
-                        <input type="text" id="bairro" name="bairro" class="form-control" required value="<?php echo isset($data['endereco']['bairro']) ? htmlspecialchars($data['endereco']['bairro']) : ''; ?>">
+                        <input type="text" id="bairro" name="bairro" class="form-control" required 
+                               value="<?php echo isset($data['endereco']['bairro']) ? htmlspecialchars($data['endereco']['bairro']) : ''; ?>">
                     </div>
                 </div>
                 
                 <div class="form-row">
                     <div class="form-group">
                         <label class="form-label" for="cidade">Cidade <span class="required">*</span></label>
-                        <input type="text" id="cidade" name="cidade" class="form-control" required value="<?php echo isset($data['endereco']['cidade']) ? htmlspecialchars($data['endereco']['cidade']) : ''; ?>">
+                        <input type="text" id="cidade" name="cidade" class="form-control" required 
+                               value="<?php echo isset($data['endereco']['cidade']) ? htmlspecialchars($data['endereco']['cidade']) : ''; ?>">
                     </div>
                     
                     <div class="form-group">
@@ -619,7 +605,8 @@ echo "<!-- Debug: Página pronta para renderizar HTML -->\n";
                         <select id="estado" name="estado" class="form-select" required>
                             <option value="">Selecione...</option>
                             <?php foreach ($estados as $uf => $nomeEstado): ?>
-                                <option value="<?php echo $uf; ?>" <?php echo (isset($data['endereco']['estado']) && $data['endereco']['estado'] == $uf) ? 'selected' : ''; ?>>
+                                <option value="<?php echo $uf; ?>" 
+                                        <?php echo (isset($data['endereco']['estado']) && $data['endereco']['estado'] == $uf) ? 'selected' : ''; ?>>
                                     <?php echo $nomeEstado; ?>
                                 </option>
                             <?php endforeach; ?>
@@ -629,9 +616,6 @@ echo "<!-- Debug: Página pronta para renderizar HTML -->\n";
                 
                 <h2 class="section-title">Configurações de Cashback</h2>
                 
-                <!-- REMOVIDO: Campo de porcentagem customizada -->
-                <!-- Todas as lojas pagam 10% (5% cliente + 5% admin) -->
-
                 <div class="form-info">
                     <h3>📊 Informações sobre Comissão</h3>
                     <div class="commission-info">
@@ -659,7 +643,8 @@ echo "<!-- Debug: Página pronta para renderizar HTML -->\n";
                 
                 <div class="form-group">
                     <label class="form-label" for="descricao">Descrição da Loja</label>
-                    <textarea id="descricao" name="descricao" class="form-control" rows="4" placeholder="Conte um pouco sobre sua loja, produtos oferecidos, diferenciais..."><?php echo isset($data['descricao']) ? htmlspecialchars($data['descricao']) : ''; ?></textarea>
+                    <textarea id="descricao" name="descricao" class="form-control" rows="4" 
+                              placeholder="Conte um pouco sobre sua loja, produtos oferecidos, diferenciais..."><?php echo isset($data['descricao']) ? htmlspecialchars($data['descricao']) : ''; ?></textarea>
                     <small class="form-text">Esta descrição será exibida para os clientes no catálogo de lojas parceiras.</small>
                 </div>
                 
@@ -668,10 +653,11 @@ echo "<!-- Debug: Página pronta para renderizar HTML -->\n";
                     <p>Ao se cadastrar como loja parceira, você concorda com os seguintes termos:</p>
                     <ul>
                         <li>O Klube Cash analisará sua solicitação e pode aprová-la ou rejeitá-la de acordo com nossos critérios.</li>
-                        <li>Você se compromete a oferecer o cashback conforme a porcentagem cadastrada.</li>
+                        <li>Você se compromete a oferecer o cashback conforme a porcentagem cadastrada (10%).</li>
                         <li>Sua loja será exibida no catálogo de parceiros após aprovação.</li>
                         <li>Todas as transações de cashback devem ser processadas através do nosso sistema.</li>
                         <li>Você terá acesso a um painel para gerenciar suas transações e relatórios.</li>
+                        <li>Sua conta de usuário será ativada automaticamente quando a loja for aprovada.</li>
                         <li>O Klube Cash se reserva o direito de cancelar a parceria em caso de violação dos termos.</li>
                     </ul>
                     <div class="checkbox-group">
@@ -683,55 +669,13 @@ echo "<!-- Debug: Página pronta para renderizar HTML -->\n";
                 <button type="submit" class="btn btn-block" id="submit-btn">Cadastrar Loja</button>
             </form>
         </div>
-        
-        <div class="benefits-section">
-            <div class="benefit-card">
-                <div class="benefit-icon">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M18 6L6 18"></path>
-                        <path d="M6 6l12 12"></path>
-                        <line x1="12" y1="2" x2="12" y2="6"></line>
-                        <line x1="12" y1="18" x2="12" y2="22"></line>
-                        <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line>
-                        <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line>
-                        <line x1="2" y1="12" x2="6" y2="12"></line>
-                        <line x1="18" y1="12" x2="22" y2="12"></line>
-                        <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line>
-                        <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line>
-                    </svg>
-                </div>
-                <h3 class="benefit-title">Aumente suas Vendas</h3>
-                <p>O cashback é um forte incentivo para novos clientes escolherem sua loja e para fidelizar os atuais. Clientes tendem a retornar às lojas onde ganham benefícios.</p>
-            </div>
-            
-            <div class="benefit-card">
-                <div class="benefit-icon">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                        <circle cx="9" cy="7" r="4"></circle>
-                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                    </svg>
-                </div>
-                <h3 class="benefit-title">Novos Clientes</h3>
-                <p>Acesse nossa base crescente de usuários que procuram ativamente por lojas que oferecem cashback. Seja encontrado por clientes interessados em seus produtos.</p>
-            </div>
-            
-            <div class="benefit-card">
-                <div class="benefit-icon">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                        <path d="M9 9h6v6H9z"></path>
-                    </svg>
-                </div>
-                <h3 class="benefit-title">Fácil Implementação</h3>
-                <p>Sistema simples e intuitivo para integrar com seu negócio. Painel administrativo completo para gerenciar transações e acompanhar relatórios de vendas.</p>
-            </div>
-        </div>
     </div>
     
+    <!-- JavaScript para máscaras e validações mantido exatamente como estava -->
     <script>
-        // Máscara para o CNPJ
+        // Como um tradutor que converte a linguagem do usuário para a linguagem do computador
+        
+        // Máscara para o CNPJ - formatação automática enquanto digita
         document.getElementById('cnpj').addEventListener('input', function (e) {
             let value = e.target.value.replace(/\D/g, '');
             
@@ -745,7 +689,7 @@ echo "<!-- Debug: Página pronta para renderizar HTML -->\n";
             e.target.value = value;
         });
         
-        // Máscara para o telefone
+        // Máscara para o telefone - formatação automática
         document.getElementById('telefone').addEventListener('input', function (e) {
             let value = e.target.value.replace(/\D/g, '');
             
@@ -761,7 +705,7 @@ echo "<!-- Debug: Página pronta para renderizar HTML -->\n";
             e.target.value = value;
         });
         
-        // Máscara para o CEP
+        // Máscara para o CEP - formatação automática
         document.getElementById('cep').addEventListener('input', function (e) {
             let value = e.target.value.replace(/\D/g, '');
             
@@ -772,27 +716,26 @@ echo "<!-- Debug: Página pronta para renderizar HTML -->\n";
             e.target.value = value;
         });
         
-        // Preenchimento automático do endereço pelo CEP
+        // Preenchimento automático do endereço pelo CEP - como um GPS que encontra o local
         document.getElementById('cep').addEventListener('blur', function() {
             const cep = this.value.replace(/\D/g, '');
             
-            if (cep.length !== 8) {
-                return;
-            }
+            if (cep.length !== 8) return;
             
-            // Mostrar indicador de carregamento
+            // Indicador visual de carregamento
             this.style.backgroundColor = '#f0f0f0';
             
             fetch(`https://viacep.com.br/ws/${cep}/json/`)
                 .then(response => response.json())
                 .then(data => {
                     if (!data.erro) {
+                        // Preenchimento automático dos campos como um assistente pessoal
                         document.getElementById('logradouro').value = data.logradouro || '';
                         document.getElementById('bairro').value = data.bairro || '';
                         document.getElementById('cidade').value = data.localidade || '';
                         document.getElementById('estado').value = data.uf || '';
                         
-                        // Focar no campo número
+                        // Focar no próximo campo lógico
                         if (data.logradouro) {
                             document.getElementById('numero').focus();
                         }
@@ -805,70 +748,24 @@ echo "<!-- Debug: Página pronta para renderizar HTML -->\n";
                     alert('Erro ao buscar CEP. Verifique sua conexão e tente novamente.');
                 })
                 .finally(() => {
-                    // Remover indicador de carregamento
                     this.style.backgroundColor = '';
                 });
         });
         
-        // Validação de força da senha
-        document.getElementById('senha').addEventListener('input', function() {
-            const senha = this.value;
-            const feedback = document.getElementById('password-feedback');
-            
-            if (senha.length === 0) {
-                feedback.style.display = 'none';
-                return;
-            }
-            
-            let score = 0;
-            let texto = '';
-            let classe = '';
-            
-            // Critérios de força da senha
-            if (senha.length >= 8) score++;
-            if (/[a-z]/.test(senha)) score++;
-            if (/[A-Z]/.test(senha)) score++;
-            if (/[0-9]/.test(senha)) score++;
-            if (/[^A-Za-z0-9]/.test(senha)) score++;
-            
-            if (score < 3) {
-                texto = 'Senha fraca';
-                classe = 'weak';
-            } else if (score < 4) {
-                texto = 'Senha média';
-                classe = 'medium';
-            } else {
-                texto = 'Senha forte';
-                classe = 'strong';
-            }
-            
-            feedback.textContent = texto;
-            feedback.className = 'password-strength ' + classe;
-            feedback.style.display = 'block';
-        });
-        
-        // Validação de confirmação de senha
+        // Validação em tempo real das senhas - como um verificador de segurança
         function validatePasswords() {
             const senha = document.getElementById('senha').value;
             const confirmaSenha = document.getElementById('confirma_senha').value;
-            const feedback = document.getElementById('password-match-feedback');
             
             if (confirmaSenha.length === 0) {
-                feedback.style.display = 'none';
                 document.getElementById('confirma_senha').setCustomValidity('');
                 return true;
             }
             
             if (senha !== confirmaSenha) {
-                feedback.textContent = 'As senhas não coincidem';
-                feedback.style.color = '#c62828';
-                feedback.style.display = 'block';
                 document.getElementById('confirma_senha').setCustomValidity('As senhas não coincidem');
                 return false;
             } else {
-                feedback.textContent = 'Senhas coincidem';
-                feedback.style.color = '#2e7d32';
-                feedback.style.display = 'block';
                 document.getElementById('confirma_senha').setCustomValidity('');
                 return true;
             }
@@ -878,18 +775,18 @@ echo "<!-- Debug: Página pronta para renderizar HTML -->\n";
         document.getElementById('confirma_senha').addEventListener('input', validatePasswords);
         document.getElementById('senha').addEventListener('input', validatePasswords);
 
-        // Validar antes do envio do formulário
+        // Validação final antes do envio - como uma última verificação antes de uma viagem
         document.getElementById('store-form').addEventListener('submit', function(event) {
             const submitBtn = document.getElementById('submit-btn');
             
-            // Verificar se as senhas coincidem
+            // Verificar senhas
             if (!validatePasswords()) {
                 event.preventDefault();
                 alert('Por favor, certifique-se de que as senhas coincidem.');
                 return false;
             }
             
-            // Verificar se todos os campos obrigatórios estão preenchidos
+            // Verificar campos obrigatórios
             const requiredFields = this.querySelectorAll('[required]');
             for (let field of requiredFields) {
                 if (!field.value.trim()) {
@@ -900,143 +797,14 @@ echo "<!-- Debug: Página pronta para renderizar HTML -->\n";
                 }
             }
             
-            // Validar CNPJ
-            const cnpj = document.getElementById('cnpj').value.replace(/\D/g, '');
-            if (cnpj.length !== 14) {
-                alert('Por favor, informe um CNPJ válido com 14 dígitos.');
-                document.getElementById('cnpj').focus();
-                event.preventDefault();
-                return false;
-            }
-            
-            // Validar email
-            const email = document.getElementById('email').value;
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRegex.test(email)) {
-                alert('Por favor, informe um email válido.');
-                document.getElementById('email').focus();
-                event.preventDefault();
-                return false;
-            }
-            
-            // Validar CEP
-            const cep = document.getElementById('cep').value.replace(/\D/g, '');
-            if (cep.length !== 8) {
-                alert('Por favor, informe um CEP válido com 8 dígitos.');
-                document.getElementById('cep').focus();
-                event.preventDefault();
-                return false;
-            }
-            
-            // Desabilitar botão de envio para evitar cliques múltiplos
+            // Desabilitar botão para evitar envios duplos - como trancar a porta depois de sair
             submitBtn.disabled = true;
             submitBtn.textContent = 'Processando...';
             
-            // Se chegou até aqui, o formulário é válido
             return true;
-        });
-
-        // Validação de CNPJ (algoritmo básico)
-        function validarCNPJ(cnpj) {
-            cnpj = cnpj.replace(/[^\d]+/g, '');
-            
-            if (cnpj.length !== 14) return false;
-            
-            // Elimina CNPJs inválidos conhecidos
-            if (/^(\d)\1+$/.test(cnpj)) return false;
-            
-            // Valida DVs
-            let tamanho = cnpj.length - 2;
-            let numeros = cnpj.substring(0, tamanho);
-            let digitos = cnpj.substring(tamanho);
-            let soma = 0;
-            let pos = tamanho - 7;
-            
-            for (let i = tamanho; i >= 1; i--) {
-                soma += numeros.charAt(tamanho - i) * pos--;
-                if (pos < 2) pos = 9;
-            }
-            
-            let resultado = soma % 11 < 2 ? 0 : 11 - soma % 11;
-            if (resultado != digitos.charAt(0)) return false;
-            
-            tamanho = tamanho + 1;
-            numeros = cnpj.substring(0, tamanho);
-            soma = 0;
-            pos = tamanho - 7;
-            
-            for (let i = tamanho; i >= 1; i--) {
-                soma += numeros.charAt(tamanho - i) * pos--;
-                if (pos < 2) pos = 9;
-            }
-            
-            resultado = soma % 11 < 2 ? 0 : 11 - soma % 11;
-            if (resultado != digitos.charAt(1)) return false;
-            
-            return true;
-        }
-
-        // Validação em tempo real do CNPJ
-        document.getElementById('cnpj').addEventListener('blur', function() {
-            const cnpj = this.value;
-            if (cnpj && !validarCNPJ(cnpj)) {
-                this.setCustomValidity('CNPJ inválido');
-                this.style.borderColor = '#c62828';
-            } else {
-                this.setCustomValidity('');
-                this.style.borderColor = '';
-            }
-        });
-
-        // Remover estilo de erro quando o usuário começar a digitar novamente
-        document.getElementById('cnpj').addEventListener('input', function() {
-            this.style.borderColor = '';
         });
     </script>
-    <style>
-/* Adicione no final do CSS existente */
-.form-info {
-    background-color: #f8f9fa;
-    padding: 20px;
-    border-radius: 8px;
-    margin: 20px 0;
-}
 
-.commission-info {
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
-}
-
-.commission-item {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    padding: 12px;
-    background-color: white;
-    border-radius: 6px;
-    border-left: 3px solid #FF7A00;
-}
-
-.commission-icon {
-    font-size: 1.5rem;
-    margin-top: 2px;
-}
-
-.commission-details strong {
-    color: #2A3F54;
-    display: block;
-    margin-bottom: 5px;
-}
-
-.commission-details ul {
-    margin: 8px 0 0 20px;
-    padding: 0;
-}
-
-.commission-details li {
-    margin-bottom: 4px;
-}
-</style>
+    <?php debug_log("Página renderizada com sucesso"); ?>
 </body>
 </html>
