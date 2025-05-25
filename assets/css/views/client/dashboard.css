@@ -543,6 +543,7 @@ body {
     }
 
     .card {
+        width: 340px;
         padding: 20px; /* Reduz o padding dos cards */
     }
 
