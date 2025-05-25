@@ -6,22 +6,22 @@
     --primary-light: #FFF0E6;
     --primary-dark: #E06E00;
     --white: #FFFFFF;
-    --light-gray: #F8F9FA; /* Fundo mais suave */
+    --light-gray: #F8F9FA;
     --medium-gray: #6c757d;
-    --dark-gray: #343A40; /* Para texto principal e títulos */
-    --text-muted: #718096; /* Cinza mais suave para texto secundário */
-    --border-color: #E2E8F0; /* Cor de borda sutil */
+    --dark-gray: #343A40;
+    --text-muted: #718096;
+    --border-color: #E2E8F0;
     --success-color: #4CAF50;
     --warning-color: #FFC107;
     --danger-color: #F44336;
 
     --font-family: 'Poppins', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     --font-size-base: 16px;
-    --font-size-sm: 0.875rem;  /* 14px */
-    --font-size-md: 1rem;     /* 16px */
-    --font-size-lg: 1.125rem; /* 18px */
-    --font-size-xl: 1.5rem;   /* 24px */
-    --font-size-xxl: 2rem;    /* 32px */
+    --font-size-sm: 0.875rem;
+    --font-size-md: 1rem;
+    --font-size-lg: 1.125rem;
+    --font-size-xl: 1.5rem;
+    --font-size-xxl: 2rem;
 
     --border-radius-sm: 6px;
     --border-radius-md: 10px;
@@ -36,7 +36,7 @@
     --transition-medium: 0.3s ease-in-out;
 
     --container-padding: 20px;
-    --navbar-height: 70px; /* Ajuste conforme a altura da sua navbar */
+    --navbar-height: 70px;
 }
 
 /* ::::::::::::: RESET BÁSICO E ESTILOS GLOBAIS :::::::::::::: */
@@ -60,17 +60,17 @@ body {
     line-height: 1.65;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    overflow-x: hidden; /* Impede o scroll horizontal no body */
+    overflow-x: hidden; /* Garante que o body não tenha scroll horizontal */
 }
 
 .container {
     width: 100%;
-    max-width: 1280px; /* Largura máxima do container */
+    max-width: 1280px;
     margin-left: auto;
     margin-right: auto;
     padding-left: var(--container-padding);
     padding-right: var(--container-padding);
-    padding-top: calc(var(--navbar-height) + 20px); /* Espaço para a navbar fixa */
+    padding-top: calc(var(--navbar-height) + 20px);
     padding-bottom: 40px;
 }
 
@@ -93,13 +93,13 @@ a:hover {
 /* ::::::::::::: CABEÇALHO DO DASHBOARD :::::::::::::: */
 .dashboard-header {
     display: flex;
-    flex-wrap: wrap; /* Permite que os itens quebrem linha em telas menores */
+    flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 30px;
     padding-bottom: 20px;
     border-bottom: 1px solid var(--border-color);
-    gap: 15px; /* Espaçamento entre os elementos do header */
+    gap: 15px;
 }
 
 .dashboard-header h1 {
@@ -118,7 +118,7 @@ a:hover {
 
 .dashboard-header > div:last-child { /* Container dos botões */
     display: flex;
-    flex-wrap: wrap; /* Botões podem quebrar linha */
+    flex-wrap: wrap;
     gap: 15px;
 }
 
@@ -136,7 +136,7 @@ a:hover {
     cursor: pointer;
     transition: all var(--transition-medium);
     text-align: center;
-    white-space: nowrap; /* Impede que o texto do botão quebre linha */
+    white-space: nowrap;
 }
 
 .btn:hover {
@@ -183,9 +183,9 @@ a:hover {
     box-shadow: var(--shadow-md);
     transition: transform var(--transition-medium), box-shadow var(--transition-medium);
     border: 1px solid var(--border-color);
-    display: flex; /* Adicionado para controle interno */
-    flex-direction: column; /* Adicionado para controle interno */
-    overflow: hidden; /* Impede conteúdo de vazar antes do scroll */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* Previne conteúdo de estourar o card SEM adicionar scroll ao card em si */
 }
 
 .card:hover {
@@ -193,17 +193,15 @@ a:hover {
     box-shadow: var(--shadow-lg);
 }
 
-.summary-card {
-    display: flex;
-    flex-direction: column;
-    gap: 8px; /* Espaço entre título, valor e change */
+.summary-card { /* Herda de .card, mas pode ter estilos específicos */
+    gap: 8px;
 }
 
 .card-title {
     font-size: var(--font-size-sm);
     color: var(--text-muted);
     font-weight: 500;
-    margin: 0;
+    margin: 0 0 8px 0; /* Adicionado margem inferior */
 }
 
 .card-value {
@@ -219,6 +217,7 @@ a:hover {
     display: flex;
     align-items: center;
     gap: 5px;
+    margin-top: auto; /* Empurra para o final do card se for flex column */
 }
 
 .card-change.positive { color: var(--success-color); }
@@ -229,27 +228,27 @@ a:hover {
 /* ::::::::::::: GRADE PRINCIPAL DO DASHBOARD :::::::::::::: */
 .dashboard-grid {
     display: grid;
-    grid-template-columns: 1fr; /* Uma coluna por padrão */
+    grid-template-columns: 1fr;
     gap: 25px;
     margin-bottom: 30px;
 }
 
-@media (min-width: 992px) { /* Duas colunas em telas maiores */
+@media (min-width: 992px) {
     .dashboard-grid {
-        grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); /* Coluna esquerda maior */
+        grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
     }
 }
 
-/* ::::::::::::: TABELA DE TRANSAÇÕES :::::::::::::: */
-.table-container {
-    overflow-x: auto; /* Scroll horizontal para tabelas largas */
-    /* Removido background-color, border-radius e shadow para aplicar no .card */
+/* ::::::::::::: TABELA DE TRANSAÇÕES (dentro de um card) :::::::::::::: */
+.card .table-container { /* Aplicar overflow ao container da tabela DENTRO do card */
+    overflow-x: auto;
+    width: 100%; /* Garante que o container não exceda o card */
 }
 
 .table {
     width: 100%;
     border-collapse: collapse;
-    min-width: 600px; /* Largura mínima para evitar quebra excessiva */
+    min-width: 600px; /* Se a tabela tiver menos que isso, não precisa de scroll */
 }
 
 .table th,
@@ -258,7 +257,7 @@ a:hover {
     text-align: left;
     font-size: var(--font-size-sm);
     border-bottom: 1px solid var(--border-color);
-    white-space: nowrap; /* Evitar quebra de texto nas células */
+    white-space: nowrap;
 }
 
 .table th {
@@ -272,48 +271,44 @@ a:hover {
 }
 
 .table tr:hover {
-    background-color: #fcfcfc; /* Hover sutil */
+    background-color: #fcfcfc;
 }
 
 /* Badges de status */
 .badge {
     padding: 5px 10px;
     border-radius: var(--border-radius-sm);
-    font-size: 0.75rem; /* 12px */
+    font-size: 0.75rem;
     font-weight: 600;
     text-transform: capitalize;
-    display: inline-block; /* Para o padding funcionar corretamente */
+    display: inline-block;
 }
 
 .badge-success { background-color: #E6F7E6; color: var(--success-color); }
 .badge-warning { background-color: #FFF8E6; color: var(--warning-color); }
 .badge-danger { background-color: #FFEAE6; color: var(--danger-color); }
 
-/* ::::::::::::: GRÁFICOS :::::::::::::: */
-.chart-container { /* O card já tem esses estilos */
+/* ::::::::::::: GRÁFICOS (dentro de um card) :::::::::::::: */
+.card .chart-container { /* O card é o container principal */
     position: relative;
-    height: 280px; /* Altura ajustada */
-    /* background-color, padding, border-radius, shadow, border já estão no .card */
+    height: 280px;
+    width: 100%; /* Garante que o canvas não exceda o card */
 }
 
-/* ::::::::::::: LISTAS (MOVIMENTAÇÕES, SALDOS POR LOJA) :::::::::::::: */
-.movements-list,
-.balance-by-store {
-    max-height: 350px; /* Altura máxima com scroll */
-    overflow-y: auto;
-    padding-right: 8px; /* Espaço para scrollbar, se visível */
+/* ::::::::::::: LISTAS (MOVIMENTAÇÕES, SALDOS POR LOJA - dentro de cards) :::::::::::::: */
+.card .movements-list,
+.card .balance-by-store {
+    max-height: 350px;
+    overflow-y: auto; /* Rolagem vertical se necessário */
+    width: 100%; /* Garante que a lista não exceda o card */
+    padding-right: 5px; /* Pequeno espaço para scrollbar */
 }
-/* Adicionado para o card "Histórico de Cashback" que contém o gráfico */
-.card.chart-card { /* Estilo específico se o card for para gráfico */
-    /* O card já tem padding, não precisa de padding aqui a menos que queira mais */
-}
-
 
 .movement-item,
 .store-balance-item {
     display: flex;
     align-items: center;
-    padding: 10px 0; /* Ajuste para remover padding lateral, já que o card tem */
+    padding: 10px 0; /* Padding vertical, o card já tem padding lateral */
     border-bottom: 1px solid var(--border-color);
 }
 
@@ -339,7 +334,7 @@ a:hover {
 .movement-icon { background-color: var(--primary-light); }
 .movement-icon svg { stroke: var(--primary-color); width: 18px; height: 18px;}
 
-.movement-item.negative .movement-icon { background-color: rgba(255, 193, 7, 0.1); } /* Amarelo para débitos */
+.movement-item.negative .movement-icon { background-color: rgba(255, 193, 7, 0.1); }
 .movement-item.negative .movement-icon svg { stroke: var(--warning-color); }
 
 .store-balance-item .store-logo { background-color: var(--primary-color); color: var(--white); }
@@ -347,7 +342,7 @@ a:hover {
 .movement-details,
 .store-balance-item .store-info {
     flex: 1;
-    min-width: 0; /* Para que o text-overflow funcione */
+    min-width: 0;
 }
 
 .movement-description,
@@ -363,7 +358,7 @@ a:hover {
 
 .movement-date,
 .store-balance-item .store-balance {
-    font-size: 0.8rem; /* 12.8px */
+    font-size: 0.8rem;
     color: var(--text-muted);
 }
 
@@ -387,7 +382,7 @@ a:hover {
     font-size: 0.8rem;
     color: var(--text-muted);
     margin-left: auto;
-    text-align: right; /* Alinhar à direita */
+    text-align: right;
     white-space: nowrap;
 }
 
@@ -407,14 +402,14 @@ a:hover {
 }
 
 .notification-title {
-    font-weight: 600; /* Aumentado para dar mais destaque */
+    font-weight: 600;
     margin-bottom: 5px;
-    color: var(--primary-dark); /* Escurecido para melhor contraste */
+    color: var(--primary-dark);
 }
 
 .notification-text {
     font-size: var(--font-size-sm);
-    color: var(--dark-gray); /* Texto um pouco mais escuro */
+    color: var(--dark-gray);
     line-height: 1.5;
 }
 
@@ -439,13 +434,13 @@ a:hover {
 .see-all {
     display: block;
     text-align: center;
-    padding: 10px; /* Padding ajustado */
+    padding: 10px;
     color: var(--primary-color);
     text-decoration: none;
     font-weight: 500;
     font-size: var(--font-size-sm);
     margin-top: 15px;
-    border-radius: var(--border-radius-sm); /* Borda mais suave */
+    border-radius: var(--border-radius-sm);
     transition: background-color var(--transition-fast);
 }
 
@@ -470,36 +465,36 @@ a:hover {
 /* ::::::::::::: MEDIA QUERIES PARA RESPONSIVIDADE :::::::::::::: */
 @media (max-width: 768px) {
     .container {
-        padding-top: calc(var(--navbar-height) + 10px); /* Menor padding para mobile */
+        padding-top: calc(var(--navbar-height) + 10px);
         padding-left: 15px;
         padding-right: 15px;
     }
 
     .dashboard-header {
-        text-align: center; /* Centralizar header em mobile */
+        text-align: center;
         margin-bottom: 20px;
     }
 
     .dashboard-header h1 {
-        font-size: var(--font-size-lg); /* Menor título */
+        font-size: var(--font-size-lg);
     }
 
     .dashboard-subtitle {
         font-size: var(--font-size-sm);
     }
 
-    .dashboard-header > div:last-child { /* Botões do header */
+    .dashboard-header > div:last-child {
         flex-direction: column;
         width: 100%;
         gap: 10px;
     }
 
     .btn {
-        width: 100%; /* Botões ocupam largura total */
+        width: 100%;
     }
 
     .summary-cards {
-        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); /* Cards menores e mais flexíveis */
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
         gap: 15px;
     }
 
@@ -508,69 +503,63 @@ a:hover {
     }
 
     .card-value {
-        font-size: 1.3rem; /* Valor do card menor */
+        font-size: 1.3rem;
     }
 
     .table th,
     .table td {
-        padding: 10px 8px; /* Menor padding na tabela */
-        font-size: 0.8rem; /* Fonte menor na tabela */
-        white-space: normal; /* Permitir quebra de linha em mobile para nomes longos */
-    }
-    .table th:nth-child(3), /* Ocultar colunas menos importantes se necessário */
-    .table td:nth-child(3) {
-        /* display: none; */ /* Descomente para ocultar colunas */
+        padding: 10px 8px;
+        font-size: 0.8rem;
+         /* white-space: normal; Removido para permitir rolagem, se necessário */
     }
 
+    /* Para listas dentro de cards, como movimentações e saldos por loja */
+    .card .movements-list,
+    .card .balance-by-store {
+        /* A rolagem vertical já está configurada, não precisa de overflow-x aqui */
+    }
 
     .movement-item,
     .store-balance-item {
         padding: 8px 0;
-        flex-direction: column; /* Empilhar itens em mobile */
-        align-items: flex-start; /* Alinhar à esquerda */
-        gap: 5px;
+        flex-direction: row; /* Manter em linha mas permitir quebrar se necessário */
+        align-items: center; /* Reajustar alinhamento */
+        gap: 10px; /* Espaço entre ícone e texto */
     }
     
-    .movement-icon,
-    .store-balance-item .store-logo {
-        width: 32px;
-        height: 32px;
-        margin-right: 0; /* Remover margem */
-        margin-bottom: 5px; /* Adicionar margem abaixo */
-        font-size: var(--font-size-sm);
+    .movement-details,
+    .store-balance-item .store-info {
+        /* Esses já são flex: 1 e min-width: 0, o que ajuda na quebra de texto */
     }
-
-    .movement-icon svg { width: 16px; height: 16px; }
 
     .movement-amount,
     .store-balance-item .store-stats {
-        margin-left: 0; /* Remover margem */
-        text-align: left; /* Alinhar à esquerda */
-        width: 100%; /* Ocupar largura */
+        margin-left: auto; /* Empurrar para a direita */
+        text-align: right;
     }
 }
 
 @media (max-width: 480px) {
     :root {
-        --font-size-base: 15px; /* Reduzir base da fonte para telas muito pequenas */
+        --font-size-base: 15px;
     }
     .container {
         padding-top: calc(var(--navbar-height) + 5px);
     }
     .dashboard-header h1 {
-        font-size: 1.2rem; /* Título ainda menor */
+        font-size: 1.2rem;
     }
     .summary-cards {
-        grid-template-columns: 1fr; /* Uma coluna para cards */
+        grid-template-columns: 1fr;
     }
     .card-value {
         font-size: 1.2rem;
     }
     .chart-container {
-        height: 220px; /* Gráfico menor */
+        height: 220px;
     }
     .btn {
-        padding: 8px 15px; /* Botões menores */
+        padding: 8px 15px;
         font-size: var(--font-size-sm);
     }
 }
