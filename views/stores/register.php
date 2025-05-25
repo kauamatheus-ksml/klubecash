@@ -26,6 +26,28 @@ $required_files = [
     '../../utils/Validator.php' => 'Validador de dados'
 ];
 
+// Função para criar diretório se não existir
+function createUploadDir($path) {
+    if (!file_exists($path)) {
+        if (!mkdir($path, 0755, true)) {
+            error_log("Não foi possível criar diretório: $path");
+            return false;
+        }
+        debug_log("Diretório criado: $path");
+    }
+    return true;
+}
+
+// Configurar diretórios de upload
+$uploadsDir = __DIR__ . '/../../uploads';
+$storeLogosDir = $uploadsDir . '/store_logos';
+
+// Criar diretórios se não existirem
+createUploadDir($uploadsDir);
+createUploadDir($storeLogosDir);
+
+debug_log("Diretórios de upload preparados");
+
 foreach ($required_files as $file => $description) {
     if (file_exists($file)) {
         require_once $file;
@@ -62,12 +84,97 @@ $success = '';
 $data = []; // Array para manter dados do formulário
 
 debug_log("Variáveis de controle inicializadas");
-
+    /**
+    * Processa upload de logo da loja
+    * Como um fotógrafo profissional que verifica, processa e arquiva fotos
+    * 
+    * @param array $file Array $_FILES['logo']
+    * @param string $storeLogosDir Diretório onde salvar
+    * @return array Resultado com status e dados
+    */
+    function processLogoUpload($file, $storeLogosDir) {
+        // Verificar se arquivo foi enviado
+        if (!isset($file) || $file['error'] === UPLOAD_ERR_NO_FILE) {
+            return ['status' => true, 'filename' => null, 'message' => 'Nenhum arquivo enviado'];
+        }
+        
+        // Verificar erros no upload
+        if ($file['error'] !== UPLOAD_ERR_OK) {
+            $errorMessages = [
+                UPLOAD_ERR_INI_SIZE => 'Arquivo muito grande (limite do servidor)',
+                UPLOAD_ERR_FORM_SIZE => 'Arquivo muito grande (limite do formulário)',
+                UPLOAD_ERR_PARTIAL => 'Upload incompleto',
+                UPLOAD_ERR_NO_TMP_DIR => 'Diretório temporário não encontrado',
+                UPLOAD_ERR_CANT_WRITE => 'Erro de escrita no disco',
+                UPLOAD_ERR_EXTENSION => 'Upload bloqueado por extensão'
+            ];
+            
+            $message = isset($errorMessages[$file['error']]) ? $errorMessages[$file['error']] : 'Erro desconhecido no upload';
+            return ['status' => false, 'message' => $message];
+        }
+        
+        // Validar tamanho (2MB máximo)
+        $maxSize = 2 * 1024 * 1024; // 2MB
+        if ($file['size'] > $maxSize) {
+            return ['status' => false, 'message' => 'Arquivo muito grande. Máximo: 2MB'];
+        }
+        
+        // Validar tipo de arquivo
+        $allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mimeType = finfo_file($finfo, $file['tmp_name']);
+        finfo_close($finfo);
+        
+        if (!in_array($mimeType, $allowedTypes)) {
+            return ['status' => false, 'message' => 'Tipo de arquivo não permitido. Use JPG, PNG ou GIF'];
+        }
+        
+        // Gerar nome único para o arquivo
+        // Como dar um número de protocolo único para cada documento
+        $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
+        $uniqueName = 'logo_' . uniqid() . '_' . time() . '.' . strtolower($extension);
+        $destinationPath = $storeLogosDir . '/' . $uniqueName;
+        
+        // Mover arquivo para destino final
+        if (!move_uploaded_file($file['tmp_name'], $destinationPath)) {
+            return ['status' => false, 'message' => 'Erro ao salvar arquivo no servidor'];
+        }
+        
+        // Verificar se arquivo foi salvo corretamente
+        if (!file_exists($destinationPath)) {
+            return ['status' => false, 'message' => 'Arquivo não foi salvo corretamente'];
+        }
+        
+        return [
+            'status' => true, 
+            'filename' => $uniqueName,
+            'path' => $destinationPath,
+            'url' => '/uploads/store_logos/' . $uniqueName,
+            'message' => 'Logo enviada com sucesso'
+        ];
+    }
 // Oitava camada: Processamento do formulário (quando enviado)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    debug_log("Processando envio do formulário");
+    debug_log("Processando envio do formulário com possível upload de logo");
     
     try {
+        $logoResult = processLogoUpload($_FILES['logo'] ?? null, $storeLogosDir);
+        
+        if (!$logoResult['status'] && $logoResult['filename'] !== null) {
+            // Se houve erro no upload (mas não por ausência de arquivo)
+            $error = "Erro no upload da logo: " . $logoResult['message'];
+            debug_log("Erro no upload: " . $logoResult['message']);
+        } else {
+            debug_log("Upload processado: " . ($logoResult['filename'] ? 'Arquivo salvo' : 'Nenhum arquivo'));
+            
+            // Adicionar informações da logo aos dados
+            if ($logoResult['filename']) {
+                $data['logo'] = $logoResult['filename'];
+                $data['logo_url'] = $logoResult['url'];
+                debug_log("Logo será salva como: " . $logoResult['filename']);
+            }
+        }
+
         // Como um filtro de água que remove impurezas, vamos limpar e validar cada campo
         // Capturar e sanitizar dados - usando métodos modernos como um sistema de segurança atualizado
         $data = [
@@ -163,7 +270,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         
     } catch (Exception $e) {
-        // Capturar qualquer erro inesperado - como um para-quedas de emergência
+        // Limpar arquivo de logo se algo der errado
+        if (isset($logoResult['path']) && file_exists($logoResult['path'])) {
+            unlink($logoResult['path']);
+            debug_log("Arquivo de logo removido devido a erro no cadastro");
+        }
+        
         $error = "Erro interno: " . $e->getMessage();
         debug_log("Exceção capturada: " . $e->getMessage());
         error_log("Erro no cadastro de loja: " . $e->getMessage());
@@ -420,6 +532,71 @@ debug_log("Dados de seleção preparados, iniciando renderização da página");
         .commission-details li {
             margin-bottom: 4px;
         }
+        
+
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+        }
+
+        .form-control[type="file"] {
+            position: relative;
+            background: white;
+            border: 2px dashed var(--primary-color);
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .form-control[type="file"]:hover {
+            background-color: var(--primary-light);
+            border-color: #E06E00;
+        }
+
+        .form-control[type="file"]:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(255, 122, 0, 0.2);
+        }
+
+        #logo-preview {
+            text-align: center;
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        #logo-preview-img {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .upload-info {
+            background-color: #e7f3ff;
+            border: 1px solid #b3d7ff;
+            border-radius: 6px;
+            padding: 12px;
+            margin-top: 10px;
+        }
+
+        .upload-info h4 {
+            margin: 0 0 8px 0;
+            color: #0066cc;
+            font-size: 14px;
+        }
+
+        .upload-info ul {
+            margin: 0;
+            padding-left: 20px;
+            font-size: 13px;
+            color: #555;
+        }
+        
 
         @media (max-width: 768px) {
             .form-row {
@@ -474,7 +651,7 @@ debug_log("Dados de seleção preparados, iniciando renderização da página");
         <?php endif; ?>
         
         <div class="form-container">
-            <form method="post" action="" id="store-form">
+            <form method="post" action="" id="store-form" enctype="multipart/form-data">
                 <h2 class="section-title">Informações da Empresa</h2>
                 
                 <div class="form-row">
@@ -538,7 +715,28 @@ debug_log("Dados de seleção preparados, iniciando renderização da página");
                            value="<?php echo isset($data['website']) ? htmlspecialchars($data['website']) : ''; ?>" 
                            placeholder="https://www.suaempresa.com.br">
                 </div>
-                
+                <div class="form-group">
+                    <label class="form-label" for="logo">Logo da Loja</label>
+                    
+                    <div class="file-input-wrapper">
+                        <input type="file" id="logo" name="logo" class="form-control" accept="image/*">
+                    </div>
+                    
+                    <div class="upload-info">
+                        <h4>📎 Informações sobre a Logo:</h4>
+                        <ul>
+                            <li>Formatos aceitos: JPG, PNG, GIF</li>
+                            <li>Tamanho máximo: 2MB</li>
+                            <li>Dimensões recomendadas: 300x300px (quadrada) ou 400x200px (retangular)</li>
+                            <li>A logo será exibida no catálogo de lojas parceiras</li>
+                        </ul>
+                    </div>
+                    
+                    <div id="logo-preview" style="display: none;">
+                        <h4>Preview da Logo:</h4>
+                        <img id="logo-preview-img" alt="Preview da logo">
+                    </div>
+                </div>
                 <h2 class="section-title">Dados de Acesso</h2>
                 
                 <div class="form-row">
@@ -675,7 +873,42 @@ debug_log("Dados de seleção preparados, iniciando renderização da página");
     <!-- JavaScript para máscaras e validações mantido exatamente como estava -->
     <script>
         // Como um tradutor que converte a linguagem do usuário para a linguagem do computador
-        
+        document.getElementById('logo').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            const preview = document.getElementById('logo-preview');
+            const previewImg = document.getElementById('logo-preview-img');
+            
+            if (file) {
+                // Verificar tamanho do arquivo (2MB = 2 * 1024 * 1024 bytes)
+                const maxSize = 2 * 1024 * 1024;
+                
+                if (file.size > maxSize) {
+                    alert('Arquivo muito grande! O tamanho máximo é 2MB.');
+                    this.value = ''; // Limpar seleção
+                    preview.style.display = 'none';
+                    return;
+                }
+                
+                // Verificar tipo de arquivo
+                const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+                if (!allowedTypes.includes(file.type)) {
+                    alert('Tipo de arquivo não permitido! Use apenas JPG, PNG ou GIF.');
+                    this.value = ''; // Limpar seleção
+                    preview.style.display = 'none';
+                    return;
+                }
+                
+                // Mostrar preview
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    previewImg.src = e.target.result;
+                    preview.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            } else {
+                preview.style.display = 'none';
+            }
+        });
         // Máscara para o CNPJ - formatação automática enquanto digita
         document.getElementById('cnpj').addEventListener('input', function (e) {
             let value = e.target.value.replace(/\D/g, '');

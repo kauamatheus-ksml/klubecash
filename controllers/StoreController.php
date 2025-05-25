@@ -320,6 +320,7 @@ class StoreController {
             // Isso é como preparar todos os ingredientes antes de cozinhar
             $nomeFantasia = $data['nome_fantasia'];
             $razaoSocial = $data['razao_social'];
+            $logoFilename = isset($data['logo']) ? $data['logo'] : null;
             $emailLoja = $data['email'];
             $telefoneLoja = $data['telefone'];
             $categoria = isset($data['categoria']) && !empty($data['categoria']) ? $data['categoria'] : 'Outros';
@@ -332,23 +333,24 @@ class StoreController {
                 INSERT INTO lojas (
                     nome_fantasia, razao_social, cnpj, email, telefone,
                     categoria, porcentagem_cashback, descricao, website,
-                    usuario_id, status, data_cadastro
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                    logo, usuario_id, status, data_cadastro
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
             ");
             
             // CORREÇÃO: Usar execute() direto com array organizado
             $storeResult = $storeInsertStmt->execute([
-                $nomeFantasia,      // 1
-                $razaoSocial,       // 2
-                $cnpjLimpo,         // 3 - CNPJ já limpo
-                $emailLoja,         // 4
-                $telefoneLoja,      // 5
-                $categoria,         // 6
-                $porcentagemCashback, // 7
-                $descricao,         // 8
-                $website,           // 9
-                $userId,            // 10 - Vincular ao usuário criado
-                $statusLoja         // 11
+                $nomeFantasia,
+                $razaoSocial,
+                $cnpjLimpo,
+                $emailLoja,
+                $telefoneLoja,
+                $categoria,
+                $porcentagemCashback,
+                $descricao,
+                $website,
+                $logoFilename,  // NOVO: Adicionar logo
+                $userId,
+                $statusLoja
             ]);
             
             if (!$storeResult) {
