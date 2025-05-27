@@ -499,3 +499,80 @@ body {
         font-size: 13px;
     }
 }
+
+/* Estilos específicos para informações de saldo */
+    .balance-indicator {
+        margin-left: 5px;
+        font-size: 0.8rem;
+    }
+    
+    .saldo-usado {
+        color: #28a745;
+        font-weight: 600;
+    }
+    
+    .sem-saldo {
+        color: #6c757d;
+        font-style: italic;
+    }
+    
+    .desconto {
+        color: #28a745;
+        font-size: 0.8rem;
+        display: block;
+    }
+    
+    .payment-summary .original-value {
+        color: #333;
+    }
+    
+    .payment-summary .balance-used {
+        color: #28a745;
+        font-weight: 600;
+    }
+    
+    .payment-summary .charged-value {
+        color: #007bff;
+        font-weight: 600;
+    }
+    
+    .payment-summary .total span:last-child {
+        color: #FF7A00;
+        font-weight: 700;
+        font-size: 1.1rem;
+    }
+    
+    .info-section {
+        margin-bottom: 25px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid #eee;
+    }
+    
+    .info-section:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+    }
+    
+    .info-section h3 {
+        color: #333;
+        margin-bottom: 15px;
+        font-size: 1.1rem;
+    }
+    
+    .info-section ul,
+    .info-section ol {
+        padding-left: 20px;
+    }
+    
+    .info-section li {
+        margin-bottom: 10px;
+        line-height: 1.6;
+    }
+    
+    .info-section ul li::marker {
+        color: #FF7A00;
+    }
+    
+    .info-section ol li::marker {
+        color: #FF7A00;
+    }
