@@ -327,46 +327,61 @@ $metodosPagamento = [
                 <?php endif; ?>
             </div>
             
-            <!-- Informações sobre Status e Saldo -->
-            <div class="card info-card">
-                <div class="card-header">
-                    <div class="card-title">Informações sobre Pagamentos e Saldo</div>
+           <!-- Informações sobre Status e Saldo (Dropdown Colapsável) -->
+            <div class="card info-card collapsible-card">
+                <div class="card-header collapsible-header" onclick="toggleInfoSection()">
+                    <div class="card-title">
+                        <span>📋 Informações sobre Pagamentos e Saldo</span>
+                        <span class="dropdown-icon" id="infoDropdownIcon">▼</span>
+                    </div>
                 </div>
-                <div class="status-info">
-                    <div class="info-section">
-                        <h4>📊 Status dos Pagamentos:</h4>
-                        <div class="status-item">
-                            <span class="status-badge status-pendente">Pendente</span>
-                            <p>O pagamento foi registrado e está aguardando a análise do administrador.</p>
+                <div class="collapsible-content" id="infoSectionContent" style="display: none;">
+                    <div class="status-info">
+                        <div class="info-section">
+                            <h4>📊 Status dos Pagamentos:</h4>
+                            <div class="status-item">
+                                <span class="status-badge status-pendente">Pendente</span>
+                                <p>O pagamento foi registrado e está aguardando a análise do administrador.</p>
+                            </div>
+                            <div class="status-item">
+                                <span class="status-badge status-aprovado">Aprovado</span>
+                                <p>O pagamento foi confirmado e o cashback já foi liberado para os clientes.</p>
+                            </div>
+                            <div class="status-item">
+                                <span class="status-badge status-rejeitado">Rejeitado</span>
+                                <p>O pagamento foi rejeitado pelo administrador. Verifique o motivo nos detalhes e faça um novo pagamento.</p>
+                            </div>
                         </div>
-                        <div class="status-item">
-                            <span class="status-badge status-aprovado">Aprovado</span>
-                            <p>O pagamento foi confirmado e o cashback já foi liberado para os clientes.</p>
+                        
+                        <div class="info-section">
+                            <h4>💰 Sobre o Uso de Saldo:</h4>
+                            <ul>
+                                <li><strong>Valor Vendas:</strong> Valor original total das vendas incluídas no pagamento</li>
+                                <li><strong>Saldo Usado:</strong> Total de saldo de cashback usado pelos clientes nas vendas</li>
+                                <li><strong>Comissão Paga:</strong> Valor líquido pago ao Klube Cash (sobre valor efetivamente cobrado)</li>
+                                <li><strong>Transações c/ saldo:</strong> Quantidade de vendas onde clientes usaram saldo</li>
+                            </ul>
                         </div>
-                        <div class="status-item">
-                            <span class="status-badge status-rejeitado">Rejeitado</span>
-                            <p>O pagamento foi rejeitado pelo administrador. Verifique o motivo nos detalhes e faça um novo pagamento.</p>
+                        
+                        <div class="info-section">
+                            <h4>🔄 Processo de Pagamento:</h4>
+                            <ol>
+                                <li>Você seleciona transações pendentes e realiza o pagamento</li>
+                                <li>A comissão é calculada sobre o valor efetivamente cobrado (descontando saldo usado)</li>
+                                <li>O administrador analisa e aprova/rejeita o pagamento</li>
+                                <li>Após aprovação, o cashback é liberado para os clientes</li>
+                            </ol>
                         </div>
-                    </div>
-                    
-                    <div class="info-section">
-                        <h4>💰 Sobre o Uso de Saldo:</h4>
-                        <ul>
-                            <li><strong>Valor Vendas:</strong> Valor original total das vendas incluídas no pagamento</li>
-                            <li><strong>Saldo Usado:</strong> Total de saldo de cashback usado pelos clientes nas vendas</li>
-                            <li><strong>Comissão Paga:</strong> Valor líquido pago ao Klube Cash (sobre valor efetivamente cobrado)</li>
-                            <li><strong>Transações c/ saldo:</strong> Quantidade de vendas onde clientes usaram saldo</li>
-                        </ul>
-                    </div>
-                    
-                    <div class="info-section">
-                        <h4>🔄 Processo de Pagamento:</h4>
-                        <ol>
-                            <li>Você seleciona transações pendentes e realiza o pagamento</li>
-                            <li>A comissão é calculada sobre o valor efetivamente cobrado (descontando saldo usado)</li>
-                            <li>O administrador analisa e aprova/rejeita o pagamento</li>
-                            <li>Após aprovação, o cashback é liberado para os clientes</li>
-                        </ol>
+                        
+                        <div class="info-section">
+                            <h4>ℹ️ Dicas Importantes:</h4>
+                            <ul>
+                                <li>Mantenha seus comprovantes de pagamento organizados</li>
+                                <li>Realize pagamentos regularmente para liberar o cashback dos clientes</li>
+                                <li>Em caso de rejeição, verifique o motivo e faça um novo pagamento</li>
+                                <li>O valor da comissão é sempre calculado sobre o valor efetivamente pago pelo cliente</li>
+                            </ul>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -402,6 +417,72 @@ $metodosPagamento = [
     </div>
     
     <script>
+        function toggleInfoSection() {
+            const content = document.getElementById('infoSectionContent');
+            const icon = document.getElementById('infoDropdownIcon');
+            const card = content.closest('.collapsible-card');
+            
+            if (content.style.display === 'none' || content.style.display === '') {
+                // Abrir
+                content.style.display = 'block';
+                content.classList.add('opening');
+                content.classList.remove('closing');
+                icon.classList.add('open');
+                card.classList.add('expanded');
+                
+                // Remover classe de animação após completar
+                setTimeout(() => {
+                    content.classList.remove('opening');
+                }, 400);
+                
+                // Salvar estado no localStorage
+                localStorage.setItem('infoSectionOpen', 'true');
+                
+            } else {
+                // Fechar
+                content.classList.add('closing');
+                content.classList.remove('opening');
+                icon.classList.remove('open');
+                card.classList.remove('expanded');
+                
+                // Ocultar após animação
+                setTimeout(() => {
+                    content.style.display = 'none';
+                    content.classList.remove('closing');
+                }, 400);
+                
+                // Salvar estado no localStorage
+                localStorage.setItem('infoSectionOpen', 'false');
+            }
+        }
+
+        // Restaurar estado do dropdown ao carregar a página
+        document.addEventListener('DOMContentLoaded', function() {
+            const savedState = localStorage.getItem('infoSectionOpen');
+            const content = document.getElementById('infoSectionContent');
+            const icon = document.getElementById('infoDropdownIcon');
+            const card = content.closest('.collapsible-card');
+            
+            if (savedState === 'true') {
+                content.style.display = 'block';
+                icon.classList.add('open');
+                card.classList.add('expanded');
+            }
+            
+            // Adicionar indicador visual ao passar o mouse
+            const header = document.querySelector('.collapsible-header');
+            if (header) {
+                header.addEventListener('mouseenter', function() {
+                    this.style.backgroundColor = '#f8f9fa';
+                });
+                
+                header.addEventListener('mouseleave', function() {
+                    if (!card.classList.contains('expanded')) {
+                        this.style.backgroundColor = '';
+                    }
+                });
+            }
+        });
 document.addEventListener('DOMContentLoaded', function() {
     // Elementos dos modais - obtendo referências dos elementos DOM
     const paymentDetailsModal = document.getElementById('paymentDetailsModal');
@@ -777,6 +858,109 @@ document.addEventListener('DOMContentLoaded', function() {
     font-weight: bold;
     position: absolute;
     left: 0;
+}
+/* Estilos para seção colapsável */
+.collapsible-card {
+    transition: all 0.3s ease;
+}
+
+.collapsible-header {
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.3s ease;
+    position: relative;
+}
+
+.collapsible-header:hover {
+    background-color: #f8f9fa;
+}
+
+.collapsible-header .card-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+.dropdown-icon {
+    font-size: 14px;
+    font-weight: bold;
+    color: var(--primary-color);
+    transition: transform 0.3s ease;
+    margin-left: 10px;
+}
+
+.dropdown-icon.open {
+    transform: rotate(180deg);
+}
+
+.collapsible-content {
+    overflow: hidden;
+    transition: all 0.4s ease;
+    border-top: 1px solid #eee;
+    margin-top: 0;
+}
+
+.collapsible-content.opening {
+    animation: slideDown 0.4s ease-out;
+}
+
+.collapsible-content.closing {
+    animation: slideUp 0.4s ease-out;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        max-height: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+    }
+    to {
+        opacity: 1;
+        max-height: 1000px;
+        padding-top: 20px;
+        padding-bottom: 20px;
+    }
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 1;
+        max-height: 1000px;
+        padding-top: 20px;
+        padding-bottom: 20px;
+    }
+    to {
+        opacity: 0;
+        max-height: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+    }
+}
+
+/* Ajustes para mobile */
+@media (max-width: 768px) {
+    .collapsible-header .card-title {
+        font-size: 16px;
+    }
+    
+    .dropdown-icon {
+        font-size: 12px;
+    }
+    
+    .info-section h4 {
+        font-size: 1rem;
+    }
+}
+
+/* Estilo especial para quando está expandido */
+.collapsible-card.expanded {
+    border-left: 4px solid var(--primary-color);
+}
+
+.collapsible-card.expanded .collapsible-header {
+    background-color: var(--primary-light);
 }
 </style>
 </body>
