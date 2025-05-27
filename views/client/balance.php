@@ -1051,25 +1051,7 @@ function tryFetchWithUrl(urls, index, storeId) {
                 modal.style.display = 'none';
             }
         }
-        // Melhorar o simulador com validações em tempo real
-        document.addEventListener('DOMContentLoaded', function() {
-            // Adicionar listener para o input do simulador quando o modal abrir
-            document.addEventListener('input', function(e) {
-                if (e.target && e.target.id === 'simulateValue') {
-                    const value = parseFloat(e.target.value || 0);
-                    const max = parseFloat(e.target.max || 0);
-                    
-                    // Validar em tempo real
-                    if (value > max) {
-                        e.target.style.borderColor = '#dc3545';
-                    } else if (value > 0) {
-                        e.target.style.borderColor = '#28a745';
-                    } else {
-                        e.target.style.borderColor = '#ced4da';
-                    }
-                }
-            });
-        });
+        
     </script>
 </body>
 </html>
