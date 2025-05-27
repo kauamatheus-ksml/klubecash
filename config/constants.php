@@ -94,7 +94,7 @@ define('STORE_REGISTER_URL', SITE_URL . '/lojas/cadastro');
 define('STORE_DASHBOARD_URL', SITE_URL . '/store/dashboard');
 define('STORE_TRANSACTIONS_URL', SITE_URL . '/store/transacoes');
 define('STORE_PENDING_TRANSACTIONS_URL', SITE_URL . '/store/transacoes-pendentes');
-define('STORE_TRANSACTIONS_URL', SITE_URL . '/views/stores/transactions.php');
+
 define('STORE_REGISTER_TRANSACTION_URL', SITE_URL . '/store/registrar-transacao');
 define('STORE_BATCH_UPLOAD_URL', SITE_URL . '/store/upload-lote');
 define('STORE_PAYMENT_URL', SITE_URL . '/store/pagamento');
