@@ -12,7 +12,188 @@ require_once __DIR__ . '/AuthController.php';
  * visualização de cashback, perfil e interação com lojas parceiras
  */
 class ClientController {
-    
+    /**
+    * Obtém detalhes específicos de saldo de uma loja para o cliente
+    * 
+    * @param int $userId ID do cliente
+    * @param int $lojaId ID da loja
+    * @return array Detalhes do saldo da loja
+    */
+    public static function getStoreBalanceDetails($userId, $lojaId) {
+        try {
+            // Verificar se é um cliente válido
+            if (!self::validateClient($userId)) {
+                return ['status' => false, 'message' => 'Cliente não encontrado ou inativo.'];
+            }
+            
+            $db = Database::getConnection();
+            
+            // Verificar se a loja existe
+            $storeStmt = $db->prepare("
+                SELECT id, nome_fantasia, categoria, porcentagem_cashback, website, descricao
+                FROM lojas 
+                WHERE id = :loja_id AND status = :status
+            ");
+            $storeStmt->bindParam(':loja_id', $lojaId);
+            $status = STORE_APPROVED;
+            $storeStmt->bindParam(':status', $status);
+            $storeStmt->execute();
+            $loja = $storeStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$loja) {
+                return ['status' => false, 'message' => 'Loja não encontrada.'];
+            }
+            
+            // Obter saldo atual da loja para o cliente
+            $saldoStmt = $db->prepare("
+                SELECT saldo_disponivel, total_creditado, total_usado
+                FROM cashback_saldos 
+                WHERE usuario_id = :user_id AND loja_id = :loja_id
+            ");
+            $saldoStmt->bindParam(':user_id', $userId);
+            $saldoStmt->bindParam(':loja_id', $lojaId);
+            $saldoStmt->execute();
+            $saldo = $saldoStmt->fetch(PDO::FETCH_ASSOC);
+            
+            // Se não tem saldo, criar registro vazio
+            if (!$saldo) {
+                $saldo = [
+                    'saldo_disponivel' => 0,
+                    'total_creditado' => 0,
+                    'total_usado' => 0
+                ];
+            }
+            
+            // Obter histórico de movimentações da loja (últimas 20)
+            $movimentacoesStmt = $db->prepare("
+                SELECT 
+                    tipo_operacao,
+                    valor,
+                    saldo_anterior,
+                    saldo_atual,
+                    descricao,
+                    data_operacao,
+                    transacao_origem_id,
+                    transacao_uso_id
+                FROM cashback_movimentacoes
+                WHERE usuario_id = :user_id AND loja_id = :loja_id
+                ORDER BY data_operacao DESC
+                LIMIT 20
+            ");
+            $movimentacoesStmt->bindParam(':user_id', $userId);
+            $movimentacoesStmt->bindParam(':loja_id', $lojaId);
+            $movimentacoesStmt->execute();
+            $movimentacoes = $movimentacoesStmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            // Obter estatísticas da loja
+            $statsStmt = $db->prepare("
+                SELECT 
+                    COUNT(DISTINCT t.id) as total_compras,
+                    SUM(t.valor_total) as valor_total_compras,
+                    SUM(t.valor_cliente) as total_cashback_recebido,
+                    MIN(t.data_transacao) as primeira_compra,
+                    MAX(t.data_transacao) as ultima_compra,
+                    AVG(t.valor_cliente) as media_cashback
+                FROM transacoes_cashback t
+                WHERE t.usuario_id = :user_id 
+                AND t.loja_id = :loja_id 
+                AND t.status = :status_aprovado
+            ");
+            $statsStmt->bindParam(':user_id', $userId);
+            $statsStmt->bindParam(':loja_id', $lojaId);
+            $status_aprovado = TRANSACTION_APPROVED;
+            $statsStmt->bindParam(':status_aprovado', $status_aprovado);
+            $statsStmt->execute();
+            $estatisticas = $statsStmt->fetch(PDO::FETCH_ASSOC);
+            
+            // Dados mensais para gráfico (últimos 6 meses)
+            $dadosMensaisStmt = $db->prepare("
+                SELECT 
+                    DATE_FORMAT(data_operacao, '%Y-%m') as mes,
+                    SUM(CASE WHEN tipo_operacao = 'credito' THEN valor ELSE 0 END) as creditos,
+                    SUM(CASE WHEN tipo_operacao = 'uso' THEN valor ELSE 0 END) as usos,
+                    COUNT(CASE WHEN tipo_operacao = 'credito' THEN 1 END) as qtd_creditos,
+                    COUNT(CASE WHEN tipo_operacao = 'uso' THEN 1 END) as qtd_usos
+                FROM cashback_movimentacoes
+                WHERE usuario_id = :user_id 
+                AND loja_id = :loja_id
+                AND data_operacao >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+                GROUP BY DATE_FORMAT(data_operacao, '%Y-%m')
+                ORDER BY mes ASC
+            ");
+            $dadosMensaisStmt->bindParam(':user_id', $userId);
+            $dadosMensaisStmt->bindParam(':loja_id', $lojaId);
+            $dadosMensaisStmt->execute();
+            $dadosMensais = $dadosMensaisStmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            return [
+                'status' => true,
+                'data' => [
+                    'loja' => $loja,
+                    'saldo' => $saldo,
+                    'movimentacoes' => $movimentacoes,
+                    'estatisticas' => $estatisticas,
+                    'dados_mensais' => $dadosMensais
+                ]
+            ];
+            
+        } catch (PDOException $e) {
+            error_log('Erro ao obter detalhes do saldo da loja: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro ao carregar detalhes da loja.'];
+        }
+    }
+
+    /**
+    * Simula o uso de saldo de uma loja específica
+    * 
+    * @param int $userId ID do cliente
+    * @param int $lojaId ID da loja
+    * @param float $valor Valor a ser usado
+    * @return array Resultado da simulação
+    */
+    public static function simulateBalanceUse($userId, $lojaId, $valor) {
+        try {
+            if (!self::validateClient($userId)) {
+                return ['status' => false, 'message' => 'Cliente não encontrado ou inativo.'];
+            }
+            
+            $db = Database::getConnection();
+            
+            // Obter saldo atual
+            $saldoStmt = $db->prepare("
+                SELECT saldo_disponivel 
+                FROM cashback_saldos 
+                WHERE usuario_id = :user_id AND loja_id = :loja_id
+            ");
+            $saldoStmt->bindParam(':user_id', $userId);
+            $saldoStmt->bindParam(':loja_id', $lojaId);
+            $saldoStmt->execute();
+            $saldo = $saldoStmt->fetch(PDO::FETCH_ASSOC);
+            
+            $saldoAtual = $saldo ? floatval($saldo['saldo_disponivel']) : 0;
+            $valorSolicitado = floatval($valor);
+            
+            $podeUsar = $saldoAtual >= $valorSolicitado && $valorSolicitado > 0;
+            $saldoRestante = $podeUsar ? ($saldoAtual - $valorSolicitado) : $saldoAtual;
+            
+            return [
+                'status' => true,
+                'data' => [
+                    'pode_usar' => $podeUsar,
+                    'saldo_atual' => $saldoAtual,
+                    'valor_solicitado' => $valorSolicitado,
+                    'saldo_restante' => $saldoRestante,
+                    'mensagem' => $podeUsar ? 
+                        'Valor disponível para uso' : 
+                        'Saldo insuficiente. Disponível: R$ ' . number_format($saldoAtual, 2, ',', '.')
+                ]
+            ];
+            
+        } catch (PDOException $e) {
+            error_log('Erro ao simular uso de saldo: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro ao processar simulação.'];
+        }
+    }
     /**
     * Obtém os dados do dashboard do cliente
     * 
@@ -2194,7 +2375,30 @@ if (basename($_SERVER['PHP_SELF']) === 'ClientController.php') {
             $result = ClientController::getClientBalance($userId);
             echo json_encode($result);
             break;
-
+        case 'store_balance_details':
+            $lojaId = isset($_GET['loja_id']) ? intval($_GET['loja_id']) : 0;
+            
+            if ($lojaId <= 0) {
+                echo json_encode(['status' => false, 'message' => 'ID da loja inválido']);
+                return;
+            }
+            
+            $result = ClientController::getStoreBalanceDetails($userId, $lojaId);
+            echo json_encode($result);
+            break;
+            
+        case 'simulate_balance_use':
+            $lojaId = isset($_POST['loja_id']) ? intval($_POST['loja_id']) : 0;
+            $valor = isset($_POST['valor']) ? floatval($_POST['valor']) : 0;
+            
+            if ($lojaId <= 0) {
+                echo json_encode(['status' => false, 'message' => 'ID da loja inválido']);
+                return;
+            }
+            
+            $result = ClientController::simulateBalanceUse($userId, $lojaId, $valor);
+            echo json_encode($result);
+            break;
         default:
             // Acesso inválido ao controlador
             header('Location: ' . CLIENT_DASHBOARD_URL);
