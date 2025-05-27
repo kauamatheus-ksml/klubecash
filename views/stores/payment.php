@@ -367,55 +367,50 @@ $activeMenu = 'payment';
                 </form>
             </div>
             
-            <div class="card info-card collapsible-card">
-                <div class="card-header collapsible-header" onclick="togglePaymentInfoSection()">
-                    <h2 class="card-title">
-                        <span>Entenda seu Pagamento</span>
-                        <span class="dropdown-icon" id="paymentInfoDropdownIcon">▼</span>
-                    </h2>
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Entenda seu Pagamento</h2>
                 </div>
-                <div class="collapsible-content" id="paymentInfoSectionContent" style="display: none;">
-                    <div class="info-content">
-                        <div class="info-section">
-                            <h3>📊 Como são calculadas as comissões:</h3>
-                            <ul>
-                                <li><strong>Valor original das vendas:</strong> Total das vendas registradas (R$ <?php echo number_format($totalOriginalValue, 2, ',', '.'); ?>)</li>
-                                <li><strong>Saldo usado pelos clientes:</strong> Cashback usado como desconto (R$ <?php echo number_format($totalBalanceUsed, 2, ',', '.'); ?>)</li>
-                                <li><strong>Valor efetivamente cobrado:</strong> O que realmente foi pago pelos clientes (R$ <?php echo number_format($totalOriginalValue - $totalBalanceUsed, 2, ',', '.'); ?>)</li>
-                                <li><strong>Comissão devida:</strong> 10% sobre o valor efetivamente cobrado (R$ <?php echo number_format($totalValue, 2, ',', '.'); ?>)</li>
-                            </ul>
-                        </div>
-                        
-                        <div class="info-section">
-                            <h3>💰 Sobre o uso de saldo pelos clientes:</h3>
-                            <ul>
-                                <li>Quando um cliente usa seu saldo de cashback, ele recebe desconto na compra</li>
-                                <li>A comissão é calculada apenas sobre o valor que o cliente efetivamente pagou</li>
-                                <li>Isso é justo para você, pois você paga comissão apenas sobre o que realmente recebeu</li>
-                                <li>O cliente ainda ganha cashback normal sobre a nova compra (5% do valor pago)</li>
-                                <li><strong>Importante:</strong> O saldo do cliente só pode ser usado na sua loja</li>
-                            </ul>
-                        </div>
-                        
-                        <div class="info-section">
-                            <h3>🔄 Distribuição da sua comissão de 10%:</h3>
-                            <ul>
-                                <li><strong>5% para o cliente:</strong> Vira cashback para usar na sua loja</li>
-                                <li><strong>5% para o Klube Cash:</strong> Nossa receita pela plataforma</li>
-                                <li><strong>0% para sua loja:</strong> Você não recebe cashback</li>
-                            </ul>
-                        </div>
-                        
-                        <div class="info-section">
-                            <h3>🔄 Processo após o pagamento:</h3>
-                            <ol>
-                                <li>Sua confirmação de pagamento será analisada em até 24 horas</li>
-                                <li>Após aprovação, o cashback será liberado automaticamente para os clientes</li>
-                                <li>Os clientes poderão usar o cashback apenas na sua loja</li>
-                                <li>Em caso de rejeição, você receberá notificação e poderá enviar novo comprovante</li>
-                                <li>Mantenha o comprovante original até a confirmação da aprovação</li>
-                            </ol>
-                        </div>
+                <div class="info-content">
+                    <div class="info-section">
+                        <h3>📊 Como são calculadas as comissões:</h3>
+                        <ul>
+                            <li><strong>Valor original das vendas:</strong> Total das vendas registradas (R$ <?php echo number_format($totalOriginalValue, 2, ',', '.'); ?>)</li>
+                            <li><strong>Saldo usado pelos clientes:</strong> Cashback usado como desconto (R$ <?php echo number_format($totalBalanceUsed, 2, ',', '.'); ?>)</li>
+                            <li><strong>Valor efetivamente cobrado:</strong> O que realmente foi pago pelos clientes (R$ <?php echo number_format($totalOriginalValue - $totalBalanceUsed, 2, ',', '.'); ?>)</li>
+                            <li><strong>Comissão devida:</strong> 10% sobre o valor efetivamente cobrado (R$ <?php echo number_format($totalValue, 2, ',', '.'); ?>)</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="info-section">
+                        <h3>💰 Sobre o uso de saldo pelos clientes:</h3>
+                        <ul>
+                            <li>Quando um cliente usa seu saldo de cashback, ele recebe desconto na compra</li>
+                            <li>A comissão é calculada apenas sobre o valor que o cliente efetivamente pagou</li>
+                            <li>Isso é justo para você, pois você paga comissão apenas sobre o que realmente recebeu</li>
+                            <li>O cliente ainda ganha cashback normal sobre a nova compra (5% do valor pago)</li>
+                            <li><strong>Importante:</strong> O saldo do cliente só pode ser usado na sua loja</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="info-section">
+                        <h3>🔄 Distribuição da sua comissão de 10%:</h3>
+                        <ul>
+                            <li><strong>5% para o cliente:</strong> Vira cashback para usar na sua loja</li>
+                            <li><strong>5% para o Klube Cash:</strong> Nossa receita pela plataforma</li>
+                            <li><strong>0% para sua loja:</strong> Você não recebe cashback</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="info-section">
+                        <h3>🔄 Processo após o pagamento:</h3>
+                        <ol>
+                            <li>Sua confirmação de pagamento será analisada em até 24 horas</li>
+                            <li>Após aprovação, o cashback será liberado automaticamente para os clientes</li>
+                            <li>Os clientes poderão usar o cashback apenas na sua loja</li>
+                            <li>Em caso de rejeição, você receberá notificação e poderá enviar novo comprovante</li>
+                            <li>Mantenha o comprovante original até a confirmação da aprovação</li>
+                        </ol>
                     </div>
                 </div>
             </div>
@@ -483,64 +478,6 @@ $activeMenu = 'payment';
         });
     </script>
     
-    <script>
-        // Função para controlar o dropdown de informações de pagamento
-        function togglePaymentInfoSection() {
-            const content = document.getElementById('paymentInfoSectionContent');
-            const icon = document.getElementById('paymentInfoDropdownIcon');
-            const card = content.closest('.collapsible-card'); // Encontra o .card pai
-            
-            if (content.style.display === 'none' || content.style.display === '') {
-                // Abrir
-                content.style.display = 'block';
-                // Adicionar classes para animação se desejar (ex: 'opening')
-                icon.classList.add('open'); // Para girar o ícone
-                if (card) card.classList.add('expanded'); // Para estilizar o card quando aberto
-                
-                // Salvar estado no localStorage (opcional)
-                localStorage.setItem('paymentInfoSectionOpen', 'true');
-                
-            } else {
-                // Fechar
-                // Adicionar classes para animação se desejar (ex: 'closing')
-                content.style.display = 'none'; // Ocultar imediatamente ou após animação
-                icon.classList.remove('open');
-                if (card) card.classList.remove('expanded');
-                
-                // Salvar estado no localStorage (opcional)
-                localStorage.setItem('paymentInfoSectionOpen', 'false');
-            }
-        }
-
-        // Restaurar estado do dropdown ao carregar a página (opcional)
-        document.addEventListener('DOMContentLoaded', function() {
-            const savedState = localStorage.getItem('paymentInfoSectionOpen');
-            const content = document.getElementById('paymentInfoSectionContent');
-            const icon = document.getElementById('paymentInfoDropdownIcon');
-            const card = content ? content.closest('.collapsible-card') : null; // Adicionar verificação se content existe
-            
-            if (savedState === 'true' && content && icon && card) { // Verificar se todos os elementos existem
-                content.style.display = 'block';
-                icon.classList.add('open');
-                card.classList.add('expanded');
-            }
-            
-            // Adicionar indicador visual ao passar o mouse no header (opcional)
-            const header = document.querySelector('.collapsible-header'); // Ajuste o seletor se necessário
-            if (header && card) {
-                header.addEventListener('mouseenter', function() {
-                    if (!card.classList.contains('expanded')) {
-                        this.style.backgroundColor = 'var(--primary-light)'; // Cor de hover suave
-                    }
-                });
-                
-                header.addEventListener('mouseleave', function() {
-                    if (!card.classList.contains('expanded')) {
-                        this.style.backgroundColor = ''; // Remove cor de hover
-                    }
-                });
-            }
-        });
-    </script>
+    
 </body>
 </html>
