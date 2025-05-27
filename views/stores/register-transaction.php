@@ -229,10 +229,25 @@ $activeMenu = 'register-transaction';
                             
                             <div class="form-group">
                                 <label for="codigo_transacao">Código da Transação*</label>
-                                <input type="text" id="codigo_transacao" name="codigo_transacao" required
-                                value="<?php echo isset($transactionData['codigo_transacao']) ? htmlspecialchars($transactionData['codigo_transacao']) : ''; ?>"
-                                placeholder="Código/número da venda no seu sistema">
-                                <small>Identificador único da venda no seu sistema</small>
+                                <div class="codigo-input-group">
+                                    <input type="text" id="codigo_transacao" name="codigo_transacao" required
+                                        value="<?php echo isset($transactionData['codigo_transacao']) ? htmlspecialchars($transactionData['codigo_transacao']) : ''; ?>"
+                                        placeholder="Código/número da venda no seu sistema">
+                                    <button type="button" id="generateCodeBtn" class="generate-code-btn" title="Gerar código automaticamente">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M12 2v4"></path>
+                                            <path d="m16.2 7.8 2.9-2.9"></path>
+                                            <path d="M18 12h4"></path>
+                                            <path d="m16.2 16.2 2.9 2.9"></path>
+                                            <path d="M12 18v4"></path>
+                                            <path d="m4.9 19.1 2.9-2.9"></path>
+                                            <path d="M2 12h4"></path>
+                                            <path d="m4.9 4.9 2.9 2.9"></path>
+                                        </svg>
+                                        <span class="btn-text">Gerar</span>
+                                    </button>
+                                </div>
+                                <small>Identificador único da venda. Use seu código interno ou clique em "Gerar" para criar automaticamente.</small>
                             </div>
                         </div>
                         <!-- NOVA SEÇÃO: USO DE SALDO -->
@@ -385,23 +400,50 @@ $activeMenu = 'register-transaction';
         </div>
     </div>
     
-    <script>
-        // Variáveis globais
+    <<script>
+        // ========================================
+        // VARIÁVEIS GLOBAIS
+        // ========================================
+
+        /**
+         * Dados do cliente selecionado
+         * @type {Object|null}
+         */
         let clientData = null;
+
+        /**
+         * Saldo disponível do cliente na loja atual
+         * @type {number}
+         */
         let clientBalance = 0;
+
+        /**
+         * ID da loja atual (vem do PHP)
+         * @type {number}
+         */
         const storeId = <?php echo $storeId; ?>;
-        
-        // Inicialização
+
+        // ========================================
+        // INICIALIZAÇÃO DA PÁGINA
+        // ========================================
+
+        /**
+         * Inicializa todos os event listeners e configurações quando a página carrega
+         */
         document.addEventListener('DOMContentLoaded', function() {
+            // Obter referências dos elementos principais
             const valorInput = document.getElementById('valor_total');
             const emailInput = document.getElementById('cliente_email');
             const searchBtn = document.getElementById('searchClientBtn');
             const usarSaldoCheck = document.getElementById('usarSaldoCheck');
             const valorSaldoUsado = document.getElementById('valorSaldoUsado');
+            const generateCodeBtn = document.getElementById('generateCodeBtn');
             
-            // Event listeners
+            // Event listeners para valor total (recalcula automaticamente)
             valorInput.addEventListener('input', calcularAutomatico);
             valorInput.addEventListener('blur', calcularAutomatico);
+            
+            // Event listeners para busca de cliente
             emailInput.addEventListener('keypress', function(e) {
                 if (e.key === 'Enter') {
                     e.preventDefault();
@@ -415,7 +457,7 @@ $activeMenu = 'register-transaction';
             valorSaldoUsado.addEventListener('input', calcularPreview);
             valorSaldoUsado.addEventListener('blur', atualizarSimulacao);
             
-            // Botões de saldo
+            // Event listeners para botões de saldo rápido
             document.getElementById('usarTodoSaldo').addEventListener('click', () => {
                 document.getElementById('valorSaldoUsado').value = clientBalance.toFixed(2);
                 calcularPreview();
@@ -434,30 +476,43 @@ $activeMenu = 'register-transaction';
                 atualizarSimulacao();
             });
             
-            // Accordion para ajuda
-            setupAccordion();
+            // Event listener para botão de gerar código
+            if (generateCodeBtn) {
+                generateCodeBtn.addEventListener('click', gerarCodigoTransacao);
+            }
             
-            // Inicializar simulação
+            // Inicializar componentes da página
+            setupAccordion();
             atualizarSimulacao();
+            adicionarNotificationStyles();
         });
-        
-        // Função para buscar cliente
+
+        // ========================================
+        // FUNÇÕES DE BUSCA DE CLIENTE
+        // ========================================
+
+        /**
+         * Busca cliente pelo email informado via API
+         * Exibe informações do cliente e habilita funcionalidades de saldo
+         */
         async function buscarCliente() {
             const email = document.getElementById('cliente_email').value.trim();
             const searchBtn = document.getElementById('searchClientBtn');
             const clientInfoCard = document.getElementById('clientInfoCard');
             
+            // Validar se email foi informado
             if (!email) {
                 alert('Por favor, digite um email válido');
                 return;
             }
             
-            // Mostrar loading
+            // Ativar estado de loading no botão
             searchBtn.disabled = true;
             searchBtn.querySelector('.btn-text').textContent = 'Buscando...';
             searchBtn.querySelector('.loading-spinner').style.display = 'inline-block';
             
             try {
+                // Fazer requisição para API de busca de cliente
                 const response = await fetch('../../api/store-client-search.php', {
                     method: 'POST',
                     headers: {
@@ -472,6 +527,7 @@ $activeMenu = 'register-transaction';
                 
                 const data = await response.json();
                 
+                // Processar resposta da API
                 if (data.status) {
                     clientData = data.data;
                     clientBalance = data.data.saldo || 0;
@@ -486,25 +542,28 @@ $activeMenu = 'register-transaction';
                 mostrarErroCliente('Erro ao buscar cliente. Tente novamente.');
                 esconderSecaoSaldo();
             } finally {
-                // Esconder loading
+                // Restaurar estado normal do botão
                 searchBtn.disabled = false;
                 searchBtn.querySelector('.btn-text').textContent = 'Buscar Cliente';
                 searchBtn.querySelector('.loading-spinner').style.display = 'none';
             }
         }
-        
-        // Função para mostrar informações do cliente
+
+        /**
+         * Exibe as informações do cliente encontrado no card de informações
+         * @param {Object} client - Dados do cliente retornados pela API
+         */
         function mostrarInfoCliente(client) {
             const clientInfoCard = document.getElementById('clientInfoCard');
             const clientInfoTitle = document.getElementById('clientInfoTitle');
             const clientInfoDetails = document.getElementById('clientInfoDetails');
             
-            // Remover classes de erro
+            // Configurar card como sucesso e torná-lo visível
             clientInfoCard.className = 'client-info-card success';
             clientInfoCard.style.display = 'block';
-            
             clientInfoTitle.textContent = 'Cliente Encontrado';
             
+            // Montar HTML com informações do cliente
             let detailsHTML = `
                 <div class="client-info-item">
                     <span class="client-info-label">Nome:</span>
@@ -526,17 +585,22 @@ $activeMenu = 'register-transaction';
             
             clientInfoDetails.innerHTML = detailsHTML;
         }
-        
-        // Função para mostrar erro na busca do cliente
+
+        /**
+         * Exibe mensagem de erro quando cliente não é encontrado
+         * @param {string} message - Mensagem de erro a ser exibida
+         */
         function mostrarErroCliente(message) {
             const clientInfoCard = document.getElementById('clientInfoCard');
             const clientInfoTitle = document.getElementById('clientInfoTitle');
             const clientInfoDetails = document.getElementById('clientInfoDetails');
             
+            // Configurar card como erro
             clientInfoCard.className = 'client-info-card error';
             clientInfoCard.style.display = 'block';
-            
             clientInfoTitle.textContent = 'Cliente Não Encontrado';
+            
+            // Exibir mensagem de erro
             clientInfoDetails.innerHTML = `
                 <div class="client-info-item">
                     <span class="client-info-value">${message}</span>
@@ -550,14 +614,21 @@ $activeMenu = 'register-transaction';
             clientData = null;
             clientBalance = 0;
         }
-        
-        // Função para mostrar seção de saldo
+
+        // ========================================
+        // FUNÇÕES DE GERENCIAMENTO DE SALDO
+        // ========================================
+
+        /**
+         * Exibe a seção de uso de saldo quando cliente tem saldo disponível
+         */
         function mostrarSecaoSaldo() {
             const saldoSection = document.getElementById('saldoSection');
             const saldoDisponivel = document.getElementById('saldoDisponivel');
             const maxSaldo = document.getElementById('maxSaldo');
             const valorSaldoUsado = document.getElementById('valorSaldoUsado');
             
+            // Só mostrar se cliente tem saldo
             if (clientBalance > 0) {
                 saldoSection.style.display = 'block';
                 saldoDisponivel.textContent = 'R$ ' + formatCurrency(clientBalance);
@@ -567,8 +638,10 @@ $activeMenu = 'register-transaction';
                 saldoSection.style.display = 'none';
             }
         }
-        
-        // Função para esconder seção de saldo
+
+        /**
+         * Esconde a seção de saldo e reseta todos os valores relacionados
+         */
         function esconderSecaoSaldo() {
             document.getElementById('saldoSection').style.display = 'none';
             document.getElementById('usarSaldoCheck').checked = false;
@@ -576,8 +649,10 @@ $activeMenu = 'register-transaction';
             document.getElementById('usar_saldo').value = 'nao';
             document.getElementById('valor_saldo_usado_hidden').value = '0';
         }
-        
-        // Função para alternar uso de saldo
+
+        /**
+         * Alterna entre usar ou não usar saldo do cliente na transação
+         */
         function toggleUsarSaldo() {
             const usarSaldoCheck = document.getElementById('usarSaldoCheck');
             const saldoControls = document.getElementById('saldoControls');
@@ -586,12 +661,14 @@ $activeMenu = 'register-transaction';
             console.log('Toggle saldo - checkbox:', usarSaldoCheck.checked);
             
             if (usarSaldoCheck.checked) {
+                // Habilitar uso de saldo
                 saldoControls.style.display = 'block';
-                usarSaldoHidden.value = 'sim';  // STRING 'sim'
+                usarSaldoHidden.value = 'sim';
                 calcularAutomatico();
             } else {
+                // Desabilitar uso de saldo
                 saldoControls.style.display = 'none';
-                usarSaldoHidden.value = 'nao';  // STRING 'nao'
+                usarSaldoHidden.value = 'nao';
                 document.getElementById('valorSaldoUsado').value = 0;
                 document.getElementById('valor_saldo_usado_hidden').value = '0';
                 calcularPreview();
@@ -600,14 +677,21 @@ $activeMenu = 'register-transaction';
             
             console.log('usar_saldo hidden value:', usarSaldoHidden.value);
         }
-        
-        // Função para calcular automaticamente quando sair do campo de valor total
+
+        // ========================================
+        // FUNÇÕES DE CÁLCULO E SIMULAÇÃO
+        // ========================================
+
+        /**
+         * Calcula automaticamente o saldo máximo a ser usado quando valor total muda
+         */
         function calcularAutomatico() {
             const valorTotal = parseFloat(document.getElementById('valor_total').value) || 0;
             const usarSaldoCheck = document.getElementById('usarSaldoCheck');
             
+            // Se tem saldo, está habilitado para usar e tem valor total
             if (clientBalance > 0 && usarSaldoCheck.checked && valorTotal > 0) {
-                // Calcular o máximo de saldo que pode ser usado
+                // Calcular o máximo de saldo que pode ser usado (menor entre saldo disponível e valor da venda)
                 const maxSaldoUsavel = Math.min(clientBalance, valorTotal);
                 document.getElementById('valorSaldoUsado').value = maxSaldoUsavel.toFixed(2);
                 calcularPreview();
@@ -615,48 +699,46 @@ $activeMenu = 'register-transaction';
             
             atualizarSimulacao();
         }
-        
-        // Função para calcular preview do uso de saldo
+
+        /**
+         * Calcula e atualiza o preview do uso de saldo em tempo real
+         */
         function calcularPreview() {
             const valorTotal = parseFloat(document.getElementById('valor_total').value) || 0;
             const valorSaldoUsado = parseFloat(document.getElementById('valorSaldoUsado').value) || 0;
             const valorFinal = Math.max(0, valorTotal - valorSaldoUsado);
             
-            // Atualizar preview visual
+            // Atualizar preview visual na seção de saldo
             document.getElementById('valorOriginal').textContent = 'R$ ' + formatCurrency(valorTotal);
             document.getElementById('valorSaldoUsadoPreview').textContent = 'R$ ' + formatCurrency(valorSaldoUsado);
             document.getElementById('valorFinal').textContent = 'R$ ' + formatCurrency(valorFinal);
             
-            // CRÍTICO: Atualizar o campo hidden que será enviado
+            // CRÍTICO: Atualizar o campo hidden que será enviado no formulário
             document.getElementById('valor_saldo_usado_hidden').value = valorSaldoUsado;
             
             console.log('Preview calculado - Saldo usado:', valorSaldoUsado);
             
-            // Validações
+            // Validações para evitar valores inválidos
             const valorSaldoUsadoInput = document.getElementById('valorSaldoUsado');
+            
+            // Não pode usar mais saldo que o disponível
             if (valorSaldoUsado > clientBalance) {
                 valorSaldoUsadoInput.value = clientBalance.toFixed(2);
                 calcularPreview();
                 return;
             }
             
+            // Não pode usar mais saldo que o valor total da venda
             if (valorSaldoUsado > valorTotal) {
                 valorSaldoUsadoInput.value = valorTotal.toFixed(2);
                 calcularPreview();
                 return;
             }
         }
-        
-        // Função para formatar valores como moeda
-        function formatCurrency(value) {
-            return parseFloat(value).toLocaleString('pt-BR', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-            });
-        }
-        
-        // Função para calcular e atualizar a simulação
-      
+
+        /**
+         * Atualiza a simulação completa de cashback e comissões
+         */
         function atualizarSimulacao() {
             const valorInput = document.getElementById('valor_total');
             const displayValorVenda = document.getElementById('display-valor-venda');
@@ -666,7 +748,6 @@ $activeMenu = 'register-transaction';
             const displayValorAdmin = document.getElementById('display-valor-admin');
             const displayValorTotal = document.getElementById('display-valor-total');
             const saldoRow = document.getElementById('cashback-saldo-row');
-            const noteSaldo = document.getElementById('cashback-note-saldo');
             
             let valorTotal = parseFloat(valorInput.value) || 0;
             
@@ -674,25 +755,26 @@ $activeMenu = 'register-transaction';
             const usarSaldo = document.getElementById('usar_saldo').value === 'sim';
             const valorSaldoUsado = parseFloat(document.getElementById('valor_saldo_usado_hidden').value) || 0;
             
+            // Calcular valor efetivamente pago
             let valorPago = valorTotal;
             if (usarSaldo && valorSaldoUsado > 0) {
                 valorPago = Math.max(0, valorTotal - valorSaldoUsado);
-                saldoRow.style.display = 'flex';
+                saldoRow.style.display = 'flex'; // Mostrar linha do saldo usado
             } else {
-                saldoRow.style.display = 'none';
+                saldoRow.style.display = 'none'; // Esconder linha do saldo usado
             }
             
-            // CORREÇÃO: Porcentagens fixas conforme especificação
+            // Porcentagens fixas do sistema Klube Cash
             const porcentagemCliente = 5.00;  // Cliente sempre recebe 5%
             const porcentagemAdmin = 5.00;    // Admin sempre recebe 5%
             const porcentagemTotal = 10.00;   // Total sempre 10%
             
-            // Calcular cashback sobre o valor PAGO (não sobre o valor total)
+            // Calcular cashback sobre o valor EFETIVAMENTE PAGO (não sobre o valor total)
             const valorCliente = valorPago * porcentagemCliente / 100;
             const valorAdmin = valorPago * porcentagemAdmin / 100;
             const valorTotalComissao = valorPago * porcentagemTotal / 100;
             
-            // Atualizar displays
+            // Atualizar todos os displays da simulação
             displayValorVenda.textContent = `R$ ${formatCurrency(valorTotal)}`;
             displaySaldoUsado.textContent = `R$ ${formatCurrency(valorSaldoUsado)}`;
             displayValorPago.textContent = `R$ ${formatCurrency(valorPago)}`;
@@ -700,8 +782,85 @@ $activeMenu = 'register-transaction';
             displayValorAdmin.textContent = `R$ ${formatCurrency(valorAdmin)}`;
             displayValorTotal.textContent = `R$ ${formatCurrency(valorTotalComissao)}`;
         }
-        
-        // Função para setup do accordion (mantida do código original)
+
+        // ========================================
+        // FUNÇÕES DE GERAÇÃO DE CÓDIGO
+        // ========================================
+
+        /**
+         * Gera automaticamente um código único para a transação
+         */
+        function gerarCodigoTransacao() {
+            const generateBtn = document.getElementById('generateCodeBtn');
+            const codigoInput = document.getElementById('codigo_transacao');
+            
+            // Ativar estado de loading
+            generateBtn.classList.add('generating');
+            generateBtn.disabled = true;
+            
+            // Simular um pequeno delay para melhor UX
+            setTimeout(() => {
+                // Obter data e hora atual
+                const agora = new Date();
+                const ano = agora.getFullYear().toString().slice(-2);
+                const mes = String(agora.getMonth() + 1).padStart(2, '0');
+                const dia = String(agora.getDate()).padStart(2, '0');
+                const hora = String(agora.getHours()).padStart(2, '0');
+                const minuto = String(agora.getMinutes()).padStart(2, '0');
+                const segundo = String(agora.getSeconds()).padStart(2, '0');
+                
+                // Gerar números aleatórios para garantir unicidade
+                const random1 = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+                const random2 = Math.floor(Math.random() * 100).toString().padStart(2, '0');
+                
+                // Formato final: KC + AAMMDD + HHMMSS + Random
+                // Exemplo: KC240327142530001
+                const codigo = `KC${ano}${mes}${dia}${hora}${minuto}${segundo}${random1}${random2}`;
+                
+                // Definir o código no input
+                codigoInput.value = codigo;
+                
+                // Adicionar feedback visual temporário
+                codigoInput.classList.add('codigo-gerado');
+                setTimeout(() => {
+                    codigoInput.classList.remove('codigo-gerado');
+                }, 2000);
+                
+                // Remover estado de loading
+                generateBtn.classList.remove('generating');
+                generateBtn.disabled = false;
+                
+                // Focar no próximo campo
+                const nextField = document.getElementById('data_transacao');
+                if (nextField) {
+                    nextField.focus();
+                }
+                
+                // Mostrar notificação de sucesso
+                mostrarNotificacao('Código gerado com sucesso!', 'success');
+                
+            }, 800); // Delay de 800ms para melhor experiência
+        }
+
+        // ========================================
+        // FUNÇÕES DE UTILIDADE
+        // ========================================
+
+        /**
+         * Formata número como moeda brasileira
+         * @param {number} value - Valor a ser formatado
+         * @returns {string} - Valor formatado como moeda
+         */
+        function formatCurrency(value) {
+            return parseFloat(value).toLocaleString('pt-BR', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+
+        /**
+         * Configura o funcionamento do accordion na seção de ajuda
+         */
         function setupAccordion() {
             const accordionItems = document.querySelectorAll('.accordion-item');
             
@@ -713,7 +872,7 @@ $activeMenu = 'register-transaction';
                 header.addEventListener('click', () => {
                     const isActive = item.classList.contains('active');
                     
-                    // Fechar todos os itens
+                    // Fechar todos os itens primeiro
                     accordionItems.forEach(i => {
                         i.classList.remove('active');
                         i.querySelector('.accordion-content').style.maxHeight = '0';
@@ -729,8 +888,96 @@ $activeMenu = 'register-transaction';
                 });
             });
         }
-        
-        // Validação de formulário
+
+        /**
+         * Mostra notificação temporária na tela
+         * @param {string} mensagem - Texto da notificação
+         * @param {string} tipo - Tipo da notificação (success, info, warning, error)
+         */
+        function mostrarNotificacao(mensagem, tipo = 'info') {
+            // Criar elemento de notificação
+            const notification = document.createElement('div');
+            notification.className = `notification ${tipo}`;
+            notification.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
+                <span>${mensagem}</span>
+            `;
+            
+            // Aplicar estilos inline
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: ${tipo === 'success' ? 'var(--success-color)' : 'var(--info-color)'};
+                color: white;
+                padding: 1rem 1.5rem;
+                border-radius: var(--border-radius-sm);
+                box-shadow: var(--shadow-lg);
+                display: flex;
+                align-items: center;
+                gap: 0.75rem;
+                font-size: var(--font-size-sm);
+                font-weight: 600;
+                z-index: 10000;
+                animation: slideInRight 0.3s ease-out;
+                max-width: 300px;
+            `;
+            
+            // Adicionar ao body
+            document.body.appendChild(notification);
+            
+            // Remover após 3 segundos
+            setTimeout(() => {
+                notification.style.animation = 'slideOutRight 0.3s ease-in forwards';
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 300);
+            }, 3000);
+        }
+
+        /**
+         * Adiciona estilos CSS para as animações das notificações
+         */
+        function adicionarNotificationStyles() {
+            const notificationStyles = document.createElement('style');
+            notificationStyles.textContent = `
+                @keyframes slideInRight {
+                    from {
+                        transform: translateX(100%);
+                        opacity: 0;
+                    }
+                    to {
+                        transform: translateX(0);
+                        opacity: 1;
+                    }
+                }
+                
+                @keyframes slideOutRight {
+                    from {
+                        transform: translateX(0);
+                        opacity: 1;
+                    }
+                    to {
+                        transform: translateX(100%);
+                        opacity: 0;
+                    }
+                }
+            `;
+            document.head.appendChild(notificationStyles);
+        }
+
+        // ========================================
+        // VALIDAÇÃO DO FORMULÁRIO
+        // ========================================
+
+        /**
+         * Valida o formulário antes do envio
+         */
         document.getElementById('transactionForm').addEventListener('submit', function(e) {
             console.log('Enviando formulário...');
             console.log('usar_saldo:', document.getElementById('usar_saldo').value);
@@ -739,12 +986,14 @@ $activeMenu = 'register-transaction';
             const valorTotal = parseFloat(document.getElementById('valor_total').value) || 0;
             const valorSaldoUsado = parseFloat(document.getElementById('valor_saldo_usado_hidden').value) || 0;
             
+            // Validar valor total
             if (valorTotal <= 0) {
                 e.preventDefault();
                 alert('Por favor, informe o valor total da venda');
                 return;
             }
             
+            // Validar se cliente foi selecionado
             if (!clientData) {
                 e.preventDefault();
                 alert('Por favor, busque e selecione um cliente antes de registrar a venda');
