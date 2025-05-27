@@ -1265,3 +1265,359 @@ body {
 .store-logo img[style*="display: none"] + .store-initial {
     display: flex !important;
 }
+
+/* Estilos para o modal de detalhes da loja */
+.store-detail-container {
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.store-detail-header {
+    margin-bottom: 25px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.store-info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.info-label {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.info-value {
+    font-size: 1rem;
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.info-value.highlight {
+    color: var(--primary-color);
+    font-size: 1.1rem;
+}
+
+.info-link {
+    color: var(--primary-color);
+    text-decoration: none;
+    font-size: 0.9rem;
+}
+
+.info-link:hover {
+    text-decoration: underline;
+}
+
+.store-description {
+    margin-top: 15px;
+    padding: 15px;
+    background-color: var(--secondary-color);
+    border-radius: 8px;
+}
+
+.store-description p {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+/* Cards de saldo no modal */
+.balance-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 15px;
+    margin-bottom: 25px;
+}
+
+.balance-card {
+    background: linear-gradient(135deg, #f8f9fa, #fff);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    transition: all 0.3s ease;
+}
+
+.balance-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+.balance-card-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+}
+
+.balance-card-icon.success {
+    background-color: var(--success-color);
+}
+
+.balance-card-icon.primary {
+    background-color: var(--primary-color);
+}
+
+.balance-card-icon.warning {
+    background-color: var(--warning-color);
+}
+
+.balance-card-content {
+    flex: 1;
+}
+
+.balance-amount {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 5px;
+}
+
+.balance-label {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+/* Seção de estatísticas */
+.statistics-section {
+    margin-bottom: 25px;
+    padding: 20px;
+    background-color: var(--secondary-color);
+    border-radius: 12px;
+}
+
+.statistics-section h4 {
+    margin: 0 0 15px 0;
+    color: var(--text-primary);
+    font-size: 1.1rem;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 15px;
+}
+
+.stat-item {
+    text-align: center;
+    padding: 10px;
+    background-color: var(--white);
+    border-radius: 8px;
+}
+
+.stat-number {
+    display: block;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--primary-color);
+    margin-bottom: 5px;
+}
+
+.stat-label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+/* Simulador de uso de saldo */
+.balance-simulator {
+    margin-bottom: 25px;
+    padding: 20px;
+    background: linear-gradient(135deg, #fff3e0, #fff);
+    border: 1px solid #ffcc80;
+    border-radius: 12px;
+}
+
+.balance-simulator h4 {
+    margin: 0 0 15px 0;
+    color: var(--text-primary);
+    font-size: 1.1rem;
+}
+
+.simulator-form {
+    display: flex;
+    gap: 15px;
+    align-items: end;
+    margin-bottom: 15px;
+}
+
+.input-group {
+    flex: 1;
+}
+
+.input-group label {
+    display: block;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-bottom: 5px;
+    font-weight: 500;
+}
+
+.input-group input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 1rem;
+}
+
+.simulation-result {
+    margin-top: 10px;
+}
+
+.simulation-message {
+    padding: 10px 15px;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.simulation-message.success {
+    background-color: #e8f5e8;
+    color: #2e7d32;
+    border: 1px solid #81c784;
+}
+
+.simulation-message.error {
+    background-color: #ffebee;
+    color: #c62828;
+    border: 1px solid #ef5350;
+}
+
+/* Histórico de movimentações no modal */
+.movements-history {
+    margin-bottom: 25px;
+}
+
+.movements-history h4 {
+    margin: 0 0 15px 0;
+    color: var(--text-primary);
+    font-size: 1.1rem;
+}
+
+.movements-list-modal {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background-color: var(--white);
+}
+
+.movement-item-modal {
+    display: flex;
+    align-items: center;
+    padding: 12px 15px;
+    border-bottom: 1px solid #f5f5f5;
+    transition: background-color 0.3s;
+}
+
+.movement-item-modal:last-child {
+    border-bottom: none;
+}
+
+.movement-item-modal:hover {
+    background-color: #fffcf8;
+}
+
+.movement-icon-modal {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 12px;
+    color: white;
+}
+
+.movement-icon-modal.credito {
+    background-color: var(--success-color);
+}
+
+.movement-icon-modal.uso {
+    background-color: var(--warning-color);
+}
+
+.movement-icon-modal.estorno {
+    background-color: var(--info-color);
+}
+
+.movement-details-modal {
+    flex: 1;
+}
+
+.movement-description-modal {
+    font-weight: 500;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+}
+
+.movement-date-modal {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.movement-amount-modal {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.movement-amount-modal.positive {
+    color: var(--success-color);
+}
+
+.movement-amount-modal.negative {
+    color: var(--warning-color);
+}
+
+.no-movements {
+    text-align: center;
+    padding: 30px;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+/* Responsividade do modal */
+@media (max-width: 768px) {
+    .modal-content {
+        width: 95%;
+        height: 85vh;
+        margin: 5% auto;
+    }
+    
+    .store-detail-container {
+        max-height: calc(85vh - 120px);
+    }
+    
+    .balance-cards-grid,
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .simulator-form {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .store-info-grid {
+        grid-template-columns: 1fr;
+    }
+}
