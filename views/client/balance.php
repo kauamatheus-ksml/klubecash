@@ -679,24 +679,25 @@ function formatMonth($yearMonth) {
             <?php endif; ?>
         });
 
-        // Função alternativa usando URL absoluta
+        // Função para visualizar detalhes da loja - VERSÃO FINAL
         function viewStoreDetails(storeId) {
+            console.log('viewStoreDetails chamada com storeId:', storeId);
+            
             const modal = document.getElementById('storeDetailsModal');
             const modalTitle = document.getElementById('modalStoreTitle');
             const modalContent = document.getElementById('modalStoreContent');
             
+            // Mostrar modal e loading
             modal.style.display = 'block';
             modalTitle.textContent = 'Carregando...';
             modalContent.innerHTML = '<div class="loading-spinner">Carregando detalhes da loja...</div>';
             
-            // URL absoluta direta
-            const url = `/controllers/client_actions.php?action=store_balance_details&loja_id=${storeId}`;
-            console.log('Tentando URL direta:', url);
+            // Usar o endpoint que funciona
+            const url = `simple_store_details.php?loja_id=${storeId}`;
             
             fetch(url)
                 .then(response => response.json())
                 .then(data => {
-                    console.log('Resposta recebida:', data);
                     if (data.status) {
                         renderStoreDetails(data.data);
                     } else {
@@ -704,7 +705,7 @@ function formatMonth($yearMonth) {
                     }
                 })
                 .catch(error => {
-                    console.error('Erro:', error);
+                    console.error('Erro na requisição:', error);
                     modalContent.innerHTML = '<div class="error-message">Erro ao carregar detalhes da loja.</div>';
                 });
         }
@@ -717,9 +718,15 @@ function formatMonth($yearMonth) {
             modalTitle.textContent = data.loja.nome_fantasia;
             
             const logoHtml = data.loja.logo ? 
-                `<img src="../../uploads/store_logos/${data.loja.logo}" alt="${data.loja.nome_fantasia}" style="max-width: 80px; height: auto; border-radius: 8px;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                 <div class="store-initial" style="width: 60px; height: 60px; font-size: 1.5rem; display: none;">${data.loja.nome_fantasia.charAt(0).toUpperCase()}</div>` : 
-                `<div class="store-initial" style="width: 60px; height: 60px; font-size: 1.5rem;">${data.loja.nome_fantasia.charAt(0).toUpperCase()}</div>`;
+                `<img src="uploads/store_logos/${data.loja.logo}" alt="${data.loja.nome_fantasia}" 
+                    style="max-width: 80px; height: auto; border-radius: 8px;" 
+                    onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                <div class="store-initial" style="width: 60px; height: 60px; font-size: 1.5rem; display: none;">
+                    ${data.loja.nome_fantasia.charAt(0).toUpperCase()}
+                </div>` : 
+                `<div class="store-initial" style="width: 60px; height: 60px; font-size: 1.5rem; background: linear-gradient(135deg, #FF7A00, #FFB366); color: white; display: flex; align-items: center; justify-content: center; border-radius: 12px; box-shadow: 0 2px 8px rgba(255, 122, 0, 0.2);">
+                    ${data.loja.nome_fantasia.charAt(0).toUpperCase()}
+                </div>`;
             
             const html = `
                 <div class="store-detail-container">
@@ -736,7 +743,7 @@ function formatMonth($yearMonth) {
                         <div class="store-info-grid">
                             <div class="info-item">
                                 <span class="info-label">Cashback para você:</span>
-                                <span class="info-value highlight">${(data.loja.porcentagem_cashback / 2).toFixed(1)}%</span>
+                                <span class="info-value highlight">${(parseFloat(data.loja.porcentagem_cashback) / 2).toFixed(1)}%</span>
                             </div>
                             ${data.loja.website ? `
                             <div class="info-item">
@@ -745,6 +752,7 @@ function formatMonth($yearMonth) {
                             </div>
                             ` : ''}
                         </div>
+                        
                         ${data.loja.descricao ? `
                         <div class="store-description">
                             <p>${data.loja.descricao}</p>
@@ -752,7 +760,7 @@ function formatMonth($yearMonth) {
                         ` : ''}
                     </div>
                     
-                    <!-- Cards de saldo no modal -->
+                    <!-- Cards de saldo -->
                     <div class="balance-cards-grid">
                         <div class="balance-card">
                             <div class="balance-card-icon success">
@@ -761,7 +769,7 @@ function formatMonth($yearMonth) {
                                 </svg>
                             </div>
                             <div class="balance-card-content">
-                                <div class="balance-amount">R$ ${parseFloat(data.saldo.saldo_disponivel || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+                                <div class="balance-amount">R$ ${parseFloat(data.saldo.saldo_disponivel).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
                                 <div class="balance-label">Saldo Disponível</div>
                             </div>
                         </div>
@@ -774,7 +782,7 @@ function formatMonth($yearMonth) {
                                 </svg>
                             </div>
                             <div class="balance-card-content">
-                                <div class="balance-amount">R$ ${parseFloat(data.saldo.total_creditado || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+                                <div class="balance-amount">R$ ${parseFloat(data.saldo.total_creditado).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
                                 <div class="balance-label">Total Recebido</div>
                             </div>
                         </div>
@@ -787,16 +795,16 @@ function formatMonth($yearMonth) {
                                 </svg>
                             </div>
                             <div class="balance-card-content">
-                                <div class="balance-amount">R$ ${parseFloat(data.saldo.total_usado || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+                                <div class="balance-amount">R$ ${parseFloat(data.saldo.total_usado).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
                                 <div class="balance-label">Total Usado</div>
                             </div>
                         </div>
                     </div>
                     
                     <!-- Simulador de uso de saldo -->
-                    ${parseFloat(data.saldo.saldo_disponivel || 0) > 0 ? `
+                    ${parseFloat(data.saldo.saldo_disponivel) > 0 ? `
                     <div class="balance-simulator">
-                        <h4>Simular Uso do Saldo</h4>
+                        <h4>💡 Simular Uso do Saldo</h4>
                         <div class="simulator-form">
                             <div class="input-group">
                                 <label for="simulateValue">Valor a usar:</label>
@@ -808,9 +816,28 @@ function formatMonth($yearMonth) {
                     </div>
                     ` : ''}
                     
+                    <!-- Estatísticas -->
+                    <div class="statistics-section">
+                        <h4>📊 Estatísticas da Loja</h4>
+                        <div class="stats-grid">
+                            <div class="stat-item">
+                                <span class="stat-number">${data.estatisticas.total_movimentacoes}</span>
+                                <span class="stat-label">Movimentações</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-number">${data.movimentacoes.filter(m => m.tipo_operacao === 'credito').length}</span>
+                                <span class="stat-label">Créditos</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-number">${data.movimentacoes.filter(m => m.tipo_operacao === 'uso').length}</span>
+                                <span class="stat-label">Usos</span>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <!-- Histórico de Movimentações -->
                     <div class="movements-history">
-                        <h4>Últimas Movimentações</h4>
+                        <h4>📝 Histórico de Movimentações</h4>
                         ${data.movimentacoes && data.movimentacoes.length > 0 ? `
                         <div class="movements-list-modal">
                             ${data.movimentacoes.map(mov => `
@@ -845,37 +872,19 @@ function formatMonth($yearMonth) {
             const value = parseFloat(valueInput.value || 0);
             
             if (value <= 0) {
-                showSimulationResult('Informe um valor válido maior que zero.', 'error');
+                showSimulationResult('⚠️ Informe um valor válido maior que zero.', 'error');
                 return;
             }
             
-            // Fazer requisição para simular
-            const formData = new FormData();
-            formData.append('action', 'simulate_balance_use');
-            formData.append('loja_id', storeId);
-            formData.append('valor', value);
+            // Obter saldo disponível do card
+            const saldoDisponivel = parseFloat(document.querySelector('.balance-card .balance-amount').textContent.replace('R$ ', '').replace(',', '.'));
             
-            fetch('<?php echo CLIENT_ACTIONS_URL; ?>', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status) {
-                    const result = data.data;
-                    const message = result.pode_usar ? 
-                        `✅ Você pode usar R$ ${result.valor_solicitado.toLocaleString('pt-BR', {minimumFractionDigits: 2})}. Restará R$ ${result.saldo_restante.toLocaleString('pt-BR', {minimumFractionDigits: 2})}.` :
-                        `❌ ${result.mensagem}`;
-                    
-                    showSimulationResult(message, result.pode_usar ? 'success' : 'error');
-                } else {
-                    showSimulationResult('Erro ao processar simulação.', 'error');
-                }
-            })
-            .catch(error => {
-                console.error('Erro na simulação:', error);
-                showSimulationResult('Erro ao processar simulação.', 'error');
-            });
+            if (value > saldoDisponivel) {
+                showSimulationResult(`❌ Saldo insuficiente. Disponível: R$ ${saldoDisponivel.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, 'error');
+            } else {
+                const restante = saldoDisponivel - value;
+                showSimulationResult(`✅ Você pode usar R$ ${value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}! Restará R$ ${restante.toLocaleString('pt-BR', {minimumFractionDigits: 2})}.`, 'success');
+            }
         }
 
         // Função para mostrar resultado da simulação
@@ -902,9 +911,9 @@ function formatMonth($yearMonth) {
 
         function getMovementDescription(tipo, descricao) {
             const tipos = {
-                'credito': 'Cashback recebido',
-                'uso': 'Saldo usado',
-                'estorno': 'Estorno'
+                'credito': '💰 Cashback recebido',
+                'uso': '🛒 Saldo usado',
+                'estorno': '↩️ Estorno'
             };
             return descricao || tipos[tipo] || 'Movimentação';
         }
@@ -914,12 +923,6 @@ function formatMonth($yearMonth) {
             const date = new Date(datetime);
             return date.toLocaleString('pt-BR');
         }
-
-        function formatDate(date) {
-            if (!date) return 'N/A';
-            return new Date(date).toLocaleDateString('pt-BR');
-        }
-
         function formatMonth(yearMonth) {
             if (!yearMonth) return '';
             const [year, month] = yearMonth.split('-');
