@@ -681,40 +681,44 @@ function formatMonth($yearMonth) {
 
         // Função para visualizar detalhes da loja - VERSÃO COM DEBUG COMPLETO
 function viewStoreDetails(storeId) {
-    console.log('=== DEBUG MODAL ===');
     console.log('viewStoreDetails chamada com storeId:', storeId);
     
     const modal = document.getElementById('storeDetailsModal');
     const modalTitle = document.getElementById('modalStoreTitle');
     const modalContent = document.getElementById('modalStoreContent');
     
-    console.log('Modal element:', modal);
-    console.log('Modal title:', modalTitle);
-    console.log('Modal content:', modalContent);
-    
-    if (!modal || !modalTitle || !modalContent) {
-        console.error('Elementos do modal não encontrados!');
-        alert('ERRO: Elementos do modal não encontrados');
-        return;
-    }
-    
     // Mostrar modal e loading
     modal.style.display = 'block';
     modalTitle.textContent = 'Carregando...';
     modalContent.innerHTML = '<div class="loading-spinner">Carregando detalhes da loja...</div>';
     
-    // Testar diferentes URLs
-    const urls = [
-        `simple_store_details.php?loja_id=${storeId}`,
-        `/simple_store_details.php?loja_id=${storeId}`,
-        `./simple_store_details.php?loja_id=${storeId}`,
-        `api/store_details.php?loja_id=${storeId}`
-    ];
+    // URL correta - caminho absoluto da raiz
+    const url = `../../simple_store_details.php?loja_id=${storeId}`;
+    console.log('URL da requisição:', url);
     
-    console.log('Testando URLs:', urls);
-    
-    // Tentar a primeira URL
-    tryFetchWithUrl(urls, 0, storeId);
+    fetch(url)
+        .then(response => {
+            console.log('Response status:', response.status);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            return response.json();
+        })
+        .then(data => {
+            console.log('Dados recebidos:', data);
+            
+            if (data.status) {
+                renderStoreDetails(data.data);
+            } else {
+                modalContent.innerHTML = `<div class="error-message">${data.message}</div>`;
+            }
+        })
+        .catch(error => {
+            console.error('Erro na requisição:', error);
+            modalContent.innerHTML = `<div class="error-message">Erro ao carregar detalhes: ${error.message}</div>`;
+        });
 }
 
 function tryFetchWithUrl(urls, index, storeId) {
@@ -772,97 +776,262 @@ function tryFetchWithUrl(urls, index, storeId) {
     });
 }
 
-// Versão simplificada da renderização para testar
-function renderStoreDetails(data) {
-    console.log('Renderizando dados:', data);
-    
-    const modalContent = document.getElementById('modalStoreContent');
-    
-    // Versão super simples primeiro
-    const html = `
-        <div style="padding: 20px;">
-            <h3>${data.loja.nome_fantasia}</h3>
-            <p><strong>Categoria:</strong> ${data.loja.categoria}</p>
-            <p><strong>Cashback:</strong> ${data.loja.porcentagem_cashback}%</p>
-            <p><strong>Saldo Disponível:</strong> R$ ${parseFloat(data.saldo.saldo_disponivel).toFixed(2)}</p>
-            <p><strong>Total Creditado:</strong> R$ ${parseFloat(data.saldo.total_creditado).toFixed(2)}</p>
-            <p><strong>Total Usado:</strong> R$ ${parseFloat(data.saldo.total_usado).toFixed(2)}</p>
-            <p><strong>Movimentações:</strong> ${data.movimentacoes.length}</p>
-            
-            <h4>Últimas Movimentações:</h4>
-            <ul>
-                ${data.movimentacoes.slice(0, 5).map(mov => `
-                    <li>
-                        ${mov.tipo_operacao.toUpperCase()}: R$ ${parseFloat(mov.valor).toFixed(2)} 
-                        - ${mov.data_operacao}
-                    </li>
-                `).join('')}
-            </ul>
-        </div>
-    `;
-    
-    modalContent.innerHTML = html;
-    console.log('Dados renderizados com sucesso!');
-}
+    // Versão simplificada da renderização para testar
+    // Função para visualizar detalhes da loja - VERSÃO CORRIGIDA
+    function viewStoreDetails(storeId) {
+        console.log('viewStoreDetails chamada com storeId:', storeId);
+        
+        const modal = document.getElementById('storeDetailsModal');
+        const modalTitle = document.getElementById('modalStoreTitle');
+        const modalContent = document.getElementById('modalStoreContent');
+        
+        // Mostrar modal e loading
+        modal.style.display = 'block';
+        modalTitle.textContent = 'Carregando...';
+        modalContent.innerHTML = '<div class="loading-spinner">Carregando detalhes da loja...</div>';
+        
+        // URL correta - caminho absoluto da raiz
+        const url = `../../simple_store_details.php?loja_id=${storeId}`;
+        console.log('URL da requisição:', url);
+        
+        fetch(url)
+            .then(response => {
+                console.log('Response status:', response.status);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                return response.json();
+            })
+            .then(data => {
+                console.log('Dados recebidos:', data);
+                
+                if (data.status) {
+                    renderStoreDetails(data.data);
+                } else {
+                    modalContent.innerHTML = `<div class="error-message">${data.message}</div>`;
+                }
+            })
+            .catch(error => {
+                console.error('Erro na requisição:', error);
+                modalContent.innerHTML = `<div class="error-message">Erro ao carregar detalhes: ${error.message}</div>`;
+            });
+    }
 
-        // Função para simular uso de saldo
-        function simulateBalanceUse(storeId) {
-            const valueInput = document.getElementById('simulateValue');
-            const resultDiv = document.getElementById('simulationResult');
-            const value = parseFloat(valueInput.value || 0);
-            
-            if (value <= 0) {
-                showSimulationResult('⚠️ Informe um valor válido maior que zero.', 'error');
-                return;
-            }
-            
-            // Obter saldo disponível do card
-            const saldoDisponivel = parseFloat(document.querySelector('.balance-card .balance-amount').textContent.replace('R$ ', '').replace(',', '.'));
-            
-            if (value > saldoDisponivel) {
-                showSimulationResult(`❌ Saldo insuficiente. Disponível: R$ ${saldoDisponivel.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, 'error');
-            } else {
-                const restante = saldoDisponivel - value;
-                showSimulationResult(`✅ Você pode usar R$ ${value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}! Restará R$ ${restante.toLocaleString('pt-BR', {minimumFractionDigits: 2})}.`, 'success');
-            }
-        }
+    // Função para renderizar os detalhes da loja no modal
+    function renderStoreDetails(data) {
+        const modalTitle = document.getElementById('modalStoreTitle');
+        const modalContent = document.getElementById('modalStoreContent');
+        
+        modalTitle.textContent = data.loja.nome_fantasia;
+        
+        const logoHtml = data.loja.logo ? 
+            `<img src="../../uploads/store_logos/${data.loja.logo}" alt="${data.loja.nome_fantasia}" 
+                style="max-width: 80px; height: auto; border-radius: 8px;" 
+                onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+            <div class="store-initial" style="width: 60px; height: 60px; font-size: 1.5rem; display: none;">
+                ${data.loja.nome_fantasia.charAt(0).toUpperCase()}
+            </div>` : 
+            `<div class="store-initial" style="width: 60px; height: 60px; font-size: 1.5rem; background: linear-gradient(135deg, #FF7A00, #FFB366); color: white; display: flex; align-items: center; justify-content: center; border-radius: 12px; box-shadow: 0 2px 8px rgba(255, 122, 0, 0.2);">
+                ${data.loja.nome_fantasia.charAt(0).toUpperCase()}
+            </div>`;
+        
+        const html = `
+            <div class="store-detail-container">
+                <!-- Informações Básicas da Loja -->
+                <div class="store-detail-header">
+                    <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
+                        ${logoHtml}
+                        <div>
+                            <h3 style="margin: 0; color: var(--text-primary);">${data.loja.nome_fantasia}</h3>
+                            <p style="margin: 5px 0 0 0; color: var(--text-muted);">${data.loja.categoria || 'Categoria não informada'}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="store-info-grid">
+                        <div class="info-item">
+                            <span class="info-label">Cashback para você:</span>
+                            <span class="info-value highlight">${(parseFloat(data.loja.porcentagem_cashback) / 2).toFixed(1)}%</span>
+                        </div>
+                        ${data.loja.website ? `
+                        <div class="info-item">
+                            <span class="info-label">Website:</span>
+                            <a href="${data.loja.website}" target="_blank" class="info-link">${data.loja.website}</a>
+                        </div>
+                        ` : ''}
+                    </div>
+                    
+                    ${data.loja.descricao ? `
+                    <div class="store-description">
+                        <p>${data.loja.descricao}</p>
+                    </div>
+                    ` : ''}
+                </div>
+                
+                <!-- Cards de saldo -->
+                <div class="balance-cards-grid">
+                    <div class="balance-card">
+                        <div class="balance-card-icon success">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                            </svg>
+                        </div>
+                        <div class="balance-card-content">
+                            <div class="balance-amount">R$ ${parseFloat(data.saldo.saldo_disponivel).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+                            <div class="balance-label">Saldo Disponível</div>
+                        </div>
+                    </div>
+                    
+                    <div class="balance-card">
+                        <div class="balance-card-icon primary">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <polyline points="19 12 12 19 5 12"></polyline>
+                            </svg>
+                        </div>
+                        <div class="balance-card-content">
+                            <div class="balance-amount">R$ ${parseFloat(data.saldo.total_creditado).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+                            <div class="balance-label">Total Recebido</div>
+                        </div>
+                    </div>
+                    
+                    <div class="balance-card">
+                        <div class="balance-card-icon warning">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="12" y1="19" x2="12" y2="5"></line>
+                                <polyline points="5 12 12 5 19 12"></polyline>
+                            </svg>
+                        </div>
+                        <div class="balance-card-content">
+                            <div class="balance-amount">R$ ${parseFloat(data.saldo.total_usado).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
+                            <div class="balance-label">Total Usado</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Simulador de uso de saldo -->
+                ${parseFloat(data.saldo.saldo_disponivel) > 0 ? `
+                <div class="balance-simulator">
+                    <h4>💡 Simular Uso do Saldo</h4>
+                    <div class="simulator-form">
+                        <div class="input-group">
+                            <label for="simulateValue">Valor a usar:</label>
+                            <input type="number" id="simulateValue" placeholder="0,00" step="0.01" max="${data.saldo.saldo_disponivel}">
+                        </div>
+                        <button onclick="simulateBalanceUse(${data.loja.id})" class="btn btn-primary btn-sm">Simular</button>
+                    </div>
+                    <div id="simulationResult" class="simulation-result" style="display: none;"></div>
+                </div>
+                ` : ''}
+                
+                <!-- Estatísticas -->
+                <div class="statistics-section">
+                    <h4>📊 Estatísticas da Loja</h4>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <span class="stat-number">${data.estatisticas.total_movimentacoes}</span>
+                            <span class="stat-label">Movimentações</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-number">${data.movimentacoes.filter(m => m.tipo_operacao === 'credito').length}</span>
+                            <span class="stat-label">Créditos</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-number">${data.movimentacoes.filter(m => m.tipo_operacao === 'uso').length}</span>
+                            <span class="stat-label">Usos</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Histórico de Movimentações -->
+                <div class="movements-history">
+                    <h4>📝 Histórico de Movimentações</h4>
+                    ${data.movimentacoes && data.movimentacoes.length > 0 ? `
+                    <div class="movements-list-modal">
+                        ${data.movimentacoes.map(mov => `
+                            <div class="movement-item-modal">
+                                <div class="movement-icon-modal ${mov.tipo_operacao}">
+                                    ${getMovementIcon(mov.tipo_operacao)}
+                                </div>
+                                <div class="movement-details-modal">
+                                    <div class="movement-description-modal">
+                                        ${getMovementDescription(mov.tipo_operacao, mov.descricao)}
+                                    </div>
+                                    <div class="movement-date-modal">${formatDateTime(mov.data_operacao)}</div>
+                                </div>
+                                <div class="movement-amount-modal ${mov.tipo_operacao === 'uso' ? 'negative' : 'positive'}">
+                                    ${mov.tipo_operacao === 'uso' ? '-' : '+'}R$ ${parseFloat(mov.valor).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                    ` : '<p class="no-movements">Nenhuma movimentação encontrada para esta loja.</p>'}
+                </div>
+            </div>
+        `;
+        
+        modalContent.innerHTML = html;
+    }
 
-        // Função para mostrar resultado da simulação
-        function showSimulationResult(message, type) {
-            const resultDiv = document.getElementById('simulationResult');
-            resultDiv.innerHTML = `<div class="simulation-message ${type}">${message}</div>`;
-            resultDiv.style.display = 'block';
-            
-            // Ocultar após 5 segundos
-            setTimeout(() => {
-                resultDiv.style.display = 'none';
-            }, 5000);
+    // Função para simular uso de saldo
+    function simulateBalanceUse(storeId) {
+        const valueInput = document.getElementById('simulateValue');
+        const resultDiv = document.getElementById('simulationResult');
+        const value = parseFloat(valueInput.value || 0);
+        
+        if (value <= 0) {
+            showSimulationResult('⚠️ Informe um valor válido maior que zero.', 'error');
+            return;
         }
+        
+        // Obter saldo disponível do card
+        const saldoDisponivel = parseFloat(document.querySelector('.balance-card .balance-amount').textContent.replace('R$ ', '').replace(',', '.'));
+        
+        if (value > saldoDisponivel) {
+            showSimulationResult(`❌ Saldo insuficiente. Disponível: R$ ${saldoDisponivel.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, 'error');
+        } else {
+            const restante = saldoDisponivel - value;
+            showSimulationResult(`✅ Você pode usar R$ ${value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}! Restará R$ ${restante.toLocaleString('pt-BR', {minimumFractionDigits: 2})}.`, 'success');
+        }
+    }
 
-        // Funções auxiliares
-        function getMovementIcon(tipo) {
-            const icons = {
-                'credito': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>',
-                'uso': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>',
-                'estorno': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"></polyline><path d="m1 10 6-6v6"></path></svg>'
-            };
-            return icons[tipo] || icons['credito'];
-        }
+    // Função para mostrar resultado da simulação
+    function showSimulationResult(message, type) {
+        const resultDiv = document.getElementById('simulationResult');
+        resultDiv.innerHTML = `<div class="simulation-message ${type}">${message}</div>`;
+        resultDiv.style.display = 'block';
+        
+        // Ocultar após 5 segundos
+        setTimeout(() => {
+            resultDiv.style.display = 'none';
+        }, 5000);
+    }
 
-        function getMovementDescription(tipo, descricao) {
-            const tipos = {
-                'credito': '💰 Cashback recebido',
-                'uso': '🛒 Saldo usado',
-                'estorno': '↩️ Estorno'
-            };
-            return descricao || tipos[tipo] || 'Movimentação';
-        }
+    // Funções auxiliares
+    function getMovementIcon(tipo) {
+        const icons = {
+            'credito': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>',
+            'uso': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>',
+            'estorno': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"></polyline><path d="m1 10 6-6v6"></path></svg>'
+        };
+        return icons[tipo] || icons['credito'];
+    }
 
-        function formatDateTime(datetime) {
-            if (!datetime) return 'Data não informada';
-            const date = new Date(datetime);
-            return date.toLocaleString('pt-BR');
-        }
+    function getMovementDescription(tipo, descricao) {
+        const tipos = {
+            'credito': '💰 Cashback recebido',
+            'uso': '🛒 Saldo usado',
+            'estorno': '↩️ Estorno'
+        };
+        return descricao || tipos[tipo] || 'Movimentação';
+    }
+
+    function formatDateTime(datetime) {
+        if (!datetime) return 'Data não informada';
+        const date = new Date(datetime);
+        return date.toLocaleString('pt-BR');
+    }
         function formatMonth(yearMonth) {
             if (!yearMonth) return '';
             const [year, month] = yearMonth.split('-');
