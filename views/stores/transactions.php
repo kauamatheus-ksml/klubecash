@@ -170,84 +170,12 @@ echo "<!-- Debug: Todas as verificações passaram, renderizando página -->\n";
 </head>
 <body>
     <div class="wrapper">
-        <!-- Sidebar -->
-        <nav id="sidebar" class="sidebar">
-            <div class="sidebar-header">
-                <h4>Loja Parceira</h4>
-            </div>
-            
-            <ul class="sidebar-nav">
-                <li>
-                    <a href="<?php echo STORE_DASHBOARD_URL; ?>">
-                        <i class="fas fa-tachometer-alt"></i>
-                        <span>Dashboard</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="<?php echo STORE_REGISTER_TRANSACTION_URL; ?>">
-                        <i class="fas fa-plus-circle"></i>
-                        <span>Registrar Venda</span>
-                    </a>
-                </li>
-                <li class="active">
-                    <a href="#">
-                        <i class="fas fa-list"></i>
-                        <span>Transações</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="<?php echo STORE_PENDING_COMMISSIONS_URL; ?>">
-                        <i class="fas fa-clock"></i>
-                        <span>Comissões Pendentes</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="<?php echo STORE_PAYMENT_HISTORY_URL; ?>">
-                        <i class="fas fa-history"></i>
-                        <span>Histórico de Pagamentos</span>
-                    </a>
-                </li>
-                <li>
-                    <a href="<?php echo STORE_PROFILE_URL; ?>">
-                        <i class="fas fa-user-cog"></i>
-                        <span>Perfil</span>
-                    </a>
-                </li>
-            </ul>
-            
-            <div class="sidebar-footer">
-                <a href="<?php echo LOGOUT_URL; ?>" class="btn btn-outline-light btn-sm">
-                    <i class="fas fa-sign-out-alt"></i>
-                    Sair
-                </a>
-            </div>
-        </nav>
+
+        <?php include_once '../components/sidebar-store.php'; ?>
 
         <!-- Content -->
         <div id="content">
-            <!-- Top Navigation -->
-            <nav class="navbar navbar-expand-lg navbar-light bg-white">
-                <div class="container-fluid">
-                    <button type="button" id="sidebarCollapse" class="btn btn-info">
-                        <i class="fas fa-bars"></i>
-                    </button>
-                    
-                    <div class="ms-auto">
-                        <div class="dropdown">
-                            <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                                <i class="fas fa-user"></i>
-                                <?php echo htmlspecialchars($store['nome_fantasia']); ?>
-                            </button>
-                            <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="<?php echo STORE_PROFILE_URL; ?>">Perfil</a></li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="<?php echo LOGOUT_URL; ?>">Sair</a></li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-            </nav>
-
+            
             <!-- Main Content -->
             <div class="container-fluid mt-4">
                 <div class="row">
