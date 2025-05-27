@@ -1222,3 +1222,46 @@ body {
         grid-template-columns: 1fr;
     }
 }
+
+
+/* Correções específicas para logos das lojas */
+.store-logo {
+    width: 60px;
+    height: 60px;
+    margin-bottom: 12px;
+    position: relative;
+    overflow: hidden;
+    border-radius: 12px;
+}
+
+.store-logo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 12px;
+    transition: opacity 0.3s ease;
+}
+
+.store-logo img:hover {
+    opacity: 0.9;
+}
+
+.store-initial {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
+    color: var(--white);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    font-size: 1.5rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    box-shadow: 0 2px 8px rgba(255, 122, 0, 0.2);
+}
+
+/* Fallback para imagens que falharam ao carregar */
+.store-logo img[style*="display: none"] + .store-initial {
+    display: flex !important;
+}
