@@ -1,33 +1,79 @@
 <?php
-// views/stores/transactions.php
+// views/stores/transactions.php - VERSÃO CORRIGIDA
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 session_start();
+
+// Incluir arquivos necessários
 require_once __DIR__ . '/../../config/constants.php';
 require_once __DIR__ . '/../../controllers/AuthController.php';
 
-// Verificar se o usuário está logado e é uma loja
+// Debug básico
+echo "<!-- Debug: Página carregando -->\n";
+
+// Verificar se o usuário está logado
 if (!AuthController::isAuthenticated()) {
-    header('Location: ' . LOGIN_URL);
+    echo "<!-- Debug: Usuário não autenticado -->\n";
+    header('Location: ' . (defined('LOGIN_URL') ? LOGIN_URL : '/login.php'));
     exit;
 }
 
+// Verificar se é uma loja
 if (!AuthController::isStore()) {
-    header('Location: ' . LOGIN_URL . '?error=' . urlencode('Acesso restrito a lojas.'));
+    echo "<!-- Debug: Usuário não é loja -->\n";
+    header('Location: ' . (defined('LOGIN_URL') ? LOGIN_URL : '/login.php') . '?error=' . urlencode('Acesso restrito a lojas.'));
     exit;
 }
 
 $currentUserId = AuthController::getCurrentUserId();
+echo "<!-- Debug: User ID: $currentUserId -->\n";
 
 // Buscar dados da loja
 require_once __DIR__ . '/../../config/database.php';
-$db = Database::getConnection();
-$storeStmt = $db->prepare("SELECT * FROM lojas WHERE usuario_id = ?");
-$storeStmt->execute([$currentUserId]);
-$store = $storeStmt->fetch(PDO::FETCH_ASSOC);
-
-if (!$store) {
-    header('Location: ' . LOGIN_URL . '?error=' . urlencode('Loja não encontrada.'));
-    exit;
+try {
+    $db = Database::getConnection();
+    $storeStmt = $db->prepare("SELECT * FROM lojas WHERE usuario_id = ?");
+    $storeStmt->execute([$currentUserId]);
+    $store = $storeStmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$store) {
+        echo "<!-- Debug: Loja não encontrada para user ID: $currentUserId -->\n";
+        header('Location: ' . (defined('LOGIN_URL') ? LOGIN_URL : '/login.php') . '?error=' . urlencode('Loja não encontrada.'));
+        exit;
+    }
+    
+    echo "<!-- Debug: Loja encontrada: " . $store['nome_fantasia'] . " -->\n";
+    
+} catch (Exception $e) {
+    echo "<!-- Debug: Erro BD: " . $e->getMessage() . " -->\n";
+    die("Erro na conexão com o banco de dados");
 }
+
+// Definir URLs se não estiverem definidas
+if (!defined('STORE_DASHBOARD_URL')) {
+    define('STORE_DASHBOARD_URL', '/views/stores/dashboard.php');
+}
+if (!defined('STORE_REGISTER_TRANSACTION_URL')) {
+    define('STORE_REGISTER_TRANSACTION_URL', '/views/stores/register-transaction.php');
+}
+if (!defined('STORE_PENDING_COMMISSIONS_URL')) {
+    define('STORE_PENDING_COMMISSIONS_URL', '/views/stores/pending-commissions.php');
+}
+if (!defined('STORE_PAYMENT_HISTORY_URL')) {
+    define('STORE_PAYMENT_HISTORY_URL', '/views/stores/payment-history.php');
+}
+if (!defined('STORE_PROFILE_URL')) {
+    define('STORE_PROFILE_URL', '/views/stores/profile.php');
+}
+if (!defined('LOGOUT_URL')) {
+    define('LOGOUT_URL', '/logout.php');
+}
+if (!defined('ASSETS_URL')) {
+    define('ASSETS_URL', '/assets');
+}
+
+echo "<!-- Debug: Todas as verificações passaram, renderizando página -->\n";
 ?>
 
 <!DOCTYPE html>
@@ -38,15 +84,95 @@ if (!$store) {
     <title>Transações - Klube Cash</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    
-    <link rel="stylesheet" href="../../assets/css/store.css">
+    <style>
+        /* CSS inline para garantir que funcione */
+        .wrapper {
+            display: flex;
+            width: 100%;
+        }
+        
+        .sidebar {
+            min-width: 250px;
+            max-width: 250px;
+            background: #343a40;
+            color: white;
+            transition: all 0.3s;
+        }
+        
+        .sidebar.active {
+            margin-left: -250px;
+        }
+        
+        .sidebar-header {
+            padding: 20px;
+            background: #495057;
+            text-align: center;
+        }
+        
+        .sidebar-header .logo {
+            max-width: 50px;
+            margin-bottom: 10px;
+        }
+        
+        .sidebar-nav {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .sidebar-nav li {
+            padding: 0;
+        }
+        
+        .sidebar-nav a {
+            display: block;
+            padding: 15px 20px;
+            color: #adb5bd;
+            text-decoration: none;
+            transition: all 0.3s;
+        }
+        
+        .sidebar-nav a:hover,
+        .sidebar-nav li.active a {
+            color: white;
+            background: #495057;
+        }
+        
+        .sidebar-footer {
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
+            padding: 0 20px;
+        }
+        
+        #content {
+            width: 100%;
+            padding: 0;
+            min-height: 100vh;
+            transition: all 0.3s;
+        }
+        
+        .navbar {
+            padding: 15px;
+            background: white !important;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        
+        @media (max-width: 768px) {
+            .sidebar {
+                margin-left: -250px;
+            }
+            .sidebar.active {
+                margin-left: 0;
+            }
+        }
+    </style>
 </head>
 <body>
     <div class="wrapper">
         <!-- Sidebar -->
         <nav id="sidebar" class="sidebar">
             <div class="sidebar-header">
-                <img src="<?php echo ASSETS_URL; ?>/images/logo.png" alt="Klube Cash" class="logo">
                 <h4>Loja Parceira</h4>
             </div>
             
@@ -64,7 +190,7 @@ if (!$store) {
                     </a>
                 </li>
                 <li class="active">
-                    <a href="<?php echo STORE_TRANSACTIONS_URL; ?>">
+                    <a href="#">
                         <i class="fas fa-list"></i>
                         <span>Transações</span>
                     </a>
@@ -100,7 +226,7 @@ if (!$store) {
         <!-- Content -->
         <div id="content">
             <!-- Top Navigation -->
-            <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
+            <nav class="navbar navbar-expand-lg navbar-light bg-white">
                 <div class="container-fluid">
                     <button type="button" id="sidebarCollapse" class="btn btn-info">
                         <i class="fas fa-bars"></i>
@@ -208,7 +334,16 @@ if (!$store) {
                                 <h5 class="mb-0">Lista de Transações</h5>
                             </div>
                             <div class="card-body">
-                                <div class="table-responsive">
+                                <div id="loadingMessage">
+                                    <div class="text-center p-4">
+                                        <div class="spinner-border" role="status">
+                                            <span class="visually-hidden">Carregando...</span>
+                                        </div>
+                                        <p class="mt-2">Carregando transações...</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="table-responsive" id="transactionsContainer" style="display: none;">
                                     <table class="table table-striped" id="transactionsTable">
                                         <thead>
                                             <tr>
@@ -223,13 +358,6 @@ if (!$store) {
                                             </tr>
                                         </thead>
                                         <tbody id="transactionsTableBody">
-                                            <tr>
-                                                <td colspan="8" class="text-center">
-                                                    <div class="spinner-border" role="status">
-                                                        <span class="visually-hidden">Carregando...</span>
-                                                    </div>
-                                                </td>
-                                            </tr>
                                         </tbody>
                                     </table>
                                 </div>
@@ -237,7 +365,6 @@ if (!$store) {
                                 <!-- Paginação -->
                                 <nav aria-label="Paginação das transações">
                                     <ul class="pagination justify-content-center" id="pagination">
-                                        <!-- Será preenchida via JavaScript -->
                                     </ul>
                                 </nav>
                             </div>
@@ -248,6 +375,7 @@ if (!$store) {
         </div>
     </div>
 
+    <!-- Modals -->
     <!-- Modal de Filtros -->
     <div class="modal fade" id="filterModal" tabindex="-1">
         <div class="modal-dialog">
@@ -303,39 +431,26 @@ if (!$store) {
         </div>
     </div>
 
-    <!-- Modal de Detalhes da Transação -->
-    <div class="modal fade" id="transactionDetailModal" tabindex="-1">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Detalhes da Transação</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body" id="transactionDetailContent">
-                    <!-- Será preenchido via JavaScript -->
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="<?php echo ASSETS_URL; ?>/js/main.js"></script>
     <script>
+        console.log('Página carregada, iniciando JavaScript');
+        
         // Variáveis globais
         const storeId = <?php echo $store['id']; ?>;
         let currentPage = 1;
         let currentFilters = {};
 
+        console.log('Store ID:', storeId);
+
         // Carregar transações ao carregar a página
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM carregado, chamando loadTransactions');
             loadTransactions();
         });
 
         // Função para carregar transações
         function loadTransactions(page = 1) {
+            console.log('loadTransactions chamada, page:', page);
             currentPage = page;
             
             const formData = new FormData();
@@ -350,32 +465,67 @@ if (!$store) {
                 }
             });
 
+            console.log('Fazendo requisição para TransactionController.php');
+
             fetch('../../controllers/TransactionController.php', {
                 method: 'POST',
                 body: formData
             })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status) {
-                    displayTransactions(data.data);
-                    updateSummaryCards(data.data.totais);
-                    updatePagination(data.data.paginacao);
-                } else {
-                    alert('Erro ao carregar transações: ' + data.message);
+            .then(response => {
+                console.log('Resposta recebida:', response);
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.text();
+            })
+            .then(text => {
+                console.log('Resposta texto:', text);
+                try {
+                    const data = JSON.parse(text);
+                    console.log('Dados JSON:', data);
+                    
+                    if (data.status) {
+                        displayTransactions(data.data);
+                        updateSummaryCards(data.data.totais);
+                        updatePagination(data.data.paginacao);
+                    } else {
+                        console.error('Erro na resposta:', data.message);
+                        showError('Erro ao carregar transações: ' + data.message);
+                    }
+                } catch (e) {
+                    console.error('Erro ao parse JSON:', e);
+                    console.error('Texto da resposta:', text);
+                    showError('Erro na resposta do servidor');
                 }
             })
             .catch(error => {
-                console.error('Erro:', error);
-                alert('Erro ao carregar transações');
+                console.error('Erro na requisição:', error);
+                showError('Erro ao carregar transações');
             });
+        }
+
+        // Função para exibir erro
+        function showError(message) {
+            document.getElementById('loadingMessage').innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    ${message}
+                    <button class="btn btn-outline-danger btn-sm ms-2" onclick="loadTransactions()">Tentar Novamente</button>
+                </div>
+            `;
         }
 
         // Função para exibir transações na tabela
         function displayTransactions(data) {
+            console.log('displayTransactions chamada:', data);
+            
+            document.getElementById('loadingMessage').style.display = 'none';
+            document.getElementById('transactionsContainer').style.display = 'block';
+            
             const tbody = document.getElementById('transactionsTableBody');
             tbody.innerHTML = '';
 
-            if (data.transacoes.length === 0) {
+            if (!data.transacoes || data.transacoes.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="8" class="text-center">Nenhuma transação encontrada</td></tr>';
                 return;
             }
@@ -429,7 +579,7 @@ if (!$store) {
                     <td>${statusBadge}</td>
                     <td>${paymentStatusBadge}</td>
                     <td>
-                        <button class="btn btn-sm btn-outline-primary" onclick="viewTransactionDetails(${transaction.id})">
+                        <button class="btn btn-sm btn-outline-primary" onclick="alert('Detalhes: ID ${transaction.id}')">
                             <i class="fas fa-eye"></i>
                         </button>
                     </td>
@@ -441,24 +591,28 @@ if (!$store) {
 
         // Função para atualizar cards de resumo
         function updateSummaryCards(totais) {
-            document.getElementById('totalTransactions').textContent = totais.total_transacoes;
-            document.getElementById('totalSales').textContent = 'R$ ' + formatMoney(totais.valor_total_vendas);
-            document.getElementById('pendingTransactions').textContent = totais.total_pendentes;
-            document.getElementById('totalCommissions').textContent = 'R$ ' + formatMoney(totais.total_comissoes);
+            console.log('updateSummaryCards:', totais);
+            if (!totais) return;
+            
+            document.getElementById('totalTransactions').textContent = totais.total_transacoes || 0;
+            document.getElementById('totalSales').textContent = 'R$ ' + formatMoney(totais.valor_total_vendas || 0);
+            document.getElementById('pendingTransactions').textContent = totais.total_pendentes || 0;
+            document.getElementById('totalCommissions').textContent = 'R$ ' + formatMoney(totais.total_comissoes || 0);
         }
 
         // Função para atualizar paginação
         function updatePagination(paginacao) {
+            console.log('updatePagination:', paginacao);
             const pagination = document.getElementById('pagination');
             pagination.innerHTML = '';
 
-            if (paginacao.total_paginas <= 1) return;
+            if (!paginacao || paginacao.total_paginas <= 1) return;
 
             // Botão Anterior
             if (paginacao.pagina_atual > 1) {
                 pagination.innerHTML += `
                     <li class="page-item">
-                        <a class="page-link" href="#" onclick="loadTransactions(${paginacao.pagina_atual - 1})">Anterior</a>
+                        <a class="page-link" href="#" onclick="loadTransactions(${paginacao.pagina_atual - 1}); return false;">Anterior</a>
                     </li>
                 `;
             }
@@ -468,7 +622,7 @@ if (!$store) {
                 const activeClass = i === paginacao.pagina_atual ? 'active' : '';
                 pagination.innerHTML += `
                     <li class="page-item ${activeClass}">
-                        <a class="page-link" href="#" onclick="loadTransactions(${i})">${i}</a>
+                        <a class="page-link" href="#" onclick="loadTransactions(${i}); return false;">${i}</a>
                     </li>
                 `;
             }
@@ -477,7 +631,7 @@ if (!$store) {
             if (paginacao.pagina_atual < paginacao.total_paginas) {
                 pagination.innerHTML += `
                     <li class="page-item">
-                        <a class="page-link" href="#" onclick="loadTransactions(${paginacao.pagina_atual + 1})">Próximo</a>
+                        <a class="page-link" href="#" onclick="loadTransactions(${paginacao.pagina_atual + 1}); return false;">Próximo</a>
                     </li>
                 `;
             }
@@ -500,7 +654,7 @@ if (!$store) {
             
             // Fechar modal
             const modal = bootstrap.Modal.getInstance(document.getElementById('filterModal'));
-            modal.hide();
+            if (modal) modal.hide();
         }
 
         // Função para limpar filtros
@@ -509,78 +663,6 @@ if (!$store) {
             currentFilters = {};
             currentPage = 1;
             loadTransactions(1);
-        }
-
-        // Função para visualizar detalhes da transação
-        function viewTransactionDetails(transactionId) {
-            const formData = new FormData();
-            formData.append('action', 'transaction_details');
-            formData.append('transaction_id', transactionId);
-
-            fetch('../../controllers/AdminController.php', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status) {
-                    displayTransactionDetails(data.data);
-                    const modal = new bootstrap.Modal(document.getElementById('transactionDetailModal'));
-                    modal.show();
-                } else {
-                    alert('Erro ao carregar detalhes: ' + data.message);
-                }
-            })
-            .catch(error => {
-                console.error('Erro:', error);
-                alert('Erro ao carregar detalhes da transação');
-            });
-        }
-
-        // Função para exibir detalhes da transação
-        function displayTransactionDetails(data) {
-            const content = document.getElementById('transactionDetailContent');
-            const transaction = data.transacao;
-            
-            content.innerHTML = `
-                <div class="row">
-                    <div class="col-md-6">
-                        <h6>Informações da Transação</h6>
-                        <table class="table table-sm">
-                            <tr><td><strong>ID:</strong></td><td>#${transaction.id}</td></tr>
-                            <tr><td><strong>Código:</strong></td><td><code>${transaction.codigo_transacao}</code></td></tr>
-                            <tr><td><strong>Data:</strong></td><td>${formatDateTime(transaction.data_transacao)}</td></tr>
-                            <tr><td><strong>Status:</strong></td><td><span class="badge bg-${getStatusColor(transaction.status)}">${transaction.status}</span></td></tr>
-                        </table>
-                    </div>
-                    <div class="col-md-6">
-                        <h6>Valores</h6>
-                        <table class="table table-sm">
-                            <tr><td><strong>Valor Total:</strong></td><td>R$ ${formatMoney(transaction.valor_total)}</td></tr>
-                            <tr><td><strong>Comissão Total:</strong></td><td>R$ ${formatMoney(transaction.valor_cashback)}</td></tr>
-                            <tr><td><strong>Cashback Cliente:</strong></td><td>R$ ${formatMoney(transaction.valor_cliente || 0)}</td></tr>
-                            <tr><td><strong>Receita Klube Cash:</strong></td><td>R$ ${formatMoney(transaction.valor_admin || 0)}</td></tr>
-                        </table>
-                    </div>
-                </div>
-                <div class="row mt-3">
-                    <div class="col-12">
-                        <h6>Cliente</h6>
-                        <table class="table table-sm">
-                            <tr><td><strong>Nome:</strong></td><td>${transaction.cliente_nome}</td></tr>
-                            <tr><td><strong>Email:</strong></td><td>${transaction.cliente_email}</td></tr>
-                        </table>
-                    </div>
-                </div>
-                ${transaction.descricao ? `
-                <div class="row mt-3">
-                    <div class="col-12">
-                        <h6>Descrição</h6>
-                        <p>${transaction.descricao}</p>
-                    </div>
-                </div>
-                ` : ''}
-            `;
         }
 
         // Funções utilitárias
@@ -594,15 +676,6 @@ if (!$store) {
         function formatDateTime(dateString) {
             const date = new Date(dateString);
             return date.toLocaleString('pt-BR');
-        }
-
-        function getStatusColor(status) {
-            switch (status) {
-                case 'pendente': return 'warning';
-                case 'aprovado': return 'success';
-                case 'cancelado': return 'danger';
-                default: return 'secondary';
-            }
         }
 
         // Sidebar toggle
