@@ -52,7 +52,7 @@ $activeMenu = 'transactions';
     <title>Transações - Klube Cash</title>
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="../../assets/css/stores/transactions.css">
+    <link rel="stylesheet" href="../../assets/css/views/stores/transactions.css">
 </head>
 <body>
     <div class="dashboard-container">
