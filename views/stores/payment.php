@@ -367,57 +367,86 @@ $activeMenu = 'payment';
                 </form>
             </div>
             
-            <div class="card">
-                <div class="card-header">
-                    <h2 class="card-title">Entenda seu Pagamento</h2>
+            
+            <div class="card info-card">
+                <div class="card-header dropdown-header" onclick="toggleDropdown('payment-info')">
+                    <h2 class="card-title">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="info-icon">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="16" x2="12" y2="12"></line>
+                            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                        </svg>
+                        Entenda seu Pagamento
+                    </h2>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="dropdown-arrow" id="payment-info-arrow">
+                        <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
                 </div>
-                <div class="info-content">
-                    <div class="info-section">
-                        <h3>📊 Como são calculadas as comissões:</h3>
-                        <ul>
-                            <li><strong>Valor original das vendas:</strong> Total das vendas registradas (R$ <?php echo number_format($totalOriginalValue, 2, ',', '.'); ?>)</li>
-                            <li><strong>Saldo usado pelos clientes:</strong> Cashback usado como desconto (R$ <?php echo number_format($totalBalanceUsed, 2, ',', '.'); ?>)</li>
-                            <li><strong>Valor efetivamente cobrado:</strong> O que realmente foi pago pelos clientes (R$ <?php echo number_format($totalOriginalValue - $totalBalanceUsed, 2, ',', '.'); ?>)</li>
-                            <li><strong>Comissão devida:</strong> 10% sobre o valor efetivamente cobrado (R$ <?php echo number_format($totalValue, 2, ',', '.'); ?>)</li>
-                        </ul>
-                    </div>
-                    
-                    <div class="info-section">
-                        <h3>💰 Sobre o uso de saldo pelos clientes:</h3>
-                        <ul>
-                            <li>Quando um cliente usa seu saldo de cashback, ele recebe desconto na compra</li>
-                            <li>A comissão é calculada apenas sobre o valor que o cliente efetivamente pagou</li>
-                            <li>Isso é justo para você, pois você paga comissão apenas sobre o que realmente recebeu</li>
-                            <li>O cliente ainda ganha cashback normal sobre a nova compra (5% do valor pago)</li>
-                            <li><strong>Importante:</strong> O saldo do cliente só pode ser usado na sua loja</li>
-                        </ul>
-                    </div>
-                    
-                    <div class="info-section">
-                        <h3>🔄 Distribuição da sua comissão de 10%:</h3>
-                        <ul>
-                            <li><strong>5% para o cliente:</strong> Vira cashback para usar na sua loja</li>
-                            <li><strong>5% para o Klube Cash:</strong> Nossa receita pela plataforma</li>
-                            <li><strong>0% para sua loja:</strong> Você não recebe cashback</li>
-                        </ul>
-                    </div>
-                    
-                    <div class="info-section">
-                        <h3>🔄 Processo após o pagamento:</h3>
-                        <ol>
-                            <li>Sua confirmação de pagamento será analisada em até 24 horas</li>
-                            <li>Após aprovação, o cashback será liberado automaticamente para os clientes</li>
-                            <li>Os clientes poderão usar o cashback apenas na sua loja</li>
-                            <li>Em caso de rejeição, você receberá notificação e poderá enviar novo comprovante</li>
-                            <li>Mantenha o comprovante original até a confirmação da aprovação</li>
-                        </ol>
+                
+                <div class="dropdown-content" id="payment-info-content" style="display: none;">
+                    <div class="info-content">
+                        <div class="info-section">
+                            <h3>📊 Como são calculadas as comissões:</h3>
+                            <ul>
+                                <li><strong>Valor original das vendas:</strong> Total das vendas registradas (R$ <?php echo number_format($totalOriginalValue, 2, ',', '.'); ?>)</li>
+                                <li><strong>Saldo usado pelos clientes:</strong> Cashback usado como desconto (R$ <?php echo number_format($totalBalanceUsed, 2, ',', '.'); ?>)</li>
+                                <li><strong>Valor efetivamente cobrado:</strong> O que realmente foi pago pelos clientes (R$ <?php echo number_format($totalOriginalValue - $totalBalanceUsed, 2, ',', '.'); ?>)</li>
+                                <li><strong>Comissão devida:</strong> 10% sobre o valor efetivamente cobrado (R$ <?php echo number_format($totalValue, 2, ',', '.'); ?>)</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="info-section">
+                            <h3>💰 Sobre o uso de saldo pelos clientes:</h3>
+                            <ul>
+                                <li>Quando um cliente usa seu saldo de cashback, ele recebe desconto na compra</li>
+                                <li>A comissão é calculada apenas sobre o valor que o cliente efetivamente pagou</li>
+                                <li>Isso é justo para você, pois você paga comissão apenas sobre o que realmente recebeu</li>
+                                <li>O cliente ainda ganha cashback normal sobre a nova compra (5% do valor pago)</li>
+                                <li><strong>Importante:</strong> O saldo do cliente só pode ser usado na sua loja</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="info-section">
+                            <h3>🔄 Distribuição da sua comissão de 10%:</h3>
+                            <ul>
+                                <li><strong>5% para o cliente:</strong> Vira cashback para usar na sua loja</li>
+                                <li><strong>5% para o Klube Cash:</strong> Nossa receita pela plataforma</li>
+                                <li><strong>0% para sua loja:</strong> Você não recebe cashback</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="info-section">
+                            <h3>🔄 Processo após o pagamento:</h3>
+                            <ol>
+                                <li>Sua confirmação de pagamento será analisada em até 24 horas</li>
+                                <li>Após aprovação, o cashback será liberado automaticamente para os clientes</li>
+                                <li>Os clientes poderão usar o cashback apenas na sua loja</li>
+                                <li>Em caso de rejeição, você receberá notificação e poderá enviar novo comprovante</li>
+                                <li>Mantenha o comprovante original até a confirmação da aprovação</li>
+                            </ol>
+                        </div>
                     </div>
                 </div>
             </div>
+
+
         <?php endif; ?>
     </div>
     
     <script>
+        // Função para controlar dropdown
+        function toggleDropdown(dropdownId) {
+            const content = document.getElementById(dropdownId + '-content');
+            const arrow = document.getElementById(dropdownId + '-arrow');
+            
+            if (content.style.display === 'none' || content.style.display === '') {
+                content.style.display = 'block';
+                arrow.style.transform = 'rotate(180deg)';
+            } else {
+                content.style.display = 'none';
+                arrow.style.transform = 'rotate(0deg)';
+            }
+        }
         document.addEventListener('DOMContentLoaded', function() {
             // Validação do formulário
             const form = document.querySelector('form[method="POST"]');
