@@ -791,7 +791,7 @@ function tryFetchWithUrl(urls, index, storeId) {
         modalContent.innerHTML = '<div class="loading-spinner">Carregando detalhes da loja...</div>';
         
         // URL correta - caminho absoluto da raiz
-        const url = `../api/store_details.php?loja_id=${storeId}`;
+        const url = `../../simple_store_details.php?loja_id=${storeId}`;
         console.log('URL da requisição:', url);
         
         fetch(url)
