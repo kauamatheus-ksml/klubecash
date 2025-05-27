@@ -692,17 +692,22 @@ function formatMonth($yearMonth) {
             
             // Fazer requisição AJAX
             fetch(`<?php echo CLIENT_ACTIONS_URL; ?>?action=store_balance_details&loja_id=${storeId}`)
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Erro na requisição: ' + response.status);
+                    }
+                    return response.json();
+                })
                 .then(data => {
                     if (data.status) {
                         renderStoreDetails(data.data);
                     } else {
-                        modalContent.innerHTML = `<div class="error-message">${data.message}</div>`;
+                        modalContent.innerHTML = `<div class="error-message">${data.message || 'Erro desconhecido'}</div>`;
                     }
                 })
                 .catch(error => {
                     console.error('Erro ao carregar detalhes:', error);
-                    modalContent.innerHTML = '<div class="error-message">Erro ao carregar detalhes da loja.</div>';
+                    modalContent.innerHTML = '<div class="error-message">Erro ao carregar detalhes da loja. Tente novamente.</div>';
                 });
         }
 

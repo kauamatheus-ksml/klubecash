@@ -14,8 +14,8 @@ require_once __DIR__ . '/AuthController.php';
 class ClientController {
     
     /**
-     * Obtém detalhes específicos de saldo de uma loja para o cliente (CORRIGIDO)
-     */
+    * Obtém detalhes específicos de saldo de uma loja para o cliente (CORRIGIDO)
+    */
     public static function getStoreBalanceDetails($userId, $lojaId) {
         try {
             if (!self::validateClient($userId)) {
@@ -24,7 +24,7 @@ class ClientController {
             
             $db = Database::getConnection();
             
-            // Verificar se a loja existe (INCLUINDO LOGO)
+            // Verificar se a loja existe
             $storeStmt = $db->prepare("
                 SELECT id, nome_fantasia, categoria, porcentagem_cashback, website, descricao, logo
                 FROM lojas 
@@ -40,7 +40,89 @@ class ClientController {
                 return ['status' => false, 'message' => 'Loja não encontrada.'];
             }
             
-            // Resto do método permanece igual...
+            // Obter saldo do cliente nesta loja
+            $saldoStmt = $db->prepare("
+                SELECT 
+                    saldo_disponivel,
+                    total_creditado,
+                    total_usado,
+                    data_criacao,
+                    ultima_atualizacao
+                FROM cashback_saldos 
+                WHERE usuario_id = :user_id AND loja_id = :loja_id
+            ");
+            $saldoStmt->bindParam(':user_id', $userId);
+            $saldoStmt->bindParam(':loja_id', $lojaId);
+            $saldoStmt->execute();
+            $saldo = $saldoStmt->fetch(PDO::FETCH_ASSOC);
+            
+            // Se não existe saldo, criar array padrão
+            if (!$saldo) {
+                $saldo = [
+                    'saldo_disponivel' => 0,
+                    'total_creditado' => 0,
+                    'total_usado' => 0,
+                    'data_criacao' => null,
+                    'ultima_atualizacao' => null
+                ];
+            }
+            
+            // Obter movimentações recentes (últimas 10)
+            $movimentacoesStmt = $db->prepare("
+                SELECT 
+                    id,
+                    tipo_operacao,
+                    valor,
+                    saldo_anterior,
+                    saldo_atual,
+                    descricao,
+                    data_operacao,
+                    transacao_origem_id,
+                    transacao_uso_id
+                FROM cashback_movimentacoes 
+                WHERE usuario_id = :user_id AND loja_id = :loja_id
+                ORDER BY data_operacao DESC
+                LIMIT 10
+            ");
+            $movimentacoesStmt->bindParam(':user_id', $userId);
+            $movimentacoesStmt->bindParam(':loja_id', $lojaId);
+            $movimentacoesStmt->execute();
+            $movimentacoes = $movimentacoesStmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            // Obter estatísticas gerais
+            $estatisticasStmt = $db->prepare("
+                SELECT 
+                    COUNT(*) as total_movimentacoes,
+                    COUNT(CASE WHEN tipo_operacao = 'credito' THEN 1 END) as total_creditos,
+                    COUNT(CASE WHEN tipo_operacao = 'uso' THEN 1 END) as total_usos,
+                    COUNT(CASE WHEN tipo_operacao = 'estorno' THEN 1 END) as total_estornos,
+                    MIN(data_operacao) as primeira_movimentacao,
+                    MAX(data_operacao) as ultima_movimentacao
+                FROM cashback_movimentacoes 
+                WHERE usuario_id = :user_id AND loja_id = :loja_id
+            ");
+            $estatisticasStmt->bindParam(':user_id', $userId);
+            $estatisticasStmt->bindParam(':loja_id', $lojaId);
+            $estatisticasStmt->execute();
+            $estatisticas = $estatisticasStmt->fetch(PDO::FETCH_ASSOC);
+            
+            // Obter dados mensais para gráfico (últimos 6 meses)
+            $dadosMensaisStmt = $db->prepare("
+                SELECT 
+                    DATE_FORMAT(data_operacao, '%Y-%m') as mes,
+                    SUM(CASE WHEN tipo_operacao = 'credito' THEN valor ELSE 0 END) as creditos,
+                    SUM(CASE WHEN tipo_operacao = 'uso' THEN valor ELSE 0 END) as usos,
+                    SUM(CASE WHEN tipo_operacao = 'estorno' THEN valor ELSE 0 END) as estornos
+                FROM cashback_movimentacoes
+                WHERE usuario_id = :user_id AND loja_id = :loja_id
+                AND data_operacao >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
+                GROUP BY DATE_FORMAT(data_operacao, '%Y-%m')
+                ORDER BY mes ASC
+            ");
+            $dadosMensaisStmt->bindParam(':user_id', $userId);
+            $dadosMensaisStmt->bindParam(':loja_id', $lojaId);
+            $dadosMensaisStmt->execute();
+            $dadosMensais = $dadosMensaisStmt->fetchAll(PDO::FETCH_ASSOC);
             
             return [
                 'status' => true,

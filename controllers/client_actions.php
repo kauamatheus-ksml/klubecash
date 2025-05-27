@@ -4,6 +4,11 @@ require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../config/constants.php';
 require_once __DIR__ . '/ClientController.php';
 require_once __DIR__ . '/AuthController.php';
+// No início do arquivo client_actions.php, após os includes
+error_log('CLIENT_ACTIONS: Recebida requisição - Método: ' . $_SERVER['REQUEST_METHOD']);
+error_log('CLIENT_ACTIONS: GET params: ' . print_r($_GET, true));
+error_log('CLIENT_ACTIONS: POST params: ' . print_r($_POST, true));
+
 
 // Iniciar sessão se não estiver iniciada
 if (session_status() === PHP_SESSION_NONE) {
