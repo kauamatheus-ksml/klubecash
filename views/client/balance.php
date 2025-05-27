@@ -679,70 +679,34 @@ function formatMonth($yearMonth) {
             <?php endif; ?>
         });
 
-        // Função para visualizar detalhes da loja
+        // Função alternativa usando URL absoluta
         function viewStoreDetails(storeId) {
-            console.log('viewStoreDetails chamada com storeId:', storeId);
-            
             const modal = document.getElementById('storeDetailsModal');
             const modalTitle = document.getElementById('modalStoreTitle');
             const modalContent = document.getElementById('modalStoreContent');
             
-            if (!modal || !modalTitle || !modalContent) {
-                console.error('Elementos do modal não encontrados');
-                alert('Erro: Elementos do modal não encontrados');
-                return;
-            }
-            
-            // Mostrar modal e loading
             modal.style.display = 'block';
             modalTitle.textContent = 'Carregando...';
             modalContent.innerHTML = '<div class="loading-spinner">Carregando detalhes da loja...</div>';
             
-            // Construir URL
-            const baseUrl = '<?php echo SITE_URL; ?>/cliente/actions';
-            const url = `${baseUrl}?action=store_balance_details&loja_id=${storeId}`;
-            console.log('URL da requisição:', url);
+            // URL absoluta direta
+            const url = `/controllers/client_actions.php?action=store_balance_details&loja_id=${storeId}`;
+            console.log('Tentando URL direta:', url);
             
-            // Fazer requisição AJAX
-            fetch(url, {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
-                credentials: 'same-origin'
-            })
-            .then(response => {
-                console.log('Response status:', response.status);
-                console.log('Response headers:', response.headers);
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-                
-                return response.text(); // Primeiro pegar como texto para debug
-            })
-            .then(text => {
-                console.log('Response text:', text);
-                
-                try {
-                    const data = JSON.parse(text);
-                    console.log('Dados parseados:', data);
-                    
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Resposta recebida:', data);
                     if (data.status) {
                         renderStoreDetails(data.data);
                     } else {
-                        modalContent.innerHTML = `<div class="error-message">${data.message || 'Erro desconhecido'}</div>`;
+                        modalContent.innerHTML = `<div class="error-message">${data.message}</div>`;
                     }
-                } catch (parseError) {
-                    console.error('Erro ao parsear JSON:', parseError);
-                    modalContent.innerHTML = `<div class="error-message">Erro na resposta do servidor: ${text.substring(0, 200)}...</div>`;
-                }
-            })
-            .catch(error => {
-                console.error('Erro na requisição:', error);
-                modalContent.innerHTML = `<div class="error-message">Erro ao carregar detalhes: ${error.message}</div>`;
-            });
+                })
+                .catch(error => {
+                    console.error('Erro:', error);
+                    modalContent.innerHTML = '<div class="error-message">Erro ao carregar detalhes da loja.</div>';
+                });
         }
 
         // Função para renderizar os detalhes da loja no modal
