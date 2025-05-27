@@ -312,7 +312,7 @@ class ClientController {
      * @param int $page Página atual
      * @return array Extrato de transações
      */
-    public static function getStatement($userId, $filters = [], $page = 1) {
+    public static function getStatement($userId, $filters = [], $page = 1, $limit = null) {
         try {
             // Verificar se é um cliente válido
             if (!self::validateClient($userId)) {
@@ -370,7 +370,7 @@ class ClientController {
             $totalCount = $countStmt->fetch(PDO::FETCH_ASSOC)['total'];
             
             // Adicionar paginação
-            $perPage = ITEMS_PER_PAGE;
+            $perPage = isset($limit) ? $limit : ITEMS_PER_PAGE;
             $offset = ($page - 1) * $perPage;
             $query .= " LIMIT $offset, $perPage";
             
@@ -1940,37 +1940,362 @@ class ClientController {
             return false;
         }
     }
-    
     /**
-     * Cria a tabela de favoritos se não existir
-     * 
-     * @param PDO $db Conexão com o banco de dados
-     * @return void
-     */
-    private static function createFavoritesTableIfNotExists($db) {
-        try {
-            // Verificar se a tabela existe
-            $stmt = $db->prepare("SHOW TABLES LIKE 'lojas_favoritas'");
-            $stmt->execute();
-            
-            if ($stmt->rowCount() == 0) {
-                // Criar a tabela
-                $createTable = "CREATE TABLE lojas_favoritas (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    usuario_id INT NOT NULL,
-                    loja_id INT NOT NULL,
-                    data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    UNIQUE KEY unique_favorite (usuario_id, loja_id),
-                    FOREIGN KEY (usuario_id) REFERENCES usuarios(id),
-                    FOREIGN KEY (loja_id) REFERENCES lojas(id)
-                )";
-                
-                $db->exec($createTable);
-            }
-        } catch (PDOException $e) {
-            error_log('Erro ao criar tabela de favoritos: ' . $e->getMessage());
-        }
+    * Gera HTML editável do extrato de cashback
+    */
+    private static function generateStatementHTML($userData, $statementData, $filters) {
+    // Definir período do relatório
+    $periodo = '';
+    if (!empty($filters['data_inicio']) && !empty($filters['data_fim'])) {
+        $periodo = "Período: " . date('d/m/Y', strtotime($filters['data_inicio'])) . 
+                    " a " . date('d/m/Y', strtotime($filters['data_fim']));
+    } elseif (!empty($filters['data_inicio'])) {
+        $periodo = "A partir de: " . date('d/m/Y', strtotime($filters['data_inicio']));
+    } elseif (!empty($filters['data_fim'])) {
+        $periodo = "Até: " . date('d/m/Y', strtotime($filters['data_fim']));
+    } else {
+        $periodo = "Todas as transações";
     }
+
+    // Calcular totais
+    $totalCompras = $statementData['estatisticas']['total_compras'] ?? 0;
+    $totalCashback = $statementData['estatisticas']['total_cashback'] ?? 0;
+    $totalTransacoes = $statementData['estatisticas']['total_transacoes'] ?? 0;
+
+    // Definir cabeçalhos HTTP para download
+    header('Content-Type: text/html; charset=utf-8');
+    header('Content-Disposition: attachment; filename="extrato_cashback_' . date('Y-m-d') . '.html"');
+
+    // Gerar HTML
+    echo '<!DOCTYPE html>
+    <html lang="pt-BR">
+    <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Extrato de Cashback - Klube Cash</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #fff;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #FF7A00;
+            padding-bottom: 20px;
+        }
+        
+        .logo {
+            font-size: 28px;
+            font-weight: bold;
+            color: #FF7A00;
+            margin-bottom: 10px;
+        }
+        
+        .client-info {
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .period-info {
+            text-align: center;
+            font-size: 16px;
+            margin-bottom: 20px;
+            color: #666;
+        }
+        
+        .summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .summary-card {
+            background-color: #FFF0E6;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid #FF7A00;
+        }
+        
+        .summary-title {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        
+        .summary-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #FF7A00;
+        }
+        
+        .transactions-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+        }
+        
+        .transactions-table th,
+        .transactions-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .transactions-table th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .transactions-table tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .status-aprovado {
+            background-color: #E6F7E6;
+            color: #4CAF50;
+        }
+        
+        .status-pendente {
+            background-color: #FFF8E6;
+            color: #FFC107;
+        }
+        
+        .status-cancelado {
+            background-color: #FFEAE6;
+            color: #F44336;
+        }
+        
+        .footer {
+            margin-top: 30px;
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+            border-top: 1px solid #ddd;
+            padding-top: 20px;
+        }
+        
+        .no-print {
+            margin-bottom: 20px;
+        }
+        
+        .edit-notice {
+            background-color: #e3f2fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #2196f3;
+        }
+        
+        @media print {
+            .no-print,
+            .edit-notice {
+                display: none;
+            }
+            
+            body {
+                padding: 0;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .summary {
+                grid-template-columns: 1fr;
+            }
+            
+            .transactions-table {
+                font-size: 12px;
+            }
+            
+            .transactions-table th,
+            .transactions-table td {
+                padding: 8px 4px;
+            }
+        }
+    </style>
+    </head>
+    <body>
+    <div class="edit-notice no-print">
+        <strong>📝 Aviso:</strong> Este é um arquivo HTML editável. Você pode modificar o conteúdo, estilo e layout conforme necessário. Para imprimir, use Ctrl+P ou Cmd+P.
+    </div>
+
+    <div class="header">
+        <div class="logo">KLUBE CASH</div>
+        <h1>Extrato de Cashback</h1>
+        <div class="period-info">' . $periodo . '</div>
+        <div class="period-info">Gerado em: ' . date('d/m/Y H:i:s') . '</div>
+    </div>
+
+    <div class="client-info">
+        <h3>Dados do Cliente</h3>
+        <p><strong>Nome:</strong> ' . htmlspecialchars($userData['nome']) . '</p>
+        <p><strong>Email:</strong> ' . htmlspecialchars($userData['email']) . '</p>
+    </div>
+
+    <div class="summary">
+        <div class="summary-card">
+            <div class="summary-title">Total de Compras</div>
+            <div class="summary-value">R$ ' . number_format($totalCompras, 2, ',', '.') . '</div>
+        </div>
+        
+        <div class="summary-card">
+            <div class="summary-title">Total de Cashback</div>
+            <div class="summary-value">R$ ' . number_format($totalCashback, 2, ',', '.') . '</div>
+        </div>
+        
+        <div class="summary-card">
+            <div class="summary-title">Total de Transações</div>
+            <div class="summary-value">' . $totalTransacoes . '</div>
+        </div>
+    </div>
+
+    <h2>Detalhamento das Transações</h2>
+
+    <table class="transactions-table">
+        <thead>
+            <tr>
+                <th>Data</th>
+                <th>Loja</th>
+                <th>Valor Total</th>
+                <th>Cashback</th>
+                <th>Status</th>
+                <th>Código</th>
+            </tr>
+        </thead>
+        <tbody>';
+
+    // Adicionar linhas das transações
+    if (!empty($statementData['transacoes'])) {
+        foreach ($statementData['transacoes'] as $transacao) {
+            $statusClass = '';
+            switch ($transacao['status']) {
+                case 'aprovado':
+                    $statusClass = 'status-aprovado';
+                    break;
+                case 'pendente':
+                    $statusClass = 'status-pendente';
+                    break;
+                case 'cancelado':
+                    $statusClass = 'status-cancelado';
+                    break;
+            }
+            
+            echo '<tr>
+                <td>' . date('d/m/Y', strtotime($transacao['data_transacao'])) . '</td>
+                <td>' . htmlspecialchars($transacao['loja_nome']) . '</td>
+                <td>R$ ' . number_format($transacao['valor_total'], 2, ',', '.') . '</td>
+                <td>R$ ' . number_format($transacao['valor_cliente'], 2, ',', '.') . '</td>
+                <td><span class="status-badge ' . $statusClass . '">' . ucfirst($transacao['status']) . '</span></td>
+                <td>' . htmlspecialchars($transacao['codigo_transacao']) . '</td>
+            </tr>';
+        }
+    } else {
+        echo '<tr>
+            <td colspan="6" style="text-align: center; padding: 30px; color: #666;">
+                Nenhuma transação encontrada para o período selecionado.
+            </td>
+        </tr>';
+    }
+
+    echo '</tbody>
+    </table>
+
+    <div class="footer">
+        <p>Este documento foi gerado automaticamente pelo sistema Klube Cash</p>
+        <p>© ' . date('Y') . ' Klube Cash - Sistema de Cashback</p>
+        <p style="margin-top: 10px; font-size: 10px;">
+            Para dúvidas ou suporte, entre em contato conosco através do email: contato@klubecash.com
+        </p>
+    </div>
+
+    <script>
+        // Script para permitir edição inline
+        document.addEventListener("DOMContentLoaded", function() {
+            // Tornar elementos editáveis ao clicar duas vezes
+            const editableElements = document.querySelectorAll("h1, h2, h3, p, td, th");
+            
+            editableElements.forEach(element => {
+                element.addEventListener("dblclick", function() {
+                    if (this.contentEditable === "true") {
+                        this.contentEditable = "false";
+                        this.style.backgroundColor = "";
+                        this.style.border = "";
+                    } else {
+                        this.contentEditable = "true";
+                        this.style.backgroundColor = "#fff3cd";
+                        this.style.border = "1px dashed #856404";
+                        this.focus();
+                    }
+                });
+            });
+            
+            // Adicionar indicação visual de elementos editáveis
+            const style = document.createElement("style");
+            style.textContent = `
+                .no-print::after {
+                    content: " (Clique duas vezes em qualquer texto para editá-lo)";
+                    font-style: italic;
+                    color: #666;
+                }
+            `;
+            document.head.appendChild(style);
+        });
+    </script>
+    </body>
+    </html>';
+    }
+        /**
+         * Cria a tabela de favoritos se não existir
+         * 
+         * @param PDO $db Conexão com o banco de dados
+         * @return void
+         */
+        private static function createFavoritesTableIfNotExists($db) {
+            try {
+                // Verificar se a tabela existe
+                $stmt = $db->prepare("SHOW TABLES LIKE 'lojas_favoritas'");
+                $stmt->execute();
+                
+                if ($stmt->rowCount() == 0) {
+                    // Criar a tabela
+                    $createTable = "CREATE TABLE lojas_favoritas (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        usuario_id INT NOT NULL,
+                        loja_id INT NOT NULL,
+                        data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE KEY unique_favorite (usuario_id, loja_id),
+                        FOREIGN KEY (usuario_id) REFERENCES usuarios(id),
+                        FOREIGN KEY (loja_id) REFERENCES lojas(id)
+                    )";
+                    
+                    $db->exec($createTable);
+                }
+            } catch (PDOException $e) {
+                error_log('Erro ao criar tabela de favoritos: ' . $e->getMessage());
+            }
+        }
     
     /**
      * Cria a tabela de notificações se não existir
@@ -2368,7 +2693,42 @@ if (basename($_SERVER['PHP_SELF']) === 'ClientController.php') {
             $result = ClientController::generateCashbackReport($userId, $filters);
             echo json_encode($result);
             break;
+        case 'export_statement':
+            // Verificar permissão
+            if (!AuthController::isClient()) {
+                header('Location: ' . LOGIN_URL . '?error=acesso_negado');
+                exit;
+            }
             
+            // Obter filtros da URL
+            $filters = [];
+            if (!empty($_GET['data_inicio'])) $filters['data_inicio'] = $_GET['data_inicio'];
+            if (!empty($_GET['data_fim'])) $filters['data_fim'] = $_GET['data_fim'];
+            if (!empty($_GET['loja_id']) && $_GET['loja_id'] !== 'todas') $filters['loja_id'] = $_GET['loja_id'];
+            if (!empty($_GET['status']) && $_GET['status'] !== 'todos') $filters['status'] = $_GET['status'];
+            if (!empty($_GET['tipo_transacao']) && $_GET['tipo_transacao'] !== 'todos') $filters['tipo_transacao'] = $_GET['tipo_transacao'];
+            
+            // Obter dados do extrato
+            $result = ClientController::getStatement($userId, $filters, 1, 999999); // Página 1 com limite alto para pegar tudo
+            
+            if (!$result['status']) {
+                echo "<h1>Erro ao gerar extrato</h1><p>" . $result['message'] . "</p>";
+                exit;
+            }
+            
+            $statementData = $result['data'];
+            
+            // Obter dados do usuário
+            $db = Database::getConnection();
+            $userStmt = $db->prepare("SELECT nome, email FROM usuarios WHERE id = ?");
+            $userStmt->execute([$userId]);
+            $userData = $userStmt->fetch(PDO::FETCH_ASSOC);
+            
+            // Gerar HTML do extrato
+            self::generateStatementHTML($userData, $statementData, $filters);
+            exit;   
+            break;
+
         case 'balance':
             $result = ClientController::getClientBalance($userId);
             echo json_encode($result);

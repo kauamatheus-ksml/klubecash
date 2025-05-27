@@ -264,7 +264,7 @@ try {
                                         <?php endif; ?>
                                     </td>
                                     <td>R$ <?php echo number_format($transacao['valor_pago'], 2, ',', '.'); ?></td>
-                                    <td>R$ <?php echo number_format($transacao['valor_cashback'], 2, ',', '.'); ?></td>
+                                    <td>R$ <?php echo number_format($transacao['valor_cliente'], 2, ',', '.'); ?></td>
                                     <td>
                                         <?php 
                                         $statusClass = '';
@@ -437,20 +437,42 @@ try {
     </div>
     
     <script>
-        // Função para exportar extrato em PDF
+        // CORREÇÃO: Função para exportar extrato em HTML editável
         function exportarExtrato() {
-            alert('Funcionalidade de exportação será implementada.');
-            // Implementação real usaria uma biblioteca como jsPDF ou uma chamada ao servidor
+            // Coletar filtros ativos
+            const filtros = {
+                data_inicio: document.getElementById('data_inicio').value,
+                data_fim: document.getElementById('data_fim').value,
+                loja_id: document.getElementById('loja_id').value,
+                status: document.getElementById('status').value,
+                tipo_transacao: document.getElementById('tipo_transacao').value
+            };
+            
+            // Construir parâmetros da URL
+            const params = new URLSearchParams();
+            Object.keys(filtros).forEach(key => {
+                if (filtros[key] && filtros[key] !== 'todas' && filtros[key] !== 'todos') {
+                    params.append(key, filtros[key]);
+                }
+            });
+            
+            // Adicionar action para exportar
+            params.append('action', 'export_statement');
+            
+            // Redirecionar para a exportação
+            window.open(`<?php echo SITE_URL; ?>/controllers/ClientController.php?${params.toString()}`, '_blank');
         }
         
-        // Função para exibir detalhes da transação
-        // Função para exibir detalhes da transação - CORRIGIDA
+        // CORREÇÃO: Função para exibir detalhes da transação
         function verDetalhes(transacaoId) {
-            fetch(`<?php echo SITE_URL; ?>/controllers/ClientController.php?action=transaction&transaction_id=${transacaoId}`, {
+            // Criar FormData para enviar via POST
+            const formData = new FormData();
+            formData.append('action', 'transaction');
+            formData.append('transaction_id', transacaoId);
+            
+            fetch('<?php echo SITE_URL; ?>/controllers/ClientController.php', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                }
+                body: formData
             })
             .then(response => response.json())
             .then(data => {
