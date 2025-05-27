@@ -1,121 +1,141 @@
 <?php
 // views/client/statement.php
+// Verificar se a sessão já foi iniciada
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 // Definir o menu ativo para a navbar
 $activeMenu = 'extrato';
 
-// Incluir arquivos necessários
-require_once '../../config/database.php';
-require_once '../../config/constants.php';
-require_once '../../controllers/AuthController.php';
-require_once '../../controllers/ClientController.php';
+// Incluir arquivos necessários com verificação de existência
+$requiredFiles = [
+    '../../config/database.php',
+    '../../config/constants.php',
+    '../../controllers/AuthController.php',
+    '../../controllers/ClientController.php'
+];
 
-// Iniciar sessão
-session_start();
+foreach ($requiredFiles as $file) {
+    if (!file_exists($file)) {
+        die("Erro: Arquivo $file não encontrado.");
+    }
+    require_once $file;
+}
 
-// Verificar se o usuário está logado e é cliente
-if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION['user_type'] !== USER_TYPE_CLIENT) {
+// Verificar autenticação
+if (!AuthController::isAuthenticated() || !AuthController::isClient()) {
     header("Location: " . LOGIN_URL . "?error=acesso_restrito");
     exit;
 }
 
 // Obter dados do usuário
-$userId = $_SESSION['user_id'];
+$userId = AuthController::getCurrentUserId();
 
-// Definir valores padrão para filtros e paginação
+// Valores padrão
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $filters = [];
-
-// Processar filtros se submetidos
-if (isset($_GET['filtrar'])) {
-    if (!empty($_GET['data_inicio'])) {
-        $filters['data_inicio'] = $_GET['data_inicio'];
-    }
-    
-    if (!empty($_GET['data_fim'])) {
-        $filters['data_fim'] = $_GET['data_fim'];
-    }
-    
-    if (!empty($_GET['loja_id']) && $_GET['loja_id'] != 'todas') {
-        $filters['loja_id'] = $_GET['loja_id'];
-    }
-    
-    if (!empty($_GET['status']) && $_GET['status'] != 'todos') {
-        $filters['status'] = $_GET['status'];
-    }
-    
-    if (!empty($_GET['tipo_transacao']) && $_GET['tipo_transacao'] != 'todos') {
-        $filters['tipo_transacao'] = $_GET['tipo_transacao'];
-    }
-}
-
-// Obter dados do extrato
-$result = ClientController::getStatement($userId, $filters, $page);
-
-// Verificar se houve erro
-$hasError = !$result['status'];
-$errorMessage = $hasError ? $result['message'] : '';
-
-// Dados para exibição
-$statementData = $hasError ? [] : $result['data'];
+$hasError = false;
+$errorMessage = '';
+$statementData = [];
+$saldoEstatisticas = [
+    'total_creditado' => 0,
+    'total_usado' => 0,
+    'total_estornado' => 0,
+    'qtd_usos' => 0
+];
 
 try {
-    $db = Database::getConnection();
-    
-    // Obter estatísticas de saldo para o período filtrado
-    $saldoStatQuery = "
-        SELECT 
-            SUM(CASE WHEN cm.tipo_operacao = 'credito' THEN cm.valor ELSE 0 END) as total_creditado,
-            SUM(CASE WHEN cm.tipo_operacao = 'uso' THEN cm.valor ELSE 0 END) as total_usado,
-            SUM(CASE WHEN cm.tipo_operacao = 'estorno' THEN cm.valor ELSE 0 END) as total_estornado,
-            COUNT(CASE WHEN cm.tipo_operacao = 'uso' THEN 1 END) as qtd_usos
-        FROM cashback_movimentacoes cm
-        WHERE cm.usuario_id = :user_id
-    ";
-
-    // Aplicar filtros de data se existirem
-    $saldoParams = [':user_id' => $userId];
-    if (!empty($filters['data_inicio'])) {
-        $saldoStatQuery .= " AND cm.data_operacao >= :data_inicio";
-        $saldoParams[':data_inicio'] = $filters['data_inicio'] . ' 00:00:00';
-    }
-    if (!empty($filters['data_fim'])) {
-        $saldoStatQuery .= " AND cm.data_operacao <= :data_fim";
-        $saldoParams[':data_fim'] = $filters['data_fim'] . ' 23:59:59';
-    }
-
-    $saldoStatStmt = $db->prepare($saldoStatQuery);
-    foreach ($saldoParams as $param => $value) {
-        $saldoStatStmt->bindValue($param, $value);
-    }
-    $saldoStatStmt->execute();
-    $saldoEstatisticas = $saldoStatStmt->fetch(PDO::FETCH_ASSOC);
-
-    // Obter transações com informações de saldo usado
-    if (!$hasError && !empty($statementData['transacoes'])) {
-        foreach ($statementData['transacoes'] as &$transacao) {
-            // Buscar saldo usado nesta transação
-            $saldoUsadoQuery = "
-                SELECT SUM(valor) as saldo_usado 
-                FROM cashback_movimentacoes 
-                WHERE transacao_uso_id = :transacao_id AND tipo_operacao = 'uso'
-            ";
-            $saldoUsadoStmt = $db->prepare($saldoUsadoQuery);
-            $saldoUsadoStmt->bindParam(':transacao_id', $transacao['id']);
-            $saldoUsadoStmt->execute();
-            $saldoUsado = $saldoUsadoStmt->fetch(PDO::FETCH_ASSOC);
-            
-            $transacao['saldo_usado'] = $saldoUsado['saldo_usado'] ?? 0;
-            $transacao['valor_pago'] = $transacao['valor_total'] - $transacao['saldo_usado'];
+    // Processar filtros se submetidos
+    if (isset($_GET['filtrar'])) {
+        if (!empty($_GET['data_inicio'])) {
+            $filters['data_inicio'] = $_GET['data_inicio'];
+        }
+        
+        if (!empty($_GET['data_fim'])) {
+            $filters['data_fim'] = $_GET['data_fim'];
+        }
+        
+        if (!empty($_GET['loja_id']) && $_GET['loja_id'] != 'todas') {
+            $filters['loja_id'] = $_GET['loja_id'];
+        }
+        
+        if (!empty($_GET['status']) && $_GET['status'] != 'todos') {
+            $filters['status'] = $_GET['status'];
+        }
+        
+        if (!empty($_GET['tipo_transacao']) && $_GET['tipo_transacao'] != 'todos') {
+            $filters['tipo_transacao'] = $_GET['tipo_transacao'];
         }
     }
+
+    // Obter dados do extrato
+    $result = ClientController::getStatement($userId, $filters, $page);
+    
+    if ($result['status']) {
+        $statementData = $result['data'];
+    } else {
+        $hasError = true;
+        $errorMessage = $result['message'];
+    }
+
+    // Obter estatísticas de saldo se não houver erro
+    if (!$hasError) {
+        $db = Database::getConnection();
+        
+        // Query simples para estatísticas de saldo
+        $saldoQuery = "
+            SELECT 
+                COALESCE(SUM(CASE WHEN cm.tipo_operacao = 'credito' THEN cm.valor ELSE 0 END), 0) as total_creditado,
+                COALESCE(SUM(CASE WHEN cm.tipo_operacao = 'uso' THEN cm.valor ELSE 0 END), 0) as total_usado,
+                COALESCE(SUM(CASE WHEN cm.tipo_operacao = 'estorno' THEN cm.valor ELSE 0 END), 0) as total_estornado,
+                COALESCE(COUNT(CASE WHEN cm.tipo_operacao = 'uso' THEN 1 END), 0) as qtd_usos
+            FROM cashback_movimentacoes cm
+            WHERE cm.usuario_id = ?
+        ";
+        
+        $saldoParams = [$userId];
+        
+        // Aplicar filtros de data se existirem
+        if (!empty($filters['data_inicio'])) {
+            $saldoQuery .= " AND cm.data_operacao >= ?";
+            $saldoParams[] = $filters['data_inicio'] . ' 00:00:00';
+        }
+        if (!empty($filters['data_fim'])) {
+            $saldoQuery .= " AND cm.data_operacao <= ?";
+            $saldoParams[] = $filters['data_fim'] . ' 23:59:59';
+        }
+
+        $saldoStmt = $db->prepare($saldoQuery);
+        $saldoStmt->execute($saldoParams);
+        $saldoResult = $saldoStmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($saldoResult) {
+            $saldoEstatisticas = $saldoResult;
+        }
+
+        // Adicionar informações de saldo usado às transações
+        if (!empty($statementData['transacoes'])) {
+            foreach ($statementData['transacoes'] as &$transacao) {
+                // Buscar saldo usado nesta transação
+                $saldoUsadoStmt = $db->prepare("
+                    SELECT COALESCE(SUM(valor), 0) as saldo_usado 
+                    FROM cashback_movimentacoes 
+                    WHERE transacao_uso_id = ? AND tipo_operacao = 'uso'
+                ");
+                $saldoUsadoStmt->execute([$transacao['id']]);
+                $saldoUsado = $saldoUsadoStmt->fetch(PDO::FETCH_ASSOC);
+                
+                $transacao['saldo_usado'] = $saldoUsado['saldo_usado'] ?? 0;
+                $transacao['valor_pago'] = $transacao['valor_total'] - $transacao['saldo_usado'];
+            }
+        }
+    }
+
 } catch (Exception $e) {
-    error_log('Erro ao carregar estatísticas de saldo: ' . $e->getMessage());
-    $saldoEstatisticas = [
-        'total_creditado' => 0,
-        'total_usado' => 0,
-        'total_estornado' => 0,
-        'qtd_usos' => 0
-    ];
+    error_log('Erro na página de extrato: ' . $e->getMessage());
+    $hasError = true;
+    $errorMessage = 'Erro ao carregar dados do extrato. Tente novamente.';
 }
 ?>
 
@@ -130,7 +150,12 @@ try {
 </head>
 <body>
     <!-- Incluir navbar -->
-    <?php include_once '../components/navbar.php'; ?>
+    <?php 
+    $navbarPath = '../components/navbar.php';
+    if (file_exists($navbarPath)) {
+        include_once $navbarPath; 
+    }
+    ?>
     
     <div class="container" style="margin-top: 80px;">
         <!-- Cabeçalho da Página -->
@@ -146,7 +171,7 @@ try {
                         <polyline points="7 10 12 15 17 10"></polyline>
                         <line x1="12" y1="15" x2="12" y2="3"></line>
                     </svg>
-                    Exportar PDF
+                    Exportar HTML
                 </button>
             </div>
         </div>
@@ -163,19 +188,18 @@ try {
             <form action="" method="GET" class="filter-form">
                 <div class="form-group">
                     <label class="form-label" for="data_inicio">Data Inicial</label>
-                    <input type="date" id="data_inicio" name="data_inicio" class="form-control" value="<?php echo $filters['data_inicio'] ?? ''; ?>">
+                    <input type="date" id="data_inicio" name="data_inicio" class="form-control" value="<?php echo htmlspecialchars($filters['data_inicio'] ?? ''); ?>">
                 </div>
                 
                 <div class="form-group">
                     <label class="form-label" for="data_fim">Data Final</label>
-                    <input type="date" id="data_fim" name="data_fim" class="form-control" value="<?php echo $filters['data_fim'] ?? ''; ?>">
+                    <input type="date" id="data_fim" name="data_fim" class="form-control" value="<?php echo htmlspecialchars($filters['data_fim'] ?? ''); ?>">
                 </div>
                 
                 <div class="form-group">
                     <label class="form-label" for="loja_id">Loja</label>
                     <select id="loja_id" name="loja_id" class="form-control">
                         <option value="todas">Todas as Lojas</option>
-                        <!-- Opções de lojas seriam inseridas aqui de forma dinâmica -->
                     </select>
                 </div>
                 
@@ -246,16 +270,19 @@ try {
                     <tbody>
                         <?php if (empty($statementData['transacoes'])): ?>
                             <tr>
-                                <td colspan="8" style="text-align:center;">Nenhuma transação encontrada.</td>
+                                <td colspan="8" style="text-align:center; padding: 30px;">
+                                    <p>Nenhuma transação encontrada.</p>
+                                    <small style="color: #666;">Tente ajustar os filtros ou realize uma compra em uma de nossas lojas parceiras.</small>
+                                </td>
                             </tr>
                         <?php else: ?>
                             <?php foreach ($statementData['transacoes'] as $transacao): ?>
                                 <tr>
                                     <td><?php echo date('d/m/Y', strtotime($transacao['data_transacao'])); ?></td>
-                                    <td><?php echo htmlspecialchars($transacao['loja_nome']); ?></td>
-                                    <td>R$ <?php echo number_format($transacao['valor_total'], 2, ',', '.'); ?></td>
+                                    <td><?php echo htmlspecialchars($transacao['loja_nome'] ?? 'N/A'); ?></td>
+                                    <td>R$ <?php echo number_format($transacao['valor_total'] ?? 0, 2, ',', '.'); ?></td>
                                     <td>
-                                        <?php if ($transacao['saldo_usado'] > 0): ?>
+                                        <?php if (($transacao['saldo_usado'] ?? 0) > 0): ?>
                                             <span style="color: #4CAF50; font-weight: 600;">
                                                 R$ <?php echo number_format($transacao['saldo_usado'], 2, ',', '.'); ?>
                                             </span>
@@ -263,12 +290,13 @@ try {
                                             <span style="color: #666;">-</span>
                                         <?php endif; ?>
                                     </td>
-                                    <td>R$ <?php echo number_format($transacao['valor_pago'], 2, ',', '.'); ?></td>
-                                    <td>R$ <?php echo number_format($transacao['valor_cliente'], 2, ',', '.'); ?></td>
+                                    <td>R$ <?php echo number_format($transacao['valor_pago'] ?? $transacao['valor_total'] ?? 0, 2, ',', '.'); ?></td>
+                                    <td>R$ <?php echo number_format($transacao['valor_cliente'] ?? 0, 2, ',', '.'); ?></td>
                                     <td>
                                         <?php 
+                                        $status = $transacao['status'] ?? 'pendente';
                                         $statusClass = '';
-                                        switch ($transacao['status']) {
+                                        switch ($status) {
                                             case 'aprovado':
                                                 $statusClass = 'badge-success';
                                                 break;
@@ -281,11 +309,11 @@ try {
                                         }
                                         ?>
                                         <span class="badge <?php echo $statusClass; ?>">
-                                            <?php echo ucfirst($transacao['status']); ?>
+                                            <?php echo ucfirst($status); ?>
                                         </span>
                                     </td>
                                     <td>
-                                        <button class="btn btn-outline" style="padding: 5px 10px;" onclick="verDetalhes(<?php echo $transacao['id']; ?>)">
+                                        <button class="btn btn-outline" style="padding: 5px 10px;" onclick="verDetalhes(<?php echo $transacao['id'] ?? 0; ?>)">
                                             Detalhes
                                         </button>
                                     </td>
@@ -349,7 +377,7 @@ try {
             <?php endif; ?>
         </div>
         
-        <!-- Movimentações de Saldo -->
+        <!-- Resumo de Uso de Saldo -->
         <?php if (!empty($saldoEstatisticas['qtd_usos']) && $saldoEstatisticas['qtd_usos'] > 0): ?>
         <div class="card" style="margin-top: 20px;">
             <h3 class="card-title">Resumo de Uso de Saldo no Período</h3>
@@ -391,55 +419,53 @@ try {
             <button class="modal-close" onclick="fecharModal()">&times;</button>
             <h2 class="transaction-detail-title">Detalhes da Transação</h2>
             <div id="detalheConteudo">
-                <!-- Conteúdo será preenchido via JavaScript -->
                 <div class="transaction-detail-row">
                     <div class="detail-label">ID da Transação:</div>
-                    <div class="detail-value" id="transacao-id"></div>
+                    <div class="detail-value" id="transacao-id">-</div>
                 </div>
                 <div class="transaction-detail-row">
                     <div class="detail-label">Data e Hora:</div>
-                    <div class="detail-value" id="transacao-data"></div>
+                    <div class="detail-value" id="transacao-data">-</div>
                 </div>
                 <div class="transaction-detail-row">
                     <div class="detail-label">Loja:</div>
-                    <div class="detail-value" id="transacao-loja"></div>
+                    <div class="detail-value" id="transacao-loja">-</div>
                 </div>
                 <div class="transaction-detail-row">
                     <div class="detail-label">Valor Original:</div>
-                    <div class="detail-value" id="transacao-valor-original"></div>
+                    <div class="detail-value" id="transacao-valor-original">-</div>
                 </div>
                 <div class="transaction-detail-row">
                     <div class="detail-label">Saldo Usado:</div>
-                    <div class="detail-value" id="transacao-saldo-usado"></div>
+                    <div class="detail-value" id="transacao-saldo-usado">-</div>
                 </div>
                 <div class="transaction-detail-row">
                     <div class="detail-label">Valor Pago:</div>
-                    <div class="detail-value" id="transacao-valor-pago"></div>
+                    <div class="detail-value" id="transacao-valor-pago">-</div>
                 </div>
                 <div class="transaction-detail-row">
                     <div class="detail-label">Valor do Cashback:</div>
-                    <div class="detail-value" id="transacao-cashback"></div>
+                    <div class="detail-value" id="transacao-cashback">-</div>
                 </div>
                 <div class="transaction-detail-row">
                     <div class="detail-label">Percentual:</div>
-                    <div class="detail-value" id="transacao-percentual"></div>
+                    <div class="detail-value" id="transacao-percentual">-</div>
                 </div>
                 <div class="transaction-detail-row">
                     <div class="detail-label">Status:</div>
-                    <div class="detail-value" id="transacao-status"></div>
+                    <div class="detail-value" id="transacao-status">-</div>
                 </div>
                 <div class="transaction-detail-row">
                     <div class="detail-label">Descrição:</div>
-                    <div class="detail-value" id="transacao-descricao"></div>
+                    <div class="detail-value" id="transacao-descricao">-</div>
                 </div>
             </div>
         </div>
     </div>
     
     <script>
-        // CORREÇÃO: Função para exportar extrato em HTML editável
+        // Função para exportar extrato
         function exportarExtrato() {
-            // Coletar filtros ativos
             const filtros = {
                 data_inicio: document.getElementById('data_inicio').value,
                 data_fim: document.getElementById('data_fim').value,
@@ -448,7 +474,6 @@ try {
                 tipo_transacao: document.getElementById('tipo_transacao').value
             };
             
-            // Construir parâmetros da URL
             const params = new URLSearchParams();
             Object.keys(filtros).forEach(key => {
                 if (filtros[key] && filtros[key] !== 'todas' && filtros[key] !== 'todos') {
@@ -456,16 +481,19 @@ try {
                 }
             });
             
-            // Adicionar action para exportar
             params.append('action', 'export_statement');
             
-            // Redirecionar para a exportação
-            window.open(`<?php echo SITE_URL; ?>/controllers/ClientController.php?${params.toString()}`, '_blank');
+            const url = `<?php echo SITE_URL; ?>/controllers/ClientController.php?${params.toString()}`;
+            window.open(url, '_blank');
         }
         
-        // CORREÇÃO: Função para exibir detalhes da transação
+        // Função para ver detalhes da transação
         function verDetalhes(transacaoId) {
-            // Criar FormData para enviar via POST
+            if (!transacaoId || transacaoId <= 0) {
+                alert('ID da transação inválido');
+                return;
+            }
+            
             const formData = new FormData();
             formData.append('action', 'transaction');
             formData.append('transaction_id', transacaoId);
@@ -474,58 +502,60 @@ try {
                 method: 'POST',
                 body: formData
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Erro na requisição');
+                }
+                return response.json();
+            })
             .then(data => {
-                if (data.status) {
+                if (data.status && data.data && data.data.transacao) {
                     const transacao = data.data.transacao;
                     
                     // Preencher os campos do modal
-                    document.getElementById('transacao-id').textContent = transacao.id;
+                    document.getElementById('transacao-id').textContent = transacao.id || '-';
                     document.getElementById('transacao-data').textContent = formatarData(transacao.data_transacao);
-                    document.getElementById('transacao-loja').textContent = transacao.loja_nome;
+                    document.getElementById('transacao-loja').textContent = transacao.loja_nome || '-';
                     
-                    // Valores originais e calculados
-                    const valorOriginal = parseFloat(transacao.valor_total);
+                    // Valores
+                    const valorOriginal = parseFloat(transacao.valor_total || 0);
                     const saldoUsado = parseFloat(transacao.saldo_usado || 0);
                     const valorPago = valorOriginal - saldoUsado;
                     
                     document.getElementById('transacao-valor-original').textContent = 'R$ ' + formatarValor(valorOriginal);
                     document.getElementById('transacao-saldo-usado').textContent = saldoUsado > 0 ? 'R$ ' + formatarValor(saldoUsado) : 'Não usado';
                     document.getElementById('transacao-valor-pago').textContent = 'R$ ' + formatarValor(valorPago);
+                    document.getElementById('transacao-cashback').textContent = 'R$ ' + formatarValor(transacao.valor_cliente || 0);
                     
-                    // CORREÇÃO: Mostrar o cashback que o CLIENTE recebeu
-                    document.getElementById('transacao-cashback').textContent = 'R$ ' + formatarValor(transacao.valor_cliente);
-                    
-                    // Calcular percentual baseado no valor do cliente, não valor total de cashback
-                    const percentual = (transacao.valor_cliente / transacao.valor_total) * 100;
+                    // Percentual
+                    const percentual = valorOriginal > 0 ? ((transacao.valor_cliente || 0) / valorOriginal) * 100 : 0;
                     document.getElementById('transacao-percentual').textContent = formatarValor(percentual) + '%';
                     
-                    // Status com formatação adequada
+                    // Status
                     const statusElement = document.getElementById('transacao-status');
-                    statusElement.textContent = capitalizarPrimeiraLetra(transacao.status);
-                    statusElement.className = '';
+                    const status = transacao.status || 'pendente';
+                    statusElement.textContent = capitalizarPrimeiraLetra(status);
+                    statusElement.className = 'badge';
                     
-                    let statusClass = '';
-                    switch (transacao.status) {
+                    switch (status) {
                         case 'aprovado':
-                            statusClass = 'badge-success';
+                            statusElement.classList.add('badge-success');
                             break;
                         case 'pendente':
-                            statusClass = 'badge-warning';
+                            statusElement.classList.add('badge-warning');
                             break;
                         case 'cancelado':
-                            statusClass = 'badge-danger';
+                            statusElement.classList.add('badge-danger');
                             break;
                     }
-                    statusElement.classList.add('badge', statusClass);
                     
-                    // Descrição (opcional)
+                    // Descrição
                     document.getElementById('transacao-descricao').textContent = transacao.descricao || 'Não disponível';
                     
                     // Exibir modal
                     document.getElementById('detalheModal').classList.add('show');
                 } else {
-                    alert('Erro ao buscar detalhes da transação: ' + data.message);
+                    alert('Erro ao buscar detalhes: ' + (data.message || 'Dados não encontrados'));
                 }
             })
             .catch(error => {
@@ -541,22 +571,24 @@ try {
         
         // Utilitários
         function formatarData(dataString) {
+            if (!dataString) return '-';
             const data = new Date(dataString);
             return data.toLocaleString('pt-BR');
         }
         
         function formatarValor(valor) {
-            return parseFloat(valor).toLocaleString('pt-BR', {
+            return parseFloat(valor || 0).toLocaleString('pt-BR', {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2
             });
         }
         
         function capitalizarPrimeiraLetra(string) {
+            if (!string) return '-';
             return string.charAt(0).toUpperCase() + string.slice(1);
         }
         
-        // Fechar modal ao clicar fora dele
+        // Fechar modal ao clicar fora
         window.onclick = function(event) {
             const modal = document.getElementById('detalheModal');
             if (event.target === modal) {
