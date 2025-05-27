@@ -1,0 +1,58 @@
+/* Adicionar estas regras ao arquivo assets/css/store.css */
+
+/* Cards de resumo */
+.card .fa-2x {
+    opacity: 0.7;
+}
+
+/* Tabela de transações */
+#transactionsTable th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    border-top: none;
+}
+
+#transactionsTable td {
+    vertical-align: middle;
+}
+
+/* Status badges */
+.badge {
+    font-size: 0.75em;
+}
+
+/* Modal de filtros */
+#filterModal .modal-body {
+    padding: 1.5rem;
+}
+
+#filterModal .form-label {
+    font-weight: 600;
+    color: #495057;
+}
+
+/* Loading spinner */
+.spinner-border {
+    width: 2rem;
+    height: 2rem;
+}
+
+/* Responsividade para mobile */
+@media (max-width: 768px) {
+    .table-responsive {
+        font-size: 0.875rem;
+    }
+    
+    .btn-sm {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+    }
+    
+    .card-body h4 {
+        font-size: 1.25rem;
+    }
+    
+    .card-body h6 {
+        font-size: 0.875rem;
+    }
+}

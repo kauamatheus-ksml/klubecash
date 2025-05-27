@@ -13,7 +13,186 @@ require_once __DIR__ . '/../utils/Validator.php';
  */
 class TransactionController {
     // Adicionar este método no TransactionController.php
-   
+   /**
+    * Obtém todas as transações de uma loja com filtros
+    * 
+    * @param int $storeId ID da loja
+    * @param array $filters Filtros para a listagem
+    * @param int $page Página atual
+    * @return array Lista de transações
+    */
+    public static function getStoreTransactions($storeId, $filters = [], $page = 1) {
+        try {
+            // Verificar se o usuário está autenticado
+            if (!AuthController::isAuthenticated()) {
+                return ['status' => false, 'message' => 'Usuário não autenticado.'];
+            }
+            
+            $db = Database::getConnection();
+            
+            // Verificar permissões - apenas a loja dona das transações ou admin podem acessar
+            if (AuthController::isStore()) {
+                $currentUserId = AuthController::getCurrentUserId();
+                $storeOwnerQuery = $db->prepare("SELECT usuario_id FROM lojas WHERE id = :loja_id");
+                $storeOwnerQuery->bindParam(':loja_id', $storeId);
+                $storeOwnerQuery->execute();
+                $storeOwner = $storeOwnerQuery->fetch(PDO::FETCH_ASSOC);
+                
+                if (!$storeOwner || $storeOwner['usuario_id'] != $currentUserId) {
+                    return ['status' => false, 'message' => 'Acesso não autorizado a esta loja.'];
+                }
+            } elseif (!AuthController::isAdmin()) {
+                return ['status' => false, 'message' => 'Acesso não autorizado.'];
+            }
+            
+            // Verificar se a loja existe
+            $storeStmt = $db->prepare("SELECT id, nome_fantasia FROM lojas WHERE id = :loja_id");
+            $storeStmt->bindParam(':loja_id', $storeId);
+            $storeStmt->execute();
+            $store = $storeStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$store) {
+                return ['status' => false, 'message' => 'Loja não encontrada.'];
+            }
+            
+            // Construir consulta
+            $query = "
+                SELECT t.*, u.nome as cliente_nome, u.email as cliente_email,
+                    pc.id as pagamento_id, pc.status as status_pagamento,
+                    pc.data_aprovacao as data_pagamento
+                FROM transacoes_cashback t
+                JOIN usuarios u ON t.usuario_id = u.id
+                LEFT JOIN pagamentos_transacoes pt ON t.id = pt.transacao_id
+                LEFT JOIN pagamentos_comissao pc ON pt.pagamento_id = pc.id
+                WHERE t.loja_id = :loja_id
+            ";
+            
+            $params = [':loja_id' => $storeId];
+            
+            // Aplicar filtros
+            if (!empty($filters)) {
+                // Filtro por status
+                if (isset($filters['status']) && !empty($filters['status'])) {
+                    $query .= " AND t.status = :status";
+                    $params[':status'] = $filters['status'];
+                }
+                
+                // Filtro por período
+                if (isset($filters['data_inicio']) && !empty($filters['data_inicio'])) {
+                    $query .= " AND t.data_transacao >= :data_inicio";
+                    $params[':data_inicio'] = $filters['data_inicio'] . ' 00:00:00';
+                }
+                
+                if (isset($filters['data_fim']) && !empty($filters['data_fim'])) {
+                    $query .= " AND t.data_transacao <= :data_fim";
+                    $params[':data_fim'] = $filters['data_fim'] . ' 23:59:59';
+                }
+                
+                // Filtro por cliente
+                if (isset($filters['cliente']) && !empty($filters['cliente'])) {
+                    $query .= " AND (u.nome LIKE :cliente OR u.email LIKE :cliente)";
+                    $params[':cliente'] = '%' . $filters['cliente'] . '%';
+                }
+                
+                // Filtro por valor mínimo
+                if (isset($filters['valor_min']) && !empty($filters['valor_min'])) {
+                    $query .= " AND t.valor_total >= :valor_min";
+                    $params[':valor_min'] = $filters['valor_min'];
+                }
+                
+                // Filtro por valor máximo
+                if (isset($filters['valor_max']) && !empty($filters['valor_max'])) {
+                    $query .= " AND t.valor_total <= :valor_max";
+                    $params[':valor_max'] = $filters['valor_max'];
+                }
+            }
+            
+            // Ordenação
+            $query .= " ORDER BY t.data_transacao DESC";
+            
+            // Contagem total para paginação
+            $countQuery = str_replace(
+                "t.*, u.nome as cliente_nome, u.email as cliente_email, pc.id as pagamento_id, pc.status as status_pagamento, pc.data_aprovacao as data_pagamento", 
+                "COUNT(*) as total", 
+                $query
+            );
+            $countStmt = $db->prepare($countQuery);
+            
+            foreach ($params as $param => $value) {
+                $countStmt->bindValue($param, $value);
+            }
+            
+            $countStmt->execute();
+            $totalCount = $countStmt->fetch(PDO::FETCH_ASSOC)['total'];
+            
+            // Paginação
+            $perPage = defined('ITEMS_PER_PAGE') ? ITEMS_PER_PAGE : 10;
+            $totalPages = ceil($totalCount / $perPage);
+            $page = max(1, min($page, $totalPages));
+            $offset = ($page - 1) * $perPage;
+            
+            $query .= " LIMIT :offset, :limit";
+            $params[':offset'] = $offset;
+            $params[':limit'] = $perPage;
+            
+            // Executar consulta
+            $stmt = $db->prepare($query);
+            
+            // Bind manual para offset e limit
+            foreach ($params as $param => $value) {
+                if ($param == ':offset' || $param == ':limit') {
+                    $stmt->bindValue($param, $value, PDO::PARAM_INT);
+                } else {
+                    $stmt->bindValue($param, $value);
+                }
+            }
+            
+            $stmt->execute();
+            $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            // Calcular totais
+            $totalValorVendas = 0;
+            $totalComissoes = 0;
+            $totalPendentes = 0;
+            $totalAprovadas = 0;
+            
+            foreach ($transactions as $transaction) {
+                $totalValorVendas += $transaction['valor_total'];
+                $totalComissoes += $transaction['valor_cashback'];
+                
+                if ($transaction['status'] === 'aprovado') {
+                    $totalAprovadas++;
+                } elseif ($transaction['status'] === 'pendente') {
+                    $totalPendentes++;
+                }
+            }
+            
+            return [
+                'status' => true,
+                'data' => [
+                    'loja' => $store,
+                    'transacoes' => $transactions,
+                    'totais' => [
+                        'total_transacoes' => count($transactions),
+                        'valor_total_vendas' => $totalValorVendas,
+                        'total_comissoes' => $totalComissoes,
+                        'total_pendentes' => $totalPendentes,
+                        'total_aprovadas' => $totalAprovadas
+                    ],
+                    'paginacao' => [
+                        'total' => $totalCount,
+                        'por_pagina' => $perPage,
+                        'pagina_atual' => $page,
+                        'total_paginas' => $totalPages
+                    ]
+                ]
+            ];
+            
+        } catch (PDOException $e) {
+            error_log('Erro ao obter transações da loja: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro ao obter transações. Tente novamente.'];
+        }
+    }
 
     /**
     * Obtém histórico de pagamentos com informações de saldo usado
@@ -2012,6 +2191,14 @@ if (basename($_SERVER['PHP_SELF']) === 'TransactionController.php') {
             $filters = $_POST['filters'] ?? [];
             $page = isset($_POST['page']) ? intval($_POST['page']) : 1;
             $result = TransactionController::getPaymentHistory($storeId, $filters, $page);
+            echo json_encode($result);
+            break;
+            
+        case 'store_transactions':
+            $storeId = isset($_POST['loja_id']) ? intval($_POST['loja_id']) : 0;
+            $filters = $_POST['filters'] ?? [];
+            $page = isset($_POST['page']) ? intval($_POST['page']) : 1;
+            $result = TransactionController::getStoreTransactions($storeId, $filters, $page);
             echo json_encode($result);
             break;
             
