@@ -392,7 +392,7 @@ class TransactionController {
     * 
     * @param int $paymentId ID do pagamento
     * @return array Resultado da operação
-     */
+    */
     public static function getPaymentDetailsWithBalance($paymentId) {
         try {
             if (!AuthController::isAuthenticated()) {
@@ -429,6 +429,24 @@ class TransactionController {
             
             if (!$payment) {
                 return ['status' => false, 'message' => 'Pagamento não encontrado.'];
+            }
+            
+            // Verificar permissões - apenas admin ou loja proprietária
+            $currentUserId = AuthController::getCurrentUserId();
+            
+            if (!AuthController::isAdmin()) {
+                if (AuthController::isStore()) {
+                    // Verificar se é a loja proprietária
+                    $storeCheckStmt = $db->prepare("SELECT usuario_id FROM lojas WHERE id = ?");
+                    $storeCheckStmt->execute([$payment['loja_id']]);
+                    $storeCheck = $storeCheckStmt->fetch(PDO::FETCH_ASSOC);
+                    
+                    if (!$storeCheck || $storeCheck['usuario_id'] != $currentUserId) {
+                        return ['status' => false, 'message' => 'Acesso não autorizado a este pagamento.'];
+                    }
+                } else {
+                    return ['status' => false, 'message' => 'Acesso não autorizado.'];
+                }
             }
             
             // Buscar transações do pagamento com informações de saldo
@@ -471,6 +489,7 @@ class TransactionController {
             return ['status' => false, 'message' => 'Erro ao buscar detalhes do pagamento.'];
         }
     }
+
     /**
     * Obtém transações pendentes com informações de saldo usado
     * 
@@ -2211,9 +2230,10 @@ if (basename($_SERVER['PHP_SELF']) === 'TransactionController.php') {
                 return;
             }
             
-            $result = self::getPaymentDetailsWithBalance($paymentId);
+            $result = TransactionController::getPaymentDetailsWithBalance($paymentId);
             echo json_encode($result);
-            break;    
+            break;
+
         case 'process_batch':
             $file = $_FILES['arquivo'] ?? null;
             $storeId = isset($_POST['loja_id']) ? intval($_POST['loja_id']) : 0;

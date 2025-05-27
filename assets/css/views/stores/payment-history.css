@@ -576,3 +576,327 @@ body {
         gap: 5px;
     }
 }
+
+/* Estilos específicos para detalhes do pagamento */
+.payment-details-container {
+    max-height: 75vh;
+    overflow-y: auto;
+    padding: 0.5rem;
+}
+
+.payment-summary,
+.financial-summary,
+.approval-info,
+.transactions-section,
+.payment-notes,
+.payment-actions {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    border: 1px solid #e9ecef;
+}
+
+.payment-summary h3,
+.financial-summary h3,
+.approval-info h3,
+.transactions-section h3,
+.payment-notes h3 {
+    margin: 0 0 1rem 0;
+    color: var(--dark-gray);
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+/* Grid para resumo do pagamento */
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+}
+
+.summary-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem;
+    background: white;
+    border-radius: 6px;
+    border: 1px solid #dee2e6;
+}
+
+.summary-label {
+    font-weight: 500;
+    color: var(--medium-gray);
+}
+
+.summary-value {
+    font-weight: 600;
+    color: var(--dark-gray);
+}
+
+/* Grid financeiro */
+.financial-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.financial-item {
+    padding: 1rem;
+    border-radius: 8px;
+    text-align: center;
+    color: white;
+}
+
+.financial-item.primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.financial-item.warning {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+
+.financial-item.success {
+    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+}
+
+.financial-item.info {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+}
+
+.financial-label {
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+    opacity: 0.9;
+}
+
+.financial-value {
+    font-size: 1.3rem;
+    font-weight: 700;
+}
+
+/* Aprovação/Rejeição */
+.approval-details {
+    background: white;
+    border-radius: 6px;
+    padding: 1rem;
+}
+
+.approval-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #eee;
+}
+
+.approval-item:last-child {
+    border-bottom: none;
+}
+
+.approval-label {
+    font-weight: 500;
+    color: var(--medium-gray);
+    flex: 1;
+}
+
+.approval-value {
+    font-weight: 600;
+    color: var(--dark-gray);
+    flex: 2;
+    text-align: right;
+}
+
+/* Tabela de transações */
+.transactions-table-container {
+    overflow-x: auto;
+    background: white;
+    border-radius: 6px;
+    border: 1px solid #dee2e6;
+}
+
+.transactions-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0;
+}
+
+.transactions-table th,
+.transactions-table td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid #eee;
+}
+
+.transactions-table th {
+    background: #f8f9fa;
+    font-weight: 600;
+    color: var(--dark-gray);
+    font-size: 0.9rem;
+}
+
+.transactions-table tr:hover {
+    background: #f8f9fa;
+}
+
+.cliente-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.cliente-info strong {
+    font-size: 0.9rem;
+}
+
+.cliente-info small {
+    font-size: 0.8rem;
+    color: var(--medium-gray);
+}
+
+.balance-indicator {
+    margin-left: 0.5rem;
+    font-size: 0.8rem;
+}
+
+.valor-original {
+    color: var(--dark-gray);
+    font-weight: 500;
+}
+
+.saldo-usado.has-balance {
+    color: #28a745;
+    font-weight: 600;
+}
+
+.saldo-usado.no-balance {
+    color: var(--medium-gray);
+    font-style: italic;
+}
+
+.valor-efetivo {
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
+.cashback {
+    color: #28a745;
+    font-weight: 600;
+}
+
+/* Observações */
+.notes-content {
+    background: white;
+    border-radius: 6px;
+    padding: 1rem;
+    border-left: 4px solid var(--primary-color);
+}
+
+/* Ações para pagamentos rejeitados */
+.payment-actions {
+    background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
+    border: none;
+    text-align: center;
+}
+
+.action-info {
+    margin-bottom: 1rem;
+}
+
+.action-info p {
+    margin: 0;
+    color: #721c24;
+}
+
+.payment-actions .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    text-decoration: none;
+}
+
+/* Estados de loading e erro */
+.loading-state,
+.error-state {
+    text-align: center;
+    padding: 2rem;
+}
+
+.loading-state .spinner {
+    width: 2rem;
+    height: 2rem;
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid var(--primary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1rem auto;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.error-state .error {
+    color: var(--danger-color);
+    margin: 0;
+}
+
+.no-transactions {
+    text-align: center;
+    padding: 2rem;
+    color: var(--medium-gray);
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .payment-details-container {
+        max-height: 65vh;
+        padding: 0.25rem;
+    }
+    
+    .payment-summary,
+    .financial-summary,
+    .approval-info,
+    .transactions-section,
+    .payment-notes,
+    .payment-actions {
+        padding: 1rem;
+        margin-bottom: 1rem;
+    }
+    
+    .summary-grid,
+    .financial-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .summary-item,
+    .approval-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+    
+    .approval-value {
+        text-align: left;
+    }
+    
+    .transactions-table-container {
+        font-size: 0.8rem;
+    }
+    
+    .transactions-table th,
+    .transactions-table td {
+        padding: 0.5rem 0.25rem;
+    }
+    
+    .cliente-info strong {
+        font-size: 0.8rem;
+    }
+    
+    .cliente-info small {
+        font-size: 0.7rem;
+    }
+}

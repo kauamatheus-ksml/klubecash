@@ -519,7 +519,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Abrir modal e mostrar loading
         paymentDetailsModal.style.display = 'block';
-        paymentDetailsContent.innerHTML = '<p>Carregando detalhes...</p>';
+        paymentDetailsContent.innerHTML = '<div class="loading-state"><div class="spinner"></div><p>Carregando detalhes...</p></div>';
         
         // Usar TransactionController para buscar detalhes com informações de saldo
         fetch('../../controllers/TransactionController.php', {
@@ -540,16 +540,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 renderPaymentDetailsWithBalance(data.data);
             } else {
                 const errorMessage = data && data.message ? data.message : 'Erro desconhecido ao carregar detalhes';
-                paymentDetailsContent.innerHTML = `<p class="error">Erro: ${errorMessage}</p>`;
+                paymentDetailsContent.innerHTML = `<div class="error-state"><p class="error">Erro: ${errorMessage}</p></div>`;
             }
         })
         .catch(error => {
             console.error('Erro na requisição:', error);
             paymentDetailsContent.innerHTML = `
-                <p class="error">
-                    Erro de conexão. Verifique sua internet e tente novamente.
-                    <br><small>Detalhes técnicos: ${error.message}</small>
-                </p>
+                <div class="error-state">
+                    <p class="error">
+                        Erro de conexão. Verifique sua internet e tente novamente.
+                        <br><small>Detalhes técnicos: ${error.message}</small>
+                    </p>
+                </div>
             `;
         });
     };
@@ -580,7 +582,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Função para renderizar os detalhes do pagamento com informações de saldo
     function renderPaymentDetailsWithBalance(data) {
         if (!data || !data.pagamento) {
-            paymentDetailsContent.innerHTML = '<p class="error">Dados do pagamento não encontrados.</p>';
+            paymentDetailsContent.innerHTML = '<div class="error-state"><p class="error">Dados do pagamento não encontrados.</p></div>';
             return;
         }
         
@@ -589,59 +591,77 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Construção do HTML com informações de saldo
         let html = `
-            <div class="payment-summary">
-                <div class="summary-row">
-                    <span class="summary-label">ID do Pagamento:</span>
-                    <span class="summary-value">#${escapeHtml(payment.id || 'N/A')}</span>
+            <div class="payment-details-container">
+                <!-- Resumo do Pagamento -->
+                <div class="payment-summary">
+                    <h3>💳 Resumo do Pagamento</h3>
+                    <div class="summary-grid">
+                        <div class="summary-item">
+                            <span class="summary-label">ID do Pagamento:</span>
+                            <span class="summary-value">#${escapeHtml(payment.id || 'N/A')}</span>
+                        </div>
+                        <div class="summary-item">
+                            <span class="summary-label">Data do Registro:</span>
+                            <span class="summary-value">${formatDate(payment.data_registro)}</span>
+                        </div>
+                        <div class="summary-item">
+                            <span class="summary-label">Status:</span>
+                            <span class="summary-value">
+                                <span class="status-badge status-${payment.status}">${getStatusName(payment.status)}</span>
+                            </span>
+                        </div>
+                        <div class="summary-item">
+                            <span class="summary-label">Método de Pagamento:</span>
+                            <span class="summary-value">${getPaymentMethodName(payment.metodo_pagamento)}</span>
+                        </div>
+                        ${payment.numero_referencia ? `
+                        <div class="summary-item">
+                            <span class="summary-label">Número de Referência:</span>
+                            <span class="summary-value">${escapeHtml(payment.numero_referencia)}</span>
+                        </div>
+                        ` : ''}
+                    </div>
                 </div>
-                <div class="summary-row">
-                    <span class="summary-label">Data do Registro:</span>
-                    <span class="summary-value">${formatDate(payment.data_registro)}</span>
+
+                <!-- Valores Financeiros -->
+                <div class="financial-summary">
+                    <h3>💰 Resumo Financeiro</h3>
+                    <div class="financial-grid">
+                        <div class="financial-item primary">
+                            <div class="financial-label">Valor Total das Vendas</div>
+                            <div class="financial-value">R$ ${formatCurrency(payment.valor_vendas_originais || payment.valor_total)}</div>
+                        </div>
+                        <div class="financial-item warning">
+                            <div class="financial-label">Total Saldo Usado pelos Clientes</div>
+                            <div class="financial-value">R$ ${formatCurrency(payment.total_saldo_usado || 0)}</div>
+                        </div>
+                        <div class="financial-item success">
+                            <div class="financial-label">Comissão Paga ao Klube Cash</div>
+                            <div class="financial-value">R$ ${formatCurrency(payment.valor_total)}</div>
+                        </div>
+                        <div class="financial-item info">
+                            <div class="financial-label">Valor Líquido Cobrado</div>
+                            <div class="financial-value">R$ ${formatCurrency((payment.valor_vendas_originais || payment.valor_total) - (payment.total_saldo_usado || 0))}</div>
+                        </div>
+                    </div>
                 </div>
-                <div class="summary-row">
-                    <span class="summary-label">Valor Total das Vendas:</span>
-                    <span class="summary-value">R$ ${formatCurrency(payment.valor_vendas_originais || payment.valor_total)}</span>
-                </div>
-                <div class="summary-row">
-                    <span class="summary-label">Total Saldo Usado:</span>
-                    <span class="summary-value balance-used">R$ ${formatCurrency(payment.total_saldo_usado || 0)}</span>
-                </div>
-                <div class="summary-row">
-                    <span class="summary-label">Comissão Paga:</span>
-                    <span class="summary-value">R$ ${formatCurrency(payment.valor_total)}</span>
-                </div>
-                <div class="summary-row">
-                    <span class="summary-label">Método de Pagamento:</span>
-                    <span class="summary-value">${getPaymentMethodName(payment.metodo_pagamento)}</span>
-                </div>
-                <div class="summary-row">
-                    <span class="summary-label">Status:</span>
-                    <span class="summary-value status-badge status-${payment.status}">${getStatusName(payment.status)}</span>
-                </div>
-                ${payment.numero_referencia ? `
-                <div class="summary-row">
-                    <span class="summary-label">Número de Referência:</span>
-                    <span class="summary-value">${escapeHtml(payment.numero_referencia)}</span>
-                </div>
-                ` : ''}
-            </div>
         `;
         
         // Seção de informações de aprovação/rejeição
         if (payment.status && payment.status !== 'pendente') {
             html += `
                 <div class="approval-info">
-                    <h3>${payment.status === 'aprovado' ? 'Informações de Aprovação' : 'Motivo da Rejeição'}</h3>
+                    <h3>${payment.status === 'aprovado' ? '✅ Informações de Aprovação' : '❌ Motivo da Rejeição'}</h3>
                     <div class="approval-details">
                         ${payment.data_aprovacao ? `
-                        <div class="approval-row">
+                        <div class="approval-item">
                             <span class="approval-label">Data:</span>
                             <span class="approval-value">${formatDate(payment.data_aprovacao)}</span>
                         </div>
                         ` : ''}
                         ${payment.observacao_admin ? `
-                        <div class="approval-row">
-                            <span class="approval-label">Observação:</span>
+                        <div class="approval-item">
+                            <span class="approval-label">Observação do Administrador:</span>
                             <span class="approval-value">${escapeHtml(payment.observacao_admin)}</span>
                         </div>
                         ` : ''}
@@ -652,11 +672,11 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Lista de transações incluídas no pagamento com informações de saldo
         html += `
-            <div class="transactions-list">
-                <h3>Transações Incluídas (${transactions.length})</h3>
+            <div class="transactions-section">
+                <h3>📋 Transações Incluídas (${transactions.length})</h3>
                 ${transactions.length > 0 ? `
-                <div class="table-responsive">
-                    <table class="table">
+                <div class="transactions-table-container">
+                    <table class="transactions-table">
                         <thead>
                             <tr>
                                 <th>Código</th>
@@ -664,32 +684,39 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <th>Data</th>
                                 <th>Valor Venda</th>
                                 <th>Saldo Usado</th>
-                                <th>Valor Pago</th>
+                                <th>Valor Efetivo</th>
                                 <th>Cashback</th>
                             </tr>
                         </thead>
                         <tbody>
                             ${transactions.map(transaction => {
-                                const saldoUsado = transaction.saldo_usado || 0;
-                                const valorPago = transaction.valor_total - saldoUsado;
+                                const saldoUsado = parseFloat(transaction.saldo_usado) || 0;
+                                const valorEfetivo = parseFloat(transaction.valor_total) - saldoUsado;
                                 return `
                                 <tr>
-                                    <td>${escapeHtml(transaction.codigo_transacao || 'N/A')}</td>
                                     <td>
-                                        ${escapeHtml(transaction.cliente_nome || 'N/A')}
-                                        ${saldoUsado > 0 ? '<span class="balance-indicator">💰</span>' : ''}
+                                        <code>${escapeHtml(transaction.codigo_transacao || 'N/A')}</code>
+                                    </td>
+                                    <td>
+                                        <div class="cliente-info">
+                                            <strong>${escapeHtml(transaction.cliente_nome || 'N/A')}</strong>
+                                            <small>${escapeHtml(transaction.cliente_email || '')}</small>
+                                            ${saldoUsado > 0 ? '<span class="balance-indicator">💰</span>' : ''}
+                                        </div>
                                     </td>
                                     <td>${formatDate(transaction.data_transacao)}</td>
-                                    <td>R$ ${formatCurrency(transaction.valor_total)}</td>
-                                    <td>${saldoUsado > 0 ? 'R$ ' + formatCurrency(saldoUsado) : '-'}</td>
-                                    <td>R$ ${formatCurrency(valorPago)}</td>
-                                    <td>R$ ${formatCurrency(transaction.valor_cliente)}</td>
+                                    <td class="valor-original">R$ ${formatCurrency(transaction.valor_total)}</td>
+                                    <td class="saldo-usado ${saldoUsado > 0 ? 'has-balance' : 'no-balance'}">
+                                        ${saldoUsado > 0 ? 'R$ ' + formatCurrency(saldoUsado) : '-'}
+                                    </td>
+                                    <td class="valor-efetivo">R$ ${formatCurrency(valorEfetivo)}</td>
+                                    <td class="cashback">R$ ${formatCurrency(transaction.valor_cliente)}</td>
                                 </tr>
                             `}).join('')}
                         </tbody>
                     </table>
                 </div>
-                ` : '<p>Nenhuma transação associada a este pagamento.</p>'}
+                ` : '<div class="no-transactions"><p>Nenhuma transação associada a este pagamento.</p></div>'}
             </div>
         `;
         
@@ -697,8 +724,10 @@ document.addEventListener('DOMContentLoaded', function() {
         if (payment.observacao) {
             html += `
                 <div class="payment-notes">
-                    <h3>Suas Observações</h3>
-                    <p>${escapeHtml(payment.observacao)}</p>
+                    <h3>📝 Suas Observações</h3>
+                    <div class="notes-content">
+                        <p>${escapeHtml(payment.observacao)}</p>
+                    </div>
                 </div>
             `;
         }
@@ -707,10 +736,18 @@ document.addEventListener('DOMContentLoaded', function() {
         if (payment.status === 'rejeitado') {
             html += `
                 <div class="payment-actions">
-                    <a href="../../store/transacoes-pendentes" class="btn btn-primary">Realizar Novo Pagamento</a>
+                    <div class="action-info">
+                        <p><strong>Seu pagamento foi rejeitado.</strong> Você pode realizar um novo pagamento com as transações pendentes.</p>
+                    </div>
+                    <a href="../../store/transacoes-pendentes" class="btn btn-primary">
+                        <i class="icon">💳</i>
+                        Realizar Novo Pagamento
+                    </a>
                 </div>
             `;
         }
+        
+        html += '</div>'; // Fechar payment-details-container
         
         paymentDetailsContent.innerHTML = html;
     }
@@ -723,7 +760,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const date = new Date(dateString);
             if (isNaN(date.getTime())) return 'Data inválida';
             
-            return date.toLocaleDateString('pt-BR') + ' ' + 
+            return date.toLocaleDateString('pt-BR') + ' às ' + 
                    date.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
         } catch (error) {
             console.error('Erro ao formatar data:', error);
