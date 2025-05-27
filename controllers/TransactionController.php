@@ -2198,8 +2198,39 @@ if (basename($_SERVER['PHP_SELF']) === 'TransactionController.php') {
             $storeId = isset($_POST['loja_id']) ? intval($_POST['loja_id']) : 0;
             $filters = $_POST['filters'] ?? [];
             $page = isset($_POST['page']) ? intval($_POST['page']) : 1;
-            $result = TransactionController::getStoreTransactions($storeId, $filters, $page);
-            echo json_encode($result);
+            
+            // Método simplificado para testar
+            try {
+                $db = Database::getConnection();
+                $stmt = $db->prepare("
+                    SELECT t.*, u.nome as cliente_nome, u.email as cliente_email
+                    FROM transacoes_cashback t
+                    JOIN usuarios u ON t.usuario_id = u.id
+                    WHERE t.loja_id = ?
+                    ORDER BY t.data_transacao DESC
+                    LIMIT 10
+                ");
+                $stmt->execute([$storeId]);
+                $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                $totals = [
+                    'total_transacoes' => count($transactions),
+                    'valor_total_vendas' => array_sum(array_column($transactions, 'valor_total')),
+                    'total_comissoes' => array_sum(array_column($transactions, 'valor_cashback')),
+                    'total_pendentes' => count(array_filter($transactions, function($t) { return $t['status'] == 'pendente'; }))
+                ];
+                
+                echo json_encode([
+                    'status' => true,
+                    'data' => [
+                        'transacoes' => $transactions,
+                        'totais' => $totals,
+                        'paginacao' => ['total_paginas' => 1, 'pagina_atual' => 1]
+                    ]
+                ]);
+            } catch (Exception $e) {
+                echo json_encode(['status' => false, 'message' => $e->getMessage()]);
+            }
             break;
             
         default:
