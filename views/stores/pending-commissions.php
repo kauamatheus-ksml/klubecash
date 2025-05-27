@@ -307,49 +307,65 @@ if ($result['status'] && isset($result['data']['totais'])) {
                 <?php endif; ?>
             </div>
             
-            <!-- Informações Adicionais -->
-            <div class="card info-card">
-                <div class="card-header">
-                    <div class="card-title">Informações sobre Saldo e Comissões</div>
+            
+            <!-- Informações sobre Saldo e Comissões (Dropdown Colapsável) -->
+            <div class="card info-card collapsible-card">
+                <div class="card-header collapsible-header" onclick="toggleInfoSection()">
+                    <div class="card-title">
+                        <span>📋 Informações sobre Saldo e Comissões</span>
+                        <span class="dropdown-icon" id="infoDropdownIcon">▼</span>
+                    </div>
                 </div>
-                <div class="info-content">
-                    <div class="info-section">
-                        <h4>📊 Como são calculadas as comissões:</h4>
-                        <ul>
-                            <li>A comissão é de <strong>10%</strong> calculada apenas sobre o valor efetivamente cobrado do cliente</li>
-                            <li>Se o cliente usou saldo, o valor é descontado antes do cálculo da comissão</li>
-                            <li>Exemplo: Venda de R$ 100,00 - Saldo usado R$ 20,00 = Comissão sobre R$ 80,00 (R$ 8,00)</li>
-                            <li><strong>Sua loja não recebe cashback</strong> - você apenas paga a comissão</li>
-                        </ul>
-                    </div>
-                    
-                    <div class="info-section">
-                        <h4>💰 Sobre o uso de saldo pelo cliente:</h4>
-                        <ul>
-                            <li>Clientes podem usar o cashback recebido para desconto em novas compras <strong>na sua loja</strong></li>
-                            <li>O saldo usado é identificado pelo ícone 💰 ao lado do nome do cliente</li>
-                            <li>O cliente ainda recebe cashback normal sobre o valor que ele efetivamente pagou</li>
-                            <li>Você paga comissão apenas sobre o valor que efetivamente recebeu</li>
-                        </ul>
-                    </div>
-                    
-                    <div class="info-section">
-                        <h4>🔔 Distribuição dos 10% de comissão:</h4>
-                        <ul>
-                            <li><strong>5% para o cliente:</strong> Vira cashback disponível para usar na sua loja</li>
-                            <li><strong>5% para o Klube Cash:</strong> Nossa receita pela plataforma</li>
-                            <li><strong>0% para sua loja:</strong> Você não recebe cashback, apenas oferece o benefício</li>
-                        </ul>
-                    </div>
-                    
-                    <div class="info-section">
-                        <h4>🔄 Processo de pagamento:</h4>
-                        <ul>
-                            <li>Selecione as transações que deseja quitar</li>
-                            <li>O valor total será a soma das comissões de todas as transações selecionadas</li>
-                            <li>Após o pagamento e aprovação, o cashback será liberado para os clientes</li>
-                            <li>Clientes poderão usar o cashback apenas na sua loja</li>
-                        </ul>
+                <div class="collapsible-content" id="infoSectionContent" style="display: none;">
+                    <div class="info-content">
+                        <div class="info-section">
+                            <h4>📊 Como são calculadas as comissões:</h4>
+                            <ul>
+                                <li>A comissão é de <strong>10%</strong> calculada apenas sobre o valor efetivamente cobrado do cliente</li>
+                                <li>Se o cliente usou saldo, o valor é descontado antes do cálculo da comissão</li>
+                                <li>Exemplo: Venda de R$ 100,00 - Saldo usado R$ 20,00 = Comissão sobre R$ 80,00 (R$ 8,00)</li>
+                                <li><strong>Sua loja não recebe cashback</strong> - você apenas paga a comissão</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="info-section">
+                            <h4>💰 Sobre o uso de saldo pelo cliente:</h4>
+                            <ul>
+                                <li>Clientes podem usar o cashback recebido para desconto em novas compras <strong>na sua loja</strong></li>
+                                <li>O saldo usado é identificado pelo ícone 💰 ao lado do nome do cliente</li>
+                                <li>O cliente ainda recebe cashback normal sobre o valor que ele efetivamente pagou</li>
+                                <li>Você paga comissão apenas sobre o valor que efetivamente recebeu</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="info-section">
+                            <h4>🔔 Distribuição dos 10% de comissão:</h4>
+                            <ul>
+                                <li><strong>5% para o cliente:</strong> Vira cashback disponível para usar na sua loja</li>
+                                <li><strong>5% para o Klube Cash:</strong> Nossa receita pela plataforma</li>
+                                <li><strong>0% para sua loja:</strong> Você não recebe cashback, apenas oferece o benefício</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="info-section">
+                            <h4>🔄 Processo de pagamento:</h4>
+                            <ul>
+                                <li>Selecione as transações que deseja quitar</li>
+                                <li>O valor total será a soma das comissões de todas as transações selecionadas</li>
+                                <li>Após o pagamento e aprovação, o cashback será liberado para os clientes</li>
+                                <li>Clientes poderão usar o cashback apenas na sua loja</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="info-section">
+                            <h4>ℹ️ Dicas Importantes:</h4>
+                            <ul>
+                                <li>Realize pagamentos regularmente para manter o fluxo de cashback dos clientes</li>
+                                <li>Monitore vendas com uso de saldo - indicam clientes fidelizados</li>
+                                <li>O valor da economia gerada aos clientes também beneficia sua loja com mais vendas</li>
+                                <li>Clientes com saldo disponível tendem a retornar mais à sua loja</li>
+                            </ul>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -469,6 +485,176 @@ if ($result['status'] && isset($result['data']['totais'])) {
             // Inicializar resumo
             updatePaymentSummary();
         });
+        document.addEventListener('DOMContentLoaded', function() {
+            const selectAllCheckbox = document.getElementById('selectAll');
+            const transactionCheckboxes = document.querySelectorAll('.transaction-checkbox');
+            const paySelectedBtn = document.getElementById('paySelectedBtn');
+            const selectedCountElement = document.getElementById('selectedCount');
+            const totalSalesValueElement = document.getElementById('totalSalesValue');
+            const totalBalanceUsedElement = document.getElementById('totalBalanceUsed');
+            const totalCommissionValueElement = document.getElementById('totalCommissionValue');
+            const paymentForm = document.getElementById('paymentForm');
+            const paymentSummary = document.getElementById('paymentSummary');
+            
+            // Função para formatar valores como moeda
+            function formatCurrency(value) {
+                return value.toLocaleString('pt-BR', {
+                    style: 'currency',
+                    currency: 'BRL',
+                    minimumFractionDigits: 2
+                });
+            }
+            
+            // Função para atualizar resumo de pagamento
+            function updatePaymentSummary() {
+                const selectedCheckboxes = document.querySelectorAll('.transaction-checkbox:checked');
+                const selectedCount = selectedCheckboxes.length;
+                let totalCommission = 0;
+                let totalSalesValue = 0;
+                let totalBalanceUsed = 0;
+                
+                selectedCheckboxes.forEach(checkbox => {
+                    // CORREÇÃO: Usar data-value do checkbox que agora tem o valor correto
+                    const commission = parseFloat(checkbox.getAttribute('data-value'));
+                    totalCommission += commission;
+                    
+                    const row = checkbox.closest('tr');
+                    const cells = row.querySelectorAll('td');
+                    
+                    // Valor original da venda (coluna 4)
+                    const originalValueText = cells[4].textContent.replace('R$ ', '').replace(/\./g, '').replace(',', '.');
+                    const originalValue = parseFloat(originalValueText);
+                    
+                    // Saldo usado (coluna 5)
+                    const balanceUsedElement = cells[5].querySelector('.saldo-usado');
+                    const balanceUsed = balanceUsedElement ? 
+                        parseFloat(balanceUsedElement.textContent.replace('R$ ', '').replace(/\./g, '').replace(',', '.')) : 0;
+                    
+                    totalSalesValue += originalValue;
+                    totalBalanceUsed += balanceUsed;
+                });
+                
+                document.getElementById('selectedCount').textContent = selectedCount;
+                document.getElementById('totalSalesValue').textContent = formatCurrency(totalSalesValue);
+                document.getElementById('totalBalanceUsed').textContent = formatCurrency(totalBalanceUsed);
+                document.getElementById('totalCommissionValue').textContent = formatCurrency(totalCommission);
+                
+                // Habilitar/desabilitar botão de pagamento
+                const paySelectedBtn = document.getElementById('paySelectedBtn');
+                paySelectedBtn.disabled = selectedCount === 0;
+                
+                // Mostrar/esconder resumo de pagamento
+                const paymentSummary = document.getElementById('paymentSummary');
+                if (selectedCount > 0) {
+                    paymentSummary.style.display = 'block';
+                } else {
+                    paymentSummary.style.display = 'none';
+                }
+            }
+            
+            // Evento para selecionar/deselecionar todos
+            if (selectAllCheckbox) {
+                selectAllCheckbox.addEventListener('change', function() {
+                    transactionCheckboxes.forEach(checkbox => {
+                        checkbox.checked = selectAllCheckbox.checked;
+                    });
+                    updatePaymentSummary();
+                });
+            }
+            
+            // Eventos para checkboxes individuais
+            transactionCheckboxes.forEach(checkbox => {
+                checkbox.addEventListener('change', function() {
+                    // Verificar se todos estão selecionados
+                    const allChecked = Array.from(transactionCheckboxes).every(cb => cb.checked);
+                    if (selectAllCheckbox) {
+                        selectAllCheckbox.checked = allChecked;
+                    }
+                    
+                    updatePaymentSummary();
+                });
+            });
+            
+            // Evento para botão de pagamento
+            if (paySelectedBtn) {
+                paySelectedBtn.addEventListener('click', function() {
+                    if (document.querySelectorAll('.transaction-checkbox:checked').length > 0) {
+                        paymentForm.submit();
+                    }
+                });
+            }
+            
+            // Inicializar resumo
+            updatePaymentSummary();
+            
+            // Restaurar estado do dropdown ao carregar a página
+            const savedState = localStorage.getItem('pendingCommissionsInfoOpen');
+            const content = document.getElementById('infoSectionContent');
+            const icon = document.getElementById('infoDropdownIcon');
+            const card = content ? content.closest('.collapsible-card') : null;
+            
+            if (savedState === 'true' && content && icon && card) {
+                content.style.display = 'block';
+                icon.classList.add('open');
+                card.classList.add('expanded');
+            }
+            
+            // Adicionar indicador visual ao passar o mouse
+            const header = document.querySelector('.collapsible-header');
+            if (header && card) {
+                header.addEventListener('mouseenter', function() {
+                    if (!card.classList.contains('expanded')) {
+                        this.style.backgroundColor = '#f8f9fa';
+                    }
+                });
+                
+                header.addEventListener('mouseleave', function() {
+                    if (!card.classList.contains('expanded')) {
+                        this.style.backgroundColor = '';
+                    }
+                });
+            }
+        });
+
+        // Função para controlar o dropdown de informações
+        function toggleInfoSection() {
+            const content = document.getElementById('infoSectionContent');
+            const icon = document.getElementById('infoDropdownIcon');
+            const card = content.closest('.collapsible-card');
+            
+            if (content.style.display === 'none' || content.style.display === '') {
+                // Abrir
+                content.style.display = 'block';
+                content.classList.add('opening');
+                content.classList.remove('closing');
+                icon.classList.add('open');
+                card.classList.add('expanded');
+                
+                // Remover classe de animação após completar
+                setTimeout(() => {
+                    content.classList.remove('opening');
+                }, 400);
+                
+                // Salvar estado no localStorage (usando chave única para esta página)
+                localStorage.setItem('pendingCommissionsInfoOpen', 'true');
+                
+            } else {
+                // Fechar
+                content.classList.add('closing');
+                content.classList.remove('opening');
+                icon.classList.remove('open');
+                card.classList.remove('expanded');
+                
+                // Ocultar após animação
+                setTimeout(() => {
+                    content.style.display = 'none';
+                    content.classList.remove('closing');
+                }, 400);
+                
+                // Salvar estado no localStorage
+                localStorage.setItem('pendingCommissionsInfoOpen', 'false');
+            }
+        }
     </script>
     
     <style>
@@ -526,6 +712,209 @@ if ($result['status'] && isset($result['data']['totais'])) {
             font-size: 0.8rem;
             color: #6c757d;
             margin-top: 5px;
+        }
+        /* Estilos para seção colapsável */
+        .collapsible-card {
+            transition: all 0.3s ease;
+        }
+
+        .collapsible-header {
+            cursor: pointer;
+            user-select: none;
+            transition: background-color 0.3s ease;
+            position: relative;
+            padding: 1.25rem 1.5rem;
+            border-bottom: none;
+        }
+
+        .collapsible-header:hover {
+            background-color: #f8f9fa;
+        }
+
+        .collapsible-header .card-title {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+            margin: 0;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--secondary-color);
+        }
+
+        .dropdown-icon {
+            font-size: 14px;
+            font-weight: bold;
+            color: var(--primary-color);
+            transition: transform 0.3s ease;
+            margin-left: 10px;
+        }
+
+        .dropdown-icon.open {
+            transform: rotate(180deg);
+        }
+
+        .collapsible-content {
+            overflow: hidden;
+            transition: all 0.4s ease;
+            border-top: 1px solid #eee;
+            margin-top: 0;
+        }
+
+        .collapsible-content.opening {
+            animation: slideDown 0.4s ease-out;
+        }
+
+        .collapsible-content.closing {
+            animation: slideUp 0.4s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                max-height: 0;
+                padding-top: 0;
+                padding-bottom: 0;
+            }
+            to {
+                opacity: 1;
+                max-height: 1000px;
+                padding-top: 20px;
+                padding-bottom: 20px;
+            }
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 1;
+                max-height: 1000px;
+                padding-top: 20px;
+                padding-bottom: 20px;
+            }
+            to {
+                opacity: 0;
+                max-height: 0;
+                padding-top: 0;
+                padding-bottom: 0;
+            }
+        }
+
+        /* Estilo especial para quando está expandido */
+        .collapsible-card.expanded {
+            border-left: 4px solid var(--primary-color);
+        }
+
+        .collapsible-card.expanded .collapsible-header {
+            background-color: var(--primary-light);
+        }
+
+        /* Estilos para o conteúdo das informações */
+        .info-content {
+            padding: 1.5rem;
+            color: var(--medium-gray);
+        }
+
+        .info-section {
+            margin-bottom: 25px;
+        }
+
+        .info-section:last-child {
+            margin-bottom: 0;
+        }
+
+        .info-section h4 {
+            color: #333;
+            margin-bottom: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .info-section ul {
+            list-style-type: none;
+            padding-left: 0;
+            margin: 0;
+        }
+
+        .info-section li {
+            margin-bottom: 10px;
+            padding-left: 20px;
+            position: relative;
+            line-height: 1.5;
+        }
+
+        .info-section li::before {
+            content: "•";
+            color: var(--primary-color);
+            font-weight: bold;
+            position: absolute;
+            left: 0;
+            top: 0;
+        }
+
+        /* Ajustes para mobile */
+        @media (max-width: 768px) {
+            .collapsible-header {
+                padding: 1rem;
+            }
+            
+            .collapsible-header .card-title {
+                font-size: 1rem;
+            }
+            
+            .dropdown-icon {
+                font-size: 12px;
+            }
+            
+            .info-content {
+                padding: 1rem;
+            }
+            
+            .info-section h4 {
+                font-size: 0.9rem;
+            }
+            
+            .info-section li {
+                font-size: 0.9rem;
+                margin-bottom: 8px;
+            }
+        }
+
+        @media (max-width: 575.98px) {
+            .collapsible-header .card-title span:first-child {
+                font-size: 0.95rem;
+            }
+            
+            .info-section li {
+                padding-left: 15px;
+            }
+        }
+
+        /* Efeitos visuais adicionais */
+        .collapsible-header::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            width: 0;
+            height: 2px;
+            background-color: var(--primary-color);
+            transition: all 0.3s ease;
+            transform: translateX(-50%);
+        }
+
+        .collapsible-card.expanded .collapsible-header::after {
+            width: 90%;
+        }
+
+        /* Destaque para informações importantes */
+        .info-section li strong {
+            color: var(--primary-color);
+            font-weight: 600;
+        }
+
+        /* Estilos para ícones nas informações */
+        .info-section h4::before {
+            margin-right: 8px;
         }
     </style>
 </body>
