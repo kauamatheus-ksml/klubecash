@@ -483,6 +483,64 @@ $activeMenu = 'payment';
         });
     </script>
     
-    
+    <script>
+        // Função para controlar o dropdown de informações de pagamento
+        function togglePaymentInfoSection() {
+            const content = document.getElementById('paymentInfoSectionContent');
+            const icon = document.getElementById('paymentInfoDropdownIcon');
+            const card = content.closest('.collapsible-card'); // Encontra o .card pai
+            
+            if (content.style.display === 'none' || content.style.display === '') {
+                // Abrir
+                content.style.display = 'block';
+                // Adicionar classes para animação se desejar (ex: 'opening')
+                icon.classList.add('open'); // Para girar o ícone
+                if (card) card.classList.add('expanded'); // Para estilizar o card quando aberto
+                
+                // Salvar estado no localStorage (opcional)
+                localStorage.setItem('paymentInfoSectionOpen', 'true');
+                
+            } else {
+                // Fechar
+                // Adicionar classes para animação se desejar (ex: 'closing')
+                content.style.display = 'none'; // Ocultar imediatamente ou após animação
+                icon.classList.remove('open');
+                if (card) card.classList.remove('expanded');
+                
+                // Salvar estado no localStorage (opcional)
+                localStorage.setItem('paymentInfoSectionOpen', 'false');
+            }
+        }
+
+        // Restaurar estado do dropdown ao carregar a página (opcional)
+        document.addEventListener('DOMContentLoaded', function() {
+            const savedState = localStorage.getItem('paymentInfoSectionOpen');
+            const content = document.getElementById('paymentInfoSectionContent');
+            const icon = document.getElementById('paymentInfoDropdownIcon');
+            const card = content ? content.closest('.collapsible-card') : null; // Adicionar verificação se content existe
+            
+            if (savedState === 'true' && content && icon && card) { // Verificar se todos os elementos existem
+                content.style.display = 'block';
+                icon.classList.add('open');
+                card.classList.add('expanded');
+            }
+            
+            // Adicionar indicador visual ao passar o mouse no header (opcional)
+            const header = document.querySelector('.collapsible-header'); // Ajuste o seletor se necessário
+            if (header && card) {
+                header.addEventListener('mouseenter', function() {
+                    if (!card.classList.contains('expanded')) {
+                        this.style.backgroundColor = 'var(--primary-light)'; // Cor de hover suave
+                    }
+                });
+                
+                header.addEventListener('mouseleave', function() {
+                    if (!card.classList.contains('expanded')) {
+                        this.style.backgroundColor = ''; // Remove cor de hover
+                    }
+                });
+            }
+        });
+    </script>
 </body>
 </html>

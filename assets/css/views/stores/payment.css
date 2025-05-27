@@ -576,3 +576,123 @@ body {
     .info-section ol li::marker {
         color: #FF7A00;
     }
+
+
+    /* Estilos para seção colapsável (adaptado de payment-history.css) */
+.collapsible-card {
+    transition: all 0.3s ease;
+    border: 1px solid #FFD9B3; /* Mantendo a borda original do .card */
+}
+
+.collapsible-header {
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.3s ease;
+    position: relative; /* Necessário para o ícone de dropdown */
+    padding: 15px 20px; /* Padding original do .card-header */
+    border-bottom: none; /* Remover borda inferior se o conteúdo estiver fechado */
+}
+
+.collapsible-card.expanded .collapsible-header {
+    border-bottom: 1px solid rgba(255, 122, 0, 0.2); /* Adicionar borda quando expandido */
+}
+
+.collapsible-header:hover {
+    background-color: var(--primary-light);
+}
+
+.collapsible-header .card-title { /* Ajustar para o h2 dentro do header */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    margin: 0; /* Remover margem padrão do h2 */
+}
+
+.dropdown-icon {
+    font-size: 14px;
+    font-weight: bold;
+    color: var(--primary-color);
+    transition: transform 0.3s ease;
+    margin-left: 10px;
+}
+
+.dropdown-icon.open {
+    transform: rotate(180deg);
+}
+
+.collapsible-content {
+    overflow: hidden;
+    transition: max-height 0.4s ease-out, padding 0.4s ease-out; /* Adicionada transição para padding */
+    /* padding já é definido no .info-content, então não precisa aqui se o display for none */
+    max-height: 0; /* Começa fechado (se display:none não for usado) */
+}
+
+/* Animação de abertura/fechamento (opcional, pode ser feito com max-height) */
+.collapsible-content.opening { 
+    animation: slideDownPaymentInfo 0.4s ease-out forwards;
+}
+
+.collapsible-content.closing {
+    animation: slideUpPaymentInfo 0.4s ease-out forwards;
+}
+
+@keyframes slideDownPaymentInfo {
+    from {
+        opacity: 0;
+        max-height: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+    }
+    to {
+        opacity: 1;
+        max-height: 1000px; /* Um valor alto o suficiente */
+        padding-top: 20px; /* Padding original do .info-content */
+        padding-bottom: 20px;
+    }
+}
+
+@keyframes slideUpPaymentInfo {
+    from {
+        opacity: 1;
+        max-height: 1000px;
+        padding-top: 20px;
+        padding-bottom: 20px;
+    }
+    to {
+        opacity: 0;
+        max-height: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+    }
+}
+
+/* Estilo especial para quando está expandido */
+.collapsible-card.expanded {
+    border-left: 4px solid var(--primary-color);
+}
+
+.collapsible-card.expanded .collapsible-header {
+    background-color: var(--primary-light);
+}
+
+/* Ajustes para o .info-content dentro do .collapsible-content */
+.collapsible-content .info-content {
+    padding: 20px; /* Padding original do .info-content */
+}
+
+
+/* Ajustes Responsivos (se necessário, replicar ou adaptar de payment-history.css) */
+@media (max-width: 768px) {
+    .collapsible-header .card-title {
+        font-size: 16px; /* Ou o tamanho que preferir para mobile */
+    }
+    
+    .dropdown-icon {
+        font-size: 12px;
+    }
+    
+    .collapsible-content .info-content {
+        padding: 15px; /* Padding menor para mobile */
+    }
+}
