@@ -483,7 +483,107 @@
         color: var(--white);
         border-color: var(--primary-color);
     }
-    
+    /* Estilos para os detalhes da transação */
+    .transaction-details {
+        max-height: 70vh;
+        overflow-y: auto;
+    }
+
+    .detail-card {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .detail-card.primary-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+    }
+
+    .detail-card.success-card {
+        background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        color: white;
+        border: none;
+    }
+
+    .detail-card.warning-card {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        color: white;
+        border: none;
+    }
+
+    .detail-card h4 {
+        margin: 0 0 1rem 0;
+        font-size: 1.1rem;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .detail-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .detail-card:not(.primary-card):not(.success-card):not(.warning-card) .detail-row {
+        border-bottom: 1px solid #dee2e6;
+    }
+
+    .detail-row:last-child {
+        border-bottom: none;
+    }
+
+    .detail-row span:first-child {
+        flex: 1;
+        font-weight: 500;
+    }
+
+    .detail-row strong,
+    .detail-row .status-badge {
+        flex-shrink: 0;
+        margin-left: 1rem;
+    }
+
+    /* Responsividade para detalhes */
+    @media (max-width: 768px) {
+        .transaction-details {
+            max-height: 60vh;
+        }
+        
+        .detail-row {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.25rem;
+        }
+        
+        .detail-row strong,
+        .detail-row .status-badge {
+            margin-left: 0;
+        }
+    }
+
+    /* Animação para o modal */
+    .modal {
+        animation: modalSlideIn 0.3s ease-out;
+    }
+
+    @keyframes modalSlideIn {
+        from {
+            opacity: 0;
+            transform: scale(0.9) translateY(-20px);
+        }
+        to {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+        }
+    }
     /* Responsividade */
     @media (max-width: 991.98px) {
         .main-content {

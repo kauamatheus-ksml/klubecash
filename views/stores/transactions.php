@@ -233,7 +233,23 @@ $activeMenu = 'transactions';
             <button class="btn btn-primary" onclick="applyFilters()">Aplicar Filtros</button>
         </div>
     </div>
-
+    <!-- Modal de Detalhes da Transação -->
+    <div class="modal-backdrop" id="detailsModalBackdrop"></div>
+    <div class="modal" id="detailsModal">
+        <div class="modal-header">
+            <h3 class="modal-title">Detalhes da Transação</h3>
+            <button class="modal-close" onclick="closeDetailsModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="detailsModalContent">
+            <div class="loading-state">
+                <div class="spinner"></div>
+                <p>Carregando detalhes...</p>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-outline-primary" onclick="closeDetailsModal()">Fechar</button>
+        </div>
+    </div>
     <script>
         // Variáveis globais
         const storeId = <?php echo $store['id']; ?>;
@@ -427,10 +443,180 @@ $activeMenu = 'transactions';
             loadTransactions(1);
         }
 
+        // Função para visualizar detalhes da transação
         function viewTransactionDetails(transactionId) {
-            alert('Ver detalhes da transação ID: ' + transactionId);
-            // Implementar modal de detalhes
+            // Mostrar modal
+            document.getElementById('detailsModal').style.display = 'block';
+            document.getElementById('detailsModalBackdrop').style.display = 'block';
+            document.getElementById('detailsModalContent').innerHTML = `
+                <div class="loading-state">
+                    <div class="spinner"></div>
+                    <p>Carregando detalhes...</p>
+                </div>
+            `;
+
+            // Buscar detalhes da transação
+            const formData = new FormData();
+            formData.append('action', 'transaction_details');
+            formData.append('transaction_id', transactionId);
+
+            fetch('../../controllers/TransactionController.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status) {
+                    displayTransactionDetails(data.data);
+                } else {
+                    document.getElementById('detailsModalContent').innerHTML = `
+                        <div style="text-align: center; padding: 2rem; color: var(--danger-color);">
+                            <h3>Erro ao carregar</h3>
+                            <p>${data.message}</p>
+                        </div>
+                    `;
+                }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                document.getElementById('detailsModalContent').innerHTML = `
+                    <div style="text-align: center; padding: 2rem; color: var(--danger-color);">
+                        <h3>Erro de conexão</h3>
+                        <p>Não foi possível carregar os detalhes da transação.</p>
+                    </div>
+                `;
+            });
         }
+
+        // Função para exibir os detalhes no modal
+        function displayTransactionDetails(transaction) {
+            const statusClass = {
+                'pendente': 'pendente',
+                'aprovado': 'aprovado',
+                'cancelado': 'cancelado',
+                'pagamento_pendente': 'warning'
+            };
+
+            const statusText = {
+                'pendente': 'Pendente',
+                'aprovado': 'Aprovado',
+                'cancelado': 'Cancelado',
+                'pagamento_pendente': 'Pagamento Pendente'
+            };
+
+            let saldoUsadoHtml = '';
+            if (transaction.valor_saldo_usado && parseFloat(transaction.valor_saldo_usado) > 0) {
+                saldoUsadoHtml = `
+                    <div class="detail-card warning-card">
+                        <h4>💰 Saldo Utilizado</h4>
+                        <div class="detail-row">
+                            <span>Valor do saldo usado:</span>
+                            <strong>R$ ${formatMoney(transaction.valor_saldo_usado)}</strong>
+                        </div>
+                        <div class="detail-row">
+                            <span>Valor efetivamente pago:</span>
+                            <strong>R$ ${formatMoney(transaction.valor_total - transaction.valor_saldo_usado)}</strong>
+                        </div>
+                    </div>
+                `;
+            }
+
+            let comissaoHtml = '';
+            if (transaction.pagamento_id) {
+                comissaoHtml = `
+                    <div class="detail-card">
+                        <h4>💼 Informações de Pagamento</h4>
+                        <div class="detail-row">
+                            <span>ID do Pagamento:</span>
+                            <strong>#${transaction.pagamento_id}</strong>
+                        </div>
+                        <div class="detail-row">
+                            <span>Status do Pagamento:</span>
+                            <span class="status-badge ${transaction.status_pagamento || 'pendente'}">${transaction.status_pagamento || 'Pendente'}</span>
+                        </div>
+                        ${transaction.data_pagamento ? `
+                        <div class="detail-row">
+                            <span>Data do Pagamento:</span>
+                            <strong>${formatDateTime(transaction.data_pagamento)}</strong>
+                        </div>
+                        ` : ''}
+                    </div>
+                `;
+            }
+
+            document.getElementById('detailsModalContent').innerHTML = `
+                <div class="transaction-details">
+                    <!-- Informações Básicas -->
+                    <div class="detail-card primary-card">
+                        <h4>📋 Informações Gerais</h4>
+                        <div class="detail-row">
+                            <span>Código da Transação:</span>
+                            <strong><code>${transaction.codigo_transacao}</code></strong>
+                        </div>
+                        <div class="detail-row">
+                            <span>Data:</span>
+                            <strong>${formatDateTime(transaction.data_transacao)}</strong>
+                        </div>
+                        <div class="detail-row">
+                            <span>Status:</span>
+                            <span class="status-badge ${statusClass[transaction.status] || ''}">${statusText[transaction.status] || transaction.status}</span>
+                        </div>
+                        ${transaction.descricao ? `
+                        <div class="detail-row">
+                            <span>Descrição:</span>
+                            <strong>${transaction.descricao}</strong>
+                        </div>
+                        ` : ''}
+                    </div>
+
+                    <!-- Informações do Cliente -->
+                    <div class="detail-card">
+                        <h4>👤 Cliente</h4>
+                        <div class="detail-row">
+                            <span>Nome:</span>
+                            <strong>${transaction.cliente_nome}</strong>
+                        </div>
+                        <div class="detail-row">
+                            <span>Email:</span>
+                            <strong>${transaction.cliente_email}</strong>
+                        </div>
+                    </div>
+
+                    <!-- Valores -->
+                    <div class="detail-card success-card">
+                        <h4>💰 Valores</h4>
+                        <div class="detail-row">
+                            <span>Valor Total da Compra:</span>
+                            <strong>R$ ${formatMoney(transaction.valor_total)}</strong>
+                        </div>
+                        <div class="detail-row">
+                            <span>Comissão Total (10%):</span>
+                            <strong>R$ ${formatMoney(transaction.valor_cashback)}</strong>
+                        </div>
+                        <div class="detail-row">
+                            <span>Cashback Cliente (5%):</span>
+                            <strong>R$ ${formatMoney(transaction.valor_cliente)}</strong>
+                        </div>
+                        <div class="detail-row">
+                            <span>Comissão Admin (5%):</span>
+                            <strong>R$ ${formatMoney(transaction.valor_admin)}</strong>
+                        </div>
+                    </div>
+
+                    ${saldoUsadoHtml}
+                    ${comissaoHtml}
+                </div>
+            `;
+        }
+
+        // Função para fechar modal de detalhes
+        function closeDetailsModal() {
+            document.getElementById('detailsModal').style.display = 'none';
+            document.getElementById('detailsModalBackdrop').style.display = 'none';
+        }
+
+        // Fechar modal clicando no backdrop
+        document.getElementById('detailsModalBackdrop').addEventListener('click', closeDetailsModal);
 
         function showError(message) {
             document.getElementById('loadingState').innerHTML = `

@@ -318,6 +318,76 @@ class TransactionController {
     }
 
     /**
+    * Obtém detalhes completos de uma transação específica
+    * 
+    * @param int $transactionId ID da transação
+    * @return array Detalhes da transação
+    */
+    public static function getTransactionDetails($transactionId) {
+        try {
+            if (!AuthController::isAuthenticated()) {
+                return ['status' => false, 'message' => 'Usuário não autenticado.'];
+            }
+            
+            $db = Database::getConnection();
+            
+            // Buscar detalhes completos da transação
+            $stmt = $db->prepare("
+                SELECT 
+                    t.*, 
+                    u.nome as cliente_nome, 
+                    u.email as cliente_email,
+                    l.nome_fantasia as loja_nome,
+                    pc.id as pagamento_id, 
+                    pc.status as status_pagamento,
+                    pc.data_aprovacao as data_pagamento,
+                    COALESCE(tsu.valor_usado, 0) as valor_saldo_usado
+                FROM transacoes_cashback t
+                JOIN usuarios u ON t.usuario_id = u.id
+                JOIN lojas l ON t.loja_id = l.id
+                LEFT JOIN pagamentos_transacoes pt ON t.id = pt.transacao_id
+                LEFT JOIN pagamentos_comissao pc ON pt.pagamento_id = pc.id
+                LEFT JOIN transacoes_saldo_usado tsu ON t.id = tsu.transacao_id
+                WHERE t.id = ?
+            ");
+            
+            $stmt->execute([$transactionId]);
+            $transaction = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$transaction) {
+                return ['status' => false, 'message' => 'Transação não encontrada.'];
+            }
+            
+            // Verificar permissões - apenas admin ou loja proprietária
+            $currentUserId = AuthController::getCurrentUserId();
+            
+            if (!AuthController::isAdmin()) {
+                if (AuthController::isStore()) {
+                    // Verificar se é a loja proprietária
+                    $storeCheckStmt = $db->prepare("SELECT usuario_id FROM lojas WHERE id = ?");
+                    $storeCheckStmt->execute([$transaction['loja_id']]);
+                    $storeCheck = $storeCheckStmt->fetch(PDO::FETCH_ASSOC);
+                    
+                    if (!$storeCheck || $storeCheck['usuario_id'] != $currentUserId) {
+                        return ['status' => false, 'message' => 'Acesso não autorizado a esta transação.'];
+                    }
+                } else {
+                    return ['status' => false, 'message' => 'Acesso não autorizado.'];
+                }
+            }
+            
+            return [
+                'status' => true,
+                'data' => $transaction
+            ];
+            
+        } catch (PDOException $e) {
+            error_log('Erro ao obter detalhes da transação: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro ao obter detalhes da transação.'];
+        }
+    }
+
+    /**
     * Obtém detalhes de um pagamento específico com informações de saldo
     * 
     * @param int $paymentId ID do pagamento
@@ -2116,6 +2186,17 @@ if (basename($_SERVER['PHP_SELF']) === 'TransactionController.php') {
     $action = $_REQUEST['action'] ?? '';
     
     switch ($action) {
+        case 'transaction_details':
+            $transactionId = isset($_POST['transaction_id']) ? intval($_POST['transaction_id']) : 0;
+            if ($transactionId <= 0) {
+                echo json_encode(['status' => false, 'message' => 'ID da transação inválido']);
+                return;
+            }
+            
+            $result = TransactionController::getTransactionDetails($transactionId);
+            echo json_encode($result);
+            break;
+
         case 'register':
             $data = $_POST;
             $result = TransactionController::registerTransaction($data);
