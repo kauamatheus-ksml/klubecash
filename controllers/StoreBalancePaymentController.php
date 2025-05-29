@@ -786,7 +786,6 @@ if (basename($_SERVER['PHP_SELF']) === 'StoreBalancePaymentController.php') {
             }
             exit;
     }
-
 }
 
 ?>
