@@ -427,18 +427,9 @@ class StoreBalancePaymentController {
                 $linkStmt->execute([$paymentId, $movId]);
             }
             
-            // 3. Registrar log informativo do reembolso (não afeta saldo admin)
-            $logStmt = $db->prepare("
-                INSERT INTO admin_saldo_movimentacoes (transacao_id, valor, tipo, descricao) 
-                VALUES (?, ?, 'debito', ?)
-            ");
-            $logStmt->execute([
-                null, 
-                $totalCalculado, 
-                "REEMBOLSO: Saldo usado por clientes na loja {$store['nome_fantasia']} - ID #$paymentId (não afeta saldo admin)"
-            ]);
+            // 3. Registrar movimentação na reserva de cashback (saída)
+            self::updateCashbackReserve($db, -$totalCalculado, null, "Cashback usado - Reembolso loja {$store['nome_fantasia']} - ID #$paymentId");
             
-
             // 4. Criar notificação para loja
             $storeUserStmt = $db->prepare("SELECT usuario_id FROM lojas WHERE id = ?");
             $storeUserStmt->execute([$data['loja_id']]);
@@ -508,6 +499,67 @@ class StoreBalancePaymentController {
             
             error_log('Erro ao processar pagamento de saldo: ' . $e->getMessage());
             return ['status' => false, 'message' => 'Erro ao processar pagamento: ' . $e->getMessage()];
+        }
+    }
+    
+    /**
+     * Atualiza a reserva de cashback (versão compatível com transação)
+     */
+    private static function updateCashbackReserve($db, $valor, $transacaoId = null, $descricao = '') {
+        try {
+            // Obter ou criar registro da reserva
+            $reservaStmt = $db->prepare("SELECT * FROM admin_reserva_cashback WHERE id = 1");
+            $reservaStmt->execute();
+            $reserva = $reservaStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$reserva) {
+                // Criar registro inicial
+                $createStmt = $db->prepare("
+                    INSERT INTO admin_reserva_cashback (id, valor_total, valor_disponivel, valor_usado) 
+                    VALUES (1, 0, 0, 0)
+                ");
+                $createStmt->execute();
+                $reserva = ['valor_total' => 0, 'valor_disponivel' => 0, 'valor_usado' => 0];
+            }
+            
+            // Calcular novos valores
+            if ($valor > 0) {
+                // Crédito (cashback disponibilizado)
+                $novoTotal = $reserva['valor_total'] + $valor;
+                $novoDisponivel = $reserva['valor_disponivel'] + $valor;
+                $novoUsado = $reserva['valor_usado'];
+            } else {
+                // Débito (cashback usado)
+                $valorAbs = abs($valor);
+                $novoTotal = $reserva['valor_total'];
+                $novoDisponivel = $reserva['valor_disponivel'] - $valorAbs;
+                $novoUsado = $reserva['valor_usado'] + $valorAbs;
+            }
+            
+            // Atualizar reserva
+            $updateStmt = $db->prepare("
+                UPDATE admin_reserva_cashback 
+                SET valor_total = ?, valor_disponivel = ?, valor_usado = ?, ultima_atualizacao = NOW() 
+                WHERE id = 1
+            ");
+            $updateStmt->execute([$novoTotal, $novoDisponivel, $novoUsado]);
+            
+            // Registrar movimentação
+            $movStmt = $db->prepare("
+                INSERT INTO admin_reserva_movimentacoes (transacao_id, valor, tipo, descricao) 
+                VALUES (?, ?, ?, ?)
+            ");
+            
+            $tipo = $valor >= 0 ? 'credito' : 'debito';
+            $valorAbs = abs($valor);
+            
+            $movStmt->execute([$transacaoId, $valorAbs, $tipo, $descricao]);
+            
+            return true;
+            
+        } catch (Exception $e) {
+            error_log('Erro ao atualizar reserva de cashback: ' . $e->getMessage());
+            return false;
         }
     }
     

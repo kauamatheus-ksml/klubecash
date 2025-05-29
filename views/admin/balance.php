@@ -128,9 +128,22 @@ try {
     $saldoTotal = $saldoAdmin['valor_disponivel'];
     $saldoPendente = $saldoAdmin['valor_pendente'];
     
+    
 } catch (Exception $e) {
     $error = "Erro ao carregar dados do saldo: " . $e->getMessage();
     error_log("Erro em balance.php: " . $e->getMessage());
+}
+
+
+// 7. Obter dados da reserva de cashback
+$reservaData = AdminController::getCashbackReserveData();
+if ($reservaData['status']) {
+    $balanceData['reserva_cashback'] = $reservaData['data'];
+} else {
+    $balanceData['reserva_cashback'] = [
+        'reserva' => ['valor_total' => 0, 'valor_disponivel' => 0, 'valor_usado' => 0],
+        'movimentacoes' => []
+    ];
 }
 ?>
 
@@ -337,18 +350,21 @@ try {
                 <h2>💼 Resumo Financeiro</h2>
                 <div class="balance-grid">
                     <div class="balance-item">
-                        <div class="balance-label">💵 Saldo Disponível</div>
+                        <div class="balance-label">💵 Receita da Administração</div>
                         <div class="balance-value">R$ <?php echo number_format($balanceData['saldo_admin']['valor_disponivel'], 2, ',', '.'); ?></div>
+                        <small>Comissões da plataforma</small>
                     </div>
                     
                     <div class="balance-item">
-                        <div class="balance-label">⏳ Saldo Pendente</div>
-                        <div class="balance-value">R$ <?php echo number_format($balanceData['saldo_admin']['valor_pendente'], 2, ',', '.'); ?></div>
+                        <div class="balance-label">🎁 Reserva de Cashback</div>
+                        <div class="balance-value">R$ <?php echo number_format($balanceData['reserva_cashback']['reserva']['valor_disponivel'], 2, ',', '.'); ?></div>
+                        <small>Disponível para clientes</small>
                     </div>
                     
                     <div class="balance-item">
-                        <div class="balance-label">📊 Saldo Total</div>
-                        <div class="balance-value">R$ <?php echo number_format($balanceData['saldo_admin']['valor_total'], 2, ',', '.'); ?></div>
+                        <div class="balance-label">💸 Cashback Usado</div>
+                        <div class="balance-value">R$ <?php echo number_format($balanceData['reserva_cashback']['reserva']['valor_usado'], 2, ',', '.'); ?></div>
+                        <small>Reembolsado às lojas</small>
                     </div>
                 </div>
                 
@@ -360,6 +376,19 @@ try {
                         💳 Pagamentos de Saldo
                     </a>
                 </div>
+            </div>
+            
+            <!-- Seção Explicativa sobre Reembolsos -->
+            <div class="info-section" style="background: #e8f4fd; border: 1px solid #bee1f4; border-radius: 10px; padding: 20px; margin-bottom: 30px;">
+                <h3 style="color: #0c5460; margin-bottom: 15px;">ℹ️ Sobre os Reembolsos às Lojas</h3>
+                <p style="color: #0c5460; margin-bottom: 10px;">
+                    <strong>Os reembolsos não afetam a receita da administração.</strong> 
+                    Quando clientes usam cashback nas compras, as lojas recebem menos dinheiro efetivamente. 
+                    O sistema processa o reembolso desses valores para que as lojas recebam o valor integral de suas vendas.
+                </p>
+                <p style="color: #0c5460; margin: 0;">
+                    <strong>Exemplo:</strong> Cliente compra R$ 100, usa R$ 20 de cashback → Loja recebe R$ 80 + R$ 20 de reembolso = R$ 100 total
+                </p>
             </div>
             
             <!-- Cards de estatísticas principais -->
@@ -383,15 +412,15 @@ try {
                 </div>
                 
                 <div class="stat-card" style="border-left-color: #17a2b8;">
-                    <div class="stat-card-title">💳 Reembolsos Processados</div>
-                    <div class="stat-card-value">R$ <?php echo number_format($balanceData['balance_stats']['valor_total_pago'] ?? 0, 2, ',', '.'); ?></div>
-                    <div class="stat-card-subtitle">Cashback usado pelos clientes</div>
+                    <div class="stat-card-title">💳 Cashback Usado</div>
+                    <div class="stat-card-value">R$ <?php echo number_format($balanceData['reserva_cashback']['reserva']['valor_usado'] ?? 0, 2, ',', '.'); ?></div>
+                    <div class="stat-card-subtitle">Pelos clientes nas compras</div>
                 </div>
                 
                 <div class="stat-card" style="border-left-color: #ffc107;">
-                    <div class="stat-card-title">⏳ Reembolsos Pendentes</div>
-                    <div class="stat-card-value">R$ <?php echo number_format($balanceData['balance_stats']['valor_total_pendente'] ?? 0, 2, ',', '.'); ?></div>
-                    <div class="stat-card-subtitle">A processar para <?php echo number_format($balanceData['balance_stats']['total_lojas'] ?? 0); ?> lojas</div>
+                    <div class="stat-card-title">⏳ Cashback Disponível</div>
+                    <div class="stat-card-value">R$ <?php echo number_format($balanceData['reserva_cashback']['reserva']['valor_disponivel'] ?? 0, 2, ',', '.'); ?></div>
+                    <div class="stat-card-subtitle">Para uso pelos clientes</div>
                 </div>
                 
                 <div class="stat-card">
@@ -406,7 +435,7 @@ try {
                 <!-- Gráfico mensal -->
                 <div class="card">
                     <div class="card-header">
-                        <div class="card-title">📊 Movimentação Mensal</div>
+                        <div class="card-title">📊 Movimentação Mensal (Receita Admin)</div>
                     </div>
                     <div class="chart-container">
                         <canvas id="monthlyChart"></canvas>
@@ -445,10 +474,10 @@ try {
                 </div>
             </div>
             
-            <!-- Histórico de Movimentações -->
+            <!-- Histórico de Movimentações da Receita Admin -->
             <div class="card transactions-container">
                 <div class="card-header">
-                    <div class="card-title">📋 Últimas Movimentações do Saldo</div>
+                    <div class="card-title">📋 Últimas Movimentações - Receita da Administração</div>
                 </div>
                 
                 <div class="table-responsive">
@@ -466,6 +495,10 @@ try {
                         <tbody>
                             <?php if (!empty($balanceData['movimentacoes'])): ?>
                                 <?php foreach ($balanceData['movimentacoes'] as $mov): ?>
+                                    <?php 
+                                    // Filtrar apenas movimentações que não são reembolsos informativos
+                                    if (strpos($mov['descricao'], 'REEMBOLSO:') !== 0): 
+                                    ?>
                                     <tr>
                                         <td><?php echo date('d/m/Y H:i', strtotime($mov['data_operacao'])); ?></td>
                                         <td><?php echo htmlspecialchars($mov['descricao']); ?></td>
@@ -482,6 +515,7 @@ try {
                                         <td><?php echo htmlspecialchars($mov['codigo_transacao'] ?? 'N/A'); ?></td>
                                         <td><?php echo htmlspecialchars($mov['loja_nome'] ?? 'N/A'); ?></td>
                                     </tr>
+                                    <?php endif; ?>
                                 <?php endforeach; ?>
                             <?php else: ?>
                                 <tr>
@@ -498,12 +532,63 @@ try {
                 </div>
             </div>
             
+            <!-- Histórico de Movimentações da Reserva de Cashback -->
+            <div class="card transactions-container">
+                <div class="card-header">
+                    <div class="card-title">🎁 Últimas Movimentações - Reserva de Cashback</div>
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Descrição</th>
+                                <th>Tipo</th>
+                                <th>Valor</th>
+                                <th>Transação</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if (!empty($balanceData['reserva_cashback']['movimentacoes'])): ?>
+                                <?php foreach ($balanceData['reserva_cashback']['movimentacoes'] as $mov): ?>
+                                    <tr>
+                                        <td><?php echo date('d/m/Y H:i', strtotime($mov['data_operacao'])); ?></td>
+                                        <td><?php echo htmlspecialchars($mov['descricao']); ?></td>
+                                        <td>
+                                            <span class="movement-type <?php echo $mov['tipo']; ?>">
+                                                <?php echo $mov['tipo'] == 'credito' ? '🎁 Cashback Disponibilizado' : '💸 Cashback Usado'; ?>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span style="color: <?php echo $mov['tipo'] == 'credito' ? '#28a745' : '#dc3545'; ?>; font-weight: 600;">
+                                                <?php echo $mov['tipo'] == 'credito' ? '+' : '-'; ?>R$ <?php echo number_format($mov['valor'], 2, ',', '.'); ?>
+                                            </span>
+                                        </td>
+                                        <td><?php echo $mov['transacao_id'] ? '#' . $mov['transacao_id'] : 'N/A'; ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <tr>
+                                    <td colspan="5" style="text-align: center; padding: 40px;">
+                                        <div style="color: #666;">
+                                            <strong>🎁 Nenhuma movimentação de cashback encontrada</strong><br>
+                                            <small>Movimentações aparecerão aqui conforme o cashback for usado pelos clientes</small>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
             <?php endif; ?>
         </div>
     </div>
     
     <script>
-        // Dados para o gráfico mensal
+        // Dados para o gráfico mensal (apenas receita admin, não inclui movimentações de cashback)
         const monthlyData = {
             labels: [
                 <?php 
@@ -546,17 +631,10 @@ try {
                 labels: monthlyData.labels,
                 datasets: [
                     {
-                        label: 'Entradas (R$)',
+                        label: 'Comissões Recebidas (R$)',
                         data: monthlyData.entrada,
                         backgroundColor: '#28a745',
                         borderColor: '#1e7e34',
-                        borderWidth: 1
-                    },
-                    {
-                        label: 'Saídas (R$)',
-                        data: monthlyData.saida,
-                        backgroundColor: '#dc3545',
-                        borderColor: '#c82333',
                         borderWidth: 1
                     }
                 ]
@@ -570,7 +648,7 @@ try {
                     },
                     title: {
                         display: true,
-                        text: 'Movimentação Financeira Mensal'
+                        text: 'Receitas da Administração - Mensal'
                     }
                 },
                 scales: {
