@@ -617,5 +617,176 @@ class StoreBalancePaymentController {
             ];
         }
     }
+    /**
+ * Obtém movimentações pendentes para uma loja específica
+ * 
+ * @param int $lojaId ID da loja
+ * @return array Lista de IDs das movimentações pendentes
+ */
+public static function getPendingMovimentacoes($lojaId) {
+    try {
+        // Verificar se o usuário está autenticado e é administrador
+        if (!AuthController::isAuthenticated() || !AuthController::isAdmin()) {
+            return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
+        }
+        
+        $db = Database::getConnection();
+        
+        // Buscar movimentações pendentes da loja
+        $query = "
+            SELECT cm.id
+            FROM cashback_movimentacoes cm
+            LEFT JOIN store_balance_payments sbp ON cm.pagamento_id = sbp.id
+            WHERE cm.loja_id = :loja_id 
+            AND cm.tipo_operacao = 'uso'
+            AND cm.transacao_uso_id IS NOT NULL
+            AND (cm.pagamento_id IS NULL OR sbp.status = 'pendente')
+            ORDER BY cm.data_operacao ASC
+        ";
+        
+        $stmt = $db->prepare($query);
+        $stmt->bindParam(':loja_id', $lojaId);
+        $stmt->execute();
+        
+        $movimentacoes = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        
+        return [
+            'status' => true,
+            'data' => [
+                'movimentacoes' => $movimentacoes
+            ]
+        ];
+        
+    } catch (PDOException $e) {
+        error_log('Erro ao obter movimentações pendentes: ' . $e->getMessage());
+        return ['status' => false, 'message' => 'Erro ao obter movimentações pendentes.'];
+    }
 }
+
+/**
+ * Obtém detalhes de um pagamento de saldo específico
+ * 
+ * @param int $paymentId ID do pagamento
+ * @return array Detalhes do pagamento
+ */
+public static function getBalancePaymentDetails($paymentId) {
+    try {
+        // Verificar se o usuário está autenticado e é administrador
+        if (!AuthController::isAuthenticated() || !AuthController::isAdmin()) {
+            return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
+        }
+        
+        $db = Database::getConnection();
+        
+        // Buscar dados do pagamento
+        $paymentStmt = $db->prepare("
+            SELECT sbp.*, l.nome_fantasia as loja_nome
+            FROM store_balance_payments sbp
+            JOIN lojas l ON sbp.loja_id = l.id
+            WHERE sbp.id = ?
+        ");
+        $paymentStmt->execute([$paymentId]);
+        $payment = $paymentStmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$payment) {
+            return ['status' => false, 'message' => 'Pagamento não encontrado.'];
+        }
+        
+        // Buscar transações relacionadas
+        $transactionsStmt = $db->prepare("
+            SELECT 
+                cm.valor as valor_saldo_usado,
+                cm.data_operacao,
+                t.codigo_transacao,
+                t.valor_total as valor_venda,
+                u.nome as cliente_nome
+            FROM cashback_movimentacoes cm
+            JOIN transacoes_cashback t ON cm.transacao_uso_id = t.id
+            JOIN usuarios u ON cm.usuario_id = u.id
+            WHERE cm.pagamento_id = ?
+            ORDER BY cm.data_operacao DESC
+        ");
+        $transactionsStmt->execute([$paymentId]);
+        $transactions = $transactionsStmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        return [
+            'status' => true,
+            'data' => [
+                'pagamento' => $payment,
+                'transacoes' => $transactions
+            ]
+        ];
+        
+    } catch (PDOException $e) {
+        error_log('Erro ao obter detalhes do pagamento de saldo: ' . $e->getMessage());
+        return ['status' => false, 'message' => 'Erro ao obter detalhes do pagamento.'];
+    }
+}
+}
+
+// Processar requisições diretas de acesso ao controlador
+if (basename($_SERVER['PHP_SELF']) === 'StoreBalancePaymentController.php') {
+    // Verificar se o usuário está autenticado
+    if (!AuthController::isAuthenticated()) {
+        header('Location: ' . LOGIN_URL . '?error=' . urlencode('Você precisa fazer login para acessar esta página.'));
+        exit;
+    }
+    
+    $action = $_REQUEST['action'] ?? '';
+    
+    switch ($action) {
+        case 'get_pending_store_balance_payments':
+            $filters = $_POST['filters'] ?? [];
+            $page = isset($_POST['page']) ? intval($_POST['page']) : 1;
+            $result = StoreBalancePaymentController::getPendingStoreBalancePayments($filters, $page);
+            echo json_encode($result);
+            break;
+            
+        case 'get_store_balance_details':
+            $lojaId = isset($_POST['loja_id']) ? intval($_POST['loja_id']) : 0;
+            $filters = $_POST['filters'] ?? [];
+            $result = StoreBalancePaymentController::getStoreBalanceDetails($lojaId, $filters);
+            echo json_encode($result);
+            break;
+            
+        case 'get_pending_movimentacoes':
+            $lojaId = isset($_POST['loja_id']) ? intval($_POST['loja_id']) : 0;
+            $result = StoreBalancePaymentController::getPendingMovimentacoes($lojaId);
+            echo json_encode($result);
+            break;
+            
+        case 'process_store_balance_payment':
+            $data = $_POST;
+            if (isset($_FILES['comprovante']) && $_FILES['comprovante']['error'] === UPLOAD_ERR_OK) {
+                $data['comprovante'] = $_FILES['comprovante'];
+            }
+            $result = StoreBalancePaymentController::processStoreBalancePayment($data);
+            echo json_encode($result);
+            break;
+            
+        case 'get_balance_payment_details':
+            $paymentId = isset($_POST['payment_id']) ? intval($_POST['payment_id']) : 0;
+            $result = StoreBalancePaymentController::getBalancePaymentDetails($paymentId);
+            echo json_encode($result);
+            break;
+            
+        case 'get_balance_statistics':
+            $result = StoreBalancePaymentController::getBalanceStatistics();
+            echo json_encode(['status' => true, 'data' => $result]);
+            break;
+            
+        default:
+            // Acesso inválido ao controlador, redirecionar baseado no tipo de usuário
+            if (AuthController::isAdmin()) {
+                header('Location: ' . ADMIN_DASHBOARD_URL);
+            } elseif (AuthController::isStore()) {
+                header('Location: ' . STORE_DASHBOARD_URL);
+            } else {
+                header('Location: ' . CLIENT_DASHBOARD_URL);
+            }
+            exit;
+    }
+
+}
+
 ?>
