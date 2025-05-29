@@ -115,11 +115,50 @@ try {
     // 6. Obter estatísticas de pagamentos de saldo
     $balanceStats = StoreBalancePaymentController::getBalanceStatistics();
 
-    // 7. Obter dados da reserva de cashback (temporário até implementar o método)
-    $balanceData['reserva_cashback'] = [
-        'reserva' => ['valor_total' => 0, 'valor_disponivel' => 0, 'valor_usado' => 0],
-        'movimentacoes' => []
-    ];
+    // 7. Obter dados REAIS da reserva de cashback
+    try {
+        // Buscar dados da reserva principal
+        $reservaStmt = $db->prepare("SELECT * FROM admin_reserva_cashback WHERE id = 1");
+        $reservaStmt->execute();
+        $reservaData = $reservaStmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$reservaData) {
+            // Se não existir, criar registro inicial
+            $createReservaStmt = $db->prepare("
+                INSERT INTO admin_reserva_cashback (id, valor_total, valor_disponivel, valor_usado) 
+                VALUES (1, 0, 0, 0)
+            ");
+            $createReservaStmt->execute();
+            $reservaData = ['valor_total' => 0, 'valor_disponivel' => 0, 'valor_usado' => 0];
+        }
+        
+        // Buscar movimentações da reserva
+        $movReservaStmt = $db->prepare("
+            SELECT * FROM admin_reserva_movimentacoes 
+            ORDER BY data_operacao DESC 
+            LIMIT 20
+        ");
+        $movReservaStmt->execute();
+        $movimentacoesReserva = $movReservaStmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Estruturar dados da reserva
+        $balanceData['reserva_cashback'] = [
+            'reserva' => [
+                'valor_total' => floatval($reservaData['valor_total']),
+                'valor_disponivel' => floatval($reservaData['valor_disponivel']),
+                'valor_usado' => floatval($reservaData['valor_usado'])
+            ],
+            'movimentacoes' => $movimentacoesReserva
+        ];
+        
+    } catch (Exception $e) {
+        error_log("Erro ao buscar dados da reserva: " . $e->getMessage());
+        // Fallback para valores zero em caso de erro
+        $balanceData['reserva_cashback'] = [
+            'reserva' => ['valor_total' => 0, 'valor_disponivel' => 0, 'valor_usado' => 0],
+            'movimentacoes' => []
+        ];
+    }
 
     // Preparar dados para a view
     $balanceData = [
