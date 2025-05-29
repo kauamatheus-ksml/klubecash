@@ -1460,12 +1460,11 @@ class TransactionController {
                 require_once __DIR__ . '/AdminController.php';
                 $balanceModel = new CashbackBalance();
                 $saldosCreditados = 0;
+                $totalCashbackReservado = 0; // NOVO: controlar total para reserva
                 
                 foreach ($transactions as $transaction) {
                     if ($transaction['valor_cliente'] > 0) {
                         $description = "Cashback da compra - Transação #{$transaction['id']} (Pagamento #{$paymentId} aprovado)";
-                        
-                        error_log("APROVAÇÃO: Creditando saldo - Transação: {$transaction['id']}, Usuario: {$transaction['usuario_id']}, Loja: {$transaction['loja_id']}, Valor: {$transaction['valor_cliente']}");
                         
                         $creditResult = $balanceModel->addBalance(
                             $transaction['usuario_id'],
@@ -1477,11 +1476,26 @@ class TransactionController {
                         
                         if ($creditResult) {
                             $saldosCreditados++;
+                            $totalCashbackReservado += $transaction['valor_cliente']; // NOVO
                             error_log("APROVAÇÃO: Saldo creditado com sucesso - Transação: {$transaction['id']}");
                         } else {
                             error_log("APROVAÇÃO: ERRO ao creditar saldo - Transação: {$transaction['id']}");
-                            // Continuamos mesmo se um crédito falhar
                         }
+                    }
+                }
+                
+                // NOVO: 5. Criar reserva de cashback após creditar saldos dos clientes
+                if ($totalCashbackReservado > 0) {
+                    $reservaResult = self::createCashbackReserve(
+                        $totalCashbackReservado, 
+                        $paymentId, 
+                        "Reserva de cashback - Pagamento #{$paymentId} aprovado - Total de clientes: {$saldosCreditados}"
+                    );
+                    
+                    if (!$reservaResult) {
+                        error_log("APROVAÇÃO: ERRO ao criar reserva de cashback para pagamento #{$paymentId}");
+                    } else {
+                        error_log("APROVAÇÃO: Reserva de cashback criada: R$ {$totalCashbackReservado}");
                     }
                 }
                 
@@ -1585,7 +1599,64 @@ class TransactionController {
             return ['status' => false, 'message' => 'Erro ao aprovar pagamento: ' . $e->getMessage()];
         }
     }
-    
+    /**
+    * NOVO MÉTODO: Cria reserva de cashback
+    * 
+    * @param float $valor Valor a ser reservado
+    * @param int $transacaoId ID da transação relacionada
+    * @param string $descricao Descrição da operação
+    * @return bool Resultado da operação
+    */
+    private static function createCashbackReserve($valor, $transacaoId = null, $descricao = '') {
+        try {
+            $db = Database::getConnection();
+            
+            // Obter ou criar registro da reserva
+            $reservaStmt = $db->prepare("SELECT * FROM admin_reserva_cashback WHERE id = 1");
+            $reservaStmt->execute();
+            $reserva = $reservaStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$reserva) {
+                // Criar registro inicial se não existir
+                $createStmt = $db->prepare("
+                    INSERT INTO admin_reserva_cashback (id, valor_total, valor_disponivel, valor_usado) 
+                    VALUES (1, 0, 0, 0)
+                ");
+                $createStmt->execute();
+                $reserva = [
+                    'valor_total' => 0,
+                    'valor_disponivel' => 0,
+                    'valor_usado' => 0
+                ];
+            }
+            
+            // Calcular novos valores (CRÉDITO = cashback disponibilizado para clientes)
+            $novoTotal = $reserva['valor_total'] + $valor;
+            $novoDisponivel = $reserva['valor_disponivel'] + $valor;
+            $novoUsado = $reserva['valor_usado']; // Não muda ainda
+            
+            // Atualizar reserva
+            $updateStmt = $db->prepare("
+                UPDATE admin_reserva_cashback 
+                SET valor_total = ?, valor_disponivel = ?, valor_usado = ?, ultima_atualizacao = NOW() 
+                WHERE id = 1
+            ");
+            $updateStmt->execute([$novoTotal, $novoDisponivel, $novoUsado]);
+            
+            // Registrar movimentação
+            $movStmt = $db->prepare("
+                INSERT INTO admin_reserva_movimentacoes (transacao_id, valor, tipo, descricao) 
+                VALUES (?, ?, 'credito', ?)
+            ");
+            $movStmt->execute([$transacaoId, $valor, $descricao]);
+            
+            return true;
+            
+        } catch (Exception $e) {
+            error_log('Erro ao criar reserva de cashback: ' . $e->getMessage());
+            return false;
+        }
+    }
     /**
      * Rejeita um pagamento de comissão
      * 
