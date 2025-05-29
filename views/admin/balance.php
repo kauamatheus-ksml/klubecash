@@ -128,6 +128,16 @@ try {
     $saldoTotal = $saldoAdmin['valor_disponivel'];
     $saldoPendente = $saldoAdmin['valor_pendente'];
     
+    // 7. Obter dados da reserva de cashback
+    $reservaData = AdminController::getCashbackReserveData();
+    if ($reservaData['status']) {
+        $balanceData['reserva_cashback'] = $reservaData['data'];
+    } else {
+        $balanceData['reserva_cashback'] = [
+            'reserva' => ['valor_total' => 0, 'valor_disponivel' => 0, 'valor_usado' => 0],
+            'movimentacoes' => []
+        ];
+    }
     
 } catch (Exception $e) {
     $error = "Erro ao carregar dados do saldo: " . $e->getMessage();
@@ -135,16 +145,7 @@ try {
 }
 
 
-// 7. Obter dados da reserva de cashback
-$reservaData = AdminController::getCashbackReserveData();
-if ($reservaData['status']) {
-    $balanceData['reserva_cashback'] = $reservaData['data'];
-} else {
-    $balanceData['reserva_cashback'] = [
-        'reserva' => ['valor_total' => 0, 'valor_disponivel' => 0, 'valor_usado' => 0],
-        'movimentacoes' => []
-    ];
-}
+
 ?>
 
 <!DOCTYPE html>
