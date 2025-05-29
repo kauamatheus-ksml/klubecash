@@ -427,9 +427,18 @@ class StoreBalancePaymentController {
                 $linkStmt->execute([$paymentId, $movId]);
             }
             
-            // 3. Registrar movimentação no saldo admin (saída) - CORRIGIDO
-            self::updateAdminBalance($db, -$totalCalculado, null, "Pagamento de saldo usado para loja {$store['nome_fantasia']} - ID #$paymentId");
+            // 3. Registrar log informativo do reembolso (não afeta saldo admin)
+            $logStmt = $db->prepare("
+                INSERT INTO admin_saldo_movimentacoes (transacao_id, valor, tipo, descricao) 
+                VALUES (?, ?, 'debito', ?)
+            ");
+            $logStmt->execute([
+                null, 
+                $totalCalculado, 
+                "REEMBOLSO: Saldo usado por clientes na loja {$store['nome_fantasia']} - ID #$paymentId (não afeta saldo admin)"
+            ]);
             
+
             // 4. Criar notificação para loja
             $storeUserStmt = $db->prepare("SELECT usuario_id FROM lojas WHERE id = ?");
             $storeUserStmt->execute([$data['loja_id']]);

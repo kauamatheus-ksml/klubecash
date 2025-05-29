@@ -382,16 +382,16 @@ try {
                     <div class="stat-card-subtitle"><?php echo number_format($balanceData['estatisticas']['transacoes_pendentes'] ?? 0); ?> transações</div>
                 </div>
                 
-                <div class="stat-card outgoing">
-                    <div class="stat-card-title">💸 Saldo Pago às Lojas</div>
+                <div class="stat-card" style="border-left-color: #17a2b8;">
+                    <div class="stat-card-title">💳 Reembolsos Processados</div>
                     <div class="stat-card-value">R$ <?php echo number_format($balanceData['balance_stats']['valor_total_pago'] ?? 0, 2, ',', '.'); ?></div>
-                    <div class="stat-card-subtitle">Reembolsos realizados</div>
+                    <div class="stat-card-subtitle">Cashback usado pelos clientes</div>
                 </div>
                 
-                <div class="stat-card pending">
-                    <div class="stat-card-title">⏳ Saldo Pendente às Lojas</div>
+                <div class="stat-card" style="border-left-color: #ffc107;">
+                    <div class="stat-card-title">⏳ Reembolsos Pendentes</div>
                     <div class="stat-card-value">R$ <?php echo number_format($balanceData['balance_stats']['valor_total_pendente'] ?? 0, 2, ',', '.'); ?></div>
-                    <div class="stat-card-subtitle"><?php echo number_format($balanceData['balance_stats']['total_lojas'] ?? 0); ?> lojas</div>
+                    <div class="stat-card-subtitle">A processar para <?php echo number_format($balanceData['balance_stats']['total_lojas'] ?? 0); ?> lojas</div>
                 </div>
                 
                 <div class="stat-card">
