@@ -295,6 +295,8 @@ class StoreBalancePaymentController {
      * @return array Resultado da operação
      */
     public static function processStoreBalancePayment($data) {
+        $db = null;
+        
         try {
             // Verificar se o usuário está autenticado e é administrador
             if (!AuthController::isAuthenticated() || !AuthController::isAdmin()) {
@@ -390,67 +392,66 @@ class StoreBalancePaymentController {
             // Iniciar transação no banco de dados
             $db->beginTransaction();
             
-            try {
-                // 1. Criar registro do pagamento
-                $paymentStmt = $db->prepare("
-                    INSERT INTO store_balance_payments (
-                        loja_id, valor_total, metodo_pagamento, 
-                        numero_referencia, comprovante, observacao, 
-                        status, data_criacao
-                    ) VALUES (
-                        ?, ?, ?, ?, ?, ?, ?, NOW()
-                    )
+            // 1. Criar registro do pagamento
+            $paymentStmt = $db->prepare("
+                INSERT INTO store_balance_payments (
+                    loja_id, valor_total, metodo_pagamento, 
+                    numero_referencia, comprovante, observacao, 
+                    status, data_criacao
+                ) VALUES (
+                    ?, ?, ?, ?, ?, ?, ?, NOW()
+                )
+            ");
+            
+            $status = isset($data['aprovar_automaticamente']) && $data['aprovar_automaticamente'] ? 'aprovado' : 'em_processamento';
+            
+            $paymentStmt->execute([
+                $data['loja_id'],
+                $totalCalculado,
+                $data['metodo_pagamento'],
+                $data['numero_referencia'] ?? '',
+                $comprovantePath,
+                $data['observacao'] ?? '',
+                $status
+            ]);
+            
+            $paymentId = $db->lastInsertId();
+            
+            // 2. Vincular movimentações ao pagamento
+            foreach ($movimentacaoIds as $movId) {
+                $linkStmt = $db->prepare("
+                    UPDATE cashback_movimentacoes
+                    SET pagamento_id = ?
+                    WHERE id = ?
                 ");
-                
-                $status = isset($data['aprovar_automaticamente']) && $data['aprovar_automaticamente'] ? 'aprovado' : 'em_processamento';
-                
-                $paymentStmt->execute([
-                    $data['loja_id'],
-                    $totalCalculado,
-                    $data['metodo_pagamento'],
-                    $data['numero_referencia'] ?? '',
-                    $comprovantePath,
-                    $data['observacao'] ?? '',
-                    $status
-                ]);
-                
-                $paymentId = $db->lastInsertId();
-                
-                // 2. Vincular movimentações ao pagamento
-                foreach ($movimentacaoIds as $movId) {
-                    $linkStmt = $db->prepare("
-                        UPDATE cashback_movimentacoes
-                        SET pagamento_id = ?
-                        WHERE id = ?
-                    ");
-                    $linkStmt->execute([$paymentId, $movId]);
-                }
-                
-                // 3. Registrar movimentação no saldo admin (saída)
-                require_once __DIR__ . '/AdminController.php';
-                AdminController::updateAdminBalance(
-                    -$totalCalculado, 
-                    null, 
-                    "Pagamento de saldo usado para loja {$store['nome_fantasia']} - ID #$paymentId"
+                $linkStmt->execute([$paymentId, $movId]);
+            }
+            
+            // 3. Registrar movimentação no saldo admin (saída) - CORRIGIDO
+            self::updateAdminBalance($db, -$totalCalculado, null, "Pagamento de saldo usado para loja {$store['nome_fantasia']} - ID #$paymentId");
+            
+            // 4. Criar notificação para loja
+            $storeUserStmt = $db->prepare("SELECT usuario_id FROM lojas WHERE id = ?");
+            $storeUserStmt->execute([$data['loja_id']]);
+            $storeUser = $storeUserStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($storeUser && !empty($storeUser['usuario_id'])) {
+                self::createNotification(
+                    $db,
+                    $storeUser['usuario_id'],
+                    'Pagamento de saldo recebido',
+                    'Você recebeu um pagamento de R$ ' . number_format($totalCalculado, 2, ',', '.') . 
+                    ' referente ao saldo de cashback usado pelos clientes.',
+                    $status == 'aprovado' ? 'success' : 'info'
                 );
-                
-                // 4. Criar notificação para loja
-                $storeUserStmt = $db->prepare("SELECT usuario_id FROM lojas WHERE id = ?");
-                $storeUserStmt->execute([$data['loja_id']]);
-                $storeUser = $storeUserStmt->fetch(PDO::FETCH_ASSOC);
-                
-                if ($storeUser && !empty($storeUser['usuario_id'])) {
-                    self::createNotification(
-                        $storeUser['usuario_id'],
-                        'Pagamento de saldo recebido',
-                        'Você recebeu um pagamento de R$ ' . number_format($totalCalculado, 2, ',', '.') . 
-                        ' referente ao saldo de cashback usado pelos clientes.',
-                        $status == 'aprovado' ? 'success' : 'info'
-                    );
-                }
-                
-                // 5. Enviar email para loja
-                if (!empty($store['email'])) {
+            }
+            
+            // Commit da transação ANTES de enviar email
+            $db->commit();
+            
+            // 5. Enviar email para loja (após commit)
+            if (!empty($store['email'])) {
+                try {
                     $subject = 'Pagamento de Saldo - Klube Cash';
                     $statusText = $status == 'aprovado' ? 'aprovado e processado' : 'registrado e está em processamento';
                     
@@ -474,84 +475,115 @@ class StoreBalancePaymentController {
                     $message .= "<p>Atenciosamente,<br>Equipe Klube Cash</p>";
                     
                     Email::send($store['email'], $subject, $message, $store['nome_fantasia']);
+                } catch (Exception $emailError) {
+                    // Log do erro de email mas não falha o processo
+                    error_log('Erro ao enviar email: ' . $emailError->getMessage());
                 }
-                
-                // Commit da transação
-                $db->commit();
-                
-                return [
-                    'status' => true,
-                    'message' => 'Pagamento processado com sucesso!',
-                    'data' => [
-                        'payment_id' => $paymentId,
-                        'valor_total' => $totalCalculado,
-                        'status' => $status
-                    ]
-                ];
-                
-            } catch (Exception $e) {
-                // Rollback em caso de erro
-                $db->rollBack();
-                throw $e;
             }
             
+            return [
+                'status' => true,
+                'message' => 'Pagamento processado com sucesso!',
+                'data' => [
+                    'payment_id' => $paymentId,
+                    'valor_total' => $totalCalculado,
+                    'status' => $status
+                ]
+            ];
+            
         } catch (Exception $e) {
+            // Rollback em caso de erro (apenas se a transação ainda estiver ativa)
+            if ($db && $db->inTransaction()) {
+                $db->rollBack();
+            }
+            
             error_log('Erro ao processar pagamento de saldo: ' . $e->getMessage());
             return ['status' => false, 'message' => 'Erro ao processar pagamento: ' . $e->getMessage()];
         }
     }
     
     /**
-     * Cria uma notificação para um usuário
+     * Atualiza o saldo do administrador (versão compatível com transação)
      * 
+     * @param PDO $db Conexão de banco de dados
+     * @param float $valor Valor a ser adicionado/subtraído
+     * @param int|null $transacaoId ID da transação relacionada
+     * @param string $descricao Descrição da movimentação
+     * @return bool Resultado da operação
+     */
+    private static function updateAdminBalance($db, $valor, $transacaoId = null, $descricao = '') {
+        try {
+            // Obter ou criar registro do saldo admin
+            $saldoStmt = $db->prepare("SELECT * FROM admin_saldo WHERE id = 1");
+            $saldoStmt->execute();
+            $saldo = $saldoStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$saldo) {
+                // Criar registro inicial
+                $createStmt = $db->prepare("
+                    INSERT INTO admin_saldo (id, valor_total, valor_disponivel, valor_pendente) 
+                    VALUES (1, 0, 0, 0)
+                ");
+                $createStmt->execute();
+                $saldo = ['valor_total' => 0, 'valor_disponivel' => 0, 'valor_pendente' => 0];
+            }
+            
+            // Calcular novos valores
+            $novoTotal = $saldo['valor_total'] + $valor;
+            $novoDisponivel = $saldo['valor_disponivel'] + $valor;
+            
+            // Atualizar saldo
+            $updateStmt = $db->prepare("
+                UPDATE admin_saldo 
+                SET valor_total = ?, valor_disponivel = ?, ultima_atualizacao = NOW() 
+                WHERE id = 1
+            ");
+            $updateStmt->execute([$novoTotal, $novoDisponivel]);
+            
+            // Registrar movimentação
+            $movStmt = $db->prepare("
+                INSERT INTO admin_saldo_movimentacoes (transacao_id, valor, tipo, descricao) 
+                VALUES (?, ?, ?, ?)
+            ");
+            
+            $tipo = $valor >= 0 ? 'credito' : 'debito';
+            $valorAbs = abs($valor);
+            
+            $movStmt->execute([$transacaoId, $valorAbs, $tipo, $descricao]);
+            
+            return true;
+            
+        } catch (Exception $e) {
+            error_log('Erro ao atualizar saldo admin: ' . $e->getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Cria uma notificação para um usuário (versão compatível com transação)
+     * 
+     * @param PDO $db Conexão de banco de dados
      * @param int $userId ID do usuário
      * @param string $titulo Título da notificação
      * @param string $mensagem Mensagem da notificação
      * @param string $tipo Tipo da notificação (info, success, warning, error)
      * @return bool Verdadeiro se a notificação foi criada
      */
-    private static function createNotification($userId, $titulo, $mensagem, $tipo = 'info') {
+    private static function createNotification($db, $userId, $titulo, $mensagem, $tipo = 'info') {
         try {
-            $db = Database::getConnection();
-            
-            // Verificar se a tabela existe, criar se não existir
-            $tableCheckStmt = $db->prepare("SHOW TABLES LIKE 'notificacoes'");
-            $tableCheckStmt->execute();
-            
-            if ($tableCheckStmt->rowCount() == 0) {
-                $createTableQuery = "
-                    CREATE TABLE notificacoes (
-                        id INT AUTO_INCREMENT PRIMARY KEY,
-                        usuario_id INT NOT NULL,
-                        titulo VARCHAR(100) NOT NULL,
-                        mensagem TEXT NOT NULL,
-                        tipo ENUM('info', 'success', 'warning', 'error') DEFAULT 'info',
-                        data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        lida TINYINT(1) DEFAULT 0,
-                        data_leitura TIMESTAMP NULL,
-                        FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
-                    )
-                ";
-                $db->exec($createTableQuery);
-            }
-            
             $stmt = $db->prepare("
                 INSERT INTO notificacoes (usuario_id, titulo, mensagem, tipo, data_criacao, lida)
-                VALUES (:usuario_id, :titulo, :mensagem, :tipo, NOW(), 0)
+                VALUES (?, ?, ?, ?, NOW(), 0)
             ");
             
-            $stmt->bindParam(':usuario_id', $userId);
-            $stmt->bindParam(':titulo', $titulo);
-            $stmt->bindParam(':mensagem', $mensagem);
-            $stmt->bindParam(':tipo', $tipo);
-            
-            return $stmt->execute();
+            return $stmt->execute([$userId, $titulo, $mensagem, $tipo]);
             
         } catch (PDOException $e) {
             error_log('Erro ao criar notificação: ' . $e->getMessage());
             return false;
         }
     }
+    
     /**
     * Obtém estatísticas gerais dos pagamentos de saldo
     * 
@@ -617,111 +649,112 @@ class StoreBalancePaymentController {
             ];
         }
     }
+    
     /**
- * Obtém movimentações pendentes para uma loja específica
- * 
- * @param int $lojaId ID da loja
- * @return array Lista de IDs das movimentações pendentes
- */
-public static function getPendingMovimentacoes($lojaId) {
-    try {
-        // Verificar se o usuário está autenticado e é administrador
-        if (!AuthController::isAuthenticated() || !AuthController::isAdmin()) {
-            return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
+     * Obtém movimentações pendentes para uma loja específica
+     * 
+     * @param int $lojaId ID da loja
+     * @return array Lista de IDs das movimentações pendentes
+     */
+    public static function getPendingMovimentacoes($lojaId) {
+        try {
+            // Verificar se o usuário está autenticado e é administrador
+            if (!AuthController::isAuthenticated() || !AuthController::isAdmin()) {
+                return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
+            }
+            
+            $db = Database::getConnection();
+            
+            // Buscar movimentações pendentes da loja
+            $query = "
+                SELECT cm.id
+                FROM cashback_movimentacoes cm
+                LEFT JOIN store_balance_payments sbp ON cm.pagamento_id = sbp.id
+                WHERE cm.loja_id = :loja_id 
+                AND cm.tipo_operacao = 'uso'
+                AND cm.transacao_uso_id IS NOT NULL
+                AND (cm.pagamento_id IS NULL OR sbp.status = 'pendente')
+                ORDER BY cm.data_operacao ASC
+            ";
+            
+            $stmt = $db->prepare($query);
+            $stmt->bindParam(':loja_id', $lojaId);
+            $stmt->execute();
+            
+            $movimentacoes = $stmt->fetchAll(PDO::FETCH_COLUMN);
+            
+            return [
+                'status' => true,
+                'data' => [
+                    'movimentacoes' => $movimentacoes
+                ]
+            ];
+            
+        } catch (PDOException $e) {
+            error_log('Erro ao obter movimentações pendentes: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro ao obter movimentações pendentes.'];
         }
-        
-        $db = Database::getConnection();
-        
-        // Buscar movimentações pendentes da loja
-        $query = "
-            SELECT cm.id
-            FROM cashback_movimentacoes cm
-            LEFT JOIN store_balance_payments sbp ON cm.pagamento_id = sbp.id
-            WHERE cm.loja_id = :loja_id 
-            AND cm.tipo_operacao = 'uso'
-            AND cm.transacao_uso_id IS NOT NULL
-            AND (cm.pagamento_id IS NULL OR sbp.status = 'pendente')
-            ORDER BY cm.data_operacao ASC
-        ";
-        
-        $stmt = $db->prepare($query);
-        $stmt->bindParam(':loja_id', $lojaId);
-        $stmt->execute();
-        
-        $movimentacoes = $stmt->fetchAll(PDO::FETCH_COLUMN);
-        
-        return [
-            'status' => true,
-            'data' => [
-                'movimentacoes' => $movimentacoes
-            ]
-        ];
-        
-    } catch (PDOException $e) {
-        error_log('Erro ao obter movimentações pendentes: ' . $e->getMessage());
-        return ['status' => false, 'message' => 'Erro ao obter movimentações pendentes.'];
     }
-}
-
-/**
- * Obtém detalhes de um pagamento de saldo específico
- * 
- * @param int $paymentId ID do pagamento
- * @return array Detalhes do pagamento
- */
-public static function getBalancePaymentDetails($paymentId) {
-    try {
-        // Verificar se o usuário está autenticado e é administrador
-        if (!AuthController::isAuthenticated() || !AuthController::isAdmin()) {
-            return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
+    
+    /**
+     * Obtém detalhes de um pagamento de saldo específico
+     * 
+     * @param int $paymentId ID do pagamento
+     * @return array Detalhes do pagamento
+     */
+    public static function getBalancePaymentDetails($paymentId) {
+        try {
+            // Verificar se o usuário está autenticado e é administrador
+            if (!AuthController::isAuthenticated() || !AuthController::isAdmin()) {
+                return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
+            }
+            
+            $db = Database::getConnection();
+            
+            // Buscar dados do pagamento
+            $paymentStmt = $db->prepare("
+                SELECT sbp.*, l.nome_fantasia as loja_nome
+                FROM store_balance_payments sbp
+                JOIN lojas l ON sbp.loja_id = l.id
+                WHERE sbp.id = ?
+            ");
+            $paymentStmt->execute([$paymentId]);
+            $payment = $paymentStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$payment) {
+                return ['status' => false, 'message' => 'Pagamento não encontrado.'];
+            }
+            
+            // Buscar transações relacionadas
+            $transactionsStmt = $db->prepare("
+                SELECT 
+                    cm.valor as valor_saldo_usado,
+                    cm.data_operacao,
+                    t.codigo_transacao,
+                    t.valor_total as valor_venda,
+                    u.nome as cliente_nome
+                FROM cashback_movimentacoes cm
+                JOIN transacoes_cashback t ON cm.transacao_uso_id = t.id
+                JOIN usuarios u ON cm.usuario_id = u.id
+                WHERE cm.pagamento_id = ?
+                ORDER BY cm.data_operacao DESC
+            ");
+            $transactionsStmt->execute([$paymentId]);
+            $transactions = $transactionsStmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            return [
+                'status' => true,
+                'data' => [
+                    'pagamento' => $payment,
+                    'transacoes' => $transactions
+                ]
+            ];
+            
+        } catch (PDOException $e) {
+            error_log('Erro ao obter detalhes do pagamento de saldo: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro ao obter detalhes do pagamento.'];
         }
-        
-        $db = Database::getConnection();
-        
-        // Buscar dados do pagamento
-        $paymentStmt = $db->prepare("
-            SELECT sbp.*, l.nome_fantasia as loja_nome
-            FROM store_balance_payments sbp
-            JOIN lojas l ON sbp.loja_id = l.id
-            WHERE sbp.id = ?
-        ");
-        $paymentStmt->execute([$paymentId]);
-        $payment = $paymentStmt->fetch(PDO::FETCH_ASSOC);
-        
-        if (!$payment) {
-            return ['status' => false, 'message' => 'Pagamento não encontrado.'];
-        }
-        
-        // Buscar transações relacionadas
-        $transactionsStmt = $db->prepare("
-            SELECT 
-                cm.valor as valor_saldo_usado,
-                cm.data_operacao,
-                t.codigo_transacao,
-                t.valor_total as valor_venda,
-                u.nome as cliente_nome
-            FROM cashback_movimentacoes cm
-            JOIN transacoes_cashback t ON cm.transacao_uso_id = t.id
-            JOIN usuarios u ON cm.usuario_id = u.id
-            WHERE cm.pagamento_id = ?
-            ORDER BY cm.data_operacao DESC
-        ");
-        $transactionsStmt->execute([$paymentId]);
-        $transactions = $transactionsStmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        return [
-            'status' => true,
-            'data' => [
-                'pagamento' => $payment,
-                'transacoes' => $transactions
-            ]
-        ];
-        
-    } catch (PDOException $e) {
-        error_log('Erro ao obter detalhes do pagamento de saldo: ' . $e->getMessage());
-        return ['status' => false, 'message' => 'Erro ao obter detalhes do pagamento.'];
     }
-}
 }
 
 // Processar requisições diretas de acesso ao controlador
