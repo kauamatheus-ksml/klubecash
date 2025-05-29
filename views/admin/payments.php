@@ -240,7 +240,7 @@ if ($activeTab === 'balance') {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
     <title>Gerenciar Pagamentos - Klube Cash</title>
-    
+    <link rel="stylesheet" href="../../assets/css/views/admin/dashboard.css">
     <link rel="stylesheet" href="../../assets/css/views/admin/payments.css">
     
 </head>
