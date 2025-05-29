@@ -115,44 +115,52 @@ try {
     // 6. Obter estatísticas de pagamentos de saldo
     $balanceStats = StoreBalancePaymentController::getBalanceStatistics();
 
-    // 7. Obter dados REAIS da reserva de cashback
+    // 7. Calcular RESERVA REAL baseada nos saldos dos clientes
     try {
-        // Buscar dados da reserva principal
-        $reservaStmt = $db->prepare("SELECT * FROM admin_reserva_cashback WHERE id = 1");
-        $reservaStmt->execute();
-        $reservaData = $reservaStmt->fetch(PDO::FETCH_ASSOC);
+        // Calcular reserva atual (soma de todos os saldos disponíveis dos clientes)
+        $reservaRealStmt = $db->prepare("
+            SELECT 
+                COALESCE(SUM(saldo_disponivel), 0) as valor_disponivel_real,
+                COALESCE(SUM(total_creditado), 0) as valor_total_creditado,
+                COALESCE(SUM(total_usado), 0) as valor_total_usado
+            FROM cashback_saldos
+        ");
+        $reservaRealStmt->execute();
+        $reservaCalculada = $reservaRealStmt->fetch(PDO::FETCH_ASSOC);
         
-        if (!$reservaData) {
-            // Se não existir, criar registro inicial
-            $createReservaStmt = $db->prepare("
-                INSERT INTO admin_reserva_cashback (id, valor_total, valor_disponivel, valor_usado) 
-                VALUES (1, 0, 0, 0)
-            ");
-            $createReservaStmt->execute();
-            $reservaData = ['valor_total' => 0, 'valor_disponivel' => 0, 'valor_usado' => 0];
-        }
-        
-        // Buscar movimentações da reserva
-        $movReservaStmt = $db->prepare("
-            SELECT * FROM admin_reserva_movimentacoes 
-            ORDER BY data_operacao DESC 
+        // Buscar movimentações de uso de saldo (cashback usado pelos clientes)
+        $usoSaldoStmt = $db->prepare("
+            SELECT 
+                cm.*,
+                t.codigo_transacao,
+                l.nome_fantasia as loja_nome,
+                u.nome as cliente_nome
+            FROM cashback_movimentacoes cm
+            LEFT JOIN transacoes_cashback t ON cm.transacao_uso_id = t.id
+            LEFT JOIN lojas l ON cm.loja_id = l.id
+            LEFT JOIN usuarios u ON cm.usuario_id = u.id
+            WHERE cm.tipo_operacao = 'uso'
+            ORDER BY cm.data_operacao DESC
             LIMIT 20
         ");
-        $movReservaStmt->execute();
-        $movimentacoesReserva = $movReservaStmt->fetchAll(PDO::FETCH_ASSOC);
+        $usoSaldoStmt->execute();
+        $movimentacoesUso = $usoSaldoStmt->fetchAll(PDO::FETCH_ASSOC);
         
-        // Estruturar dados da reserva
+        // Estruturar dados da reserva baseados nos valores REAIS
         $balanceData['reserva_cashback'] = [
             'reserva' => [
-                'valor_total' => floatval($reservaData['valor_total']),
-                'valor_disponivel' => floatval($reservaData['valor_disponivel']),
-                'valor_usado' => floatval($reservaData['valor_usado'])
+                'valor_total' => floatval($reservaCalculada['valor_total_creditado']), // Total já creditado
+                'valor_disponivel' => floatval($reservaCalculada['valor_disponivel_real']), // Disponível nos saldos
+                'valor_usado' => floatval($reservaCalculada['valor_total_usado']) // Total usado pelos clientes
             ],
-            'movimentacoes' => $movimentacoesReserva
+            'movimentacoes' => $movimentacoesUso
         ];
         
+        // Log para debugar valores
+        error_log("RESERVA DEBUG - Disponível: {$reservaCalculada['valor_disponivel_real']}, Usado: {$reservaCalculada['valor_total_usado']}, Total: {$reservaCalculada['valor_total_creditado']}");
+        
     } catch (Exception $e) {
-        error_log("Erro ao buscar dados da reserva: " . $e->getMessage());
+        error_log("Erro ao calcular reserva real: " . $e->getMessage());
         // Fallback para valores zero em caso de erro
         $balanceData['reserva_cashback'] = [
             'reserva' => ['valor_total' => 0, 'valor_disponivel' => 0, 'valor_usado' => 0],
