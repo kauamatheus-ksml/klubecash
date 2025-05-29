@@ -133,11 +133,7 @@ try {
         'estatisticas' => $estatisticas,
         'mensal' => $mensal,
         'top_lojas' => $topLojas,
-        'balance_stats' => $balanceStats,
-        'reserva_cashback' => [
-            'reserva' => ['valor_total' => 0, 'valor_disponivel' => 0, 'valor_usado' => 0],
-            'movimentacoes' => []
-        ]
+        'balance_stats' => $balanceStats
     ];
     
     $saldoTotal = $saldoAdmin['valor_disponivel'];
