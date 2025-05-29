@@ -242,7 +242,118 @@ if ($activeTab === 'balance') {
     <title>Gerenciar Pagamentos - Klube Cash</title>
     <link rel="stylesheet" href="../../assets/css/views/admin/dashboard.css">
     <link rel="stylesheet" href="../../assets/css/views/admin/payments.css">
-    
+    <style>
+        
+/* Estilos para as abas */
+        .tabs-container {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .tab {
+            padding: 12px 20px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border-bottom: 3px solid transparent;
+            color: #555;
+        }
+        
+        .tab:hover {
+            background-color: #f9f9f9;
+        }
+        
+        .tab.active {
+            border-bottom: 3px solid <?php echo PRIMARY_COLOR; ?>;
+            color: <?php echo PRIMARY_COLOR; ?>;
+        }
+        
+        .tab-content {
+            margin-top: 20px;
+        }
+        
+        .tab-pane {
+            display: block;
+        }
+        
+        .tab-pane.hidden {
+            display: none;
+        }
+        
+        /* Estilos para a tabela de saldo */
+        .saldo-usado {
+            color: #28a745;
+            font-weight: 600;
+        }
+        
+        .sem-saldo {
+            color: #6c757d;
+        }
+        
+        .economia-badge {
+            background-color: #e8f7ed;
+            color: #28a745;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 11px;
+            display: inline-block;
+            margin-top: 3px;
+        }
+        
+        .balance-indicator {
+            color: #28a745;
+            margin-left: 5px;
+            font-size: 14px;
+        }
+        
+        /* Estilos para o modal de pagamento */
+        .modal-lg {
+            width: 90%;
+            max-width: 900px;
+        }
+        
+        .payment-summary {
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            border-left: 4px solid <?php echo PRIMARY_COLOR; ?>;
+        }
+        
+        .detail-section {
+            margin-bottom: 25px;
+        }
+        
+        .detail-actions {
+            margin-top: 25px;
+            text-align: right;
+        }
+        
+        .form-check {
+            display: flex;
+            align-items: center;
+            margin: 15px 0;
+        }
+        
+        .form-check input {
+            margin-right: 10px;
+        }
+        
+        /* Estilos para pagamentos de saldo */
+        .saldo-section {
+            background-color: #f1f9ff;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .saldo-info {
+            margin-top: 5px;
+            font-size: 12px;
+            color: #28a745;
+        }
+    </style>
 </head>
 <body>
     <?php include_once '../components/sidebar.php'; ?>
