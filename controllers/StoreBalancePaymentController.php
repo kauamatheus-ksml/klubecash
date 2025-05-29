@@ -427,8 +427,9 @@ class StoreBalancePaymentController {
                 $linkStmt->execute([$paymentId, $movId]);
             }
             
-            // 3. Registrar movimentação na reserva de cashback (saída)
-            self::updateCashbackReserve($db, -$totalCalculado, null, "Cashback usado - Reembolso loja {$store['nome_fantasia']} - ID #$paymentId");
+            // 3. CORREÇÃO CRÍTICA: Registrar movimentação na reserva de cashback (saída)
+            // Este é o ponto onde o sistema não estava funcionando corretamente
+            self::updateCashbackReserveOnUse($db, $totalCalculado, $paymentId, "Reembolso à loja {$store['nome_fantasia']} - Pagamento ID #{$paymentId}");
             
             // 4. Criar notificação para loja
             $storeUserStmt = $db->prepare("SELECT usuario_id FROM lojas WHERE id = ?");
@@ -503,10 +504,104 @@ class StoreBalancePaymentController {
     }
     
     /**
+     * MÉTODO NOVO E CRÍTICO: Atualiza a reserva de cashback quando clientes USAM saldo
+     * 
+     * Este método resolve o problema principal do sistema. Quando um cliente usa saldo,
+     * precisamos debitar da reserva de cashback, pois esse valor será reembolsado à loja.
+     * 
+     * FLUXO CORRETO:
+     * 1. Transação aprovada → Cria reserva (crédito) ✅
+     * 2. Cliente usa saldo → Debita da reserva (débito) ✅ ← ESTE MÉTODO
+     * 3. Loja recebe reembolso → Não mexe na reserva (correto)
+     * 
+     * @param PDO $db Conexão de banco de dados
+     * @param float $valor Valor usado pelos clientes (sempre positivo)
+     * @param int|null $transacaoId ID da transação relacionada
+     * @param string $descricao Descrição da operação
+     * @return bool Resultado da operação
+     */
+    private static function updateCashbackReserveOnUse($db, $valor, $transacaoId = null, $descricao = '') {
+        try {
+            error_log("RESERVA USE: Processando uso de saldo - Valor: R$ {$valor}");
+            
+            // Obter reserva atual
+            $reservaStmt = $db->prepare("SELECT * FROM admin_reserva_cashback WHERE id = 1");
+            $reservaStmt->execute();
+            $reserva = $reservaStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$reserva) {
+                // Se não existe reserva, criar registro inicial
+                $createStmt = $db->prepare("
+                    INSERT INTO admin_reserva_cashback (id, valor_total, valor_disponivel, valor_usado) 
+                    VALUES (1, 0, 0, 0)
+                ");
+                $createStmt->execute();
+                $reserva = [
+                    'valor_total' => 0,
+                    'valor_disponivel' => 0,
+                    'valor_usado' => 0
+                ];
+                error_log("RESERVA USE: Reserva criada inicialmente");
+            }
+            
+            // DÉBITO: Cliente usou saldo, reduzir disponível e aumentar usado
+            $valorUso = abs($valor); // Garantir que seja positivo
+            $novoTotal = $reserva['valor_total']; // Total não muda no uso
+            $novoDisponivel = $reserva['valor_disponivel'] - $valorUso; // Reduz disponível
+            $novoUsado = $reserva['valor_usado'] + $valorUso; // Aumenta usado
+            
+            error_log("RESERVA USE: Calculando novos valores - Disponível: {$reserva['valor_disponivel']} → {$novoDisponivel}, Usado: {$reserva['valor_usado']} → {$novoUsado}");
+            
+            // Validar se tem saldo suficiente na reserva
+            if ($novoDisponivel < 0) {
+                error_log("RESERVA USE: AVISO - Saldo da reserva ficará negativo. Disponível atual: {$reserva['valor_disponivel']}, Tentando debitar: {$valorUso}");
+                // Não falhar aqui, apenas registrar o aviso para investigação
+            }
+            
+            // Atualizar reserva
+            $updateStmt = $db->prepare("
+                UPDATE admin_reserva_cashback 
+                SET valor_disponivel = ?, valor_usado = ?, ultima_atualizacao = NOW() 
+                WHERE id = 1
+            ");
+            $updateResult = $updateStmt->execute([$novoDisponivel, $novoUsado]);
+            
+            if (!$updateResult) {
+                error_log("RESERVA USE: ERRO ao atualizar reserva");
+                return false;
+            }
+            
+            // Registrar movimentação (sempre como débito para uso de saldo)
+            $movStmt = $db->prepare("
+                INSERT INTO admin_reserva_movimentacoes (transacao_id, valor, tipo, descricao) 
+                VALUES (?, ?, 'debito', ?)
+            ");
+            $movResult = $movStmt->execute([$transacaoId, $valorUso, $descricao]);
+            
+            if (!$movResult) {
+                error_log("RESERVA USE: ERRO ao registrar movimentação");
+                return false;
+            }
+            
+            error_log("RESERVA USE: Sucesso - Reserva atualizada. Novo disponível: R$ {$novoDisponivel}, Novo usado: R$ {$novoUsado}");
+            return true;
+            
+        } catch (Exception $e) {
+            error_log('RESERVA USE: Erro ao atualizar reserva de cashback no uso: ' . $e->getMessage());
+            return false;
+        }
+    }
+    
+    /**
      * Atualiza a reserva de cashback (versão compatível com transação)
+     * 
+     * MÉTODO CORRIGIDO: Este método é usado quando cashback é DISPONIBILIZADO (crédito)
+     * É chamado quando pagamentos são aprovados e saldo é liberado para clientes
      */
     private static function updateCashbackReserve($db, $valor, $transacaoId = null, $descricao = '') {
         try {
+            error_log("RESERVA CREDIT: Processando crédito de reserva - Valor: R$ {$valor}");
+            
             // Obter ou criar registro da reserva
             $reservaStmt = $db->prepare("SELECT * FROM admin_reserva_cashback WHERE id = 1");
             $reservaStmt->execute();
@@ -520,20 +615,25 @@ class StoreBalancePaymentController {
                 ");
                 $createStmt->execute();
                 $reserva = ['valor_total' => 0, 'valor_disponivel' => 0, 'valor_usado' => 0];
+                error_log("RESERVA CREDIT: Reserva criada inicialmente");
             }
             
-            // Calcular novos valores
+            // Determinar se é crédito ou débito baseado no sinal do valor
             if ($valor > 0) {
-                // Crédito (cashback disponibilizado)
+                // CRÉDITO: Cashback disponibilizado para clientes
                 $novoTotal = $reserva['valor_total'] + $valor;
                 $novoDisponivel = $reserva['valor_disponivel'] + $valor;
-                $novoUsado = $reserva['valor_usado'];
+                $novoUsado = $reserva['valor_usado']; // Não muda
+                $tipoOperacao = 'credito';
+                error_log("RESERVA CREDIT: Operação de crédito - Adicionando R$ {$valor} à reserva");
             } else {
-                // Débito (cashback usado)
+                // DÉBITO: Cashback usado (este caso normalmente é tratado pelo método updateCashbackReserveOnUse)
                 $valorAbs = abs($valor);
-                $novoTotal = $reserva['valor_total'];
+                $novoTotal = $reserva['valor_total']; // Total não muda no débito
                 $novoDisponivel = $reserva['valor_disponivel'] - $valorAbs;
                 $novoUsado = $reserva['valor_usado'] + $valorAbs;
+                $tipoOperacao = 'debito';
+                error_log("RESERVA CREDIT: Operação de débito - Removendo R$ {$valorAbs} da reserva");
             }
             
             // Atualizar reserva
@@ -542,7 +642,12 @@ class StoreBalancePaymentController {
                 SET valor_total = ?, valor_disponivel = ?, valor_usado = ?, ultima_atualizacao = NOW() 
                 WHERE id = 1
             ");
-            $updateStmt->execute([$novoTotal, $novoDisponivel, $novoUsado]);
+            $updateResult = $updateStmt->execute([$novoTotal, $novoDisponivel, $novoUsado]);
+            
+            if (!$updateResult) {
+                error_log("RESERVA CREDIT: ERRO ao atualizar reserva");
+                return false;
+            }
             
             // Registrar movimentação
             $movStmt = $db->prepare("
@@ -550,15 +655,19 @@ class StoreBalancePaymentController {
                 VALUES (?, ?, ?, ?)
             ");
             
-            $tipo = $valor >= 0 ? 'credito' : 'debito';
             $valorAbs = abs($valor);
+            $movResult = $movStmt->execute([$transacaoId, $valorAbs, $tipoOperacao, $descricao]);
             
-            $movStmt->execute([$transacaoId, $valorAbs, $tipo, $descricao]);
+            if (!$movResult) {
+                error_log("RESERVA CREDIT: ERRO ao registrar movimentação");
+                return false;
+            }
             
+            error_log("RESERVA CREDIT: Sucesso - Reserva atualizada. Novo total: R$ {$novoTotal}, Disponível: R$ {$novoDisponivel}, Usado: R$ {$novoUsado}");
             return true;
             
         } catch (Exception $e) {
-            error_log('Erro ao atualizar reserva de cashback: ' . $e->getMessage());
+            error_log('RESERVA CREDIT: Erro ao atualizar reserva de cashback: ' . $e->getMessage());
             return false;
         }
     }
