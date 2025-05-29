@@ -114,7 +114,18 @@ try {
     
     // 6. Obter estatísticas de pagamentos de saldo
     $balanceStats = StoreBalancePaymentController::getBalanceStatistics();
-    
+
+    // 7. Obter dados da reserva de cashback
+    $reservaData = AdminController::getCashbackReserveData();
+    if ($reservaData['status']) {
+        $balanceData['reserva_cashback'] = $reservaData['data'];
+    } else {
+        $balanceData['reserva_cashback'] = [
+            'reserva' => ['valor_total' => 0, 'valor_disponivel' => 0, 'valor_usado' => 0],
+            'movimentacoes' => []
+        ];
+    }
+
     // Preparar dados para a view
     $balanceData = [
         'saldo_admin' => $saldoAdmin,
