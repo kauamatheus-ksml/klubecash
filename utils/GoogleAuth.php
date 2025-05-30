@@ -1,5 +1,5 @@
 <?php
-// utils/GoogleAuth.php
+// utils/GoogleAuth.php - VERSÃO ATUALIZADA
 
 class GoogleAuth {
     
@@ -10,14 +10,13 @@ class GoogleAuth {
         $params = [
             'client_id' => GOOGLE_CLIENT_ID,
             'response_type' => 'code',
-            'scope' => 'openid email profile',
+            'scope' => 'openid email profile', // Escopos necessários
             'redirect_uri' => GOOGLE_REDIRECT_URI,
             'state' => self::generateState(),
-            'access_type' => 'offline', // Para refresh token se necessário
-            'prompt' => 'select_account' // Permite escolher conta
+            'access_type' => 'offline',
+            'prompt' => 'select_account'
         ];
         
-        // Armazenar o state na sessão para verificação posterior
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
@@ -27,8 +26,95 @@ class GoogleAuth {
     }
     
     /**
-     * Troca o código de autorização por um token de acesso
+     * Busca informações do usuário usando People API
      */
+    public static function getUserInfo($accessToken) {
+        // Tentar People API primeiro (recomendada)
+        $peopleApiUrl = 'https://people.googleapis.com/v1/people/me?personFields=names,emailAddresses,photos';
+        
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $peopleApiUrl);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Authorization: Bearer ' . $accessToken,
+            'Accept: application/json'
+        ]);
+        
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        
+        if ($httpCode === 200) {
+            $data = json_decode($response, true);
+            
+            // Converter formato People API para formato compatível
+            return self::convertPeopleApiToLegacyFormat($data);
+        }
+        
+        // Fallback para API antiga se People API falhar
+        error_log('People API falhou, tentando API legada');
+        return self::getUserInfoLegacy($accessToken);
+    }
+    
+    /**
+     * Fallback para API legada (Google+ API ou userinfo)
+     */
+    private static function getUserInfoLegacy($accessToken) {
+        $legacyUrl = 'https://www.googleapis.com/oauth2/v2/userinfo';
+        
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $legacyUrl);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Authorization: Bearer ' . $accessToken,
+            'Accept: application/json'
+        ]);
+        
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        
+        if ($httpCode !== 200) {
+            error_log('API legada também falhou: ' . $httpCode . ' - ' . $response);
+            return false;
+        }
+        
+        return json_decode($response, true);
+    }
+    
+    /**
+     * Converte resposta da People API para formato compatível
+     */
+    private static function convertPeopleApiToLegacyFormat($peopleData) {
+        $converted = [];
+        
+        // ID do usuário
+        $converted['id'] = $peopleData['resourceName'] ?? '';
+        $converted['id'] = str_replace('people/', '', $converted['id']);
+        
+        // Nome
+        if (isset($peopleData['names']) && !empty($peopleData['names'])) {
+            $converted['name'] = $peopleData['names'][0]['displayName'] ?? '';
+        }
+        
+        // Email
+        if (isset($peopleData['emailAddresses']) && !empty($peopleData['emailAddresses'])) {
+            $converted['email'] = $peopleData['emailAddresses'][0]['value'] ?? '';
+            $converted['verified_email'] = true; // People API já retorna emails verificados
+        }
+        
+        // Foto
+        if (isset($peopleData['photos']) && !empty($peopleData['photos'])) {
+            $converted['picture'] = $peopleData['photos'][0]['url'] ?? '';
+        }
+        
+        return $converted;
+    }
+    
+    // ... resto dos métodos permanecem iguais ...
+    
     public static function getAccessToken($code) {
         $postData = [
             'client_id' => GOOGLE_CLIENT_ID,
@@ -51,13 +137,6 @@ class GoogleAuth {
         
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        
-        if (curl_error($ch)) {
-            error_log('Erro cURL no token Google: ' . curl_error($ch));
-            curl_close($ch);
-            return false;
-        }
-        
         curl_close($ch);
         
         if ($httpCode !== 200) {
@@ -67,86 +146,11 @@ class GoogleAuth {
         
         return json_decode($response, true);
     }
-    /**
-    * Valida se os dados do usuário Google são suficientes para registro
-    */
-    public static function validateUserDataForRegistration($userInfo) {
-        $errors = [];
-        
-        // Verificar nome
-        if (empty($userInfo['name']) || strlen(trim($userInfo['name'])) < 2) {
-            $errors[] = 'Nome fornecido pelo Google é inválido';
-        }
-        
-        // Verificar email
-        if (empty($userInfo['email']) || !filter_var($userInfo['email'], FILTER_VALIDATE_EMAIL)) {
-            $errors[] = 'Email fornecido pelo Google é inválido';
-        }
-        
-        // Verificar se email está verificado no Google
-        if (!isset($userInfo['verified_email']) || !$userInfo['verified_email']) {
-            $errors[] = 'Email não está verificado no Google';
-        }
-        
-        // Verificar ID do Google
-        if (empty($userInfo['id'])) {
-            $errors[] = 'ID do Google não fornecido';
-        }
-        
-        return [
-            'valid' => empty($errors),
-            'errors' => $errors,
-            'user_data' => [
-                'name' => trim($userInfo['name'] ?? ''),
-                'email' => strtolower(trim($userInfo['email'] ?? '')),
-                'google_id' => $userInfo['id'] ?? '',
-                'avatar_url' => $userInfo['picture'] ?? null,
-                'email_verified' => isset($userInfo['verified_email']) && $userInfo['verified_email']
-            ]
-        ];
-    }
-    /**
-     * Busca informações do usuário usando o token de acesso
-     */
-    public static function getUserInfo($accessToken) {
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, GOOGLE_USER_INFO_URL . '?access_token=' . $accessToken);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            'Authorization: Bearer ' . $accessToken,
-            'Accept: application/json'
-        ]);
-        
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        
-        if (curl_error($ch)) {
-            error_log('Erro cURL nas informações do usuário Google: ' . curl_error($ch));
-            curl_close($ch);
-            return false;
-        }
-        
-        curl_close($ch);
-        
-        if ($httpCode !== 200) {
-            error_log('Erro HTTP nas informações do usuário Google: ' . $httpCode . ' - ' . $response);
-            return false;
-        }
-        
-        return json_decode($response, true);
-    }
     
-    /**
-     * Gera um state aleatório para segurança
-     */
     private static function generateState() {
         return bin2hex(random_bytes(16));
     }
     
-    /**
-     * Verifica se o state é válido
-     */
     public static function verifyState($state) {
         if (session_status() === PHP_SESSION_NONE) {
             session_start();

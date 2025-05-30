@@ -113,6 +113,7 @@ define('GOOGLE_REDIRECT_URI', 'https://klubecash.com/auth/google/callback');
 define('GOOGLE_AUTH_URL', 'https://accounts.google.com/o/oauth2/auth');
 define('GOOGLE_TOKEN_URL', 'https://oauth2.googleapis.com/token');
 define('GOOGLE_USER_INFO_URL', 'https://www.googleapis.com/oauth2/v2/userinfo');
+define('GOOGLE_PEOPLE_API_URL', 'https://people.googleapis.com/v1/people/me');
 
 // URLs de autenticação
 define('GOOGLE_AUTH_ENDPOINT', SITE_URL . '/auth/google/auth');
