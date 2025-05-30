@@ -406,7 +406,7 @@ try {
         }
         
         .btn-secondary {
-            background: #155724;
+            background: #17a2b8;
             color: white;
         }
         
