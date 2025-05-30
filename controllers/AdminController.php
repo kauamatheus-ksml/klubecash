@@ -512,7 +512,6 @@ public static function getUserDetails($userId) {
     */
     public static function manageStoresWithBalance($filters = [], $page = 1) {
         try {
-        // Verificar se é um administrador
             if (!self::validateAdmin()) {
                 return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
             }
@@ -543,19 +542,19 @@ public static function getUserDetails($userId) {
             
             $whereClause = "WHERE " . implode(" AND ", $whereConditions);
             
-            // Query para obter lojas com informações de saldo
+            // Query principal corrigida com informações de saldo
             $storesQuery = "
                 SELECT 
                     l.*,
                     COALESCE(SUM(cs.saldo_disponivel), 0) as total_saldo_clientes,
                     COUNT(CASE WHEN cs.saldo_disponivel > 0 THEN 1 END) as clientes_com_saldo,
                     COUNT(DISTINCT t.id) as total_transacoes,
-                    COUNT(DISTINCT CASE WHEN cm.id IS NOT NULL THEN t.id END) as transacoes_com_saldo,
-                    COALESCE(SUM(cm.valor), 0) as total_saldo_usado
+                    COUNT(DISTINCT CASE WHEN tsu.id IS NOT NULL THEN t.id END) as transacoes_com_saldo,
+                    COALESCE(SUM(tsu.valor_usado), 0) as total_saldo_usado
                 FROM lojas l
                 LEFT JOIN cashback_saldos cs ON l.id = cs.loja_id
                 LEFT JOIN transacoes_cashback t ON l.id = t.loja_id AND t.status = 'aprovado'
-                LEFT JOIN cashback_movimentacoes cm ON t.id = cm.transacao_uso_id AND cm.tipo_operacao = 'uso'
+                LEFT JOIN transacoes_saldo_usado tsu ON t.id = tsu.transacao_id
                 $whereClause
                 GROUP BY l.id
                 ORDER BY l.data_cadastro DESC
@@ -572,7 +571,7 @@ public static function getUserDetails($userId) {
             
             $stores = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
-            // Query para contar total de lojas
+            // Query para contar total
             $countQuery = "
                 SELECT COUNT(DISTINCT l.id) as total
                 FROM lojas l
@@ -586,20 +585,20 @@ public static function getUserDetails($userId) {
             $countStmt->execute();
             $totalCount = $countStmt->fetch(PDO::FETCH_ASSOC)['total'];
             
-            // Obter categorias disponíveis
+            // Obter categorias
             $categoriesStmt = $db->query("SELECT DISTINCT categoria FROM lojas WHERE categoria IS NOT NULL ORDER BY categoria");
             $categories = $categoriesStmt->fetchAll(PDO::FETCH_COLUMN);
             
-            // Calcular estatísticas gerais - usando consulta simples
+            // Estatísticas consolidadas
             $statsQuery = "
                 SELECT 
                     COUNT(DISTINCT l.id) as total_lojas,
                     COUNT(DISTINCT CASE WHEN cs.saldo_disponivel > 0 THEN l.id END) as lojas_com_saldo,
                     COALESCE(SUM(cs.saldo_disponivel), 0) as total_saldo_acumulado,
-                    COALESCE(SUM(cm.valor), 0) as total_saldo_usado
+                    COALESCE(SUM(tsu.valor_usado), 0) as total_saldo_usado
                 FROM lojas l
                 LEFT JOIN cashback_saldos cs ON l.id = cs.loja_id
-                LEFT JOIN cashback_movimentacoes cm ON l.id = cm.loja_id AND cm.tipo_operacao = 'uso'
+                LEFT JOIN transacoes_saldo_usado tsu ON cs.loja_id = tsu.loja_id
                 WHERE l.status = 'aprovado'
             ";
             

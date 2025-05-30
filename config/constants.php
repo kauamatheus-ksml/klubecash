@@ -151,5 +151,46 @@ if (session_status() === PHP_SESSION_NONE) {
     ini_set('session.cookie_secure', 0); // Mude para 1 se usar HTTPS
     session_start();
 }
+
+
+
+
+// Itens por página
+if (!defined('ITEMS_PER_PAGE')) {
+    define('ITEMS_PER_PAGE', 15);
+}
+
+// Status das lojas
+if (!defined('STORE_PENDING')) {
+    define('STORE_PENDING', 'pendente');
+}
+if (!defined('STORE_APPROVED')) {
+    define('STORE_APPROVED', 'aprovado');
+}
+if (!defined('STORE_REJECTED')) {
+    define('STORE_REJECTED', 'rejeitado');
+}
+
+// Status dos usuários
+if (!defined('USER_ACTIVE')) {
+    define('USER_ACTIVE', 'ativo');
+}
+if (!defined('USER_INACTIVE')) {
+    define('USER_INACTIVE', 'inativo');
+}
+if (!defined('USER_BLOCKED')) {
+    define('USER_BLOCKED', 'bloqueado');
+}
+
+// Tipos de usuário
+if (!defined('USER_TYPE_CLIENT')) {
+    define('USER_TYPE_CLIENT', 'cliente');
+}
+if (!defined('USER_TYPE_ADMIN')) {
+    define('USER_TYPE_ADMIN', 'admin');
+}
+if (!defined('USER_TYPE_STORE')) {
+    define('USER_TYPE_STORE', 'loja');
+}
 ?>
 
