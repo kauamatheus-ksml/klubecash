@@ -120,7 +120,7 @@ define('GOOGLE_AUTH_ENDPOINT', SITE_URL . '/auth/google/auth');
 define('GOOGLE_CALLBACK_ENDPOINT', SITE_URL . '/auth/google/callback');
 
 
-// Configurações de email (adicionar se não existirem)
+// Configurações de email (adicionar se não existirem)2
 if (!defined('SMTP_HOST')) {
     define('SMTP_HOST', 'smtp.hostinger.com');
     define('SMTP_PORT', 465);
