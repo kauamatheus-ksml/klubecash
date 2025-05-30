@@ -401,12 +401,12 @@ try {
         }
         
         .btn-primary {
-            background: #FF7A00;
-            color: white;
+            background: #fff;
+            color: #FF7A00;
         }
         
         .btn-secondary {
-            background: #6c757d;
+            background: #155724;
             color: white;
         }
         
