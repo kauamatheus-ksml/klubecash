@@ -61,15 +61,15 @@ try {
     $movStmt->execute();
     $movimentacoes = $movStmt->fetchAll(PDO::FETCH_ASSOC);
     
-    // 3. Obter estatísticas de comissões
+    // 3. CORRIGIDO: Obter estatísticas de comissões
     $statsStmt = $db->prepare("
         SELECT 
-            COUNT(DISTINCT tc.id) as total_transacoes,
-            SUM(tc.valor_admin) as total_comissoes_recebidas,
+            COUNT(DISTINCT tcom.id) as total_transacoes,
+            COALESCE(SUM(CASE WHEN tc.status = 'aprovado' THEN tcom.valor_comissao ELSE 0 END), 0) as comissoes_aprovadas,
             COUNT(CASE WHEN tc.status = 'pendente' THEN 1 END) as transacoes_pendentes,
-            SUM(CASE WHEN tc.status = 'pendente' THEN tc.valor_admin ELSE 0 END) as comissoes_pendentes,
+            COALESCE(SUM(CASE WHEN tc.status = 'pendente' THEN tcom.valor_comissao ELSE 0 END), 0) as comissoes_pendentes,
             COUNT(CASE WHEN tc.status = 'aprovado' THEN 1 END) as transacoes_aprovadas,
-            SUM(CASE WHEN tc.status = 'aprovado' THEN tc.valor_admin ELSE 0 END) as comissoes_aprovadas
+            COALESCE(SUM(tcom.valor_comissao), 0) as total_comissoes_recebidas
         FROM transacoes_comissao tcom
         JOIN transacoes_cashback tc ON tcom.transacao_id = tc.id
         WHERE tcom.tipo_usuario = 'admin'
@@ -77,13 +77,20 @@ try {
     $statsStmt->execute();
     $estatisticas = $statsStmt->fetch(PDO::FETCH_ASSOC);
     
+    // Garantir que não há valores nulos
+    foreach ($estatisticas as $key => $value) {
+        if ($value === null) {
+            $estatisticas[$key] = 0;
+        }
+    }
+    
     // 4. Obter dados mensais para gráfico
     $monthlyStmt = $db->prepare("
         SELECT 
             DATE_FORMAT(asm.data_operacao, '%Y-%m') as mes,
-            SUM(CASE WHEN asm.tipo = 'credito' THEN asm.valor ELSE 0 END) as entrada,
-            SUM(CASE WHEN asm.tipo = 'debito' THEN asm.valor ELSE 0 END) as saida,
-            SUM(CASE WHEN asm.tipo = 'credito' THEN asm.valor ELSE -asm.valor END) as total
+            COALESCE(SUM(CASE WHEN asm.tipo = 'credito' THEN asm.valor ELSE 0 END), 0) as entrada,
+            COALESCE(SUM(CASE WHEN asm.tipo = 'debito' THEN asm.valor ELSE 0 END), 0) as saida,
+            COALESCE(SUM(CASE WHEN asm.tipo = 'credito' THEN asm.valor ELSE -asm.valor END), 0) as total
         FROM admin_saldo_movimentacoes asm
         WHERE asm.data_operacao >= DATE_SUB(NOW(), INTERVAL 12 MONTH)
         GROUP BY DATE_FORMAT(asm.data_operacao, '%Y-%m')
@@ -93,19 +100,20 @@ try {
     $monthlyStmt->execute();
     $mensal = $monthlyStmt->fetchAll(PDO::FETCH_ASSOC);
     
-    // 5. Obter top lojas por comissões geradas
+    // 5. CORRIGIDO: Obter top lojas por comissões geradas
     $topLojasStmt = $db->prepare("
         SELECT 
             l.id,
             l.nome_fantasia,
-            COUNT(tc.id) as quantidade_transacoes,
-            SUM(tc.valor_admin) as total_comissoes
+            COUNT(DISTINCT tcom.id) as quantidade_transacoes,
+            COALESCE(SUM(tcom.valor_comissao), 0) as total_comissoes
         FROM lojas l
         JOIN transacoes_cashback tc ON l.id = tc.loja_id
         JOIN transacoes_comissao tcom ON tc.id = tcom.transacao_id
         WHERE tcom.tipo_usuario = 'admin'
         AND tc.status IN ('aprovado', 'pendente')
         GROUP BY l.id, l.nome_fantasia
+        HAVING total_comissoes > 0
         ORDER BY total_comissoes DESC
         LIMIT 10
     ");
@@ -115,31 +123,38 @@ try {
     // 6. Obter estatísticas de pagamentos de saldo
     $balanceStats = StoreBalancePaymentController::getBalanceStatistics();
 
-    // 7. Calcular RESERVA REAL baseada nos saldos dos clientes
+    // 7. CORRIGIDO: Calcular RESERVA REAL baseada nos saldos dos clientes
     try {
         // Calcular reserva atual (soma de todos os saldos disponíveis dos clientes)
         $reservaRealStmt = $db->prepare("
             SELECT 
                 COALESCE(SUM(saldo_disponivel), 0) as valor_disponivel_real,
                 COALESCE(SUM(total_creditado), 0) as valor_total_creditado,
-                COALESCE(SUM(total_usado), 0) as valor_total_usado
+                COALESCE(SUM(total_usado), 0) as valor_total_usado,
+                COUNT(*) as total_contas
             FROM cashback_saldos
+            WHERE saldo_disponivel > 0 OR total_creditado > 0
         ");
         $reservaRealStmt->execute();
         $reservaCalculada = $reservaRealStmt->fetch(PDO::FETCH_ASSOC);
         
-        // Buscar movimentações de uso de saldo (cashback usado pelos clientes)
+        // CORRIGIDO: Buscar movimentações de uso de saldo mais detalhadas
         $usoSaldoStmt = $db->prepare("
             SELECT 
                 cm.*,
                 t.codigo_transacao,
-                l.nome_fantasia as loja_nome,
-                u.nome as cliente_nome
+                COALESCE(l.nome_fantasia, 'Loja não encontrada') as loja_nome,
+                COALESCE(u.nome, 'Cliente não encontrado') as cliente_nome,
+                CASE 
+                    WHEN cm.pagamento_id IS NOT NULL THEN 'Reembolsado'
+                    ELSE 'Pendente reembolso'
+                END as status_reembolso
             FROM cashback_movimentacoes cm
             LEFT JOIN transacoes_cashback t ON cm.transacao_uso_id = t.id
             LEFT JOIN lojas l ON cm.loja_id = l.id
             LEFT JOIN usuarios u ON cm.usuario_id = u.id
             WHERE cm.tipo_operacao = 'uso'
+            AND cm.valor > 0
             ORDER BY cm.data_operacao DESC
             LIMIT 20
         ");
@@ -151,7 +166,8 @@ try {
             'reserva' => [
                 'valor_total' => floatval($reservaCalculada['valor_total_creditado']), // Total já creditado
                 'valor_disponivel' => floatval($reservaCalculada['valor_disponivel_real']), // Disponível nos saldos
-                'valor_usado' => floatval($reservaCalculada['valor_total_usado']) // Total usado pelos clientes
+                'valor_usado' => floatval($reservaCalculada['valor_total_usado']), // Total usado pelos clientes
+                'total_contas' => intval($reservaCalculada['total_contas']) // Quantidade de contas com saldo
             ],
             'movimentacoes' => $movimentacoesUso
         ];
@@ -163,8 +179,38 @@ try {
         error_log("Erro ao calcular reserva real: " . $e->getMessage());
         // Fallback para valores zero em caso de erro
         $balanceData['reserva_cashback'] = [
-            'reserva' => ['valor_total' => 0, 'valor_disponivel' => 0, 'valor_usado' => 0],
+            'reserva' => ['valor_total' => 0, 'valor_disponivel' => 0, 'valor_usado' => 0, 'total_contas' => 0],
             'movimentacoes' => []
+        ];
+    }
+
+    // 8. NOVO: Obter estatísticas consolidadas de reembolsos
+    try {
+        $reembolsoStmt = $db->prepare("
+            SELECT 
+                COUNT(DISTINCT sbp.id) as total_pagamentos_reembolso,
+                COALESCE(SUM(CASE WHEN sbp.status = 'pendente' THEN sbp.valor_total ELSE 0 END), 0) as valor_pendente_reembolso,
+                COALESCE(SUM(CASE WHEN sbp.status = 'aprovado' THEN sbp.valor_total ELSE 0 END), 0) as valor_pago_reembolso,
+                COUNT(DISTINCT CASE WHEN sbp.status = 'pendente' THEN sbp.loja_id END) as lojas_com_reembolso_pendente
+            FROM store_balance_payments sbp
+        ");
+        $reembolsoStmt->execute();
+        $statsReembolso = $reembolsoStmt->fetch(PDO::FETCH_ASSOC);
+        
+        // Garantir que não há valores nulos
+        foreach ($statsReembolso as $key => $value) {
+            if ($value === null) {
+                $statsReembolso[$key] = 0;
+            }
+        }
+        
+    } catch (Exception $e) {
+        error_log("Erro ao obter estatísticas de reembolso: " . $e->getMessage());
+        $statsReembolso = [
+            'total_pagamentos_reembolso' => 0,
+            'valor_pendente_reembolso' => 0,
+            'valor_pago_reembolso' => 0,
+            'lojas_com_reembolso_pendente' => 0
         ];
     }
 
@@ -173,10 +219,11 @@ try {
         'saldo_admin' => $saldoAdmin,
         'movimentacoes' => $movimentacoes,
         'estatisticas' => $estatisticas,
+        'stats_reembolso' => $statsReembolso, // NOVO
         'mensal' => $mensal,
         'top_lojas' => $topLojas,
         'balance_stats' => $balanceStats,
-        'reserva_cashback' => $balanceData['reserva_cashback'] // INCLUIR AQUI
+        'reserva_cashback' => $balanceData['reserva_cashback']
     ];
     
     $saldoTotal = $saldoAdmin['valor_disponivel'];
@@ -187,8 +234,6 @@ try {
     $error = "Erro ao carregar dados do saldo: " . $e->getMessage();
     error_log("Erro em balance.php: " . $e->getMessage());
 }
-
-
 
 ?>
 
@@ -228,6 +273,10 @@ try {
         
         .stat-card.outgoing {
             border-left-color: #dc3545;
+        }
+        
+        .stat-card.info {
+            border-left-color: #17a2b8;
         }
         
         .stat-card-title {
@@ -290,6 +339,11 @@ try {
         .movement-type.debito {
             background-color: #f8d7da;
             color: #721c24;
+        }
+        
+        .movement-type.uso {
+            background-color: #fff3cd;
+            color: #856404;
         }
         
         .balance-section {
@@ -361,6 +415,23 @@ try {
             box-shadow: 0 3px 10px rgba(0,0,0,0.2);
         }
         
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        
+        .status-pendente {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        
+        .status-reembolsado {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        
         @media (max-width: 768px) {
             .two-column-layout {
                 grid-template-columns: 1fr;
@@ -409,7 +480,13 @@ try {
                     <div class="balance-item">
                         <div class="balance-label">💸 Cashback Usado</div>
                         <div class="balance-value">R$ <?php echo number_format($balanceData['reserva_cashback']['reserva']['valor_usado'], 2, ',', '.'); ?></div>
-                        <small>Reembolsado às lojas</small>
+                        <small>Usado pelos clientes</small>
+                    </div>
+                    
+                    <div class="balance-item">
+                        <div class="balance-label">👥 Contas Ativas</div>
+                        <div class="balance-value"><?php echo number_format($balanceData['reserva_cashback']['reserva']['total_contas']); ?></div>
+                        <small>Clientes com saldo</small>
                     </div>
                 </div>
                 
@@ -456,16 +533,16 @@ try {
                     <div class="stat-card-subtitle"><?php echo number_format($balanceData['estatisticas']['transacoes_pendentes'] ?? 0); ?> transações</div>
                 </div>
                 
-                <div class="stat-card" style="border-left-color: #17a2b8;">
-                    <div class="stat-card-title">💳 Cashback Usado</div>
-                    <div class="stat-card-value">R$ <?php echo number_format($balanceData['reserva_cashback']['reserva']['valor_usado'] ?? 0, 2, ',', '.'); ?></div>
-                    <div class="stat-card-subtitle">Pelos clientes nas compras</div>
+                <div class="stat-card info">
+                    <div class="stat-card-title">🏪 Reembolsos Pendentes</div>
+                    <div class="stat-card-value">R$ <?php echo number_format($balanceData['stats_reembolso']['valor_pendente_reembolso'] ?? 0, 2, ',', '.'); ?></div>
+                    <div class="stat-card-subtitle"><?php echo number_format($balanceData['stats_reembolso']['lojas_com_reembolso_pendente'] ?? 0); ?> lojas</div>
                 </div>
                 
-                <div class="stat-card" style="border-left-color: #ffc107;">
-                    <div class="stat-card-title">⏳ Cashback Disponível</div>
-                    <div class="stat-card-value">R$ <?php echo number_format($balanceData['reserva_cashback']['reserva']['valor_disponivel'] ?? 0, 2, ',', '.'); ?></div>
-                    <div class="stat-card-subtitle">Para uso pelos clientes</div>
+                <div class="stat-card outgoing">
+                    <div class="stat-card-title">💳 Reembolsos Pagos</div>
+                    <div class="stat-card-value">R$ <?php echo number_format($balanceData['stats_reembolso']['valor_pago_reembolso'] ?? 0, 2, ',', '.'); ?></div>
+                    <div class="stat-card-subtitle">Total reembolsado</div>
                 </div>
                 
                 <div class="stat-card">
@@ -540,10 +617,6 @@ try {
                         <tbody>
                             <?php if (!empty($balanceData['movimentacoes'])): ?>
                                 <?php foreach ($balanceData['movimentacoes'] as $mov): ?>
-                                    <?php 
-                                    // Filtrar apenas movimentações que não são reembolsos informativos
-                                    if (strpos($mov['descricao'], 'REEMBOLSO:') !== 0): 
-                                    ?>
                                     <tr>
                                         <td><?php echo date('d/m/Y H:i', strtotime($mov['data_operacao'])); ?></td>
                                         <td><?php echo htmlspecialchars($mov['descricao']); ?></td>
@@ -560,7 +633,6 @@ try {
                                         <td><?php echo htmlspecialchars($mov['codigo_transacao'] ?? 'N/A'); ?></td>
                                         <td><?php echo htmlspecialchars($mov['loja_nome'] ?? 'N/A'); ?></td>
                                     </tr>
-                                    <?php endif; ?>
                                 <?php endforeach; ?>
                             <?php else: ?>
                                 <tr>
@@ -580,7 +652,7 @@ try {
             <!-- Histórico de Movimentações da Reserva de Cashback -->
             <div class="card transactions-container">
                 <div class="card-header">
-                    <div class="card-title">🎁 Últimas Movimentações - Reserva de Cashback</div>
+                    <div class="card-title">🎁 Últimas Movimentações - Uso de Cashback</div>
                 </div>
                 
                 <div class="table-responsive">
@@ -588,10 +660,11 @@ try {
                         <thead>
                             <tr>
                                 <th>Data</th>
-                                <th>Descrição</th>
-                                <th>Tipo</th>
-                                <th>Valor</th>
+                                <th>Cliente</th>
+                                <th>Loja</th>
+                                <th>Valor Usado</th>
                                 <th>Transação</th>
+                                <th>Status Reembolso</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -599,23 +672,24 @@ try {
                                 <?php foreach ($balanceData['reserva_cashback']['movimentacoes'] as $mov): ?>
                                     <tr>
                                         <td><?php echo date('d/m/Y H:i', strtotime($mov['data_operacao'])); ?></td>
-                                        <td><?php echo htmlspecialchars($mov['descricao']); ?></td>
+                                        <td><?php echo htmlspecialchars($mov['cliente_nome']); ?></td>
+                                        <td><?php echo htmlspecialchars($mov['loja_nome']); ?></td>
                                         <td>
-                                            <span class="movement-type <?php echo $mov['tipo']; ?>">
-                                                <?php echo $mov['tipo'] == 'credito' ? '🎁 Cashback Disponibilizado' : '💸 Cashback Usado'; ?>
+                                            <span style="color: #dc3545; font-weight: 600;">
+                                                -R$ <?php echo number_format($mov['valor'], 2, ',', '.'); ?>
                                             </span>
                                         </td>
+                                        <td><?php echo htmlspecialchars($mov['codigo_transacao'] ?? 'N/A'); ?></td>
                                         <td>
-                                            <span style="color: <?php echo $mov['tipo'] == 'credito' ? '#28a745' : '#dc3545'; ?>; font-weight: 600;">
-                                                <?php echo $mov['tipo'] == 'credito' ? '+' : '-'; ?>R$ <?php echo number_format($mov['valor'], 2, ',', '.'); ?>
+                                            <span class="status-badge status-<?php echo strtolower(str_replace(' ', '', $mov['status_reembolso'])); ?>">
+                                                <?php echo $mov['status_reembolso']; ?>
                                             </span>
                                         </td>
-                                        <td><?php echo $mov['transacao_id'] ? '#' . $mov['transacao_id'] : 'N/A'; ?></td>
                                     </tr>
                                 <?php endforeach; ?>
                             <?php else: ?>
                                 <tr>
-                                    <td colspan="5" style="text-align: center; padding: 40px;">
+                                    <td colspan="6" style="text-align: center; padding: 40px;">
                                         <div style="color: #666;">
                                             <strong>🎁 Nenhuma movimentação de cashback encontrada</strong><br>
                                             <small>Movimentações aparecerão aqui conforme o cashback for usado pelos clientes</small>
@@ -633,7 +707,7 @@ try {
     </div>
     
     <script>
-        // Dados para o gráfico mensal (apenas receita admin, não inclui movimentações de cashback)
+        // Dados para o gráfico mensal (apenas receita admin)
         const monthlyData = {
             labels: [
                 <?php 
@@ -650,19 +724,9 @@ try {
                 <?php 
                     if (!empty($balanceData['mensal'])) {
                         $entradas = array_map(function($item) {
-                            return $item['entrada'];
+                            return floatval($item['entrada']);
                         }, array_reverse($balanceData['mensal']));
                         echo implode(', ', $entradas);
-                    }
-                ?>
-            ],
-            saida: [
-                <?php 
-                    if (!empty($balanceData['mensal'])) {
-                        $saidas = array_map(function($item) {
-                            return $item['saida'];
-                        }, array_reverse($balanceData['mensal']));
-                        echo implode(', ', $saidas);
                     }
                 ?>
             ]
