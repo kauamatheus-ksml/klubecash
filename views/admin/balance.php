@@ -90,15 +90,53 @@ try {
             DATE_FORMAT(asm.data_operacao, '%Y-%m') as mes,
             COALESCE(SUM(CASE WHEN asm.tipo = 'credito' THEN asm.valor ELSE 0 END), 0) as entrada,
             COALESCE(SUM(CASE WHEN asm.tipo = 'debito' THEN asm.valor ELSE 0 END), 0) as saida,
-            COALESCE(SUM(CASE WHEN asm.tipo = 'credito' THEN asm.valor ELSE -asm.valor END), 0) as total
+            COALESCE(SUM(CASE WHEN asm.tipo = 'credito' THEN asm.valor ELSE -asm.valor END), 0) as saldo_liquido
         FROM admin_saldo_movimentacoes asm
         WHERE asm.data_operacao >= DATE_SUB(NOW(), INTERVAL 12 MONTH)
         GROUP BY DATE_FORMAT(asm.data_operacao, '%Y-%m')
-        ORDER BY mes DESC
+        ORDER BY mes ASC
         LIMIT 12
     ");
     $monthlyStmt->execute();
     $mensal = $monthlyStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Se não há dados mensais, criar array com mês atual zerado
+    if (empty($mensal)) {
+        $mensal = [
+            [
+                'mes' => date('Y-m'),
+                'entrada' => 0,
+                'saida' => 0,
+                'saldo_liquido' => 0
+            ]
+        ];
+    }
+
+    // Garantir que temos pelo menos os últimos 6 meses para o gráfico
+    $mesesCompletos = [];
+    for ($i = 5; $i >= 0; $i--) {
+        $mesRef = date('Y-m', strtotime("-$i month"));
+        $mesEncontrado = false;
+        
+        foreach ($mensal as $dadosMes) {
+            if ($dadosMes['mes'] === $mesRef) {
+                $mesesCompletos[] = $dadosMes;
+                $mesEncontrado = true;
+                break;
+            }
+        }
+        
+        if (!$mesEncontrado) {
+            $mesesCompletos[] = [
+                'mes' => $mesRef,
+                'entrada' => 0,
+                'saida' => 0,
+                'saldo_liquido' => 0
+            ];
+        }
+    }
+
+    $mensal = $mesesCompletos;
     
     // 5. CORRIGIDO: Obter top lojas por comissões geradas
     $topLojasStmt = $db->prepare("
@@ -558,9 +596,18 @@ try {
                 <div class="card">
                     <div class="card-header">
                         <div class="card-title">📊 Movimentação Mensal (Receita Admin)</div>
+                        <?php if (empty($mensal) || array_sum(array_column($mensal, 'entrada')) == 0): ?>
+                            <small style="color: #666;">Aguardando primeiras movimentações</small>
+                        <?php endif; ?>
                     </div>
                     <div class="chart-container">
                         <canvas id="monthlyChart"></canvas>
+                        <?php if (empty($mensal) || array_sum(array_column($mensal, 'entrada')) == 0): ?>
+                            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; color: #666;">
+                                <strong>📊 Sem dados para exibir</strong><br>
+                                <small>O gráfico será preenchido conforme as transações forem processadas</small>
+                            </div>
+                        <?php endif; ?>
                     </div>
                 </div>
                 
@@ -711,79 +758,125 @@ try {
         const monthlyData = {
             labels: [
                 <?php 
-                    if (!empty($balanceData['mensal'])) {
-                        $monthLabels = array_map(function($item) {
-                            $date = DateTime::createFromFormat('Y-m', $item['mes']);
-                            return "'" . $date->format('M/Y') . "'";
-                        }, array_reverse($balanceData['mensal']));
-                        echo implode(', ', $monthLabels);
+                    $monthLabels = [];
+                    foreach ($mensal as $item) {
+                        $date = DateTime::createFromFormat('Y-m', $item['mes']);
+                        if ($date) {
+                            $monthLabels[] = "'" . $date->format('M/Y') . "'";
+                        }
                     }
+                    echo !empty($monthLabels) ? implode(', ', $monthLabels) : "'Sem dados'";
                 ?>
             ],
             entrada: [
                 <?php 
-                    if (!empty($balanceData['mensal'])) {
-                        $entradas = array_map(function($item) {
-                            return floatval($item['entrada']);
-                        }, array_reverse($balanceData['mensal']));
-                        echo implode(', ', $entradas);
+                    $entradas = [];
+                    foreach ($mensal as $item) {
+                        $entradas[] = floatval($item['entrada']);
                     }
+                    echo !empty($entradas) ? implode(', ', $entradas) : '0';
+                ?>
+            ],
+            saida: [
+                <?php 
+                    $saidas = [];
+                    foreach ($mensal as $item) {
+                        $saidas[] = floatval($item['saida']);
+                    }
+                    echo !empty($saidas) ? implode(', ', $saidas) : '0';
                 ?>
             ]
         };
         
+        // Debug dos dados no console
+        console.log('Dados do gráfico mensal:', monthlyData);
+        
+        // Verificar se temos dados válidos
+        const hasData = monthlyData.entrada.some(value => value > 0) || monthlyData.saida.some(value => value > 0);
+        
         // Inicializar gráfico mensal
         const ctxMonthly = document.getElementById('monthlyChart').getContext('2d');
-        const monthlyChart = new Chart(ctxMonthly, {
-            type: 'bar',
-            data: {
-                labels: monthlyData.labels,
-                datasets: [
-                    {
-                        label: 'Comissões Recebidas (R$)',
-                        data: monthlyData.entrada,
-                        backgroundColor: '#28a745',
-                        borderColor: '#1e7e34',
-                        borderWidth: 1
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'top',
-                    },
-                    title: {
-                        display: true,
-                        text: 'Receitas da Administração - Mensal'
-                    }
+        
+        if (!hasData) {
+            // Se não há dados, mostrar mensagem
+            ctxMonthly.font = '16px Arial';
+            ctxMonthly.fillStyle = '#666';
+            ctxMonthly.textAlign = 'center';
+            ctxMonthly.fillText('Nenhuma movimentação encontrada nos últimos 6 meses', 
+                            ctxMonthly.canvas.width / 2, 
+                            ctxMonthly.canvas.height / 2);
+        } else {
+            // Criar gráfico normal
+            const monthlyChart = new Chart(ctxMonthly, {
+                type: 'bar',
+                data: {
+                    labels: monthlyData.labels,
+                    datasets: [
+                        {
+                            label: 'Comissões Recebidas (R$)',
+                            data: monthlyData.entrada,
+                            backgroundColor: 'rgba(40, 167, 69, 0.8)',
+                            borderColor: '#28a745',
+                            borderWidth: 2
+                        },
+                        {
+                            label: 'Saídas (R$)',
+                            data: monthlyData.saida,
+                            backgroundColor: 'rgba(220, 53, 69, 0.8)',
+                            borderColor: '#dc3545',
+                            borderWidth: 2
+                        }
+                    ]
                 },
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            callback: function(value, index, values) {
-                                return 'R$ ' + value.toLocaleString('pt-BR');
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                        title: {
+                            display: true,
+                            text: 'Movimentações da Receita Administrativa - Últimos 6 Meses'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return 'R$ ' + value.toLocaleString('pt-BR', {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2
+                                    });
+                                }
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                maxRotation: 45
                             }
                         }
-                    }
-                },
-                interaction: {
-                    intersect: false,
-                },
-                plugins: {
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                return context.dataset.label + ': R$ ' + context.parsed.y.toLocaleString('pt-BR', {minimumFractionDigits: 2});
+                    },
+                    interaction: {
+                        intersect: false,
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': R$ ' + 
+                                        context.parsed.y.toLocaleString('pt-BR', {
+                                            minimumFractionDigits: 2,
+                                            maximumFractionDigits: 2
+                                        });
+                                }
                             }
                         }
                     }
                 }
-            }
-        });
+            });
+        }
         
         // Auto-refresh da página a cada 5 minutos para manter dados atualizados
         setTimeout(function() {
