@@ -281,3 +281,107 @@ gap: 5px;
         margin-top: 0;
     }
 }
+
+
+/* Melhorias para o layout responsivo e posicionamento */
+.social-login {
+    display: flex;
+    gap: 10px;
+    margin: 20px 0;
+    justify-content: center;
+}
+
+.social-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px;
+    background-color: var(--light-gray);
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+    font-weight: 500;
+}
+
+.social-btn:hover {
+    background-color: #e0e0e0;
+    transform: translateY(-1px);
+}
+
+.google-btn {
+    flex: 2;
+    background-color: #FFF1E6;
+    color: var(--primary-color);
+    min-width: 200px;
+}
+
+.facebook-btn, .apple-btn {
+    flex: 1;
+    min-width: 60px;
+}
+
+.social-btn img {
+    height: 24px;
+    margin-right: 10px;
+}
+
+.google-btn img {
+    height: 20px;
+}
+
+.hide {
+    display: none !important;
+}
+
+.hide-on-mobile {
+    display: inline;
+}
+
+.register-link {
+    margin-top: 20px;
+    text-align: center;
+    color: var(--medium-gray);
+    font-size: 14px;
+}
+
+.register-link a {
+    color: var(--primary-color);
+    text-decoration: none;
+    font-weight: bold;
+}
+
+.register-link a:hover {
+    text-decoration: underline;
+}
+
+/* Ajustes específicos para mobile */
+@media (max-width: 768px) {
+    .social-login {
+        margin: 15px 0;
+    }
+    
+    .google-btn {
+        min-width: auto;
+    }
+    
+    .hide-on-mobile {
+        display: none;
+    }
+    
+    .social-btn {
+        padding: 10px;
+    }
+    
+    .facebook-btn img,
+    .apple-btn img {
+        margin-right: 0;
+    }
+}
+
+/* Ajustes para desktop */
+@media (min-width: 992px) {
+    .social-login {
+        margin-top: 20px;
+    }
+}

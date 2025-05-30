@@ -28,42 +28,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $nome = filter_input(INPUT_POST, 'nome', FILTER_SANITIZE_STRING);
     $telefone = filter_input(INPUT_POST, 'telefone', FILTER_SANITIZE_STRING);
     $senha = $_POST['senha'] ?? '';
-    
+
     // Validar campos
     $errors = [];
-    
+
     if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $errors[] = 'Email inválido';
     }
-    
+
     if (empty($nome) || strlen($nome) < 3) {
         $errors[] = 'Nome precisa ter pelo menos 3 caracteres';
     }
-    
+
     if (empty($telefone) || strlen($telefone) < 10) {
         $errors[] = 'Telefone inválido';
     }
-    
+
     if (empty($senha) || strlen($senha) < PASSWORD_MIN_LENGTH) {
         $errors[] = 'A senha deve ter no mínimo ' . PASSWORD_MIN_LENGTH . ' caracteres';
     }
-    
+
     // Se não houver erros, prosseguir com o registro
     if (empty($errors)) {
         try {
             $db = Database::getConnection();
-            
+
             // Verificar se o email já existe
             $stmt = $db->prepare("SELECT id FROM usuarios WHERE email = :email");
             $stmt->bindParam(':email', $email);
             $stmt->execute();
-            
+
             if ($stmt->rowCount() > 0) {
                 $error = 'Este email já está cadastrado. Por favor, use outro ou faça login.';
             } else {
                 // Hash da senha
                 $senha_hash = password_hash($senha, PASSWORD_DEFAULT);
-                
+
                 // Inserir novo usuário
                 $stmt = $db->prepare("INSERT INTO usuarios (nome, email, senha_hash, tipo, telefone) VALUES (:nome, :email, :senha_hash, :tipo, :telefone)");
                 $stmt->bindParam(':nome', $nome);
@@ -72,16 +72,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $tipo = USER_TYPE_CLIENT;
                 $stmt->bindParam(':tipo', $tipo);
                 $stmt->bindParam(':telefone', $telefone);
-                
+
                 if ($stmt->execute()) {
                     $user_id = $db->lastInsertId();
-                    
+
                     // Enviar email de boas-vindas
                     Email::sendWelcome($email, $nome);
-                    
+
                     // Redirecionar para página de sucesso ou login
                     $success = 'Cadastro realizado com sucesso! Você já pode fazer login.';
-                    
+
                     // Opcionalmente, fazer login automático
                     // $_SESSION['user_id'] = $user_id;
                     // $_SESSION['user_name'] = $nome;
@@ -184,7 +184,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <button type="submit" class="register-btn">Registre-se</button>
                 </form>
             </div>
-            
+
             <div class="illustration-right">
                 <img src="../../assets/images/illustrations/woman-phone.svg" alt="">
             </div>
@@ -214,7 +214,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             const originalText = googleBtn.innerHTML;
             googleBtn.innerHTML = '<img src="../../assets/images/icons/google.svg" alt="Google"> Conectando...';
             googleBtn.disabled = true;
-            
+
             // Fazer requisição para registro com Google (diferente do login)
             fetch('<?php echo SITE_URL; ?>/auth/google/register', {
                 method: 'GET',
@@ -239,7 +239,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             .catch(error => {
                 console.error('Erro no registro Google:', error);
                 alert('Erro ao conectar com o Google: ' + error.message);
-                
+
                 // Restaurar botão
                 googleBtn.innerHTML = originalText;
                 googleBtn.disabled = false;
@@ -260,23 +260,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             const urlParams = new URLSearchParams(window.location.search);
             const successMsg = urlParams.get('success');
             const errorMsg = urlParams.get('error');
-            
+
             if (successMsg) {
                 // Mostrar mensagem de sucesso
                 const successDiv = document.createElement('div');
                 successDiv.className = 'success-message';
                 successDiv.textContent = successMsg;
-                
+
                 const form = document.getElementById('register-form');
                 form.parentNode.insertBefore(successDiv, form);
             }
-            
+
             if (errorMsg) {
                 // Mostrar erro do registro com Google
                 const errorDiv = document.createElement('div');
                 errorDiv.className = 'error-message';
                 errorDiv.textContent = errorMsg;
-                
+
                 const form = document.getElementById('register-form');
                 form.parentNode.insertBefore(errorDiv, form);
             }
@@ -285,7 +285,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         function togglePassword() {
             const passwordField = document.getElementById('senha');
             const passwordToggle = document.querySelector('.password-toggle img');
-            
+
             if (passwordField.type === 'password') {
                 passwordField.type = 'text';
                 passwordToggle.src = '../../assets/images/icons/eye-slash.svg';
@@ -298,7 +298,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Máscara para o campo de telefone
         document.getElementById('telefone').addEventListener('input', function (e) {
             let value = e.target.value.replace(/\D/g, ''); // Remove não-dígitos
-            
+
             // Aplicar máscara (XX) XXXXX-XXXX
             if (value.length <= 11) {
                 if (value.length > 2) {
@@ -308,7 +308,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     value = value.substring(0, 10) + '-' + value.substring(10);
                 }
             }
-            
+
             e.target.value = value;
         });
 
@@ -318,10 +318,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             const nome = document.getElementById('nome').value;
             const telefone = document.getElementById('telefone').value;
             const senha = document.getElementById('senha').value;
-            
+
             let isValid = true;
             let errorMessage = '';
-            
+
             if (!email) {
                 errorMessage = 'Por favor, informe seu email.';
                 isValid = false;
@@ -329,28 +329,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 errorMessage = 'Por favor, informe um email válido.';
                 isValid = false;
             }
-            
+
             if (!nome || nome.length < 3) {
                 errorMessage = 'Por favor, informe seu nome completo (mínimo 3 caracteres).';
                 isValid = false;
             }
-            
+
             if (!telefone || telefone.replace(/\D/g, '').length < 10) {
                 errorMessage = 'Por favor, informe um telefone válido.';
                 isValid = false;
             }
-            
+
             if (!senha || senha.length < <?php echo PASSWORD_MIN_LENGTH; ?>) {
                 errorMessage = 'A senha deve ter no mínimo <?php echo PASSWORD_MIN_LENGTH; ?> caracteres.';
                 isValid = false;
             }
-            
+
             if (!isValid) {
                 event.preventDefault();
                 alert(errorMessage);
             }
         });
-        
+
         function isValidEmail(email) {
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             return emailRegex.test(email);
