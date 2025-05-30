@@ -173,8 +173,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // Funções para login social (seriam implementadas com as respectivas APIs)
         function loginWithGoogle() {
-            // Implementação da API do Google
-            alert('Login com Google será implementado com a API do Google.');
+            // Mostrar indicador de carregamento
+            const googleBtn = document.querySelector('.google-btn');
+            const originalText = googleBtn.innerHTML;
+            googleBtn.innerHTML = '<img src="../../assets/images/icons/google.svg" alt="Google"> Conectando...';
+            googleBtn.disabled = true;
+            
+            // Fazer requisição para obter a URL de autorização do Google
+            fetch('<?php echo SITE_URL; ?>/auth/google/auth', {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json'
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Erro na requisição: ' + response.status);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.status && data.auth_url) {
+                    // Redirecionar para o Google
+                    window.location.href = data.auth_url;
+                } else {
+                    throw new Error(data.message || 'Erro desconhecido');
+                }
+            })
+            .catch(error => {
+                console.error('Erro no login Google:', error);
+                alert('Erro ao conectar com o Google: ' + error.message);
+                
+                // Restaurar botão
+                googleBtn.innerHTML = originalText;
+                googleBtn.disabled = false;
+            });
         }
 
         function loginWithFacebook() {
