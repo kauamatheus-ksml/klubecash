@@ -10,7 +10,9 @@ require_once '../../controllers/AuthController.php';
 require_once '../../controllers/AdminController.php';
 
 // Iniciar sessão
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // Verificar se o usuário está logado e é administrador
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION['user_type'] !== USER_TYPE_ADMIN) {
@@ -19,16 +21,25 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION[
     exit;
 }
 
-// Inicializar variáveis de paginação
+// Inicializar variáveis de paginação e filtros
 $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
 $filters = [];
 
-// Verificar valores dos filtros para debug
-error_log('Filtros preparados: ' . print_r($filters, true));
-error_log('Página: ' . $page);
+// Processar filtros se enviados
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET)) {
+    if (!empty($_GET['tipo']) && $_GET['tipo'] !== 'todos') {
+        $filters['tipo'] = $_GET['tipo'];
+    }
+    if (!empty($_GET['status']) && $_GET['status'] !== 'todos') {
+        $filters['status'] = $_GET['status'];
+    }
+    if (!empty($_GET['busca'])) {
+        $filters['busca'] = trim($_GET['busca']);
+    }
+}
 
 try {
-    // Obter dados dos usuários
+    // Obter dados dos usuários com filtros aplicados
     $result = AdminController::manageUsers($filters, $page);
 
     // Verificar se houve erro
@@ -55,7 +66,12 @@ try {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gerenciar Usuários - Klube Cash</title>
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
+    
+    <!-- CSS Principal -->
     <link rel="stylesheet" href="../../assets/css/views/admin/users.css">
+    
+    <!-- Font Awesome para ícones -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
     <?php include_once '../components/sidebar.php'; ?>
@@ -65,101 +81,277 @@ try {
         <div class="page-wrapper">
             <!-- Cabeçalho da Página -->
             <div class="page-header">
-                <h1>Usuários</h1>
-                <button class="btn btn-primary" onclick="showUserModal()">Adicionar Usuário</button>
+                <div class="page-title">
+                    <h1><i class="fas fa-users"></i> Gerenciar Usuários</h1>
+                    <p>Visualize e gerencie todos os usuários do sistema</p>
+                </div>
+                <div class="page-actions">
+                    <button class="btn btn-primary" onclick="showUserModal()">
+                        <i class="fas fa-plus"></i> Novo Usuário
+                    </button>
+                </div>
             </div>
 
-            <div id="bulkActionBar" class="bulk-action-bar" style="display: none;">
-                <div class="selected-count">
-                    <span id="selectedCount">0</span> usuários selecionados
+            <!-- Estatísticas Rápidas -->
+            <?php if (!$hasError && !empty($statistics)): ?>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3><?php echo number_format($statistics['total_usuarios']); ?></h3>
+                        <p>Total de Usuários</p>
+                    </div>
                 </div>
-                <div class="bulk-actions">
-                    <button class="btn btn-warning btn-sm" onclick="bulkAction('inativo')">Desativar</button>
-                    <button class="btn btn-danger btn-sm" onclick="bulkAction('bloqueado')">Bloquear</button>
+                <div class="stat-card">
+                    <div class="stat-icon client">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3><?php echo number_format($statistics['total_clientes']); ?></h3>
+                        <p>Clientes</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon store">
+                        <i class="fas fa-store"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3><?php echo number_format($statistics['total_lojas']); ?></h3>
+                        <p>Lojas</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon admin">
+                        <i class="fas fa-user-shield"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3><?php echo number_format($statistics['total_admins']); ?></h3>
+                        <p>Administradores</p>
+                    </div>
                 </div>
             </div>
+            <?php endif; ?>
             
             <!-- Container de mensagens -->
             <div id="messageContainer" class="alert-container"></div>
             
+            <!-- Filtros e Busca -->
+            <div class="filters-section">
+                <form method="GET" class="filters-form" id="filtersForm">
+                    <div class="filter-group">
+                        <div class="search-bar">
+                            <input type="text" 
+                                   name="busca" 
+                                   id="searchInput"
+                                   placeholder="Buscar por nome ou email..." 
+                                   value="<?php echo htmlspecialchars($_GET['busca'] ?? ''); ?>">
+                            <button type="submit" class="search-btn">
+                                <i class="fas fa-search"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="filter-group">
+                        <select name="tipo" id="tipoFilter">
+                            <option value="todos">Todos os tipos</option>
+                            <option value="cliente" <?php echo (($_GET['tipo'] ?? '') === 'cliente') ? 'selected' : ''; ?>>Clientes</option>
+                            <option value="loja" <?php echo (($_GET['tipo'] ?? '') === 'loja') ? 'selected' : ''; ?>>Lojas</option>
+                            <option value="admin" <?php echo (($_GET['tipo'] ?? '') === 'admin') ? 'selected' : ''; ?>>Administradores</option>
+                        </select>
+                    </div>
+                    
+                    <div class="filter-group">
+                        <select name="status" id="statusFilter">
+                            <option value="todos">Todos os status</option>
+                            <option value="ativo" <?php echo (($_GET['status'] ?? '') === 'ativo') ? 'selected' : ''; ?>>Ativo</option>
+                            <option value="inativo" <?php echo (($_GET['status'] ?? '') === 'inativo') ? 'selected' : ''; ?>>Inativo</option>
+                            <option value="bloqueado" <?php echo (($_GET['status'] ?? '') === 'bloqueado') ? 'selected' : ''; ?>>Bloqueado</option>
+                        </select>
+                    </div>
+                    
+                    <div class="filter-group">
+                        <button type="button" class="btn btn-secondary" onclick="clearFilters()">
+                            <i class="fas fa-times"></i> Limpar
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Barra de Ações em Massa -->
+            <div id="bulkActionBar" class="bulk-action-bar" style="display: none;">
+                <div class="bulk-info">
+                    <span id="selectedCount">0</span> usuários selecionados
+                </div>
+                <div class="bulk-actions">
+                    <button class="btn btn-sm btn-success" onclick="bulkAction('ativo')">
+                        <i class="fas fa-check"></i> Ativar
+                    </button>
+                    <button class="btn btn-sm btn-warning" onclick="bulkAction('inativo')">
+                        <i class="fas fa-pause"></i> Desativar
+                    </button>
+                    <button class="btn btn-sm btn-danger" onclick="bulkAction('bloqueado')">
+                        <i class="fas fa-ban"></i> Bloquear
+                    </button>
+                </div>
+            </div>
+            
             <?php if ($hasError): ?>
                 <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle"></i>
                     <?php echo htmlspecialchars($errorMessage); ?>
                 </div>
             <?php else: ?>
             
-            <!-- Card Principal -->
+            <!-- Tabela de Usuários -->
             <div class="card">
-                <!-- Tabela de Usuários -->
+                <div class="card-header">
+                    <h3>Lista de Usuários</h3>
+                    <div class="card-actions">
+                        <button class="btn btn-sm btn-outline" onclick="exportUsers()">
+                            <i class="fas fa-download"></i> Exportar
+                        </button>
+                    </div>
+                </div>
+                
                 <div class="table-container">
                     <table class="table">
                         <thead>
                             <tr>
-                                <th>
+                                <th class="checkbox-column">
                                     <div class="checkbox-wrapper">
                                         <input type="checkbox" id="selectAll" onchange="toggleSelectAll()">
                                         <span class="checkmark"></span>
                                     </div>
                                 </th>
-                                <th>Nome</th>
-                                <th>E-mail</th>
+                                <th>Usuário</th>
                                 <th>Tipo</th>
-                                <th>Cadastro</th>
                                 <th>Status</th>
-                                <th>Ações</th>
+                                <th>Cadastro</th>
+                                <th>Último Login</th>
+                                <th class="actions-column">Ações</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php if (empty($users)): ?>
                                 <tr>
-                                    <td colspan="7" style="text-align: center;">Nenhum usuário encontrado</td>
+                                    <td colspan="7" class="no-data">
+                                        <div class="no-data-content">
+                                            <i class="fas fa-users"></i>
+                                            <h4>Nenhum usuário encontrado</h4>
+                                            <p>Não há usuários que atendam aos critérios de busca.</p>
+                                        </div>
+                                    </td>
                                 </tr>
                             <?php else: ?>
                                 <?php foreach ($users as $user): ?>
                                     <tr>
                                         <td>
                                             <div class="checkbox-wrapper">
-                                                <input type="checkbox" class="user-checkbox" value="<?php echo $user['id']; ?>" onchange="toggleUserSelection(this, <?php echo $user['id']; ?>)">
+                                                <input type="checkbox" 
+                                                       class="user-checkbox" 
+                                                       value="<?php echo $user['id']; ?>" 
+                                                       onchange="toggleUserSelection(this, <?php echo $user['id']; ?>)">
                                                 <span class="checkmark"></span>
                                             </div>
                                         </td>
-                                        <td><?php echo htmlspecialchars($user['nome']); ?></td>
-                                        <td><?php echo htmlspecialchars($user['email']); ?></td>
-                                        <td><?php echo htmlspecialchars(ucfirst($user['tipo'])); ?></td>
-                                        <td><?php echo date('d/m/Y', strtotime($user['data_criacao'])); ?></td>
+                                        <td>
+                                            <div class="user-info">
+                                                <div class="user-avatar">
+                                                    <i class="fas fa-user"></i>
+                                                </div>
+                                                <div class="user-details">
+                                                    <div class="user-name"><?php echo htmlspecialchars($user['nome']); ?></div>
+                                                    <div class="user-email"><?php echo htmlspecialchars($user['email']); ?></div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span class="type-badge type-<?php echo $user['tipo']; ?>">
+                                                <?php 
+                                                    $tipos = [
+                                                        'cliente' => 'Cliente',
+                                                        'loja' => 'Loja',
+                                                        'admin' => 'Admin'
+                                                    ];
+                                                    echo $tipos[$user['tipo']] ?? ucfirst($user['tipo']);
+                                                ?>
+                                            </span>
+                                        </td>
                                         <td>
                                             <?php 
                                                 $statusClass = '';
+                                                $statusIcon = '';
                                                 switch ($user['status']) {
                                                     case 'ativo':
                                                         $statusClass = 'badge-success';
+                                                        $statusIcon = 'fas fa-check';
                                                         break;
                                                     case 'inativo':
                                                         $statusClass = 'badge-warning';
+                                                        $statusIcon = 'fas fa-pause';
                                                         break;
                                                     case 'bloqueado':
                                                         $statusClass = 'badge-danger';
+                                                        $statusIcon = 'fas fa-ban';
                                                         break;
                                                 }
                                             ?>
                                             <span class="badge <?php echo $statusClass; ?>">
+                                                <i class="<?php echo $statusIcon; ?>"></i>
                                                 <?php echo htmlspecialchars(ucfirst($user['status'])); ?>
                                             </span>
                                         </td>
                                         <td>
+                                            <div class="date-info">
+                                                <div class="date-primary">
+                                                    <?php echo date('d/m/Y', strtotime($user['data_criacao'])); ?>
+                                                </div>
+                                                <div class="date-secondary">
+                                                    <?php echo date('H:i', strtotime($user['data_criacao'])); ?>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="date-info">
+                                                <?php if ($user['ultimo_login']): ?>
+                                                    <div class="date-primary">
+                                                        <?php echo date('d/m/Y', strtotime($user['ultimo_login'])); ?>
+                                                    </div>
+                                                    <div class="date-secondary">
+                                                        <?php echo date('H:i', strtotime($user['ultimo_login'])); ?>
+                                                    </div>
+                                                <?php else: ?>
+                                                    <span class="text-muted">Nunca</span>
+                                                <?php endif; ?>
+                                            </div>
+                                        </td>
+                                        <td>
                                             <div class="table-actions">
-                                                <button class="action-btn edit" onclick="editUser(<?php echo $user['id']; ?>)">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                                                    </svg>
+                                                <button class="action-btn edit" 
+                                                        onclick="editUser(<?php echo $user['id']; ?>)"
+                                                        title="Editar usuário">
+                                                    <i class="fas fa-edit"></i>
                                                 </button>
-                                                <button class="action-btn deactivate" onclick="deactivateUser(<?php echo $user['id']; ?>, '<?php echo addslashes($user['nome']); ?>')">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                                        <circle cx="12" cy="12" r="10"></circle>
-                                                        <line x1="8" y1="12" x2="16" y2="12"></line>
-                                                    </svg>
+                                                <button class="action-btn view" 
+                                                        onclick="viewUser(<?php echo $user['id']; ?>)"
+                                                        title="Visualizar usuário">
+                                                    <i class="fas fa-eye"></i>
                                                 </button>
+                                                <?php if ($user['status'] === 'ativo'): ?>
+                                                    <button class="action-btn deactivate" 
+                                                            onclick="changeUserStatus(<?php echo $user['id']; ?>, 'inativo', '<?php echo addslashes($user['nome']); ?>')"
+                                                            title="Desativar usuário">
+                                                        <i class="fas fa-pause"></i>
+                                                    </button>
+                                                <?php else: ?>
+                                                    <button class="action-btn activate" 
+                                                            onclick="changeUserStatus(<?php echo $user['id']; ?>, 'ativo', '<?php echo addslashes($user['nome']); ?>')"
+                                                            title="Ativar usuário">
+                                                        <i class="fas fa-check"></i>
+                                                    </button>
+                                                <?php endif; ?>
                                             </div>
                                         </td>
                                     </tr>
@@ -171,32 +363,45 @@ try {
                 
                 <!-- Paginação -->
                 <?php if (!empty($pagination) && $pagination['total_paginas'] > 1): ?>
-                    <div class="pagination">
-                        <a href="?page=<?php echo max(1, $page - 1); ?>" class="pagination-arrow">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <polyline points="15 18 9 12 15 6"></polyline>
-                            </svg>
-                        </a>
-                        
-                        <?php 
-                            $startPage = max(1, $page - 2);
-                            $endPage = min($pagination['total_paginas'], $startPage + 4);
-                            if ($endPage - $startPage < 4) {
-                                $startPage = max(1, $endPage - 4);
-                            }
+                    <div class="pagination-wrapper">
+                        <div class="pagination-info">
+                            Mostrando <?php echo (($page - 1) * $pagination['por_pagina']) + 1; ?>-<?php echo min($page * $pagination['por_pagina'], $pagination['total']); ?> 
+                            de <?php echo $pagination['total']; ?> usuários
+                        </div>
+                        <div class="pagination">
+                            <?php if ($page > 1): ?>
+                                <a href="?page=1<?php echo http_build_query($_GET, '', '&amp;', PHP_QUERY_RFC3986); ?>" class="pagination-arrow" title="Primeira página">
+                                    <i class="fas fa-angle-double-left"></i>
+                                </a>
+                                <a href="?page=<?php echo max(1, $page - 1); ?><?php echo http_build_query($_GET, '', '&amp;', PHP_QUERY_RFC3986); ?>" class="pagination-arrow" title="Página anterior">
+                                    <i class="fas fa-angle-left"></i>
+                                </a>
+                            <?php endif; ?>
                             
-                            for ($i = $startPage; $i <= $endPage; $i++): 
-                        ?>
-                            <a href="?page=<?php echo $i; ?>" class="pagination-item <?php echo ($i == $page) ? 'active' : ''; ?>">
-                                <?php echo $i; ?>
-                            </a>
-                        <?php endfor; ?>
-                        
-                        <a href="?page=<?php echo min($pagination['total_paginas'], $page + 1); ?>" class="pagination-arrow">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <polyline points="9 18 15 12 9 6"></polyline>
-                            </svg>
-                        </a>
+                            <?php 
+                                $startPage = max(1, $page - 2);
+                                $endPage = min($pagination['total_paginas'], $startPage + 4);
+                                if ($endPage - $startPage < 4) {
+                                    $startPage = max(1, $endPage - 4);
+                                }
+                                
+                                for ($i = $startPage; $i <= $endPage; $i++): 
+                            ?>
+                                <a href="?page=<?php echo $i; ?><?php echo http_build_query($_GET, '', '&amp;', PHP_QUERY_RFC3986); ?>" 
+                                   class="pagination-item <?php echo ($i == $page) ? 'active' : ''; ?>">
+                                    <?php echo $i; ?>
+                                </a>
+                            <?php endfor; ?>
+                            
+                            <?php if ($page < $pagination['total_paginas']): ?>
+                                <a href="?page=<?php echo min($pagination['total_paginas'], $page + 1); ?><?php echo http_build_query($_GET, '', '&amp;', PHP_QUERY_RFC3986); ?>" class="pagination-arrow" title="Próxima página">
+                                    <i class="fas fa-angle-right"></i>
+                                </a>
+                                <a href="?page=<?php echo $pagination['total_paginas']; ?><?php echo http_build_query($_GET, '', '&amp;', PHP_QUERY_RFC3986); ?>" class="pagination-arrow" title="Última página">
+                                    <i class="fas fa-angle-double-right"></i>
+                                </a>
+                            <?php endif; ?>
+                        </div>
                     </div>
                 <?php endif; ?>
             </div>
@@ -208,628 +413,156 @@ try {
     <div class="modal" id="userModal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3 class="modal-title" id="userModalTitle">Adicionar Usuário</h3>
-                <div class="modal-close" onclick="hideUserModal()">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <line x1="18" y1="6" x2="6" y2="18"></line>
-                        <line x1="6" y1="6" x2="18" y2="18"></line>
-                    </svg>
+                <h3 class="modal-title" id="userModalTitle">
+                    <i class="fas fa-user-plus"></i> Adicionar Usuário
+                </h3>
+                <button class="modal-close" onclick="hideUserModal()" type="button">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="modal-body">
+                <form id="userForm" onsubmit="submitUserForm(event)">
+                    <input type="hidden" id="userId" name="id" value="">
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label required" for="userType">Tipo de Usuário</label>
+                            <select class="form-select" id="userType" name="tipo" required>
+                                <option value="">Selecione o tipo...</option>
+                                <option value="cliente">Cliente</option>
+                                <option value="loja">Loja</option>
+                                <option value="admin">Administrador</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label required" for="userStatus">Status</label>
+                            <select class="form-select" id="userStatus" name="status" required>
+                                <option value="ativo">Ativo</option>
+                                <option value="inativo">Inativo</option>
+                                <option value="bloqueado">Bloqueado</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label required" for="userName">Nome Completo</label>
+                        <input type="text" 
+                               class="form-control" 
+                               id="userName" 
+                               name="nome" 
+                               required 
+                               placeholder="Digite o nome completo">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label required" for="userEmail">E-mail</label>
+                        <div id="emailSelectContainer" style="display: none;">
+                            <select class="form-select" id="userEmailSelect" name="email_select">
+                                <option value="">Selecione uma loja...</option>
+                            </select>
+                        </div>
+                        <input type="email" 
+                               class="form-control" 
+                               id="userEmail" 
+                               name="email" 
+                               required 
+                               placeholder="Digite o e-mail">
+                    </div>
+                    
+                    <!-- Campos que serão preenchidos automaticamente quando for loja -->
+                    <div id="storeDataFields" style="display: none;">
+                        <div class="form-group">
+                            <label class="form-label" for="storeName">Nome da Loja</label>
+                            <input type="text" class="form-control" id="storeName" readonly>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label" for="storeDocument">CNPJ</label>
+                            <input type="text" class="form-control" id="storeDocument" readonly>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label" for="storeCategory">Categoria</label>
+                            <input type="text" class="form-control" id="storeCategory" readonly>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="userPhone">Telefone</label>
+                        <input type="tel" 
+                               class="form-control" 
+                               id="userPhone" 
+                               name="telefone" 
+                               placeholder="(00) 00000-0000">
+                    </div>
+                    
+                    <div class="form-group" id="passwordGroup">
+                        <label class="form-label required" for="userPassword">Senha</label>
+                        <div class="password-input">
+                            <input type="password" 
+                                   class="form-control" 
+                                   id="userPassword" 
+                                   name="senha"
+                                   placeholder="Digite a senha">
+                            <button type="button" class="password-toggle" onclick="togglePassword('userPassword')">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                        <small id="passwordHelp" class="form-text">
+                            Mínimo de 8 caracteres (deixe em branco para manter a senha atual ao editar)
+                        </small>
+                    </div>
+                </form>
+            </div>
+            
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="hideUserModal()">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+                <button type="submit" form="userForm" class="btn btn-primary" id="submitBtn">
+                    <i class="fas fa-save"></i> Salvar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Visualização de Usuário -->
+    <div class="modal" id="viewUserModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">
+                    <i class="fas fa-eye"></i> Detalhes do Usuário
+                </h3>
+                <button class="modal-close" onclick="hideViewUserModal()" type="button">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="modal-body">
+                <div id="userViewContent">
+                    <!-- Conteúdo será carregado dinamicamente -->
                 </div>
             </div>
             
-            <form id="userForm" onsubmit="submitUserForm(event)">
-                <input type="hidden" id="userId" name="id" value="">
-                
-                <div class="form-group">
-                    <label class="form-label" for="userType">Tipo</label>
-                    <select class="form-select" id="userType" name="tipo">
-                        <option value="cliente">Cliente</option>
-                        <option value="admin">Administrador</option>
-                        <option value="loja">Loja</option>
-                    </select>
-                </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="hideViewUserModal()">
+                    <i class="fas fa-times"></i> Fechar
+                </button>
+            </div>
+        </div>
+    </div>
 
-                <div class="form-group">
-                    <label class="form-label" for="userEmail">E-mail</label>
-                    <div id="emailSelectContainer" style="display: none;">
-                        <select class="form-select" id="userEmailSelect" name="email_select">
-                            <option value="">Selecione uma loja...</option>
-                        </select>
-                    </div>
-                    <input type="email" class="form-control" id="userEmail" name="email" required>
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label" for="userName">Nome</label>
-                    <input type="text" class="form-control" id="userName" name="nome" required>
-                </div>
-                
-                <!-- Campos que serão preenchidos automaticamente quando for loja -->
-                <div id="storeDataFields" style="display: none;">
-                    <div class="form-group">
-                        <label class="form-label" for="storeName">Nome da Loja</label>
-                        <input type="text" class="form-control" id="storeName" readonly>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label class="form-label" for="storeDocument">CNPJ</label>
-                        <input type="text" class="form-control" id="storeDocument" readonly>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label class="form-label" for="storeCategory">Categoria</label>
-                        <input type="text" class="form-control" id="storeCategory" readonly>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label" for="userPhone">Telefone</label>
-                    <input type="text" class="form-control" id="userPhone" name="telefone">
-                </div>
-                
-                <div class="form-group">
-                    <label class="form-label" for="userStatus">Status</label>
-                    <select class="form-select" id="userStatus" name="status">
-                        <option value="ativo">Ativo</option>
-                        <option value="inativo">Inativo</option>
-                        <option value="bloqueado">Bloqueado</option>
-                    </select>
-                </div>
-                
-                <div class="form-group" id="passwordGroup">
-                    <label class="form-label" for="userPassword">Senha</label>
-                    <input type="password" class="form-control" id="userPassword" name="senha">
-                    <small id="passwordHelp" class="form-text">Mínimo de 8 caracteres (deixe em branco para manter a senha atual ao editar)</small>
-                </div>
-                
-                <div class="form-footer">
-                    <button type="button" class="btn btn-secondary" onclick="hideUserModal()">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Salvar</button>
-                </div>
-            </form>
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+        <div class="loading-spinner">
+            <i class="fas fa-spinner fa-spin"></i>
+            <p>Carregando...</p>
         </div>
     </div>
     
-    <script>
-// Variáveis globais
-let currentUserId = null;
-let selectedUsers = [];
-let availableStores = []; // Array com lojas disponíveis para vinculação
-let isStoreUser = false; // Flag para controlar se é usuário do tipo loja
-let isEditMode = false; // Flag para saber se estamos editando
-
-// Função para exibir mensagens
-function showMessage(message, type = 'success') {
-    const messageContainer = document.getElementById('messageContainer');
-    messageContainer.innerHTML = `
-        <div class="alert alert-${type}">
-            ${message}
-        </div>
-    `;
-    
-    // Rolar para a mensagem
-    messageContainer.scrollIntoView({ behavior: 'smooth' });
-    
-    // Remover a mensagem após 5 segundos
-    setTimeout(() => {
-        messageContainer.innerHTML = '';
-    }, 5000);
-}
-
-// Função para carregar lojas disponíveis (aprovadas e sem usuário vinculado)
-function loadAvailableStores() {
-    fetch('<?php echo SITE_URL; ?>/controllers/AdminController.php', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: 'action=get_available_stores'
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.status && data.data) {
-            availableStores = data.data;
-            populateStoreSelect();
-        } else {
-            console.warn('Nenhuma loja disponível encontrada');
-            availableStores = [];
-        }
-    })
-    .catch(error => {
-        console.error('Erro ao carregar lojas:', error);
-        availableStores = [];
-    });
-}
-
-// Função para popular o select de lojas
-function populateStoreSelect() {
-    const select = document.getElementById('userEmailSelect');
-    
-    // Limpar opções existentes
-    select.innerHTML = '<option value="">Selecione uma loja...</option>';
-    
-    // Adicionar lojas disponíveis
-    availableStores.forEach(store => {
-        const option = document.createElement('option');
-        option.value = store.email;
-        option.textContent = `${store.nome_fantasia} (${store.email})`;
-        option.dataset.storeData = JSON.stringify(store);
-        select.appendChild(option);
-    });
-}
-
-// Função para resetar campos relacionados a loja
-function resetStoreFields() {
-    // Ocultar container do select de lojas e mostrar input normal de email
-    document.getElementById('emailSelectContainer').style.display = 'none';
-    document.getElementById('userEmail').style.display = 'block';
-    document.getElementById('storeDataFields').style.display = 'none';
-    
-    // Limpar valores dos campos
-    document.getElementById('userEmailSelect').value = '';
-    document.getElementById('storeName').value = '';
-    document.getElementById('storeDocument').value = '';
-    document.getElementById('storeCategory').value = '';
-    
-    // Habilitar edição dos campos principais
-    document.getElementById('userEmail').readOnly = false;
-    document.getElementById('userName').readOnly = false;
-    document.getElementById('userPhone').readOnly = false;
-    document.getElementById('userEmail').required = true;
-    
-    // Resetar flag
-    isStoreUser = false;
-}
-
-// Função para mostrar modal de adicionar usuário
-function showUserModal() {
-    document.getElementById('userModalTitle').textContent = 'Adicionar Usuário';
-    document.getElementById('userForm').reset();
-    document.getElementById('userId').value = '';
-    currentUserId = null;
-    isEditMode = false; // Definir que estamos criando
-    
-    // Configurar campo de senha para criação
-    const passwordField = document.getElementById('userPassword');
-    const passwordGroup = document.getElementById('passwordGroup');
-    const passwordHelp = document.getElementById('passwordHelp');
-    
-    passwordGroup.style.display = 'block';
-    passwordField.required = true;
-    passwordHelp.textContent = 'Mínimo de 8 caracteres';
-    
-    // Resetar campos de loja
-    resetStoreFields();
-    
-    // Mostrar modal
-    document.getElementById('userModal').classList.add('show');
-    
-    // Carregar lojas disponíveis para o select
-    loadAvailableStores();
-}
-
-// Função para esconder modal
-function hideUserModal() {
-    document.getElementById('userModal').classList.remove('show');
-}
-
-// Função para editar usuário
-function editUser(userId) {
-    // Armazenar ID do usuário atual
-    currentUserId = userId;
-    isEditMode = true; // Definir que estamos editando
-    
-    // Mostrar carregamento
-    document.getElementById('userModalTitle').textContent = 'Carregando...';
-    document.getElementById('userForm').reset();
-    document.getElementById('userId').value = userId;
-    document.getElementById('userModal').classList.add('show');
-    
-    // Configurar campo de senha para edição (opcional)
-    const passwordField = document.getElementById('userPassword');
-    const passwordGroup = document.getElementById('passwordGroup');
-    const passwordHelp = document.getElementById('passwordHelp');
-    
-    passwordGroup.style.display = 'block';
-    passwordField.required = false; // Senha opcional na edição
-    passwordHelp.textContent = 'Mínimo de 8 caracteres (deixe em branco para manter a senha atual)';
-    
-    // Resetar campos de loja (no modo edição, não mostramos a seleção de loja)
-    resetStoreFields();
-    
-    // Fazer requisição AJAX para obter dados do usuário
-    fetch('<?php echo SITE_URL; ?>/controllers/AdminController.php', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: 'action=getUserDetails&user_id=' + userId
-    })
-    .then(response => {
-        if (!response.ok) {
-            throw new Error('Erro na requisição: ' + response.status);
-        }
-        return response.json();
-    })
-    .then(data => {
-        if (data.status && data.data && data.data.usuario) {
-            const userData = data.data.usuario;
-            
-            // Preencher o formulário
-            document.getElementById('userModalTitle').textContent = 'Editar Usuário';
-            document.getElementById('userId').value = userData.id;
-            document.getElementById('userName').value = userData.nome;
-            document.getElementById('userEmail').value = userData.email;
-            
-            // Campo telefone
-            if (userData.telefone) {
-                document.getElementById('userPhone').value = userData.telefone;
-            }
-            
-            document.getElementById('userType').value = userData.tipo;
-            document.getElementById('userStatus').value = userData.status;
-            
-            // Limpar campo de senha
-            document.getElementById('userPassword').value = '';
-        } else {
-            hideUserModal();
-            showMessage(data.message || 'Erro ao carregar dados do usuário', 'danger');
-        }
-    })
-    .catch(error => {
-        console.error('Erro:', error);
-        hideUserModal();
-        showMessage('Erro ao carregar dados do usuário: ' + error.message, 'danger');
-    });
-}
-
-// Função para desativar usuário
-function deactivateUser(userId, userName) {
-    if (confirm(`Tem certeza que deseja desativar o usuário "${userName}"?`)) {
-        fetch('<?php echo SITE_URL; ?>/controllers/AdminController.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: 'action=update_user_status&user_id=' + userId + '&status=inativo'
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status) {
-                showMessage('Usuário desativado com sucesso!');
-                setTimeout(() => { location.reload(); }, 1000);
-            } else {
-                showMessage(data.message || 'Erro ao desativar usuário', 'danger');
-            }
-        })
-        .catch(error => {
-            console.error('Erro:', error);
-            showMessage('Erro ao processar a solicitação: ' + error.message, 'danger');
-        });
-    }
-}
-
-// Função para enviar formulário (com validação de senha corrigida)
-function submitUserForm(event) {
-    event.preventDefault();
-    
-    // Obter dados do formulário
-    const form = document.getElementById('userForm');
-    const formData = new FormData(form);
-    
-    // Verificar se estamos editando ou criando
-    const userId = formData.get('id');
-    const isEditing = userId !== '';
-    
-    // Validação específica para senha
-    const senha = formData.get('senha');
-    if (!isEditing) {
-        // Para criação, senha é obrigatória
-        if (!senha || senha.trim() === '') {
-            showMessage('Senha é obrigatória para criar um novo usuário', 'danger');
-            document.getElementById('userPassword').focus();
-            return;
-        }
-        if (senha.length < 8) {
-            showMessage('A senha deve ter no mínimo 8 caracteres', 'danger');
-            document.getElementById('userPassword').focus();
-            return;
-        }
-    } else {
-        // Para edição, senha é opcional, mas se fornecida deve ter no mínimo 8 caracteres
-        if (senha && senha.trim() !== '' && senha.length < 8) {
-            showMessage('A senha deve ter no mínimo 8 caracteres', 'danger');
-            document.getElementById('userPassword').focus();
-            return;
-        }
-    }
-    
-    // Se for usuário do tipo loja, usar o email selecionado no select
-    if (isStoreUser && !isEditing) {
-        const selectedEmail = document.getElementById('userEmailSelect').value;
-        if (selectedEmail) {
-            formData.set('email', selectedEmail);
-        } else {
-            showMessage('Por favor, selecione uma loja antes de continuar.', 'danger');
-            return;
-        }
-    }
-    
-    // Mostrar indicador de carregamento
-    const saveButton = form.querySelector('button[type="submit"]');
-    const originalButtonText = saveButton.textContent;
-    saveButton.textContent = 'Salvando...';
-    saveButton.disabled = true;
-    
-    // Converter FormData para URLSearchParams
-    const data = new URLSearchParams();
-    
-    if (isEditing) {
-        // Para edição, usar AdminController.php
-        data.append('action', 'update_user');
-        data.append('user_id', userId);
-        data.append('nome', formData.get('nome'));
-        data.append('email', formData.get('email'));
-        data.append('telefone', formData.get('telefone') || '');
-        data.append('tipo', formData.get('tipo'));
-        data.append('status', formData.get('status'));
-        
-        // Senha opcional - só incluir se foi preenchida
-        if (senha && senha.trim() !== '') {
-            data.append('senha', senha);
-        }
-        
-        var url = '<?php echo SITE_URL; ?>/controllers/AdminController.php';
-    } else {
-        // Para criação, usar AuthController.php
-        data.append('action', 'register');
-        data.append('nome', formData.get('nome'));
-        data.append('email', formData.get('email'));
-        data.append('telefone', formData.get('telefone') || '');
-        data.append('senha', senha); // Senha obrigatória para criação
-        data.append('tipo', formData.get('tipo'));
-        data.append('ajax', '1'); // Indicar que é uma chamada AJAX
-        
-        var url = '<?php echo SITE_URL; ?>/controllers/AuthController.php';
-    }
-    
-    // Enviar requisição
-    fetch(url, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'X-Requested-With': 'XMLHttpRequest'
-        },
-        body: data
-    })
-    .then(response => response.text())
-    .then(text => {
-        console.log('Resposta completa do servidor:', text);
-        
-        let data;
-        try {
-            data = JSON.parse(text);
-        } catch (e) {
-            console.error("Falha ao analisar JSON:", text);
-            throw new Error("Resposta do servidor não é JSON válido");
-        }
-        return data;
-    })
-    .then(data => {
-        if (data.status) {
-            hideUserModal();
-            let message = isEditing ? 'Usuário atualizado com sucesso!' : 'Usuário adicionado com sucesso!';
-            
-            // Adicionar informação sobre vinculação da loja se aplicável
-            if (data.store_linked) {
-                message += ' A loja foi vinculada automaticamente ao usuário.';
-            }
-            
-            showMessage(message);
-            setTimeout(() => {
-                location.reload();
-            }, 1000);
-        } else {
-            showMessage(data.message || 'Erro ao processar solicitação', 'danger');
-        }
-    })
-    .catch(error => {
-        console.error('Erro:', error);
-        showMessage('Erro ao processar a solicitação: ' + error.message, 'danger');
-    })
-    .finally(() => {
-        saveButton.textContent = originalButtonText;
-        saveButton.disabled = false;
-    });
-}
-
-// Função para selecionar/desselecionar todos
-function toggleSelectAll() {
-    const selectAll = document.getElementById('selectAll');
-    const checkboxes = document.querySelectorAll('.user-checkbox');
-    
-    selectedUsers = [];
-    
-    checkboxes.forEach(checkbox => {
-        checkbox.checked = selectAll.checked;
-        if (selectAll.checked) {
-            const userId = parseInt(checkbox.value);
-            if (!selectedUsers.includes(userId)) {
-                selectedUsers.push(userId);
-            }
-        }
-    });
-    
-    updateBulkActionBar();
-}
-
-// Função para processar checkbox individual
-function toggleUserSelection(checkbox, userId) {
-    if (checkbox.checked) {
-        if (!selectedUsers.includes(userId)) {
-            selectedUsers.push(userId);
-        }
-    } else {
-        selectedUsers = selectedUsers.filter(id => id !== userId);
-        // Desmarcar o checkbox "selecionar todos" se nem todos estão selecionados
-        const selectAllCheckbox = document.getElementById('selectAll');
-        if (selectAllCheckbox) {
-            selectAllCheckbox.checked = false;
-        }
-    }
-    
-    updateBulkActionBar();
-}
-
-// Função para atualizar a barra de ações em massa
-function updateBulkActionBar() {
-    const bulkActionBar = document.getElementById('bulkActionBar');
-    const selectedCount = document.getElementById('selectedCount');
-    
-    selectedCount.textContent = selectedUsers.length;
-    
-    if (selectedUsers.length > 0) {
-        bulkActionBar.style.display = 'flex';
-    } else {
-        bulkActionBar.style.display = 'none';
-    }
-}
-
-// Função para executar ação em massa
-function bulkAction(status) {
-    if (selectedUsers.length === 0) return;
-    
-    const actionText = status === 'inativo' ? 'desativar' : 'bloquear';
-    
-    if (confirm(`Tem certeza que deseja ${actionText} ${selectedUsers.length} usuários selecionados?`)) {
-        const bulkActionBar = document.getElementById('bulkActionBar');
-        bulkActionBar.innerHTML = `<div class="selected-count">Processando ${selectedUsers.length} usuários...</div>`;
-        
-        let processed = 0;
-        let successful = 0;
-        
-        selectedUsers.forEach(userId => {
-            fetch('<?php echo SITE_URL; ?>/controllers/AdminController.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: `action=update_user_status&user_id=${userId}&status=${status}`
-            })
-            .then(response => response.json())
-            .then(data => {
-                processed++;
-                if (data.status) successful++;
-                
-                if (processed === selectedUsers.length) {
-                    showMessage(`${successful} usuários foram ${actionText === 'desativar' ? 'desativados' : 'bloqueados'} com sucesso!`);
-                    setTimeout(() => { location.reload(); }, 1500);
-                }
-            })
-            .catch(() => {
-                processed++;
-                if (processed === selectedUsers.length) {
-                    showMessage(`${successful} usuários foram ${actionText === 'desativar' ? 'desativados' : 'bloqueados'} com sucesso!`);
-                    setTimeout(() => { location.reload(); }, 1500);
-                }
-            });
-        });
-    }
-}
-
-// Event Listeners - executados quando a página carrega
-document.addEventListener('DOMContentLoaded', function() {
-    // Event listener para mudança no tipo de usuário
-    const userTypeSelect = document.getElementById('userType');
-    if (userTypeSelect) {
-        userTypeSelect.addEventListener('change', function() {
-            const isStore = this.value === 'loja';
-            isStoreUser = isStore;
-            
-            if (isStore && !isEditMode) {
-                // Para usuários tipo loja em modo de criação
-                // Mostrar interface específica para lojas
-                document.getElementById('emailSelectContainer').style.display = 'block';
-                document.getElementById('userEmail').style.display = 'none';
-                document.getElementById('storeDataFields').style.display = 'block';
-                
-                // Tornar campo de email não obrigatório quando usando select
-                document.getElementById('userEmail').required = false;
-                
-                // Carregar lojas se ainda não foram carregadas
-                if (availableStores.length === 0) {
-                    loadAvailableStores();
-                }
-            } else {
-                // Para outros tipos de usuário ou modo de edição
-                resetStoreFields();
-            }
-        });
-    }
-    
-    // Event listener para mudança na seleção de loja
-    const emailSelect = document.getElementById('userEmailSelect');
-    if (emailSelect) {
-        emailSelect.addEventListener('change', function() {
-            const selectedEmail = this.value;
-            
-            if (selectedEmail) {
-                // Buscar dados detalhados da loja selecionada
-                fetch('<?php echo SITE_URL; ?>/controllers/AdminController.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                    body: 'action=get_store_by_email&email=' + encodeURIComponent(selectedEmail)
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status && data.data) {
-                        const store = data.data;
-                        
-                        // Preencher campos automaticamente com dados da loja
-                        document.getElementById('userEmail').value = store.email;
-                        document.getElementById('userName').value = store.nome_fantasia;
-                        document.getElementById('userPhone').value = store.telefone || '';
-                        
-                        // Preencher campos informativos (somente leitura)
-                        document.getElementById('storeName').value = store.nome_fantasia;
-                        document.getElementById('storeDocument').value = store.cnpj;
-                        document.getElementById('storeCategory').value = store.categoria || 'Não informado';
-                        
-                        // Tornar campos principais somente leitura para evitar alterações acidentais
-                        document.getElementById('userEmail').readOnly = true;
-                        document.getElementById('userName').readOnly = true;
-                        document.getElementById('userPhone').readOnly = true;
-                    } else {
-                        showMessage(data.message || 'Erro ao carregar dados da loja', 'danger');
-                        // Resetar campos em caso de erro
-                        document.getElementById('userEmail').value = '';
-                        document.getElementById('userName').value = '';
-                        document.getElementById('userPhone').value = '';
-                    }
-                })
-                .catch(error => {
-                    console.error('Erro:', error);
-                    showMessage('Erro ao carregar dados da loja: ' + error.message, 'danger');
-                });
-            } else {
-                // Limpar campos se nenhuma loja for selecionada
-                document.getElementById('userEmail').value = '';
-                document.getElementById('userName').value = '';
-                document.getElementById('userPhone').value = '';
-                document.getElementById('storeName').value = '';
-                document.getElementById('storeDocument').value = '';
-                document.getElementById('storeCategory').value = '';
-                
-                // Reabilitar edição dos campos
-                document.getElementById('userEmail').readOnly = false;
-                document.getElementById('userName').readOnly = false;
-                document.getElementById('userPhone').readOnly = false;
-            }
-        });
-    }
-});
-</script>
+    <!-- JavaScript -->
+    <script src="../../assets/js/admin/users.js"></script>
 </body>
 </html>

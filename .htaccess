@@ -101,6 +101,16 @@ RewriteRule ^auth/google/auth/?$ auth/google/auth.php [L]
 RewriteRule ^auth/google/register/?$ auth/google/register.php [L]
 RewriteRule ^auth/google/callback/?$ auth/google/callback.php [L]
 
+# Rotas específicas para gerenciamento de usuários
+RewriteRule ^admin/usuarios/([0-9]+)/?$ views/admin/user-details.php?id=$1 [L]
+RewriteRule ^admin/usuarios/editar/([0-9]+)/?$ views/admin/users.php?edit=$1 [L]
+RewriteRule ^admin/usuarios/novo/?$ views/admin/users.php?new=1 [L]
+
+# API routes para usuários
+RewriteRule ^api/users/?$ api/users.php [L,QSA]
+RewriteRule ^api/users/([0-9]+)/?$ api/users.php?id=$1 [L,QSA]
+
+
 # Configurações de performance
 <IfModule mod_expires.c>
     ExpiresActive On
