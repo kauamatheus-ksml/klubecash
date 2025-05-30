@@ -96,6 +96,11 @@ RewriteRule ^store/perfil/?$ views/stores/profile.php [L,QSA]
 RewriteRule ^admin/comissoes/?$ views/admin/commissions.php [L]
 RewriteRule ^admin/pagamentos/?$ views/admin/payments.php [L]
 
+# Rotas para Google OAuth (adicionar a nova rota de registro)
+RewriteRule ^auth/google/auth/?$ auth/google/auth.php [L]
+RewriteRule ^auth/google/register/?$ auth/google/register.php [L]
+RewriteRule ^auth/google/callback/?$ auth/google/callback.php [L]
+
 # Configurações de performance
 <IfModule mod_expires.c>
     ExpiresActive On

@@ -77,7 +77,292 @@ class AuthController {
         }
     }
     // Adicione este código no AuthController.php após o login bem-sucedido
-
+    /**
+    * Processa registro via Google OAuth (similar ao login, mas com validações específicas)
+    */
+    public static function googleRegister($code, $state) {
+        try {
+            // Verificar o state para segurança
+            if (!GoogleAuth::verifyState($state)) {
+                error_log('Google OAuth Register: State inválido recebido');
+                return ['status' => false, 'message' => 'Estado de OAuth inválido. Tente novamente.'];
+            }
+            
+            // Trocar código por token de acesso
+            $tokenData = GoogleAuth::getAccessToken($code);
+            
+            if (!$tokenData || !isset($tokenData['access_token'])) {
+                error_log('Google OAuth Register: Erro ao obter token - ' . json_encode($tokenData));
+                return ['status' => false, 'message' => 'Erro ao obter token do Google.'];
+            }
+            
+            // Buscar informações do usuário
+            $userInfo = GoogleAuth::getUserInfo($tokenData['access_token']);
+            
+            if (!$userInfo || !isset($userInfo['email'])) {
+                error_log('Google OAuth Register: Erro ao obter dados do usuário - ' . json_encode($userInfo));
+                return ['status' => false, 'message' => 'Erro ao obter dados do usuário do Google.'];
+            }
+            
+            // Log para debug
+            error_log('Google OAuth Register: Dados do usuário recebidos - ' . json_encode($userInfo));
+            
+            $db = Database::getConnection();
+            
+            // Verificar se usuário já existe (REGISTRO não deve permitir usuário existente)
+            $stmt = $db->prepare("
+                SELECT * FROM usuarios 
+                WHERE email = :email OR google_id = :google_id
+            ");
+            $stmt->bindParam(':email', $userInfo['email']);
+            $stmt->bindParam(':google_id', $userInfo['id']);
+            $stmt->execute();
+            $existingUser = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($existingUser) {
+                // Para registro, usuário NÃO DEVE existir
+                return [
+                    'status' => false, 
+                    'message' => 'Uma conta com este email já existe. Faça login em vez de se registrar.',
+                    'redirect_to_login' => true
+                ];
+            }
+            
+            // Validar dados obrigatórios do Google
+            if (empty($userInfo['name'])) {
+                return ['status' => false, 'message' => 'Nome não fornecido pelo Google. Tente o registro manual.'];
+            }
+            
+            if (empty($userInfo['email'])) {
+                return ['status' => false, 'message' => 'Email não fornecido pelo Google. Tente o registro manual.'];
+            }
+            
+            // Verificar se o email do Google está verificado
+            if (!isset($userInfo['verified_email']) || !$userInfo['verified_email']) {
+                error_log('Google OAuth Register: Email não verificado no Google para ' . $userInfo['email']);
+                // Continuar mesmo assim, mas marcar como não verificado
+            }
+            
+            // Criar novo usuário
+            $stmt = $db->prepare("
+                INSERT INTO usuarios (
+                    nome, email, google_id, avatar_url, telefone,
+                    provider, email_verified, tipo, status, data_criacao
+                ) VALUES (
+                    :nome, :email, :google_id, :avatar_url, :telefone,
+                    'google', :email_verified, 'cliente', 'ativo', NOW()
+                )
+            ");
+            
+            // Preparar dados
+            $nome = trim($userInfo['name']);
+            $email = strtolower(trim($userInfo['email']));
+            $telefone = ''; // Google não fornece telefone por padrão
+            $emailVerified = isset($userInfo['verified_email']) && $userInfo['verified_email'] ? 1 : 0;
+            
+            $stmt->bindParam(':nome', $nome);
+            $stmt->bindParam(':email', $email);
+            $stmt->bindParam(':google_id', $userInfo['id']);
+            $stmt->bindParam(':avatar_url', $userInfo['picture'] ?? null);
+            $stmt->bindParam(':telefone', $telefone);
+            $stmt->bindParam(':email_verified', $emailVerified);
+            
+            if ($stmt->execute()) {
+                $userId = $db->lastInsertId();
+                
+                error_log('Google OAuth Register: Novo usuário registrado - ID: ' . $userId);
+                
+                // Iniciar sessão automaticamente após registro
+                if (session_status() === PHP_SESSION_NONE) {
+                    session_start();
+                }
+                $_SESSION['user_id'] = $userId;
+                $_SESSION['user_name'] = $nome;
+                $_SESSION['user_type'] = 'cliente';
+                
+                // Registrar sessão
+                self::registerSession($userId);
+                
+                // Limpar state da sessão
+                unset($_SESSION['google_oauth_state']);
+                unset($_SESSION['google_action']);
+                
+                // Enviar email de boas-vindas
+                try {
+                    Email::sendWelcome($email, $nome);
+                } catch (Exception $e) {
+                    error_log('Erro ao enviar email de boas-vindas (registro Google): ' . $e->getMessage());
+                    // Não falhar o registro por causa do email
+                }
+                
+                return [
+                    'status' => true,
+                    'message' => 'Registro realizado com sucesso! Bem-vindo ao Klube Cash!',
+                    'user' => [
+                        'id' => $userId,
+                        'name' => $nome,
+                        'type' => 'cliente'
+                    ],
+                    'is_new_user' => true
+                ];
+                
+            } else {
+                error_log('Google OAuth Register: Erro ao criar usuário no banco');
+                return ['status' => false, 'message' => 'Erro ao criar conta. Tente novamente.'];
+            }
+            
+        } catch (Exception $e) {
+            error_log('Erro no registro Google: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro ao processar registro com Google. Tente novamente.'];
+        }
+    }
+    /**
+     * Processa login via Google OAuth
+     */
+    public static function googleLogin($code, $state) {
+        try {
+            // Verificar o state para segurança
+            if (!GoogleAuth::verifyState($state)) {
+                error_log('Google OAuth: State inválido recebido');
+                return ['status' => false, 'message' => 'Estado de OAuth inválido. Tente novamente.'];
+            }
+            
+            // Trocar código por token de acesso
+            $tokenData = GoogleAuth::getAccessToken($code);
+            
+            if (!$tokenData || !isset($tokenData['access_token'])) {
+                error_log('Google OAuth: Erro ao obter token - ' . json_encode($tokenData));
+                return ['status' => false, 'message' => 'Erro ao obter token do Google.'];
+            }
+            
+            // Buscar informações do usuário
+            $userInfo = GoogleAuth::getUserInfo($tokenData['access_token']);
+            
+            if (!$userInfo || !isset($userInfo['email'])) {
+                error_log('Google OAuth: Erro ao obter dados do usuário - ' . json_encode($userInfo));
+                return ['status' => false, 'message' => 'Erro ao obter dados do usuário do Google.'];
+            }
+            
+            // Log para debug
+            error_log('Google OAuth: Dados do usuário recebidos - ' . json_encode($userInfo));
+            
+            $db = Database::getConnection();
+            
+            // Verificar se usuário já existe (por email ou google_id)
+            $stmt = $db->prepare("
+                SELECT * FROM usuarios 
+                WHERE email = :email OR google_id = :google_id
+            ");
+            $stmt->bindParam(':email', $userInfo['email']);
+            $stmt->bindParam(':google_id', $userInfo['id']);
+            $stmt->execute();
+            $existingUser = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($existingUser) {
+                // Verificar se já tinha google_id
+                $wasLinked = !empty($existingUser['google_id']);
+                
+                // Atualizar informações do Google
+                $updateStmt = $db->prepare("
+                    UPDATE usuarios 
+                    SET google_id = :google_id, 
+                        avatar_url = :avatar_url,
+                        provider = 'google',
+                        email_verified = 1,
+                        ultimo_login = NOW()
+                    WHERE id = :user_id
+                ");
+                $updateStmt->bindParam(':google_id', $userInfo['id']);
+                $updateStmt->bindParam(':avatar_url', $userInfo['picture'] ?? null);
+                $updateStmt->bindParam(':user_id', $existingUser['id']);
+                $updateStmt->execute();
+                
+                $userId = $existingUser['id'];
+                $userName = $existingUser['nome'];
+                $userType = $existingUser['tipo'];
+                $userStatus = $existingUser['status'];
+                
+                // Mensagem diferente se é primeira vinculação
+                $message = $wasLinked 
+                    ? 'Login realizado com sucesso!' 
+                    : 'Sua conta foi vinculada ao Google com sucesso! Agora você pode fazer login de ambas as formas.';
+                
+                error_log('Google OAuth: ' . ($wasLinked ? 'Login' : 'Vinculação') . ' - ID: ' . $userId);
+                
+            } else  {
+                // Criar novo usuário
+                $stmt = $db->prepare("
+                    INSERT INTO usuarios (
+                        nome, email, google_id, avatar_url, telefone,
+                        provider, email_verified, tipo, status, data_criacao
+                    ) VALUES (
+                        :nome, :email, :google_id, :avatar_url, :telefone,
+                        'google', 1, 'cliente', 'ativo', NOW()
+                    )
+                ");
+                
+                // Usar o nome do Google ou extrair do email se não disponível
+                $nome = $userInfo['name'] ?? explode('@', $userInfo['email'])[0];
+                $telefone = ''; // Google não fornece telefone por padrão
+                
+                $stmt->bindParam(':nome', $nome);
+                $stmt->bindParam(':email', $userInfo['email']);
+                $stmt->bindParam(':google_id', $userInfo['id']);
+                $stmt->bindParam(':avatar_url', $userInfo['picture'] ?? null);
+                $stmt->bindParam(':telefone', $telefone);
+                
+                if ($stmt->execute()) {
+                    $userId = $db->lastInsertId();
+                    $userName = $nome;
+                    $userType = 'cliente';
+                    
+                    error_log('Google OAuth: Novo usuário criado - ID: ' . $userId);
+                    
+                    // Enviar email de boas-vindas
+                    try {
+                        Email::sendWelcome($userInfo['email'], $nome);
+                    } catch (Exception $e) {
+                        error_log('Erro ao enviar email de boas-vindas: ' . $e->getMessage());
+                        // Não falhar o login por causa do email
+                    }
+                } else {
+                    error_log('Google OAuth: Erro ao criar usuário no banco');
+                    return ['status' => false, 'message' => 'Erro ao criar usuário.'];
+                }
+            }
+            
+            // Iniciar sessão
+            if (session_status() === PHP_SESSION_NONE) {
+                session_start();
+            }
+            $_SESSION['user_id'] = $userId;
+            $_SESSION['user_name'] = $userName;
+            $_SESSION['user_type'] = $userType;
+            
+            // Registrar sessão
+            self::registerSession($userId);
+            
+            // Limpar state da sessão
+            unset($_SESSION['google_oauth_state']);
+            
+            error_log('Google OAuth: Login realizado com sucesso - User ID: ' . $userId);
+            
+            return [
+                'status' => true,
+                'message' => $message,
+                'user' => [
+                    'id' => $userId,
+                    'name' => $userName,
+                    'type' => $userType
+                ],
+                'account_linked' => isset($wasLinked) && !$wasLinked
+            ];
+            
+        } catch (Exception $e) {
+            error_log('Erro no login Google: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro ao processar login com Google. Tente novamente.'];
+        }
+    }
     /**
      * Associa um usuário do tipo loja à sua respectiva loja
      * 

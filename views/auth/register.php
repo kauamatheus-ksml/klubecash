@@ -188,10 +188,99 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="illustration-right">
                 <img src="../../assets/images/illustrations/woman-phone.svg" alt="">
             </div>
+
+            <div class="or-divider">Ou</div>
+
+            <div class="social-login">
+                <button class="social-btn google-btn" onclick="registerWithGoogle()">
+                    <img src="../../assets/images/icons/google.svg" alt="Google">
+                    <span class="hide-on-mobile">Registre-se com Google</span>
+                </button>
+                <button class="social-btn facebook-btn" onclick="registerWithFacebook()">
+                    <img src="../../assets/images/icons/facebook.svg" alt="Facebook">
+                </button>
+                <button class="social-btn apple-btn" onclick="registerWithApple()">
+                    <img src="../../assets/images/icons/apple.svg" alt="Apple">
+                </button>
+            </div>
         </div>
     </div>
 
     <script>
+        // Função específica para registro com Google
+        function registerWithGoogle() {
+            // Mostrar indicador de carregamento
+            const googleBtn = document.querySelector('.google-btn');
+            const originalText = googleBtn.innerHTML;
+            googleBtn.innerHTML = '<img src="../../assets/images/icons/google.svg" alt="Google"> Conectando...';
+            googleBtn.disabled = true;
+            
+            // Fazer requisição para registro com Google (diferente do login)
+            fetch('<?php echo SITE_URL; ?>/auth/google/register', {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json'
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Erro na requisição: ' + response.status);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.status && data.auth_url) {
+                    // Redirecionar para o Google
+                    window.location.href = data.auth_url;
+                } else {
+                    throw new Error(data.message || 'Erro desconhecido');
+                }
+            })
+            .catch(error => {
+                console.error('Erro no registro Google:', error);
+                alert('Erro ao conectar com o Google: ' + error.message);
+                
+                // Restaurar botão
+                googleBtn.innerHTML = originalText;
+                googleBtn.disabled = false;
+            });
+        }
+
+        // Funções placeholder para outros provedores
+        function registerWithFacebook() {
+            alert('Registro com Facebook será implementado com a API do Facebook.');
+        }
+
+        function registerWithApple() {
+            alert('Registro com Apple será implementado com a API da Apple.');
+        }
+
+        // Verificar mensagens na URL
+        document.addEventListener('DOMContentLoaded', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const successMsg = urlParams.get('success');
+            const errorMsg = urlParams.get('error');
+            
+            if (successMsg) {
+                // Mostrar mensagem de sucesso
+                const successDiv = document.createElement('div');
+                successDiv.className = 'success-message';
+                successDiv.textContent = successMsg;
+                
+                const form = document.getElementById('register-form');
+                form.parentNode.insertBefore(successDiv, form);
+            }
+            
+            if (errorMsg) {
+                // Mostrar erro do registro com Google
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'error-message';
+                errorDiv.textContent = errorMsg;
+                
+                const form = document.getElementById('register-form');
+                form.parentNode.insertBefore(errorDiv, form);
+            }
+        });
         // Função para alternar a visibilidade da senha
         function togglePassword() {
             const passwordField = document.getElementById('senha');

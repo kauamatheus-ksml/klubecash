@@ -104,6 +104,21 @@ define('STORE_PROFILE_URL', SITE_URL . '/store/perfil');
 // Diretório para exportação
 define('EXPORTS_DIR', ROOT_DIR . '/exports');
 
+// Google OAuth Configuration (SUAS CREDENCIAIS REAIS)
+define('GOOGLE_CLIENT_ID', '662122339659-cj38e31a45cghrmnt4qq9slkroqh24n4s.apps.googleusercontent.com');
+define('GOOGLE_CLIENT_SECRET', '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');
+define('GOOGLE_REDIRECT_URI', 'https://klubecash.com/auth/google/callback');
+
+// Google OAuth URLs
+define('GOOGLE_AUTH_URL', 'https://accounts.google.com/o/oauth2/auth');
+define('GOOGLE_TOKEN_URL', 'https://oauth2.googleapis.com/token');
+define('GOOGLE_USER_INFO_URL', 'https://www.googleapis.com/oauth2/v2/userinfo');
+
+// URLs de autenticação
+define('GOOGLE_AUTH_ENDPOINT', SITE_URL . '/auth/google/auth');
+define('GOOGLE_CALLBACK_ENDPOINT', SITE_URL . '/auth/google/callback');
+
+
 // Configurações de email (adicionar se não existirem)
 if (!defined('SMTP_HOST')) {
     define('SMTP_HOST', 'smtp.hostinger.com');
