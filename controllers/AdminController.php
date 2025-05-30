@@ -2385,72 +2385,20 @@ public static function getAvailableStores() {
                             exit;
                         }
                         
-                        // Testar conexão com banco
-                        $db = Database::getConnection();
-                        if (!$db) {
-                            error_log("store_details_with_balance: Erro na conexão com banco");
-                            echo json_encode(['status' => false, 'message' => 'Erro na conexão com banco']);
-                            exit;
-                        }
-                        
-                        // Buscar dados básicos da loja
-                        $storeStmt = $db->prepare("SELECT * FROM lojas WHERE id = ?");
-                        $storeStmt->execute([$storeId]);
-                        $store = $storeStmt->fetch(PDO::FETCH_ASSOC);
-                        
-                        if (!$store) {
-                            error_log("store_details_with_balance: Loja não encontrada");
-                            echo json_encode(['status' => false, 'message' => 'Loja não encontrada']);
-                            exit;
-                        }
-                        
-                        error_log("store_details_with_balance: Loja encontrada - " . $store['nome_fantasia']);
-                        
-                        // Buscar estatísticas básicas
-                        $statsStmt = $db->prepare("
-                            SELECT 
-                                COUNT(*) as total_transacoes,
-                                COALESCE(SUM(valor_total), 0) as total_vendas,
-                                COALESCE(SUM(valor_cliente), 0) as total_cashback
-                            FROM transacoes_cashback
-                            WHERE loja_id = ? AND status = 'aprovado'
-                        ");
-                        $statsStmt->execute([$storeId]);
-                        $statistics = $statsStmt->fetch(PDO::FETCH_ASSOC);
-                        
-                        error_log("store_details_with_balance: Estatísticas obtidas");
-                        
-                        // Preparar resposta
-                        $result = [
-                            'status' => true,
-                            'data' => [
-                                'loja' => $store,
-                                'estatisticas' => $statistics,
-                                'estatisticas_saldo' => [
-                                    'total_saldo_clientes' => 0,
-                                    'clientes_com_saldo' => 0,
-                                    'total_saldo_usado' => 0,
-                                    'total_transacoes' => $statistics['total_transacoes'] ?? 0,
-                                    'transacoes_com_saldo' => 0
-                                ],
-                                'transacoes' => []
-                            ]
-                        ];
-                        
-                        error_log("store_details_with_balance: Enviando resposta JSON");
+                        // Usar o método da classe
+                        $result = AdminController::getStoreDetailsWithBalance($storeId);
                         echo json_encode($result, JSON_UNESCAPED_UNICODE);
                         
                     } catch (Exception $e) {
                         error_log('store_details_with_balance: Erro - ' . $e->getMessage());
                         echo json_encode([
                             'status' => false, 
-                            'message' => 'Erro interno: ' . $e->getMessage(),
-                            'file' => $e->getFile(),
-                            'line' => $e->getLine()
+                            'message' => 'Erro interno: ' . $e->getMessage()
                         ]);
                     }
                     exit;
                     break;
+                    
                 case 'test_store_connection':
                     header('Content-Type: application/json; charset=UTF-8');
                     
