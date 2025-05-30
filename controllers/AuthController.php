@@ -120,7 +120,8 @@ class AuthController {
             $existingUser = $stmt->fetch(PDO::FETCH_ASSOC);
             
             if ($existingUser) {
-                // Para registro, usuário NÃO DEVE existir
+                // Para registro, usuário não deve existir
+                error_log('Google OAuth Register: Usuário já existe - ' . $userInfo['email']);
                 return [
                     'status' => false, 
                     'message' => 'Uma conta com este email já existe. Faça login em vez de se registrar.',
@@ -259,10 +260,7 @@ class AuthController {
             $existingUser = $stmt->fetch(PDO::FETCH_ASSOC);
             
             if ($existingUser) {
-                // Verificar se já tinha google_id
-                $wasLinked = !empty($existingUser['google_id']);
-                
-                // Atualizar informações do Google
+                // Usuário existe - atualizar informações do Google se necessário
                 $updateStmt = $db->prepare("
                     UPDATE usuarios 
                     SET google_id = :google_id, 
@@ -282,14 +280,14 @@ class AuthController {
                 $userType = $existingUser['tipo'];
                 $userStatus = $existingUser['status'];
                 
-                // Mensagem diferente se é primeira vinculação
-                $message = $wasLinked 
-                    ? 'Login realizado com sucesso!' 
-                    : 'Sua conta foi vinculada ao Google com sucesso! Agora você pode fazer login de ambas as formas.';
+                // Verificar status do usuário
+                if ($userStatus !== USER_ACTIVE) {
+                    return ['status' => false, 'message' => 'Sua conta está ' . $userStatus . '. Entre em contato com o suporte.'];
+                }
                 
-                error_log('Google OAuth: ' . ($wasLinked ? 'Login' : 'Vinculação') . ' - ID: ' . $userId);
+                error_log('Google OAuth: Usuário existente atualizado - ID: ' . $userId);
                 
-            } else  {
+            } else {
                 // Criar novo usuário
                 $stmt = $db->prepare("
                     INSERT INTO usuarios (
@@ -349,13 +347,12 @@ class AuthController {
             
             return [
                 'status' => true,
-                'message' => $message,
+                'message' => 'Login realizado com sucesso!',
                 'user' => [
                     'id' => $userId,
                     'name' => $userName,
                     'type' => $userType
-                ],
-                'account_linked' => isset($wasLinked) && !$wasLinked
+                ]
             ];
             
         } catch (Exception $e) {
