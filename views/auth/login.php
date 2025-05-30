@@ -68,6 +68,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 }
+
+// Verificar mensagens de URL
+$urlError = $_GET['error'] ?? '';
+$urlSuccess = $_GET['success'] ?? '';
+if (!empty($urlError)) {
+    $error = $urlError;
+}
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -106,6 +113,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
                 <?php endif; ?>
 
+                <?php if (!empty($urlSuccess)): ?>
+                    <div class="success-message">
+                        <?php echo htmlspecialchars($urlSuccess); ?>
+                    </div>
+                <?php endif; ?>
+
                 <div class="login-header">
                     <h1>Seja <span>BEM VINDO</span></h1>
                     <h2>Login</h2>
@@ -128,7 +141,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
 
                     <div class="forgot-password">
-                    <a href="<?php echo RECOVER_PASSWORD_URL; ?>">Esqueci minha senha</a>
+                        <a href="<?php echo RECOVER_PASSWORD_URL; ?>">Esqueci minha senha</a>
                     </div>
 
                     <button type="submit" class="login-btn">Entrar</button>
@@ -171,7 +184,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-        // Funções para login social (seriam implementadas com as respectivas APIs)
+        // Função REAL para login com Google
         function loginWithGoogle() {
             // Mostrar indicador de carregamento
             const googleBtn = document.querySelector('.google-btn');
@@ -210,13 +223,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             });
         }
 
+        // Funções placeholder para outros provedores
         function loginWithFacebook() {
-            // Implementação da API do Facebook
             alert('Login com Facebook será implementado com a API do Facebook.');
         }
 
         function loginWithApple() {
-            // Implementação da API da Apple
             alert('Login com Apple será implementado com a API da Apple.');
         }
 
