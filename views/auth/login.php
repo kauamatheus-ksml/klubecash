@@ -85,6 +85,7 @@ if (!empty($urlError)) {
     <title>Login - Klube Cash</title>
     <link rel="stylesheet" href="../../assets/css/auth.css">
     <link rel="stylesheet" href="../../assets/css/responsive.css">
+    <link rel="stylesheet" href="../../assets/css/components/toast.css">
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
     <link rel="stylesheet" href="../../assets/css/views/auth/login.css">
 </head>
@@ -108,18 +109,6 @@ if (!empty($urlError)) {
 
         <div class="right-panel">
             <div class="login-container">
-                <?php if (!empty($error)): ?>
-                    <div class="error-message">
-                        <?php echo htmlspecialchars($error); ?>
-                    </div>
-                <?php endif; ?>
-
-                <?php if (!empty($urlSuccess)): ?>
-                    <div class="success-message">
-                        <?php echo htmlspecialchars($urlSuccess); ?>
-                    </div>
-                <?php endif; ?>
-
                 <div class="login-header">
                     <h1>Seja <span>BEM VINDO</span></h1>
                     <h2>Login</h2>
@@ -169,6 +158,7 @@ if (!empty($urlError)) {
             </div>
         </div>
     </div>
+
     <script src="../../assets/js/components/toast.js"></script>
     <script>
         // Mostrar mensagens de erro/sucesso com toast
