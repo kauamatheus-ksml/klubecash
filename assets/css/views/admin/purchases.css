@@ -833,3 +833,75 @@
                 --medium-gray: #a0aec0;
             }
         }
+        /* Badges para status */
+.badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.badge-success {
+    background: #d4edda;
+    color: #155724;
+}
+
+.badge-danger {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.badge-warning {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.badge-info {
+    background: #d1ecf1;
+    color: #0c5460;
+}
+
+/* Melhorias no modal */
+.modal-content {
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.detail-card table {
+    border-collapse: collapse;
+}
+
+.detail-card table th {
+    font-weight: 600;
+    color: var(--dark-gray);
+    border-bottom: 2px solid #e9ecef;
+}
+
+.detail-card table td {
+    vertical-align: middle;
+}
+
+/* Loading animation */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--primary-color);
+}
+
+.loading::after {
+    content: '';
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid var(--primary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}

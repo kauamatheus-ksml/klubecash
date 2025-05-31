@@ -414,6 +414,15 @@ function buildQueryString($exclude = []) {
                                         </td>
                                         <td>
                                             <span class="value-display"><?php echo formatCurrency($transaction['valor_cliente']); ?></span>
+                                            <?php if ($transaction['valor_admin'] > 0 || $transaction['valor_loja'] > 0): ?>
+                                                <br>
+                                                <small style="color: #666; font-size: 11px;">
+                                                    Admin: <?php echo formatCurrency($transaction['valor_admin']); ?>
+                                                    <?php if ($transaction['valor_loja'] > 0): ?>
+                                                        | Loja: <?php echo formatCurrency($transaction['valor_loja']); ?>
+                                                    <?php endif; ?>
+                                                </small>
+                                            <?php endif; ?>
                                         </td>
                                         <td><?php echo formatDate($transaction['data_transacao']); ?></td>
                                         <td>
@@ -683,6 +692,7 @@ function buildQueryString($exclude = []) {
             const content = document.getElementById('modalTransactionContent');
             const title = document.getElementById('modalTransactionTitle');
             
+            // Mostrar modal com loading
             modal.style.display = 'block';
             content.innerHTML = '<div class="loading" style="height: 200px; display: flex; align-items: center; justify-content: center;">Carregando detalhes...</div>';
             title.textContent = `Transação #${transactionId}`;
@@ -690,6 +700,7 @@ function buildQueryString($exclude = []) {
             // Adicionar animação de entrada
             modal.style.animation = 'fadeIn 0.3s ease';
             
+            // Fazer requisição com melhor tratamento de erros
             fetch('../../controllers/AdminController.php', {
                 method: 'POST',
                 headers: {
@@ -697,31 +708,55 @@ function buildQueryString($exclude = []) {
                 },
                 body: `action=transaction_details_with_balance&transaction_id=${transactionId}`
             })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status) {
-                    renderTransactionDetailsWithBalance(data.data);
-                } else {
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.text();
+            })
+            .then(text => {
+                // Log para debug
+                console.log('Resposta raw:', text);
+                
+                try {
+                    const data = JSON.parse(text);
+                    
+                    if (data.status) {
+                        renderTransactionDetailsWithBalance(data.data);
+                    } else {
+                        content.innerHTML = `
+                            <div class="alert alert-danger">
+                                <strong>Erro:</strong> ${data.message || 'Erro desconhecido ao carregar detalhes.'}
+                            </div>
+                        `;
+                    }
+                } catch (jsonError) {
+                    console.error('Erro ao fazer parse do JSON:', jsonError);
+                    console.error('Texto recebido:', text);
                     content.innerHTML = `
                         <div class="alert alert-danger">
-                            <strong>Erro:</strong> ${data.message}
+                            <strong>Erro:</strong> Resposta inválida do servidor. Por favor, tente novamente.
                         </div>
                     `;
                 }
             })
             .catch(error => {
-                console.error('Erro:', error);
+                console.error('Erro na requisição:', error);
                 content.innerHTML = `
                     <div class="alert alert-danger">
-                        <strong>Erro:</strong> Não foi possível carregar os detalhes. Tente novamente.
+                        <strong>Erro:</strong> Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.
                     </div>
                 `;
             });
         }
-        
+
         function renderTransactionDetailsWithBalance(transaction) {
-            const saldoUsado = parseFloat(transaction.saldo_usado || 0);
-            const valorOriginal = parseFloat(transaction.valor_total);
+            // Garantir que os valores sejam números
+            const valorOriginal = parseFloat(transaction.valor_total) || 0;
+            const valorCliente = parseFloat(transaction.valor_cliente) || 0;
+            const valorAdmin = parseFloat(transaction.valor_admin) || 0;
+            const valorLoja = parseFloat(transaction.valor_loja) || 0;
+            const saldoUsado = parseFloat(transaction.saldo_usado) || 0;
             const valorPago = valorOriginal - saldoUsado;
             
             const content = document.getElementById('modalTransactionContent');
@@ -740,24 +775,38 @@ function buildQueryString($exclude = []) {
                             </h4>
                             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
                                 <div class="detail-item" style="flex-direction: column; align-items: flex-start; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                                    <span class="detail-label" style="margin-bottom: 5px;">Código da Transação</span>
+                                    <span class="detail-value" style="font-weight: 600; color: var(--dark-gray);">${transaction.codigo_transacao || 'Não informado'}</span>
+                                </div>
+                                <div class="detail-item" style="flex-direction: column; align-items: flex-start; padding: 15px; background: #f8f9fa; border-radius: 8px;">
                                     <span class="detail-label" style="margin-bottom: 5px;">Data da Transação</span>
                                     <span class="detail-value" style="font-weight: 600; color: var(--dark-gray);">${formatDate(transaction.data_transacao)}</span>
                                 </div>
                                 <div class="detail-item" style="flex-direction: column; align-items: flex-start; padding: 15px; background: #f8f9fa; border-radius: 8px;">
                                     <span class="detail-label" style="margin-bottom: 5px;">Cliente</span>
                                     <span class="detail-value" style="font-weight: 600; color: var(--dark-gray);">
-                                        ${transaction.cliente_nome}
-                                        ${saldoUsado > 0 ? '<span class="balance-indicator" style="margin-left: 8px;">💰 Usou Saldo</span>' : ''}
+                                        ${transaction.cliente_nome || 'Não identificado'}
+                                        <br><small style="color: #666;">${transaction.cliente_email || ''}</small>
+                                        ${saldoUsado > 0 ? '<br><span class="balance-indicator" style="margin-top: 5px; display: inline-block;">💰 Usou Saldo</span>' : ''}
                                     </span>
                                 </div>
                                 <div class="detail-item" style="flex-direction: column; align-items: flex-start; padding: 15px; background: #f8f9fa; border-radius: 8px;">
                                     <span class="detail-label" style="margin-bottom: 5px;">Loja</span>
-                                    <span class="detail-value" style="font-weight: 600; color: var(--dark-gray);">${transaction.loja_nome}</span>
+                                    <span class="detail-value" style="font-weight: 600; color: var(--dark-gray);">
+                                        ${transaction.loja_nome || 'Não identificada'}
+                                        ${transaction.loja_categoria ? `<br><small style="color: #666;">${transaction.loja_categoria}</small>` : ''}
+                                    </span>
                                 </div>
                                 <div class="detail-item" style="flex-direction: column; align-items: flex-start; padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                                    <span class="detail-label" style="margin-bottom: 5px;">Status</span>
+                                    <span class="detail-label" style="margin-bottom: 5px;">Status da Transação</span>
                                     <span class="detail-value">${getStatusBadge(transaction.status)}</span>
                                 </div>
+                                ${transaction.status_pagamento ? `
+                                    <div class="detail-item" style="flex-direction: column; align-items: flex-start; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                                        <span class="detail-label" style="margin-bottom: 5px;">Status do Pagamento</span>
+                                        <span class="detail-value">${getPaymentStatusBadge(transaction.status_pagamento)}</span>
+                                    </div>
+                                ` : ''}
                             </div>
                             ${transaction.descricao ? `
                                 <div style="margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
@@ -787,22 +836,114 @@ function buildQueryString($exclude = []) {
                                         <span>Saldo usado pelo cliente:</span>
                                         <span class="value">-${formatCurrency(saldoUsado)}</span>
                                     </div>
+                                    <div class="breakdown-item total">
+                                        <span>Valor efetivamente pago:</span>
+                                        <span class="value" style="color: #28a745; font-size: 18px;">${formatCurrency(valorPago)}</span>
+                                    </div>
                                 ` : ''}
-                                <div class="breakdown-item ${saldoUsado > 0 ? 'total' : ''}">
-                                    <span>${saldoUsado > 0 ? 'Valor efetivamente pago:' : 'Valor total:'}</span>
-                                    <span class="value" style="color: #28a745; font-size: 18px;">${formatCurrency(valorPago)}</span>
-                                </div>
-                                <div class="breakdown-item">
-                                    <span>Cashback do cliente:</span>
-                                    <span class="value" style="color: var(--primary-color);">${formatCurrency(transaction.valor_cliente)}</span>
-                                </div>
-                                <div class="breakdown-item">
-                                    <span>Comissão Klube Cash:</span>
-                                    <span class="value" style="color: var(--primary-color);">${formatCurrency(transaction.valor_admin)}</span>
+                                
+                                <div style="margin-top: 20px; padding-top: 20px; border-top: 2px solid #e9ecef;">
+                                    <h5 style="margin-bottom: 10px; color: #666;">Distribuição do Cashback (10% do valor pago)</h5>
+                                    <div class="breakdown-item">
+                                        <span>Cashback do cliente (5%):</span>
+                                        <span class="value" style="color: var(--primary-color);">${formatCurrency(valorCliente)}</span>
+                                    </div>
+                                    <div class="breakdown-item">
+                                        <span>Comissão Klube Cash (5%):</span>
+                                        <span class="value" style="color: var(--primary-color);">${formatCurrency(valorAdmin)}</span>
+                                    </div>
+                                    <div class="breakdown-item">
+                                        <span>Comissão da Loja:</span>
+                                        <span class="value" style="color: #666;">${formatCurrency(valorLoja)}</span>
+                                    </div>
+                                    <div class="breakdown-item total">
+                                        <span>Total de Comissões:</span>
+                                        <span class="value" style="color: #28a745;">${formatCurrency(valorCliente + valorAdmin + valorLoja)}</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
             `;
+            
+            // Se houver informações de pagamento
+            if (transaction.pagamento_id) {
+                html += `
+                    <div class="detail-card">
+                        <h4 style="color: var(--primary-color); margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="2" y="5" width="20" height="14" rx="2"/>
+                                <line x1="2" y1="10" x2="22" y2="10"/>
+                            </svg>
+                            Informações de Pagamento
+                        </h4>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                            <div class="detail-item" style="flex-direction: column; align-items: flex-start; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                                <span class="detail-label" style="margin-bottom: 5px;">ID do Pagamento</span>
+                                <span class="detail-value" style="font-weight: 600;">#${transaction.pagamento_id}</span>
+                            </div>
+                            <div class="detail-item" style="flex-direction: column; align-items: flex-start; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                                <span class="detail-label" style="margin-bottom: 5px;">Método</span>
+                                <span class="detail-value" style="font-weight: 600;">${transaction.metodo_pagamento || 'Não informado'}</span>
+                            </div>
+                            ${transaction.numero_referencia ? `
+                                <div class="detail-item" style="flex-direction: column; align-items: flex-start; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                                    <span class="detail-label" style="margin-bottom: 5px;">Referência</span>
+                                    <span class="detail-value" style="font-weight: 600;">${transaction.numero_referencia}</span>
+                                </div>
+                            ` : ''}
+                            ${transaction.data_pagamento ? `
+                                <div class="detail-item" style="flex-direction: column; align-items: flex-start; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                                    <span class="detail-label" style="margin-bottom: 5px;">Data de Aprovação</span>
+                                    <span class="detail-value" style="font-weight: 600;">${formatDate(transaction.data_pagamento)}</span>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Se há movimentações
+            if (transaction.movimentacoes && transaction.movimentacoes.length > 0) {
+                html += `
+                    <div class="detail-card">
+                        <h4 style="color: var(--primary-color); margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M3 3v18h18"/>
+                                <path d="m19 9-5 5-4-4-3 3"/>
+                            </svg>
+                            Histórico de Movimentações
+                        </h4>
+                        <div style="max-height: 300px; overflow-y: auto;">
+                            <table style="width: 100%; font-size: 14px;">
+                                <thead>
+                                    <tr style="background: #f8f9fa;">
+                                        <th style="padding: 10px; text-align: left;">Data</th>
+                                        <th style="padding: 10px; text-align: left;">Tipo</th>
+                                        <th style="padding: 10px; text-align: left;">Descrição</th>
+                                        <th style="padding: 10px; text-align: right;">Valor</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${transaction.movimentacoes.map(mov => `
+                                        <tr style="border-bottom: 1px solid #e9ecef;">
+                                            <td style="padding: 10px;">${formatDate(mov.data_operacao)}</td>
+                                            <td style="padding: 10px;">
+                                                <span class="badge ${mov.tipo_operacao === 'credito' ? 'badge-success' : 'badge-danger'}">
+                                                    ${mov.tipo_operacao.toUpperCase()}
+                                                </span>
+                                            </td>
+                                            <td style="padding: 10px;">${mov.descricao || 'Sem descrição'}</td>
+                                            <td style="padding: 10px; text-align: right; font-weight: 600; color: ${mov.tipo_operacao === 'credito' ? '#28a745' : '#e74c3c'};">
+                                                ${mov.tipo_operacao === 'credito' ? '+' : '-'}${formatCurrency(mov.valor)}
+                                            </td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+            }
             
             if (saldoUsado > 0) {
                 html += `
@@ -823,16 +964,34 @@ function buildQueryString($exclude = []) {
                                 <div style="font-size: 16px; font-weight: 700; color: #2e7d32;">${formatCurrency(saldoUsado)}</div>
                             </div>
                             <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-                                <div style="font-size: 12px; color: #666; margin-bottom: 5px; font-weight: 600; text-transform: uppercase;">Impacto na Comissão</div>
-                                <div style="font-size: 16px; font-weight: 700; color: #2e7d32;">-${formatCurrency(saldoUsado * 0.1)}</div>
+                                <div style="font-size: 12px; color: #666; margin-bottom: 5px; font-weight: 600; text-transform: uppercase;">Redução na Comissão</div>
+                                <div style="font-size: 16px; font-weight: 700; color: #dc3545;">-${formatCurrency(saldoUsado * 0.1)}</div>
+                                <small style="color: #666;">10% do valor usado</small>
                             </div>
                             <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-                                <div style="font-size: 12px; color: #666; margin-bottom: 5px; font-weight: 600; text-transform: uppercase;">Percentual do Saldo</div>
+                                <div style="font-size: 12px; color: #666; margin-bottom: 5px; font-weight: 600; text-transform: uppercase;">Percentual Usado</div>
                                 <div style="font-size: 16px; font-weight: 700; color: #2e7d32;">${((saldoUsado / valorOriginal) * 100).toFixed(1)}%</div>
+                                <small style="color: #666;">do valor total</small>
                             </div>
                         </div>
                     </div>
                 `;
+            }
+            
+            html += `</div></div>`;
+            content.innerHTML = html;
+        }
+
+        // Função auxiliar para formatar badge de status de pagamento
+        function getPaymentStatusBadge(status) {
+            const badges = {
+                'pendente': '<span class="status-badge status-pending">Pendente</span>',
+                'em_processamento': '<span class="status-badge status-payment">Em Processamento</span>',
+                'aprovado': '<span class="status-badge status-approved">Aprovado</span>',
+                'rejeitado': '<span class="status-badge status-canceled">Rejeitado</span>'
+            };
+            return badges[status] || `<span class="status-badge status-pending">${status || 'Sem pagamento'}</span>`;
+
             }
             
             html += `</div></div>`;
