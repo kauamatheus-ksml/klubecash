@@ -531,7 +531,7 @@ body {
     justify-content: center; /* Centraliza horizontalmente */
     cursor: pointer;
     transition: var(--transition);
-    background: transparent;
+    background: #1976D2;
     color: var(--medium-gray); /* Define a cor do ícone, --medium-gray é #6C757D */
 }
 
