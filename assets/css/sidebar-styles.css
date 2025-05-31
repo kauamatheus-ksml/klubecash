@@ -156,7 +156,7 @@
 
 /* Container principal */
 .main-content {
-    margin-left: 280px;
+    margin-left: 25px;
     transition: var(--transition);
     min-height: 100vh;
 }
