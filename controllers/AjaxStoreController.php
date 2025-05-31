@@ -35,22 +35,37 @@ try {
             
         case 'store_details':
             $storeId = isset($_POST['store_id']) ? intval($_POST['store_id']) : 0;
-
+            
             if ($storeId <= 0) {
                 echo json_encode(['status' => false, 'message' => 'ID da loja inválido']);
                 exit;
             }
-
+            
             $db = Database::getConnection();
-
-            // Buscar dados completos da loja com informações de saldo
+            
+            // QUERY CORRIGIDA - Qualificação adequada das colunas
             $stmt = $db->prepare("
                 SELECT 
-                    l.*,
-                    -- Informações de saldo
+                    l.id,
+                    l.usuario_id,
+                    l.nome_fantasia,
+                    l.razao_social,
+                    l.cnpj,
+                    l.email,
+                    l.telefone,
+                    l.categoria,
+                    l.porcentagem_cashback,
+                    l.descricao,
+                    l.website,
+                    l.logo,
+                    l.status,
+                    l.observacao,
+                    l.data_cadastro,
+                    l.data_aprovacao,
+                    -- Informações de saldo (QUALIFICADO)
                     COALESCE(saldo_info.clientes_com_saldo, 0) as clientes_com_saldo,
                     COALESCE(saldo_info.total_saldo_clientes, 0) as total_saldo_clientes,
-                    -- Informações de transações
+                    -- Informações de transações (QUALIFICADO)
                     COALESCE(trans_info.total_transacoes, 0) as total_transacoes,
                     COALESCE(trans_info.transacoes_com_saldo, 0) as transacoes_com_saldo,
                     -- Informações do usuário
@@ -60,54 +75,54 @@ try {
                 LEFT JOIN usuarios u ON l.usuario_id = u.id
                 LEFT JOIN (
                     SELECT 
-                        loja_id,
-                        COUNT(DISTINCT usuario_id) as clientes_com_saldo,
-                        SUM(saldo_disponivel) as total_saldo_clientes
-                    FROM cashback_saldos 
-                    WHERE saldo_disponivel > 0
-                    GROUP BY loja_id
+                        cs.loja_id,
+                        COUNT(DISTINCT cs.usuario_id) as clientes_com_saldo,
+                        SUM(cs.saldo_disponivel) as total_saldo_clientes
+                    FROM cashback_saldos cs 
+                    WHERE cs.saldo_disponivel > 0
+                    GROUP BY cs.loja_id
                 ) saldo_info ON l.id = saldo_info.loja_id
                 LEFT JOIN (
                     SELECT 
-                        loja_id,
+                        tc.loja_id,
                         COUNT(*) as total_transacoes,
                         COUNT(CASE WHEN tsu.valor_usado > 0 THEN 1 END) as transacoes_com_saldo
                     FROM transacoes_cashback tc
                     LEFT JOIN transacoes_saldo_usado tsu ON tc.id = tsu.transacao_id
                     WHERE tc.status = 'aprovado'
-                    GROUP BY loja_id
+                    GROUP BY tc.loja_id
                 ) trans_info ON l.id = trans_info.loja_id
                 WHERE l.id = ?
             ");
             $stmt->execute([$storeId]);
             $store = $stmt->fetch(PDO::FETCH_ASSOC);
-
+            
             if (!$store) {
                 echo json_encode(['status' => false, 'message' => 'Loja não encontrada']);
                 exit;
             }
-
-            // Buscar estatísticas da loja
+            
+            // Buscar estatísticas da loja (QUALIFICADO)
             $statsStmt = $db->prepare("
                 SELECT 
                     COUNT(*) as total_transacoes,
-                    COALESCE(SUM(valor_total), 0) as total_vendas,
-                    COALESCE(SUM(valor_cliente), 0) as total_cashback
-                FROM transacoes_cashback
-                WHERE loja_id = ? AND status = 'aprovado'
+                    COALESCE(SUM(tc.valor_total), 0) as total_vendas,
+                    COALESCE(SUM(tc.valor_cliente), 0) as total_cashback
+                FROM transacoes_cashback tc
+                WHERE tc.loja_id = ? AND tc.status = 'aprovado'
             ");
             $statsStmt->execute([$storeId]);
             $statistics = $statsStmt->fetch(PDO::FETCH_ASSOC);
-
+            
             // Buscar endereço se existir
             $addrStmt = $db->prepare("SELECT * FROM lojas_endereco WHERE loja_id = ?");
             $addrStmt->execute([$storeId]);
             $address = $addrStmt->fetch(PDO::FETCH_ASSOC);
-
+            
             if ($address) {
                 $store['endereco'] = $address;
             }
-
+            
             echo json_encode([
                 'status' => true,
                 'data' => [
