@@ -690,17 +690,12 @@ function buildQueryString($exclude = []) {
         function viewTransactionDetails(transactionId) {
             const modal = document.getElementById('transactionDetailsModal');
             const content = document.getElementById('modalTransactionContent');
-            const title = document.getElementById('modalTransactionTitle');
             
-            // Mostrar modal com loading
             modal.style.display = 'block';
-            content.innerHTML = '<div class="loading" style="height: 200px; display: flex; align-items: center; justify-content: center;">Carregando detalhes...</div>';
-            title.textContent = `Transação #${transactionId}`;
+            content.innerHTML = '<div class="loading">Carregando...</div>';
             
-            // Adicionar animação de entrada
-            modal.style.animation = 'fadeIn 0.3s ease';
+            console.log('Buscando transação:', transactionId);
             
-            // Fazer requisição com melhor tratamento de erros
             fetch('../../controllers/AdminController.php', {
                 method: 'POST',
                 headers: {
@@ -709,44 +704,34 @@ function buildQueryString($exclude = []) {
                 body: `action=transaction_details_with_balance&transaction_id=${transactionId}`
             })
             .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
+                console.log('Response status:', response.status);
                 return response.text();
             })
             .then(text => {
-                // Log para debug
-                console.log('Resposta raw:', text);
+                console.log('Response text:', text);
                 
+                // Tentar fazer parse JSON
                 try {
                     const data = JSON.parse(text);
-                    
                     if (data.status) {
                         renderTransactionDetailsWithBalance(data.data);
                     } else {
-                        content.innerHTML = `
-                            <div class="alert alert-danger">
-                                <strong>Erro:</strong> ${data.message || 'Erro desconhecido ao carregar detalhes.'}
-                            </div>
-                        `;
+                        content.innerHTML = `<div class="alert alert-danger">Erro: ${data.message}</div>`;
                     }
-                } catch (jsonError) {
-                    console.error('Erro ao fazer parse do JSON:', jsonError);
-                    console.error('Texto recebido:', text);
+                } catch (e) {
+                    console.error('Erro JSON:', e);
+                    // Mostrar resposta raw para debug
                     content.innerHTML = `
                         <div class="alert alert-danger">
-                            <strong>Erro:</strong> Resposta inválida do servidor. Por favor, tente novamente.
+                            <strong>Debug - Resposta do servidor:</strong><br>
+                            <pre style="white-space: pre-wrap; font-size: 12px;">${text}</pre>
                         </div>
                     `;
                 }
             })
             .catch(error => {
-                console.error('Erro na requisição:', error);
-                content.innerHTML = `
-                    <div class="alert alert-danger">
-                        <strong>Erro:</strong> Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.
-                    </div>
-                `;
+                console.error('Erro fetch:', error);
+                content.innerHTML = `<div class="alert alert-danger">Erro de conexão: ${error.message}</div>`;
             });
         }
 
