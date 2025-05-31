@@ -182,14 +182,14 @@ body {
     font-weight: bold;
 }
 
-.error-message {
+/*.error-message {
     background-color: #ffdddd;
     color: #ff0000;
     padding: 10px;
     border-radius: 5px;
     margin-bottom: 20px;
     text-align: center;
-}
+}*/
 
 .or-divider {
     display: flex;
