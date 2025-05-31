@@ -192,5 +192,15 @@ if (!defined('USER_TYPE_ADMIN')) {
 if (!defined('USER_TYPE_STORE')) {
     define('USER_TYPE_STORE', 'loja');
 }
+
+
+// Adicionar essas URLs caso não existam:
+if (!defined('CLIENT_BALANCE_DETAILS_URL')) {
+    define('CLIENT_BALANCE_DETAILS_URL', SITE_URL . '/cliente/saldo/detalhes');
+}
+
+if (!defined('CLIENT_DASHBOARD_API_URL')) {
+    define('CLIENT_DASHBOARD_API_URL', SITE_URL . '/api/client/dashboard');
+}
 ?>
 
