@@ -67,11 +67,10 @@ try {
     <title>Gerenciar Usuários - Klube Cash</title>
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
     
-    <!-- CSS Principal -->
-    <link rel="stylesheet" href="../../assets/css/views/admin/users.css">
-    
-    <!-- Font Awesome para ícones -->
+    <!-- Font Awesome primeiro -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Seu CSS depois -->
+    <link rel="stylesheet" href="../../assets/css/views/admin/users.css">
     <link rel="stylesheet" href="../../assets/css/layout-fix.css">
 </head>
 <body>

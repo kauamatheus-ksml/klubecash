@@ -1,3 +1,4 @@
+
 :root {
     --primary-color: #FF7A00;
     --primary-light: #FFF0E6;
@@ -514,7 +515,7 @@ body {
     font-style: italic;
 }
 
-/* Ações da Tabela */
+/* Ações da Tabela - CSS Corrigido */
 .table-actions {
     display: flex;
     gap: 0.375rem;
@@ -526,39 +527,59 @@ body {
     height: 32px;
     border-radius: 50%;
     border: none;
-    display: flex; /* Importante para centralizar o ícone filho */
-    align-items: center; /* Centraliza verticalmente */
-    justify-content: center; /* Centraliza horizontalmente */
+    display: flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
     transition: var(--transition);
-    background: transparent;
-    color: var(--medium-gray); /* Define a cor do ícone, --medium-gray é #6C757D */
+    font-size: 0.875rem;
+    /* Removemos o background e color fixos daqui */
 }
 
+/* Estados padrão para cada tipo de botão */
+.action-btn.edit {
+    background: #E3F2FD;
+    color: #1976D2;
+}
+
+.action-btn.view {
+    background: #F3E5F5;
+    color: #7B1FA2;
+}
+
+.action-btn.activate {
+    background: #E8F5E8;
+    color: var(--success-color);
+}
+
+.action-btn.deactivate {
+    background: #FFF8E1;
+    color: var(--warning-color);
+}
+
+/* Estados hover mais distintos */
 .action-btn:hover {
     transform: scale(1.1);
 }
 
 .action-btn.edit:hover {
-    background: #E3F2FD;
-    color: #1976D2;
+    background: #1976D2;
+    color: white;
 }
 
-
-
 .action-btn.view:hover {
-    background: #F3E5F5;
-    color: #7B1FA2;
+    background: #7B1FA2;
+    color: white;
 }
 
 .action-btn.activate:hover {
-    background: #E8F5E8;
-    color: var(--success-color);
+    background: var(--success-color);
+    color: white;
 }
 
 .action-btn.deactivate:hover {
-    background: #FFF8E1;
-    color: var(--warning-color);
+    background: var(--warning-color);
+    color: var(--dark-gray);
 }
 
 /* Checkbox Personalizado */
