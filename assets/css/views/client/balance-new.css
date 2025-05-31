@@ -1224,17 +1224,3 @@ body {
     }
 }
 
-/* Dark mode support (preparação futura) */
-@media (prefers-color-scheme: dark) {
-    :root {
-        --text-primary: #F9FAFB;
-        --text-secondary: #E5E7EB;
-        --text-muted: #D1D5DB;
-        --text-light: #9CA3AF;
-        --bg-primary: #1F2937;
-        --bg-secondary: #111827;
-        --bg-tertiary: #374151;
-        --border-light: #374151;
-        --border-medium: #4B5563;
-    }
-}
