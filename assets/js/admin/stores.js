@@ -323,7 +323,23 @@ function validateStoreForm(formData) {
     
     return true;
 }
-
+function debugStoreDetails(storeId) {
+    console.log('Debug: Testando conexão...');
+    
+    makeRequest('test_connection')
+        .then(data => {
+            console.log('Conexão OK:', data);
+            
+            // Agora testar detalhes da loja
+            return makeRequest('store_details', { store_id: storeId });
+        })
+        .then(data => {
+            console.log('Detalhes da loja:', data);
+        })
+        .catch(error => {
+            console.error('Erro de debug:', error);
+        });
+}
 function submitStoreForm(formData, isEditing) {
     const submitButton = document.querySelector('#storeForm button[type="submit"]');
     const originalText = submitButton.textContent;
