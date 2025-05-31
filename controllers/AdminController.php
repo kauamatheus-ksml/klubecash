@@ -2356,7 +2356,185 @@ public static function getAvailableStores() {
             return ['status' => false, 'message' => 'Erro ao atualizar configurações. Tente novamente.'];
         }
     }
-    
+    /**
+    * Obtém dados completos para relatórios financeiros
+    * 
+    * @param array $filters Filtros de período
+    * @return array Dados dos relatórios
+    */
+    public static function getFinancialReports($filters = []) {
+        try {
+            if (!self::validateAdmin()) {
+                return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
+            }
+            
+            $db = Database::getConnection();
+            
+            // Preparar condições de filtro
+            $conditions = "1=1";
+            $params = [];
+            
+            if (!empty($filters['data_inicio'])) {
+                $conditions .= " AND data_transacao >= :data_inicio";
+                $params[':data_inicio'] = $filters['data_inicio'] . ' 00:00:00';
+            }
+            
+            if (!empty($filters['data_fim'])) {
+                $conditions .= " AND data_transacao <= :data_fim";
+                $params[':data_fim'] = $filters['data_fim'] . ' 23:59:59';
+            }
+            
+            // 1. ESTATÍSTICAS DE SALDO
+            $saldoQuery = "
+                SELECT 
+                    COUNT(DISTINCT cs.usuario_id) as total_clientes_com_saldo,
+                    COUNT(DISTINCT cs.loja_id) as total_lojas_com_saldo,
+                    COALESCE(SUM(cs.saldo_disponivel), 0) as total_saldo_disponivel,
+                    COALESCE(SUM(cs.total_creditado), 0) as total_saldo_creditado,
+                    COALESCE(SUM(cs.total_usado), 0) as total_saldo_usado,
+                    COALESCE(AVG(cs.saldo_disponivel), 0) as media_saldo_por_cliente
+                FROM cashback_saldos cs
+                WHERE cs.saldo_disponivel > 0
+            ";
+            
+            $saldoStmt = $db->query($saldoQuery);
+            $saldoStats = $saldoStmt->fetch(PDO::FETCH_ASSOC);
+            
+            // 2. MOVIMENTAÇÕES DO PERÍODO
+            $movimentacoesQuery = "
+                SELECT 
+                    COALESCE(SUM(CASE WHEN tipo_operacao = 'credito' THEN valor ELSE 0 END), 0) as creditos_periodo,
+                    COALESCE(SUM(CASE WHEN tipo_operacao = 'uso' THEN valor ELSE 0 END), 0) as usos_periodo,
+                    COALESCE(SUM(CASE WHEN tipo_operacao = 'estorno' THEN valor ELSE 0 END), 0) as estornos_periodo,
+                    COUNT(CASE WHEN tipo_operacao = 'credito' THEN 1 END) as qtd_creditos,
+                    COUNT(CASE WHEN tipo_operacao = 'uso' THEN 1 END) as qtd_usos,
+                    COUNT(CASE WHEN tipo_operacao = 'estorno' THEN 1 END) as qtd_estornos
+                FROM cashback_movimentacoes
+                WHERE $conditions
+            ";
+            
+            $movStmt = $db->prepare($movimentacoesQuery);
+            foreach ($params as $param => $value) {
+                $movStmt->bindValue($param, $value);
+            }
+            $movStmt->execute();
+            $movimentacoesStats = $movStmt->fetch(PDO::FETCH_ASSOC);
+            
+            // 3. VENDAS ORIGINAIS VS LÍQUIDAS
+            $vendasQuery = "
+                SELECT 
+                    DATE_FORMAT(t.data_transacao, '%Y-%m') as mes,
+                    COALESCE(SUM(t.valor_total), 0) as vendas_originais,
+                    COALESCE(SUM(CASE WHEN tsu.valor_usado IS NOT NULL THEN tsu.valor_usado ELSE 0 END), 0) as total_saldo_usado_mes,
+                    COALESCE(SUM(t.valor_total - COALESCE(tsu.valor_usado, 0)), 0) as vendas_liquidas
+                FROM transacoes_cashback t
+                LEFT JOIN transacoes_saldo_usado tsu ON t.id = tsu.transacao_id
+                WHERE t.status = 'aprovado' AND $conditions
+                GROUP BY DATE_FORMAT(t.data_transacao, '%Y-%m')
+                ORDER BY mes ASC
+            ";
+            
+            $vendasStmt = $db->prepare($vendasQuery);
+            foreach ($params as $param => $value) {
+                $vendasStmt->bindValue($param, $value);
+            }
+            $vendasStmt->execute();
+            $vendasComparacao = $vendasStmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            // 4. RANKING LOJAS POR USO DE SALDO
+            $lojasSaldoQuery = "
+                SELECT 
+                    l.nome_fantasia,
+                    COALESCE(SUM(cs.saldo_disponivel), 0) as saldo_atual,
+                    COALESCE(SUM(cs.total_creditado), 0) as total_creditado,
+                    COALESCE(SUM(cs.total_usado), 0) as total_usado,
+                    COUNT(DISTINCT cs.usuario_id) as clientes_com_saldo,
+                    CASE 
+                        WHEN SUM(cs.total_creditado) > 0 
+                        THEN (SUM(cs.total_usado) / SUM(cs.total_creditado)) * 100 
+                        ELSE 0 
+                    END as percentual_uso
+                FROM cashback_saldos cs
+                JOIN lojas l ON cs.loja_id = l.id
+                WHERE cs.total_creditado > 0
+                GROUP BY l.id, l.nome_fantasia
+                ORDER BY total_usado DESC
+                LIMIT 10
+            ";
+            
+            $lojasSaldoStmt = $db->query($lojasSaldoQuery);
+            $lojasSaldo = $lojasSaldoStmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            // 5. DADOS FINANCEIROS GERAIS
+            $financeQuery = "
+                SELECT 
+                    COALESCE(SUM(valor_total), 0) as total_vendas,
+                    COALESCE(SUM(valor_cliente), 0) as total_cashback,
+                    COALESCE(COUNT(*), 0) as total_transacoes,
+                    COALESCE(AVG(valor_cliente), 0) as media_cashback
+                FROM transacoes_cashback
+                WHERE status = 'aprovado' AND $conditions
+            ";
+            
+            $financeStmt = $db->prepare($financeQuery);
+            foreach ($params as $param => $value) {
+                $financeStmt->bindValue($param, $value);
+            }
+            $financeStmt->execute();
+            $financialData = $financeStmt->fetch(PDO::FETCH_ASSOC);
+            
+            // 6. COMISSÃO DO ADMIN
+            $adminComissionQuery = "
+                SELECT COALESCE(SUM(valor_comissao), 0) as total_comissao
+                FROM transacoes_comissao
+                WHERE tipo_usuario = 'admin' AND status = 'aprovado' AND $conditions
+            ";
+            
+            $adminStmt = $db->prepare($adminComissionQuery);
+            foreach ($params as $param => $value) {
+                $adminStmt->bindValue($param, $value);
+            }
+            $adminStmt->execute();
+            $adminComission = $adminStmt->fetch(PDO::FETCH_ASSOC)['total_comissao'];
+            
+            // 7. DADOS MENSAIS PARA A TABELA CASHBACK X RECEITA
+            $monthlyQuery = "
+                SELECT 
+                    DATE_FORMAT(tc.data_transacao, '%Y-%m') as mes,
+                    COALESCE(SUM(CASE WHEN tc.tipo_usuario = 'admin' THEN tc.valor_comissao ELSE 0 END), 0) as comissao_admin,
+                    COALESCE(SUM(t.valor_cliente), 0) as total_cashback
+                FROM transacoes_comissao tc
+                JOIN transacoes_cashback t ON tc.transacao_id = t.id
+                WHERE tc.status = 'aprovado' AND $conditions
+                GROUP BY DATE_FORMAT(tc.data_transacao, '%Y-%m')
+                ORDER BY mes ASC
+            ";
+            
+            $monthlyStmt = $db->prepare($monthlyQuery);
+            foreach ($params as $param => $value) {
+                $monthlyStmt->bindValue($param, $value);
+            }
+            $monthlyStmt->execute();
+            $monthlyData = $monthlyStmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            return [
+                'status' => true,
+                'data' => [
+                    'saldo_stats' => $saldoStats,
+                    'movimentacoes_stats' => $movimentacoesStats,
+                    'vendas_comparacao' => $vendasComparacao,
+                    'lojas_saldo' => $lojasSaldo,
+                    'financial_data' => $financialData,
+                    'admin_comission' => $adminComission,
+                    'monthly_data' => $monthlyData
+                ]
+            ];
+            
+        } catch (PDOException $e) {
+            error_log('Erro ao gerar relatórios financeiros: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro ao carregar relatórios.'];
+        }
+    }
     /**
      * Gera relatórios administrativos
      * 
@@ -2390,6 +2568,12 @@ public static function getAvailableStores() {
             $reportData = [];
             
             switch ($type) {
+                case 'financial_reports':
+                    $filters = $_POST['filters'] ?? [];
+                    $result = AdminController::getFinancialReports($filters);
+                    echo json_encode($result);
+                    break;
+                    
                 case 'create_store':
                     header('Content-Type: application/json; charset=UTF-8');
                     
