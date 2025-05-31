@@ -42,12 +42,15 @@ $activeMenu = $activeMenu ?? 'painel';
 
 <!-- Sidebar -->
 <div class="sidebar" id="sidebar">
-    <div class="sidebar-header">
-        <img src="../../assets/images/logo.png" alt="KlubeCash" class="sidebar-logo">
-    </div>
-    
-    <ul class="sidebar-nav" role="navigation">
-        <li>
+    <!-- CORREÇÃO: Wrapper para controle de layout no mobile -->
+    <div class="sidebar-content">
+        <!-- Header da Sidebar -->
+        <div class="sidebar-header">
+            <img src="../../assets/images/logo.png" alt="KlubeCash" class="sidebar-logo">
+        </div>
+        
+        <!-- Navegação Principal -->
+        <nav class="sidebar-nav" role="navigation">
             <a href="<?php echo ADMIN_DASHBOARD_URL; ?>" 
                class="sidebar-nav-item <?php echo ($activeMenu == 'painel') ? 'active' : ''; ?>"
                aria-current="<?php echo ($activeMenu == 'painel') ? 'page' : 'false'; ?>">
@@ -57,8 +60,7 @@ $activeMenu = $activeMenu ?? 'painel';
                 </svg>
                 Painel
             </a>
-        </li>
-        <li>
+            
             <a href="<?php echo ADMIN_USERS_URL; ?>" 
                class="sidebar-nav-item <?php echo ($activeMenu == 'usuarios') ? 'active' : ''; ?>"
                aria-current="<?php echo ($activeMenu == 'usuarios') ? 'page' : 'false'; ?>">
@@ -68,8 +70,7 @@ $activeMenu = $activeMenu ?? 'painel';
                 </svg>
                 Usuários
             </a>
-        </li>
-        <li>
+            
             <a href="<?php echo ADMIN_BALANCE_URL; ?>" 
                class="sidebar-nav-item <?php echo ($activeMenu == 'saldo') ? 'active' : ''; ?>"
                aria-current="<?php echo ($activeMenu == 'saldo') ? 'page' : 'false'; ?>">
@@ -79,8 +80,7 @@ $activeMenu = $activeMenu ?? 'painel';
                 </svg>
                 Saldo
             </a>
-        </li>
-        <li>
+            
             <a href="<?php echo ADMIN_STORES_URL; ?>" 
                class="sidebar-nav-item <?php echo ($activeMenu == 'lojas') ? 'active' : ''; ?>"
                aria-current="<?php echo ($activeMenu == 'lojas') ? 'page' : 'false'; ?>">
@@ -90,8 +90,7 @@ $activeMenu = $activeMenu ?? 'painel';
                 </svg>
                 Lojas
             </a>
-        </li>
-        <li>
+            
             <a href="<?php echo ADMIN_PAYMENTS_URL; ?>" 
                class="sidebar-nav-item <?php echo ($activeMenu == 'pagamentos') ? 'active' : ''; ?>"
                aria-current="<?php echo ($activeMenu == 'pagamentos') ? 'page' : 'false'; ?>">
@@ -101,8 +100,7 @@ $activeMenu = $activeMenu ?? 'painel';
                 </svg>
                 Pagamentos
             </a>
-        </li>
-        <li>
+            
             <a href="<?php echo ADMIN_TRANSACTIONS_URL; ?>" 
                class="sidebar-nav-item <?php echo ($activeMenu == 'compras') ? 'active' : ''; ?>"
                aria-current="<?php echo ($activeMenu == 'compras') ? 'page' : 'false'; ?>">
@@ -113,8 +111,7 @@ $activeMenu = $activeMenu ?? 'painel';
                 </svg>
                 Compras
             </a>
-        </li>
-        <li>
+            
             <a href="<?php echo SITE_URL; ?>/admin/relatorios" 
                class="sidebar-nav-item <?php echo ($activeMenu == 'relatorios') ? 'active' : ''; ?>"
                aria-current="<?php echo ($activeMenu == 'relatorios') ? 'page' : 'false'; ?>">
@@ -127,8 +124,7 @@ $activeMenu = $activeMenu ?? 'painel';
                 </svg>
                 Relatórios
             </a>
-        </li>
-        <li>
+            
             <a href="<?php echo ADMIN_SETTINGS_URL; ?>" 
                class="sidebar-nav-item <?php echo ($activeMenu == 'configuracoes') ? 'active' : ''; ?>"
                aria-current="<?php echo ($activeMenu == 'configuracoes') ? 'page' : 'false'; ?>">
@@ -138,9 +134,10 @@ $activeMenu = $activeMenu ?? 'painel';
                 </svg>
                 Configurações
             </a>
-        </li>
-    </ul>
+        </nav>
+    </div>
     
+    <!-- CORREÇÃO: Footer fora do wrapper para fixar no bottom em mobile -->
     <div class="sidebar-footer">
         <a href="<?php echo SITE_URL; ?>/controllers/AuthController.php?action=logout" 
            class="logout-btn" 
@@ -155,7 +152,7 @@ $activeMenu = $activeMenu ?? 'painel';
     </div>
 </div>
 
-<!-- Script da Sidebar Atualizado -->
+<!-- Script da Sidebar Corrigido -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // Elementos da DOM
@@ -200,8 +197,14 @@ document.addEventListener('DOMContentLoaded', function() {
     function openSidebar() {
         sidebar.classList.add('open');
         overlay.classList.add('active');
-        body.style.overflow = 'hidden'; // Previne scroll do body
+        body.classList.add('sidebar-open'); // CORREÇÃO: Usar classe em vez de style
         sidebarOpen = true;
+        
+        // CORREÇÃO: Esconder o botão toggle
+        if (sidebarToggle) {
+            sidebarToggle.style.opacity = '0';
+            sidebarToggle.style.pointerEvents = 'none';
+        }
         
         // Foco no primeiro item do menu para acessibilidade
         const firstMenuItem = sidebar.querySelector('.sidebar-nav-item');
@@ -216,8 +219,14 @@ document.addEventListener('DOMContentLoaded', function() {
     function closeSidebar() {
         sidebar.classList.remove('open');
         overlay.classList.remove('active');
-        body.style.overflow = ''; // Restaura o scroll do body
+        body.classList.remove('sidebar-open'); // CORREÇÃO: Usar classe em vez de style
         sidebarOpen = false;
+        
+        // CORREÇÃO: Mostrar o botão toggle novamente
+        if (sidebarToggle) {
+            sidebarToggle.style.opacity = '1';
+            sidebarToggle.style.pointerEvents = 'auto';
+        }
     }
     
     /**
@@ -226,26 +235,43 @@ document.addEventListener('DOMContentLoaded', function() {
     function checkScreenSize() {
         if (window.innerWidth > 768) {
             closeSidebar();
-            body.style.overflow = ''; // Garantir que o scroll funcione em desktop
+            body.classList.remove('sidebar-open'); // Garantir que o scroll funcione em desktop
         }
     }
     
     // Verificar o tamanho da tela ao carregar e redimensionar
     window.addEventListener('resize', checkScreenSize);
     
-    // Adicionar indicadores visuais de carregamento nos links
+    // CORREÇÃO: Fechar sidebar ao clicar em um link no mobile
     const navItems = document.querySelectorAll('.sidebar-nav-item');
     navItems.forEach(item => {
         item.addEventListener('click', function() {
             // Adicionar classe de loading
             this.classList.add('loading');
             
-            // Remover classe após um tempo (será removida quando a página carregar)
+            // CORREÇÃO: Fechar sidebar no mobile ao clicar em um link
+            if (window.innerWidth <= 768 && sidebarOpen) {
+                setTimeout(() => {
+                    closeSidebar();
+                }, 150); // Pequeno delay para visual
+            }
+            
+            // Remover classe após um tempo
             setTimeout(() => {
                 this.classList.remove('loading');
             }, 2000);
         });
     });
+    
+    // CORREÇÃO: Prevenir scroll do body quando sidebar está aberta no mobile
+    document.addEventListener('touchmove', function(e) {
+        if (body.classList.contains('sidebar-open')) {
+            // Permitir scroll apenas dentro da sidebar
+            if (!e.target.closest('.sidebar')) {
+                e.preventDefault();
+            }
+        }
+    }, { passive: false });
     
     // Animação suave para os itens do menu
     const observer = new IntersectionObserver((entries) => {
@@ -260,5 +286,52 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Inicializar
     checkScreenSize();
+    
+    // CORREÇÃO: Detectar mudanças de orientação em dispositivos móveis
+    window.addEventListener('orientationchange', function() {
+        setTimeout(checkScreenSize, 100);
+    });
 });
 </script>
+
+<!-- CORREÇÃO: CSS adicional para controle específico da classe sidebar-open -->
+<style>
+/* Prevenir scroll do body quando sidebar está aberta */
+body.sidebar-open {
+    overflow: hidden !important;
+    position: fixed !important;
+    width: 100% !important;
+}
+
+/* Garantir que a sidebar-content tenha altura correta */
+@media (max-width: 768px) {
+    .sidebar-content {
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - 130px); /* Deixa espaço para o footer */
+        overflow: hidden;
+    }
+    
+    .sidebar-nav {
+        flex: 1;
+        overflow-y: auto;
+        padding-bottom: 20px;
+    }
+    
+    /* Garantir que o footer esteja sempre visível */
+    .sidebar-footer {
+        position: absolute !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        z-index: 10 !important;
+    }
+    
+    /* Esconder o toggle quando sidebar está aberta */
+    .sidebar.open ~ .sidebar-toggle {
+        opacity: 0 !important;
+        pointer-events: none !important;
+        transform: scale(0.8) !important;
+    }
+}
+</style>
