@@ -552,124 +552,160 @@ public static function getUserDetails($userId) {
     * @param int $page Página atual
     * @return array Resultado da operação
     */
-    public static function manageStoresWithBalance($filters = [], $page = 1) {
-        try {
-            if (!self::validateAdmin()) {
-                return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
-            }
-
-            $db = Database::getConnection();
-            $limit = ITEMS_PER_PAGE;
-            $offset = ($page - 1) * $limit;
-            
-            // Construir condições WHERE
-            $whereConditions = ["l.id IS NOT NULL"];
-            $params = [];
-            
-            // Aplicar filtros
-            if (!empty($filters['busca'])) {
-                $whereConditions[] = "(l.nome_fantasia LIKE :busca OR l.razao_social LIKE :busca OR l.email LIKE :busca)";
-                $params[':busca'] = '%' . $filters['busca'] . '%';
-            }
-            
-            if (!empty($filters['status'])) {
-                $whereConditions[] = "l.status = :status";
-                $params[':status'] = $filters['status'];
-            }
-            
-            if (!empty($filters['categoria'])) {
-                $whereConditions[] = "l.categoria = :categoria";
-                $params[':categoria'] = $filters['categoria'];
-            }
-            
-            $whereClause = "WHERE " . implode(" AND ", $whereConditions);
-            
-            // Query principal simplificada para evitar tabelas inexistentes
-            $storesQuery = "
-                SELECT 
-                    l.*,
-                    COUNT(DISTINCT t.id) as total_transacoes,
-                    COALESCE(SUM(CASE WHEN t.status = 'aprovado' THEN t.valor_cliente ELSE 0 END), 0) as total_cashback_gerado,
-                    COALESCE(SUM(CASE WHEN t.status = 'aprovado' THEN t.valor_total ELSE 0 END), 0) as total_vendas,
-                    0 as total_saldo_clientes,
-                    0 as clientes_com_saldo,
-                    0 as transacoes_com_saldo,
-                    0 as total_saldo_usado
-                FROM lojas l
-                LEFT JOIN transacoes_cashback t ON l.id = t.loja_id
-                $whereClause
-                GROUP BY l.id
-                ORDER BY l.data_cadastro DESC
-                LIMIT :limit OFFSET :offset
-            ";
-            
-            $stmt = $db->prepare($storesQuery);
-            foreach ($params as $key => $value) {
-                $stmt->bindValue($key, $value);
-            }
-            $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
-            $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
-            $stmt->execute();
-            
-            $stores = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            
-            // Query para contar total
-            $countQuery = "
-                SELECT COUNT(DISTINCT l.id) as total
-                FROM lojas l
-                $whereClause
-            ";
-            
-            $countStmt = $db->prepare($countQuery);
-            foreach ($params as $key => $value) {
-                $countStmt->bindValue($key, $value);
-            }
-            $countStmt->execute();
-            $totalCount = $countStmt->fetch(PDO::FETCH_ASSOC)['total'];
-            
-            // Obter categorias
-            $categoriesStmt = $db->query("SELECT DISTINCT categoria FROM lojas WHERE categoria IS NOT NULL ORDER BY categoria");
-            $categories = $categoriesStmt->fetchAll(PDO::FETCH_COLUMN);
-            
-            // Estatísticas consolidadas simplificadas
-            $statsQuery = "
-                SELECT 
-                    COUNT(DISTINCT l.id) as total_lojas,
-                    COUNT(DISTINCT CASE WHEN l.status = 'aprovado' THEN l.id END) as lojas_aprovadas,
-                    COUNT(DISTINCT CASE WHEN l.status = 'pendente' THEN l.id END) as lojas_pendentes,
-                    0 as lojas_com_saldo,
-                    COALESCE(SUM(CASE WHEN t.status = 'aprovado' THEN t.valor_cliente ELSE 0 END), 0) as total_saldo_acumulado,
-                    0 as total_saldo_usado
-                FROM lojas l
-                LEFT JOIN transacoes_cashback t ON l.id = t.loja_id
-            ";
-            
-            $statsStmt = $db->query($statsQuery);
-            $statistics = $statsStmt->fetch(PDO::FETCH_ASSOC);
-            
-            // Calcular paginação
-            $totalPages = ceil($totalCount / $limit);
-            
-            return [
-                'status' => true,
-                'data' => [
-                    'lojas' => $stores,
-                    'estatisticas' => $statistics,
-                    'categorias' => $categories,
-                    'paginacao' => [
-                        'pagina_atual' => $page,
-                        'total_paginas' => $totalPages,
-                        'total_itens' => $totalCount,
-                        'itens_por_pagina' => $limit
-                    ]
-                ]
-            ];
-            
-        } catch (Exception $e) {
-            error_log('Erro ao gerenciar lojas com saldo: ' . $e->getMessage());
-            return ['status' => false, 'message' => 'Erro ao carregar dados das lojas: ' . $e->getMessage()];
+    /**
+ * Gerencia lojas com informações detalhadas de saldo e uso
+ * 
+ * @param array $filters Filtros para a listagem
+ * @param int $page Página atual
+ * @return array Resultado com dados das lojas e estatísticas
+ */
+public static function manageStoresWithBalance($filters = [], $page = 1) {
+    try {
+        // Verificar se é um administrador
+        if (!AuthController::isAdmin()) {
+            return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
         }
+        
+        $db = Database::getConnection();
+        $limit = ITEMS_PER_PAGE;
+        $offset = ($page - 1) * $limit;
+        
+        // Construir condições WHERE
+        $whereConditions = ["1=1"];
+        $params = [];
+        
+        // Aplicar filtros
+        if (!empty($filters['busca'])) {
+            $whereConditions[] = "(l.nome_fantasia LIKE ? OR l.razao_social LIKE ? OR l.cnpj LIKE ? OR l.email LIKE ?)";
+            $searchTerm = '%' . $filters['busca'] . '%';
+            $params[] = $searchTerm;
+            $params[] = $searchTerm;
+            $params[] = $searchTerm;
+            $params[] = $searchTerm;
+        }
+        
+        if (!empty($filters['status'])) {
+            $whereConditions[] = "l.status = ?";
+            $params[] = $filters['status'];
+        }
+        
+        if (!empty($filters['categoria'])) {
+            $whereConditions[] = "l.categoria = ?";
+            $params[] = $filters['categoria'];
+        }
+        
+        $whereClause = "WHERE " . implode(" AND ", $whereConditions);
+        
+        // Query principal com informações de saldo
+        $query = "
+            SELECT 
+                l.*,
+                -- Contar clientes com saldo ativo nesta loja
+                COALESCE(saldo_info.clientes_com_saldo, 0) as clientes_com_saldo,
+                -- Somar saldo total dos clientes nesta loja
+                COALESCE(saldo_info.total_saldo_clientes, 0) as total_saldo_clientes,
+                -- Contar total de transações da loja
+                COALESCE(trans_info.total_transacoes, 0) as total_transacoes,
+                -- Contar transações onde houve uso de saldo
+                COALESCE(trans_info.transacoes_com_saldo, 0) as transacoes_com_saldo,
+                -- Valor total usado em saldo
+                COALESCE(trans_info.total_saldo_usado, 0) as total_saldo_usado,
+                -- Informações do usuário associado
+                u.nome as usuario_nome,
+                u.status as usuario_status
+            FROM lojas l
+            LEFT JOIN usuarios u ON l.usuario_id = u.id
+            LEFT JOIN (
+                SELECT 
+                    loja_id,
+                    COUNT(DISTINCT usuario_id) as clientes_com_saldo,
+                    SUM(saldo_disponivel) as total_saldo_clientes
+                FROM cashback_saldos 
+                WHERE saldo_disponivel > 0
+                GROUP BY loja_id
+            ) saldo_info ON l.id = saldo_info.loja_id
+            LEFT JOIN (
+                SELECT 
+                    loja_id,
+                    COUNT(*) as total_transacoes,
+                    COUNT(CASE WHEN tsu.valor_usado > 0 THEN 1 END) as transacoes_com_saldo,
+                    COALESCE(SUM(tsu.valor_usado), 0) as total_saldo_usado
+                FROM transacoes_cashback tc
+                LEFT JOIN transacoes_saldo_usado tsu ON tc.id = tsu.transacao_id
+                WHERE tc.status = 'aprovado'
+                GROUP BY loja_id
+            ) trans_info ON l.id = trans_info.loja_id
+            $whereClause
+            ORDER BY l.data_cadastro DESC
+            LIMIT ? OFFSET ?
+        ";
+        
+        // Adicionar limit e offset aos parâmetros
+        $params[] = $limit;
+        $params[] = $offset;
+        
+        $stmt = $db->prepare($query);
+        $stmt->execute($params);
+        $stores = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Query para contar total de registros
+        $countQuery = "
+            SELECT COUNT(*) as total
+            FROM lojas l
+            $whereClause
+        ";
+        
+        $countStmt = $db->prepare($countQuery);
+        $countStmt->execute(array_slice($params, 0, -2)); // Remove limit e offset
+        $totalCount = $countStmt->fetch(PDO::FETCH_ASSOC)['total'];
+        
+        // Calcular estatísticas gerais
+        $statsQuery = "
+            SELECT 
+                COUNT(DISTINCT l.id) as total_lojas,
+                COUNT(DISTINCT CASE WHEN cs.saldo_disponivel > 0 THEN l.id END) as lojas_com_saldo,
+                COALESCE(SUM(cs.saldo_disponivel), 0) as total_saldo_acumulado,
+                COALESCE(SUM(cm.valor), 0) as total_saldo_usado,
+                COUNT(DISTINCT CASE WHEN l.status = 'aprovado' THEN l.id END) as lojas_aprovadas,
+                COUNT(DISTINCT CASE WHEN l.status = 'pendente' THEN l.id END) as lojas_pendentes
+            FROM lojas l
+            LEFT JOIN cashback_saldos cs ON l.id = cs.loja_id AND cs.saldo_disponivel > 0
+            LEFT JOIN cashback_movimentacoes cm ON l.id = cm.loja_id AND cm.tipo_operacao = 'uso'
+            $whereClause
+        ";
+        
+        $statsStmt = $db->prepare($statsQuery);
+        $statsStmt->execute(array_slice($params, 0, -2)); // Remove limit e offset
+        $statistics = $statsStmt->fetch(PDO::FETCH_ASSOC);
+        
+        // Obter categorias distintas
+        $categoriesQuery = "SELECT DISTINCT categoria FROM lojas WHERE categoria IS NOT NULL AND categoria != '' ORDER BY categoria";
+        $categoriesStmt = $db->query($categoriesQuery);
+        $categories = $categoriesStmt->fetchAll(PDO::FETCH_COLUMN);
+        
+        // Calcular informações de paginação
+        $totalPages = ceil($totalCount / $limit);
+        
+        return [
+            'status' => true,
+            'data' => [
+                'lojas' => $stores,
+                'estatisticas' => $statistics,
+                'categorias' => $categories,
+                'paginacao' => [
+                    'pagina_atual' => $page,
+                    'total_paginas' => $totalPages,
+                    'total_itens' => $totalCount,
+                    'itens_por_pagina' => $limit
+                ]
+            ]
+        ];
+        
+    } catch (PDOException $e) {
+        error_log('Erro ao gerenciar lojas com saldo: ' . $e->getMessage());
+        return ['status' => false, 'message' => 'Erro ao carregar dados das lojas.'];
     }
+}
 
     /**
     * Obter detalhes de uma loja com informações de saldo
