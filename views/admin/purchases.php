@@ -694,23 +694,18 @@ function buildQueryString($exclude = []) {
             modal.style.display = 'block';
             content.innerHTML = '<div class="loading">Carregando...</div>';
             
-            console.log('Buscando transação:', transactionId);
-            
-            fetch('../../controllers/AdminController.php', {
+            // Usar o caminho absoluto correto
+            fetch('/controllers/AdminController.php', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
                 },
                 body: `action=transaction_details_with_balance&transaction_id=${transactionId}`
             })
-            .then(response => {
-                console.log('Response status:', response.status);
-                return response.text();
-            })
+            .then(response => response.text())
             .then(text => {
-                console.log('Response text:', text);
+                console.log('Resposta:', text);
                 
-                // Tentar fazer parse JSON
                 try {
                     const data = JSON.parse(text);
                     if (data.status) {
@@ -719,19 +714,11 @@ function buildQueryString($exclude = []) {
                         content.innerHTML = `<div class="alert alert-danger">Erro: ${data.message}</div>`;
                     }
                 } catch (e) {
-                    console.error('Erro JSON:', e);
-                    // Mostrar resposta raw para debug
-                    content.innerHTML = `
-                        <div class="alert alert-danger">
-                            <strong>Debug - Resposta do servidor:</strong><br>
-                            <pre style="white-space: pre-wrap; font-size: 12px;">${text}</pre>
-                        </div>
-                    `;
+                    content.innerHTML = `<div class="alert alert-danger">Erro de resposta do servidor</div>`;
                 }
             })
             .catch(error => {
-                console.error('Erro fetch:', error);
-                content.innerHTML = `<div class="alert alert-danger">Erro de conexão: ${error.message}</div>`;
+                content.innerHTML = `<div class="alert alert-danger">Erro de conexão</div>`;
             });
         }
 
