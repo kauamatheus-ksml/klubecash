@@ -1,4 +1,5 @@
 <?php
+// views/auth/login.php
 // Incluir arquivos de configuração
 require_once '../../config/constants.php';
 require_once '../../config/database.php';
@@ -84,7 +85,6 @@ if (!empty($urlError)) {
     <title>Login - Klube Cash</title>
     <link rel="stylesheet" href="../../assets/css/auth.css">
     <link rel="stylesheet" href="../../assets/css/responsive.css">
-    <link rel="stylesheet" href="../../assets/css/components/toast.css">
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
     <link rel="stylesheet" href="../../assets/css/views/auth/login.css">
 </head>
@@ -108,6 +108,18 @@ if (!empty($urlError)) {
 
         <div class="right-panel">
             <div class="login-container">
+                <?php if (!empty($error)): ?>
+                    <div class="error-message">
+                        <?php echo htmlspecialchars($error); ?>
+                    </div>
+                <?php endif; ?>
+
+                <?php if (!empty($urlSuccess)): ?>
+                    <div class="success-message">
+                        <?php echo htmlspecialchars($urlSuccess); ?>
+                    </div>
+                <?php endif; ?>
+
                 <div class="login-header">
                     <h1>Seja <span>BEM VINDO</span></h1>
                     <h2>Login</h2>
@@ -157,20 +169,81 @@ if (!empty($urlError)) {
             </div>
         </div>
     </div>
-
     <script src="../../assets/js/components/toast.js"></script>
     <script>
-        // Mostrar mensagens usando toasts
+        // Mostrar mensagens com toast
         document.addEventListener('DOMContentLoaded', function() {
             <?php if (!empty($error)): ?>
                 KlubeToast.error('<?php echo addslashes($error); ?>');
             <?php endif; ?>
 
-            <?php if (!empty($urlSuccess)): ?>
-                KlubeToast.success('<?php echo addslashes($urlSuccess); ?>');
+            <?php if (!empty($success)): ?>
+                KlubeToast.success('<?php echo addslashes($success); ?>');
             <?php endif; ?>
         });
 
+        // Validação dos formulários com toast
+        document.getElementById('recover-form')?.addEventListener('submit', function(event) {
+            const email = document.getElementById('email').value;
+            
+            let isValid = true;
+            let errorMessage = '';
+            
+            if (!email) {
+                errorMessage = 'Por favor, informe seu email.';
+                isValid = false;
+            } else if (!isValidEmail(email)) {
+                errorMessage = 'Por favor, informe um email válido.';
+                isValid = false;
+            }
+            
+            if (!isValid) {
+                event.preventDefault();
+                KlubeToast.error(errorMessage);
+                return false;
+            }
+
+            // Mostrar spinner
+            KlubeSpinner.show();
+            
+            const submitBtn = document.querySelector('.recover-btn');
+            const originalText = submitBtn.textContent;
+            submitBtn.textContent = 'Enviando...';
+            submitBtn.disabled = true;
+        });
+        
+        document.getElementById('reset-form')?.addEventListener('submit', function(event) {
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirm_password').value;
+            
+            let isValid = true;
+            let errorMessage = '';
+            
+            if (!password) {
+                errorMessage = 'Por favor, informe sua nova senha.';
+                isValid = false;
+            } else if (password.length < <?php echo PASSWORD_MIN_LENGTH; ?>) {
+                errorMessage = 'A senha deve ter no mínimo <?php echo PASSWORD_MIN_LENGTH; ?> caracteres.';
+                isValid = false;
+            } else if (password !== confirmPassword) {
+                errorMessage = 'As senhas não coincidem.';
+                isValid = false;
+            }
+            
+            if (!isValid) {
+                event.preventDefault();
+                KlubeToast.error(errorMessage);
+                return false;
+            }
+
+            // Mostrar spinner
+            KlubeSpinner.show();
+            
+            const submitBtn = document.querySelector('.recover-btn');
+            const originalText = submitBtn.textContent;
+            submitBtn.textContent = 'Alterando...';
+            submitBtn.disabled = true;
+        });
         // Função para alternar a visibilidade da senha
         function togglePassword() {
             const passwordField = document.getElementById('password');
@@ -185,15 +258,15 @@ if (!empty($urlError)) {
             }
         }
 
-        // Função para login com Google
+        // Função REAL para login com Google
         function loginWithGoogle() {
-            KlubeSpinner.show();
-            
+            // Mostrar indicador de carregamento
             const googleBtn = document.querySelector('.google-btn');
             const originalText = googleBtn.innerHTML;
             googleBtn.innerHTML = '<img src="../../assets/images/icons/google.svg" alt="Google"> Conectando...';
             googleBtn.disabled = true;
             
+            // Fazer requisição para obter a URL de autorização do Google
             fetch('<?php echo SITE_URL; ?>/auth/google/auth', {
                 method: 'GET',
                 headers: {
@@ -207,8 +280,8 @@ if (!empty($urlError)) {
                 return response.json();
             })
             .then(data => {
-                KlubeSpinner.hide();
                 if (data.status && data.auth_url) {
+                    // Redirecionar para o Google
                     window.location.href = data.auth_url;
                 } else {
                     throw new Error(data.message || 'Erro desconhecido');
@@ -216,23 +289,24 @@ if (!empty($urlError)) {
             })
             .catch(error => {
                 console.error('Erro no login Google:', error);
-                KlubeSpinner.hide();
-                KlubeToast.error('Erro ao conectar com o Google: ' + error.message);
+                alert('Erro ao conectar com o Google: ' + error.message);
                 
+                // Restaurar botão
                 googleBtn.innerHTML = originalText;
                 googleBtn.disabled = false;
             });
         }
 
+        // Funções placeholder para outros provedores
         function loginWithFacebook() {
-            KlubeToast.info('Login com Facebook será implementado em breve.');
+            alert('Login com Facebook será implementado com a API do Facebook.');
         }
 
         function loginWithApple() {
-            KlubeToast.info('Login com Apple será implementado em breve.');
+            alert('Login com Apple será implementado com a API da Apple.');
         }
 
-        // Validação do formulário
+        // Validação do formulário no lado do cliente
         document.getElementById('login-form').addEventListener('submit', function(event) {
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
@@ -255,16 +329,8 @@ if (!empty($urlError)) {
             
             if (!isValid) {
                 event.preventDefault();
-                KlubeToast.error(errorMessage);
-                return false;
+                alert(errorMessage);
             }
-
-            // Mostrar spinner durante o login
-            KlubeSpinner.show();
-            
-            const submitBtn = document.querySelector('.login-btn');
-            submitBtn.textContent = 'Entrando...';
-            submitBtn.disabled = true;
         });
         
         function isValidEmail(email) {
@@ -272,12 +338,35 @@ if (!empty($urlError)) {
             return emailRegex.test(email);
         }
 
-        // Teste dos toasts (remover depois)
-        setTimeout(() => {
-            console.log('Testando toast...');
-            // Descomente para testar:
-            // KlubeToast.success('Toast funcionando!');
-        }, 1000);
+        // Verifica o tamanho da tela e aplica ajustes específicos
+        function checkScreenSize() {
+            const socialBtns = document.querySelectorAll('.social-btn');
+            const googleBtn = document.querySelector('.google-btn span');
+            
+            if (window.innerWidth < 768) {
+                socialBtns.forEach(btn => {
+                    if (!btn.classList.contains('google-btn')) {
+                        btn.querySelector('span')?.classList.add('hide');
+                    }
+                });
+                
+                if (googleBtn) {
+                    googleBtn.textContent = 'Login com Google';
+                }
+            } else {
+                socialBtns.forEach(btn => {
+                    btn.querySelector('span')?.classList.remove('hide');
+                });
+                
+                if (googleBtn) {
+                    googleBtn.textContent = 'Entre com Google';
+                }
+            }
+        }
+
+        // Executa verificação no carregamento e redimensionamento
+        window.addEventListener('load', checkScreenSize);
+        window.addEventListener('resize', checkScreenSize);
     </script>
 </body>
 </html>

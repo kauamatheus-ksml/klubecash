@@ -1,4 +1,4 @@
-// Sistema de Toast Notifications para Klube Cash
+// assets/js/components/toast.js
 class KlubeToast {
     constructor() {
         this.container = null;
@@ -6,6 +6,7 @@ class KlubeToast {
     }
 
     init() {
+        // Criar container se não existir
         if (!document.querySelector('.toast-container')) {
             this.container = document.createElement('div');
             this.container.className = 'toast-container';
@@ -25,9 +26,11 @@ class KlubeToast {
 
         const config = { ...defaultOptions, ...options };
 
+        // Criar elemento do toast
         const toast = document.createElement('div');
         toast.className = `toast ${type}`;
 
+        // HTML interno do toast
         toast.innerHTML = `
             <div class="toast-icon">${this.getIcon(type)}</div>
             <div class="toast-content">
@@ -38,18 +41,22 @@ class KlubeToast {
             ${config.progress ? '<div class="toast-progress"></div>' : ''}
         `;
 
+        // Adicionar ao container
         this.container.appendChild(toast);
 
+        // Configurar barra de progresso
         const progressBar = toast.querySelector('.toast-progress');
         if (progressBar && config.duration > 0) {
             progressBar.style.width = '100%';
             progressBar.style.transitionDuration = `${config.duration}ms`;
             
+            // Animar progresso
             setTimeout(() => {
                 progressBar.style.width = '0%';
             }, 10);
         }
 
+        // Configurar botão de fechar
         const closeBtn = toast.querySelector('.toast-close');
         if (closeBtn) {
             closeBtn.addEventListener('click', () => {
@@ -57,16 +64,19 @@ class KlubeToast {
             });
         }
 
+        // Mostrar toast
         setTimeout(() => {
             toast.classList.add('show');
         }, 10);
 
+        // Auto remover
         if (config.duration > 0) {
             setTimeout(() => {
                 this.hide(toast);
             }, config.duration);
         }
 
+        // Pausar progresso no hover
         if (progressBar) {
             toast.addEventListener('mouseenter', () => {
                 progressBar.style.animationPlayState = 'paused';
@@ -111,6 +121,7 @@ class KlubeToast {
         return titles[type] || titles.info;
     }
 
+    // Métodos de conveniência
     success(message, options = {}) {
         return this.show(message, 'success', options);
     }
@@ -128,6 +139,7 @@ class KlubeToast {
     }
 }
 
+// Classe para gerenciar spinner
 class KlubeSpinner {
     constructor() {
         this.overlay = null;
@@ -135,6 +147,7 @@ class KlubeSpinner {
     }
 
     init() {
+        // Criar overlay do spinner se não existir
         if (!document.querySelector('.spinner-overlay')) {
             this.overlay = document.createElement('div');
             this.overlay.className = 'spinner-overlay';
@@ -147,20 +160,20 @@ class KlubeSpinner {
 
     show() {
         this.overlay.classList.add('show');
-        document.body.style.overflow = 'hidden';
+        document.body.style.overflow = 'hidden'; // Prevenir scroll
     }
 
     hide() {
         this.overlay.classList.remove('show');
-        document.body.style.overflow = '';
+        document.body.style.overflow = ''; // Restaurar scroll
     }
 }
 
-// Criar instâncias globais
+// Instâncias globais
 window.KlubeToast = new KlubeToast();
 window.KlubeSpinner = new KlubeSpinner();
 
-// Funções de conveniência
+// Compatibilidade com código existente
 window.showToast = (message, type = 'info', options = {}) => {
     return window.KlubeToast.show(message, type, options);
 };
