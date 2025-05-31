@@ -2293,69 +2293,61 @@ public static function getAvailableStores() {
     * @return array Resultado da operação
     */
     public static function updateSettings($data) {
-        try {
-            // Verificar se é um administrador
-            if (!self::validateAdmin()) {
-                return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
-            }
-            
-            // CORREÇÃO: Validar apenas cliente e admin, loja sempre será 0
-            $requiredFields = ['porcentagem_cliente', 'porcentagem_admin'];
-            foreach ($requiredFields as $field) {
-                if (!isset($data[$field]) || !is_numeric($data[$field])) {
-                    return ['status' => false, 'message' => 'Campos inválidos ou incompletos.'];
-                }
-                
-                // Converter para float
-                $data[$field] = floatval($data[$field]);
-                
-                // Validar valores
-                if ($data[$field] < 0 || $data[$field] > 100) {
-                    return ['status' => false, 'message' => 'Porcentagens devem estar entre 0 e 100.'];
-                }
-            }
-            
-            // CORREÇÃO: Forçar porcentagem da loja como 0
-            $data['porcentagem_loja'] = 0.00;
-            
-            // CORREÇÃO: Calcular total apenas com cliente + admin
-            $porcentagemTotal = $data['porcentagem_cliente'] + $data['porcentagem_admin'];
-            
-            // CORREÇÃO: Validar que o total seja 10%
-            if (abs($porcentagemTotal - 10.00) > 0.01) {
-                // Ajustar proporcionalmente para somar 10%
-                $fator = 10.00 / $porcentagemTotal;
-                $data['porcentagem_cliente'] = round($data['porcentagem_cliente'] * $fator, 2);
-                $data['porcentagem_admin'] = round($data['porcentagem_admin'] * $fator, 2);
-                $porcentagemTotal = 10.00;
-            }
-            
-            $db = Database::getConnection();
-            
-            // Verificar se a tabela existe
-            self::createSettingsTableIfNotExists($db);
-            
-            // Inserir novas configurações
-            $stmt = $db->prepare("
-                INSERT INTO configuracoes_cashback (
-                    porcentagem_total, porcentagem_cliente, porcentagem_admin, porcentagem_loja, data_atualizacao
-                ) VALUES (
-                    :porcentagem_total, :porcentagem_cliente, :porcentagem_admin, 0.00, NOW()
-                )
-            ");
-            
-            $stmt->bindParam(':porcentagem_total', $porcentagemTotal);
-            $stmt->bindParam(':porcentagem_cliente', $data['porcentagem_cliente']);
-            $stmt->bindParam(':porcentagem_admin', $data['porcentagem_admin']);
-            $stmt->execute();
-            
-            return ['status' => true, 'message' => 'Configurações atualizadas com sucesso.'];
-            
-        } catch (PDOException $e) {
-            error_log('Erro ao atualizar configurações: ' . $e->getMessage());
-            return ['status' => false, 'message' => 'Erro ao atualizar configurações. Tente novamente.'];
+    try {
+        // Verificar se é um administrador
+        if (!self::validateAdmin()) {
+            return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
         }
+        
+        // Validar apenas cliente e admin, loja sempre será 0
+        $requiredFields = ['porcentagem_cliente', 'porcentagem_admin'];
+        foreach ($requiredFields as $field) {
+            if (!isset($data[$field]) || !is_numeric($data[$field])) {
+                return ['status' => false, 'message' => 'Campos inválidos ou incompletos.'];
+            }
+            
+            $data[$field] = floatval($data[$field]);
+            
+            if ($data[$field] < 0 || $data[$field] > 10) {
+                return ['status' => false, 'message' => 'Porcentagens devem estar entre 0 e 10.'];
+            }
+        }
+        
+        // Forçar porcentagem da loja como 0
+        $data['porcentagem_loja'] = 0.00;
+        
+        // Calcular total e validar que seja exatamente 10%
+        $porcentagemTotal = $data['porcentagem_cliente'] + $data['porcentagem_admin'];
+        
+        if (abs($porcentagemTotal - 10.00) > 0.01) {
+            return ['status' => false, 'message' => 'A soma das porcentagens deve ser exatamente 10% (cliente + admin).'];
+        }
+        
+        $db = Database::getConnection();
+        
+        // Verificar se a tabela existe
+        self::createSettingsTableIfNotExists($db);
+        
+        // Inserir novas configurações
+        $stmt = $db->prepare("
+            INSERT INTO configuracoes_cashback (
+                porcentagem_cliente, porcentagem_admin, porcentagem_loja, data_atualizacao
+            ) VALUES (
+                :porcentagem_cliente, :porcentagem_admin, 0.00, NOW()
+            )
+        ");
+        
+        $stmt->bindParam(':porcentagem_cliente', $data['porcentagem_cliente']);
+        $stmt->bindParam(':porcentagem_admin', $data['porcentagem_admin']);
+        $stmt->execute();
+        
+        return ['status' => true, 'message' => 'Configurações atualizadas com sucesso.'];
+        
+    } catch (PDOException $e) {
+        error_log('Erro ao atualizar configurações: ' . $e->getMessage());
+        return ['status' => false, 'message' => 'Erro ao atualizar configurações. Tente novamente.'];
     }
+}
     /**
     * Obtém dados completos para relatórios financeiros
     * 

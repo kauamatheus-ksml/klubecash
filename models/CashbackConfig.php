@@ -148,7 +148,7 @@ class CashbackConfig {
     */
     private function validarPorcentagens() {
         // Verificar se todas as porcentagens são números positivos
-        if ($this->porcentagemCliente < 0 || $this->porcentagemAdmin < 0 || $this->porcentagemLoja < 0) {
+        if ($this->porcentagemCliente < 0 || $this->porcentagemAdmin < 0) {
             return false;
         }
         
@@ -157,9 +157,9 @@ class CashbackConfig {
             return false;
         }
         
-        // Verificar se a soma cliente + admin não ultrapassa 100%
+        // Verificar se a soma cliente + admin é exatamente 10%
         $total = $this->porcentagemCliente + $this->porcentagemAdmin;
-        return $total <= 100;
+        return abs($total - 10.00) <= 0.01;
     }
     
     /**
@@ -308,15 +308,15 @@ class CashbackConfig {
         // Forçar porcentagem da loja como 0
         $porcentagemLoja = 0.00;
         
-        // Validar que a soma não ultrapassa 100%
-        $total = $porcentagemCliente + $porcentagemAdmin; // Não incluir loja
-        if ($total > 100) {
+        // Validar que a soma seja exatamente 10%
+        $total = $porcentagemCliente + $porcentagemAdmin;
+        if (abs($total - 10.00) > 0.01) {
             return false;
         }
         
         $this->porcentagemCliente = $porcentagemCliente;
         $this->porcentagemAdmin = $porcentagemAdmin;
-        $this->porcentagemLoja = 0.00; // Sempre 0
+        $this->porcentagemLoja = 0.00;
         
         return true;
     }

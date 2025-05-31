@@ -300,7 +300,6 @@ try {
                 </div>
             <?php endif; ?>
             
-            <!-- Configurações de Cashback -->
             <form method="post" action="" id="cashbackForm">
                 <input type="hidden" name="action" value="update_cashback">
                 <div class="card">
@@ -308,44 +307,31 @@ try {
                         <h2 class="card-title">Configurações de Cashback</h2>
                     </div>
                     <div class="card-body">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label class="form-label" for="porcentagemTotal">Porcentagem Total de Cashback</label>
-                                <input type="number" step="0.01" min="0" max="100" class="form-control" id="porcentagemTotal" name="porcentagem_total" value="<?php echo $settings['porcentagem_total']; ?>" required>
-                                <small class="form-text">Porcentagem total aplicada sobre o valor da compra</small>
+                        <!-- REMOVIDO: Campo porcentagem total - sempre será 10% -->
+                        <div class="info-box">
+                            <div class="info-icon">ℹ️</div>
+                            <div class="info-content">
+                                <strong>Informação importante:</strong> A comissão total é sempre 10% sobre cada venda. 
+                                Esta porcentagem é distribuída entre cliente e plataforma. A loja não recebe cashback.
                             </div>
                         </div>
                         
-                        <div class="form-divider"></div>
-                        
                         <div class="form-row">
                             <div class="form-group">
-                                <label class="form-label" for="porcentagemCliente">Porcentagem para o Cliente</label>
-                                <input type="number" step="0.01" min="0" max="100" class="form-control" id="porcentagemCliente" name="porcentagem_cliente" value="<?php echo $settings['porcentagem_cliente']; ?>" required>
+                                <label class="form-label" for="porcentagemCliente">Porcentagem para o Cliente (%)</label>
+                                <input type="number" step="0.01" min="0" max="10" class="form-control" id="porcentagemCliente" name="porcentagem_cliente" value="<?php echo $settings['porcentagem_cliente']; ?>" required>
                                 <small class="form-text">Parte do cashback que vai para o cliente</small>
                             </div>
                             
                             <div class="form-group">
-                                <label class="form-label" for="porcentagemAdmin">Porcentagem para o Admin</label>
-                                <input type="number" step="0.01" min="0" max="100" class="form-control" id="porcentagemAdmin" name="porcentagem_admin" value="<?php echo $settings['porcentagem_admin']; ?>" required>
-                                <small class="form-text">Parte do cashback que vai para a plataforma (comissão)</small>
-                            </div>
-                            
-                            <!-- REMOVIDO: Campo da porcentagem da loja -->
-                            <!-- A loja não recebe cashback, apenas paga a comissão -->
-                        </div>
-
-                        <!-- ADICIONADO: Informação sobre a loja -->
-                        <div class="info-box">
-                            <div class="info-icon">ℹ️</div>
-                            <div class="info-content">
-                                <strong>Informação importante:</strong> A loja parceira não recebe cashback. 
-                                Ela paga uma comissão de 10% sobre cada venda, que é distribuída entre cliente (5%) e plataforma (5%).
+                                <label class="form-label" for="porcentagemAdmin">Porcentagem para a Plataforma (%)</label>
+                                <input type="number" step="0.01" min="0" max="10" class="form-control" id="porcentagemAdmin" name="porcentagem_admin" value="<?php echo $settings['porcentagem_admin']; ?>" required>
+                                <small class="form-text">Parte da comissão que fica para a plataforma</small>
                             </div>
                         </div>
                         
                         <p class="form-text" id="somaInfo">
-                            A soma das porcentagens (cliente + admin) deve ser igual à porcentagem total.
+                            A soma deve ser exatamente <strong>10%</strong> (cliente + plataforma).
                             <strong>Soma atual: <span id="somaAtual">0.00</span>%</strong>
                         </p>
                         
@@ -588,59 +574,49 @@ try {
         function updateSoma() {
             const porcentagemCliente = parseFloat(document.getElementById('porcentagemCliente').value) || 0;
             const porcentagemAdmin = parseFloat(document.getElementById('porcentagemAdmin').value) || 0;
-            // REMOVIDO: porcentagemLoja
             
-            const soma = porcentagemCliente + porcentagemAdmin; // Apenas cliente + admin
+            const soma = porcentagemCliente + porcentagemAdmin;
             document.getElementById('somaAtual').textContent = soma.toFixed(2);
             
-            // Verificar se soma é igual à porcentagem total
-            const porcentagemTotal = parseFloat(document.getElementById('porcentagemTotal').value) || 0;
+            // Verificar se soma é exatamente 10%
             const somaInfo = document.getElementById('somaInfo');
             
-            if (Math.abs(soma - porcentagemTotal) > 0.01) {
+            if (Math.abs(soma - 10.00) > 0.01) {
                 somaInfo.style.color = 'var(--danger-color)';
             } else {
                 somaInfo.style.color = 'var(--success-color)';
             }
         }
 
-        // Adicionar eventos para campos de porcentagem
-        document.getElementById('porcentagemTotal').addEventListener('input', updateSoma);
+        // Eventos
         document.getElementById('porcentagemCliente').addEventListener('input', updateSoma);
         document.getElementById('porcentagemAdmin').addEventListener('input', updateSoma);
-        // REMOVIDO: evento para porcentagemLoja
-        
-        // Inicializar soma
+
+        // Inicializar
         document.addEventListener('DOMContentLoaded', updateSoma);
         
         // Validar formulário de cashback antes de enviar
         // Validar formulário de cashback antes de enviar
         document.getElementById('cashbackForm').addEventListener('submit', function(event) {
-            const porcentagemTotal = parseFloat(document.getElementById('porcentagemTotal').value);
             const porcentagemCliente = parseFloat(document.getElementById('porcentagemCliente').value);
             const porcentagemAdmin = parseFloat(document.getElementById('porcentagemAdmin').value);
-            // REMOVIDO: porcentagemLoja
             
-            // Verificar se valores são válidos
-            if (isNaN(porcentagemTotal) || isNaN(porcentagemCliente) || isNaN(porcentagemAdmin)) {
+            if (isNaN(porcentagemCliente) || isNaN(porcentagemAdmin)) {
                 alert('Por favor, preencha todos os campos com valores numéricos válidos.');
                 event.preventDefault();
                 return false;
             }
             
-            // Verificar se porcentagens estão entre 0 e 100
-            if (porcentagemTotal < 0 || porcentagemTotal > 100 || 
-                porcentagemCliente < 0 || porcentagemCliente > 100 || 
-                porcentagemAdmin < 0 || porcentagemAdmin > 100) {
-                alert('As porcentagens devem estar entre 0 e 100.');
+            if (porcentagemCliente < 0 || porcentagemCliente > 10 || 
+                porcentagemAdmin < 0 || porcentagemAdmin > 10) {
+                alert('As porcentagens devem estar entre 0 e 10.');
                 event.preventDefault();
                 return false;
             }
             
-            // CORREÇÃO: Verificar se a soma das porcentagens (apenas cliente + admin) é igual à porcentagem total
             const soma = porcentagemCliente + porcentagemAdmin;
-            if (Math.abs(soma - porcentagemTotal) > 0.01) {
-                alert('A soma das porcentagens (cliente + admin) deve ser igual à porcentagem total.');
+            if (Math.abs(soma - 10.00) > 0.01) {
+                alert('A soma das porcentagens deve ser exatamente 10%.');
                 event.preventDefault();
                 return false;
             }
