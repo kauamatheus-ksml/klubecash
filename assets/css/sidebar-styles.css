@@ -224,7 +224,7 @@
 /* Responsividade - CORREÇÕES PRINCIPAIS */
 @media (max-width: 768px) {
     .sidebar {
-        height: 850px;
+        height: 800px;
         width: 300px; /* REDUZIDO de 320px para 300px */
         transform: translateX(-100%);
         box-shadow: var(--shadow-medium);
