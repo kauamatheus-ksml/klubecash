@@ -13,7 +13,7 @@
     --border-radius-small: 8px;
     --font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    --sidebar-width: 280px; /* Definir como variável */
+    --sidebar-width: 250px; /* VOLTA PARA 250px COMO ESTAVA ORIGINALMENTE */
 }
 
 /* Reset e estilos gerais */
@@ -155,12 +155,8 @@
     height: 18px;
 }
 
-/* Container principal - CORREÇÃO PRINCIPAL */
-.main-content {
-    margin-left: var(--sidebar-width); /* CORRIGIDO: era 25px, agora usa a variável */
-    transition: var(--transition);
-    min-height: 100vh;
-}
+/* Container principal - REMOVIDO DAQUI */
+/* Não definir .main-content aqui para evitar conflitos */
 
 /* Toggle da Sidebar para Mobile */
 .sidebar-toggle {
@@ -224,10 +220,6 @@
     
     .sidebar.open {
         transform: translateX(0);
-    }
-    
-    .main-content {
-        margin-left: 0; /* No mobile, sem margin */
     }
     
     .sidebar-toggle {
