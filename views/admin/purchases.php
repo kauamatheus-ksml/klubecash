@@ -750,6 +750,7 @@ function buildQueryString($exclude = []) {
             });
         }
 
+
         function renderTransactionDetailsWithBalance(transaction) {
             // Garantir que os valores sejam números
             const valorOriginal = parseFloat(transaction.valor_total) || 0;
