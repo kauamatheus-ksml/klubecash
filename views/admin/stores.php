@@ -64,7 +64,7 @@ try {
     
     // Fallback: tentar método mais simples
     try {
-        $result = AdminController::manageStores($filters, $page);
+        $result = AdminController::manageStoresWithBalance($filters, $page);
         
         if ($result['status']) {
             $stores = $result['data']['lojas'] ?? [];
