@@ -29,7 +29,7 @@ if (!empty($status)) $filters['status'] = strtolower($status);
 if (!empty($category)) $filters['categoria'] = $category;
 
 try {
-    // Tentar carregar dados com o método corrigido
+    // CORRIGIDO: Usar o método correto que funciona
     $result = AdminController::manageStoresWithBalance($filters, $page);
     
     if (!$result['status']) {
@@ -42,6 +42,22 @@ try {
     $pagination = $result['data']['paginacao'] ?? [];
     $hasError = false;
     $errorMessage = '';
+    
+    // Debug para confirmar (remover depois)
+    error_log("STORES.PHP - Total lojas: " . count($stores));
+    error_log("STORES.PHP - Estatísticas: " . json_encode($statistics));
+    
+} catch (Exception $e) {
+    error_log("Erro em stores.php: " . $e->getMessage());
+    
+    // Fallback: NÃO usar manageStores, é o método antigo
+    $hasError = true;
+    $errorMessage = 'Erro ao carregar dados das lojas: ' . $e->getMessage();
+    $stores = [];
+    $statistics = [];
+    $categories = [];
+    $pagination = [];
+
     
 } catch (Exception $e) {
     error_log("Erro em stores.php: " . $e->getMessage());
