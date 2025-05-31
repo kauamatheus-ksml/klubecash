@@ -565,59 +565,6 @@ try {
     
     <!-- JavaScript -->
     <script src="../../assets/js/admin/users.js"></script>
-    <script>
-// Script de diagnóstico - remover após corrigir
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('=== DIAGNÓSTICO DOS ÍCONES ===');
     
-    // Verificar se Font Awesome carregou
-    const testIcon = document.createElement('i');
-    testIcon.className = 'fas fa-heart';
-    document.body.appendChild(testIcon);
-    
-    setTimeout(() => {
-        const styles = window.getComputedStyle(testIcon, ':before');
-        const content = styles.getPropertyValue('content');
-        
-        if (content && content !== 'none' && content !== '""') {
-            console.log('✅ Font Awesome carregado com sucesso');
-        } else {
-            console.log('❌ Font Awesome NÃO carregou');
-            console.log('Aplicando correção alternativa...');
-            
-            // Aplicar ícones alternativos se Font Awesome falhar
-            document.querySelectorAll('.action-btn').forEach(btn => {
-                const icon = btn.querySelector('i');
-                if (icon) {
-                    if (icon.classList.contains('fa-edit')) {
-                        btn.innerHTML = '✏️';
-                    } else if (icon.classList.contains('fa-eye')) {
-                        btn.innerHTML = '👁️';
-                    } else if (icon.classList.contains('fa-check')) {
-                        btn.innerHTML = '✅';
-                    } else if (icon.classList.contains('fa-pause')) {
-                        btn.innerHTML = '⏸️';
-                    }
-                }
-            });
-        }
-        
-        document.body.removeChild(testIcon);
-    }, 100);
-    
-    // Verificar se os botões existem
-    const actionBtns = document.querySelectorAll('.action-btn');
-    console.log(`Encontrados ${actionBtns.length} botões de ação`);
-    
-    actionBtns.forEach((btn, index) => {
-        const icon = btn.querySelector('i');
-        console.log(`Botão ${index + 1}:`, {
-            classes: btn.className,
-            hasIcon: !!icon,
-            iconClasses: icon ? icon.className : 'sem ícone'
-        });
-    });
-});
-</script>
 </body>
 </html>
