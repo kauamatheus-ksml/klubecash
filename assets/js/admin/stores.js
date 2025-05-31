@@ -837,3 +837,34 @@ function testAjaxConnection() {
 document.addEventListener('DOMContentLoaded', function() {
     setTimeout(testAjaxConnection, 1000); // Testar após 1 segundo
 });
+
+
+
+
+
+
+
+// Função para testar conexão - adicionar no final do arquivo
+function debugConnection() {
+    console.log('🔍 Testando conexão com servidor...');
+    
+    makeRequest('test_connection')
+        .then(data => {
+            console.log('✅ Conexão OK:', data);
+            showNotification('Conexão funcionando!', 'success');
+        })
+        .catch(error => {
+            console.error('❌ Erro de conexão:', error);
+            showNotification('Erro de conexão: ' + error.message, 'error');
+        });
+}
+
+// Executar teste automaticamente se houver problemas
+document.addEventListener('DOMContentLoaded', function() {
+    // Verificar se a página carregou com erro
+    const hasError = document.querySelector('.alert-danger');
+    if (hasError) {
+        console.log('⚠️ Erro detectado na página, testando conexão...');
+        setTimeout(debugConnection, 2000);
+    }
+});
