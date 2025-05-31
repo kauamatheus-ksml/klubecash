@@ -395,75 +395,50 @@ public static function manageTransactionsWithBalance($filters = [], $page = 1) {
 }
 
     /**
-     * Obtém detalhes de uma transação com informações de saldo
-     * 
-     * @param int $transactionId ID da transação
-     * @return array Detalhes da transação
-     */
-    public static function getTransactionDetailsWithBalance($transactionId) {
-        try {
-            // Verificar se o usuário está autenticado e é administrador
-            if (!AuthController::isAuthenticated() || !AuthController::isAdmin()) {
-                return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
-            }
-            
-            $db = Database::getConnection();
-            
-            // Buscar detalhes completos da transação com informações de saldo
-            $stmt = $db->prepare("
-                SELECT 
-                    t.*, 
-                    u.nome as cliente_nome, 
-                    u.email as cliente_email,
-                    l.nome_fantasia as loja_nome,
-                    l.categoria as loja_categoria,
-                    pc.id as pagamento_id, 
-                    pc.status as status_pagamento,
-                    pc.metodo_pagamento,
-                    pc.numero_referencia,
-                    pc.data_aprovacao as data_pagamento,
-                    COALESCE(tsu.valor_usado, 0) as saldo_usado
-                FROM transacoes_cashback t
-                JOIN usuarios u ON t.usuario_id = u.id
-                JOIN lojas l ON t.loja_id = l.id
-                LEFT JOIN pagamentos_transacoes pt ON t.id = pt.transacao_id
-                LEFT JOIN pagamentos_comissao pc ON pt.pagamento_id = pc.id
-                LEFT JOIN transacoes_saldo_usado tsu ON t.id = tsu.transacao_id
-                WHERE t.id = ?
-            ");
-            
-            $stmt->execute([$transactionId]);
-            $transaction = $stmt->fetch(PDO::FETCH_ASSOC);
-            
-            if (!$transaction) {
-                return ['status' => false, 'message' => 'Transação não encontrada.'];
-            }
-            
-            // Buscar movimentações de cashback relacionadas
-            $movStmt = $db->prepare("
-                SELECT 
-                    cm.*,
-                    'cashback' as origem
-                FROM cashback_movimentacoes cm
-                WHERE cm.transacao_origem_id = ? OR cm.transacao_uso_id = ?
-                ORDER BY cm.data_operacao DESC
-            ");
-            
-            $movStmt->execute([$transactionId, $transactionId]);
-            $movimentacoes = $movStmt->fetchAll(PDO::FETCH_ASSOC);
-            
-            $transaction['movimentacoes'] = $movimentacoes;
-            
-            return [
-                'status' => true,
-                'data' => $transaction
-            ];
-            
-        } catch (PDOException $e) {
-            error_log('Erro ao obter detalhes da transação com saldo: ' . $e->getMessage());
-            return ['status' => false, 'message' => 'Erro ao obter detalhes da transação.'];
+ * Obtém detalhes de transação com saldo usado
+ */
+public static function getTransactionDetailsWithBalance($transactionId) {
+    try {
+        if (!AuthController::isAuthenticated() || !AuthController::isAdmin()) {
+            return ['status' => false, 'message' => 'Acesso negado'];
         }
-    }    
+        
+        $db = Database::getConnection();
+        
+        $stmt = $db->prepare("
+            SELECT 
+                t.*, 
+                u.nome as cliente_nome, 
+                u.email as cliente_email,
+                l.nome_fantasia as loja_nome,
+                COALESCE(tsu.valor_usado, 0) as saldo_usado,
+                pc.id as pagamento_id,
+                pc.status as status_pagamento,
+                pc.metodo_pagamento,
+                pc.data_aprovacao as data_pagamento
+            FROM transacoes_cashback t
+            JOIN usuarios u ON t.usuario_id = u.id
+            JOIN lojas l ON t.loja_id = l.id
+            LEFT JOIN transacoes_saldo_usado tsu ON t.id = tsu.transacao_id
+            LEFT JOIN pagamentos_transacoes pt ON t.id = pt.transacao_id
+            LEFT JOIN pagamentos_comissao pc ON pt.pagamento_id = pc.id
+            WHERE t.id = ?
+        ");
+        
+        $stmt->execute([$transactionId]);
+        $transaction = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$transaction) {
+            return ['status' => false, 'message' => 'Transação não encontrada'];
+        }
+        
+        return ['status' => true, 'data' => $transaction];
+        
+    } catch (Exception $e) {
+        error_log('Erro getTransactionDetailsWithBalance: ' . $e->getMessage());
+        return ['status' => false, 'message' => 'Erro interno'];
+    }
+}
 
     /**
      * Gerencia usuários do sistema
@@ -2474,16 +2449,17 @@ public static function getAvailableStores() {
                     break;
 
                 case 'transaction_details_with_balance':
-                    $transactionId = isset($_POST['transaction_id']) ? intval($_POST['transaction_id']) : 0;
+                    $transactionId = intval($_POST['transaction_id'] ?? 0);
                     if ($transactionId <= 0) {
-                        echo json_encode(['status' => false, 'message' => 'ID da transação inválido']);
-                        return;
+                        echo json_encode(['status' => false, 'message' => 'ID inválido']);
+                        exit;
                     }
-                    
-                    $result = AdminController::getTransactionDetailsWithBalance($transactionId);
+
+                    $result = self::getTransactionDetailsWithBalance($transactionId);
+                    header('Content-Type: application/json');
                     echo json_encode($result);
-                    break;
-                    
+                    exit;
+
                 case 'store_details':
                     // Forçar output JSON
                     ob_clean();
