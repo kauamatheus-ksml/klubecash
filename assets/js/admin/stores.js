@@ -502,8 +502,8 @@ function bulkApprove() {
 // ========== FUNÇÕES UTILITÁRIAS ==========
 
 function makeRequest(action, data = {}, method = 'POST') {
-    // URL absoluta para evitar problemas de redirecionamento
-    const url = '/controllers/AdminController.php';
+    // Usar a rota AJAX específica
+     const url = '/admin/ajax/stores-direct';
     
     let body;
     let headers = {};
@@ -523,13 +523,13 @@ function makeRequest(action, data = {}, method = 'POST') {
         body = params.toString();
     }
     
-    console.log('Making request to:', url, 'Action:', action, 'Data:', data);
+    console.log('Making request to:', url, 'Action:', action);
     
     return fetch(url, {
         method: method,
         headers: headers,
         body: body,
-        credentials: 'same-origin' // Importante para manter a sessão
+        credentials: 'same-origin'
     })
     .then(response => {
         console.log('Response status:', response.status, response.statusText);
@@ -540,7 +540,14 @@ function makeRequest(action, data = {}, method = 'POST') {
         return response.text();
     })
     .then(text => {
-        console.log('Response text (first 500 chars):', text.substring(0, 500));
+        console.log('Response received, length:', text.length);
+        console.log('First 200 chars:', text.substring(0, 200));
+        
+        // Verificar se a resposta começa com HTML
+        if (text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html')) {
+            console.error('Received HTML instead of JSON:', text.substring(0, 500));
+            throw new Error('Servidor retornou HTML em vez de JSON - verifique autenticação');
+        }
         
         try {
             return JSON.parse(text);
@@ -809,3 +816,24 @@ if (!document.getElementById('notification-styles')) {
     style.textContent = notificationStyles;
     document.head.appendChild(style);
 }
+
+
+// Função para testar AJAX - adicionar no final do arquivo
+function testAjaxConnection() {
+    console.log('Testando conexão AJAX...');
+    
+    makeRequest('test_ajax')
+        .then(data => {
+            console.log('✅ AJAX funcionando:', data);
+            showNotification('Conexão AJAX funcionando!', 'success');
+        })
+        .catch(error => {
+            console.error('❌ Erro AJAX:', error);
+            showNotification('Erro na conexão AJAX: ' + error.message, 'error');
+        });
+}
+
+// Executar teste ao carregar a página
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(testAjaxConnection, 1000); // Testar após 1 segundo
+});

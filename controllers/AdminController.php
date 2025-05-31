@@ -8,26 +8,38 @@ require_once __DIR__ . '/../utils/Validator.php';
 require_once __DIR__ . '/AuthController.php';
 
 
-// Verificar se é uma requisição AJAX
-$isAjax = (
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Verificar se é uma requisição AJAX válida
+$isAjaxRequest = (
+    isset($_POST['action']) || 
+    isset($_GET['action']) ||
     !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && 
     strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest'
-) || isset($_POST['action']) || isset($_GET['action']);
+);
 
-// Se não for AJAX e acessar diretamente, redirecionar
-if (!$isAjax && basename($_SERVER['PHP_SELF']) === 'AdminController.php') {
-    // Verificar se o usuário está autenticado
-    session_start();
+// Se for acesso direto ao arquivo (não AJAX), redirecionar
+if (!$isAjaxRequest && basename($_SERVER['PHP_SELF']) === 'AdminController.php') {
+    // Verificar autenticação
     if (!isset($_SESSION['user_id']) || $_SESSION['user_type'] !== USER_TYPE_ADMIN) {
-        header('Location: ' . LOGIN_URL . '?error=' . urlencode('Você precisa fazer login para acessar esta página.'));
-        exit;
+        header('Location: /login?error=' . urlencode('Você precisa fazer login.'));
+    } else {
+        header('Location: /admin/dashboard');
     }
-    
-    // Se está autenticado mas não é AJAX, ir para dashboard
-    header('Location: /admin/dashboard');
     exit;
 }
 
+// Verificar autenticação para requisições AJAX
+if ($isAjaxRequest) {
+    if (!isset($_SESSION['user_id']) || $_SESSION['user_type'] !== USER_TYPE_ADMIN) {
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode(['status' => false, 'message' => 'Sessão expirada. Faça login novamente.']);
+        exit;
+    }
+}
 
 // No início do arquivo, após os includes
 ini_set('display_errors', 0);
@@ -2463,7 +2475,16 @@ public static function getAvailableStores() {
                     }
                     exit;
                     break;
-                
+                case 'test_ajax':
+                    header('Content-Type: application/json; charset=UTF-8');
+                    echo json_encode([
+                        'status' => true,
+                        'message' => 'AJAX funcionando!',
+                        'timestamp' => date('Y-m-d H:i:s'),
+                        'user_id' => $_SESSION['user_id'] ?? null,
+                        'user_type' => $_SESSION['user_type'] ?? null
+                    ]);
+                    exit;
                 case 'test_connection':
                     header('Content-Type: application/json; charset=UTF-8');
 

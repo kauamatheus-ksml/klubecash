@@ -23,7 +23,12 @@ RewriteBase /
     Order Allow,Deny
     Deny from all
 </FilesMatch>
-
+# Rotas AJAX para administração - ADICIONAR NO INÍCIO
+RewriteRule ^admin/ajax/stores/?$ controllers/AdminController.php [L,QSA]
+RewriteRule ^admin/ajax/users/?$ controllers/AdminController.php [L,QSA]
+RewriteRule ^admin/ajax/transactions/?$ controllers/AdminController.php [L,QSA]
+# Rota específica para AJAX de lojas
+RewriteRule ^admin/ajax/stores-direct/?$ controllers/AjaxStoreController.php [L,QSA]
 # Evitar navegação em diretórios
 Options -Indexes
 
