@@ -561,7 +561,6 @@ public static function getUserDetails($userId) {
  */
 public static function manageStoresWithBalance($filters = [], $page = 1) {
     try {
-        // Verificar se é um administrador
         if (!AuthController::isAdmin()) {
             return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
         }
@@ -596,7 +595,7 @@ public static function manageStoresWithBalance($filters = [], $page = 1) {
         
         $whereClause = "WHERE " . implode(" AND ", $whereConditions);
         
-        // Query principal com informações de saldo
+        // QUERY CORRIGIDA - O problema estava aqui
         $query = "
             SELECT 
                 l.*,
@@ -626,14 +625,14 @@ public static function manageStoresWithBalance($filters = [], $page = 1) {
             ) saldo_info ON l.id = saldo_info.loja_id
             LEFT JOIN (
                 SELECT 
-                    loja_id,
-                    COUNT(*) as total_transacoes,
-                    COUNT(CASE WHEN tsu.valor_usado > 0 THEN 1 END) as transacoes_com_saldo,
+                    tc.loja_id,
+                    COUNT(DISTINCT tc.id) as total_transacoes,
+                    COUNT(DISTINCT CASE WHEN tsu.valor_usado > 0 THEN tc.id END) as transacoes_com_saldo,
                     COALESCE(SUM(tsu.valor_usado), 0) as total_saldo_usado
                 FROM transacoes_cashback tc
                 LEFT JOIN transacoes_saldo_usado tsu ON tc.id = tsu.transacao_id
                 WHERE tc.status = 'aprovado'
-                GROUP BY loja_id
+                GROUP BY tc.loja_id
             ) trans_info ON l.id = trans_info.loja_id
             $whereClause
             ORDER BY l.data_cadastro DESC
@@ -648,9 +647,12 @@ public static function manageStoresWithBalance($filters = [], $page = 1) {
         $stmt->execute($params);
         $stores = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
+        // Debug: vamos verificar os dados retornados
+        error_log("DEBUG - Lojas retornadas: " . json_encode($stores));
+        
         // Query para contar total de registros
         $countQuery = "
-            SELECT COUNT(*) as total
+            SELECT COUNT(DISTINCT l.id) as total
             FROM lojas l
             $whereClause
         ";
@@ -659,24 +661,28 @@ public static function manageStoresWithBalance($filters = [], $page = 1) {
         $countStmt->execute(array_slice($params, 0, -2)); // Remove limit e offset
         $totalCount = $countStmt->fetch(PDO::FETCH_ASSOC)['total'];
         
-        // Calcular estatísticas gerais
+        // ESTATÍSTICAS CORRIGIDAS
         $statsQuery = "
             SELECT 
                 COUNT(DISTINCT l.id) as total_lojas,
-                COUNT(DISTINCT CASE WHEN cs.saldo_disponivel > 0 THEN l.id END) as lojas_com_saldo,
+                COUNT(DISTINCT CASE WHEN cs.saldo_disponivel > 0 THEN cs.loja_id END) as lojas_com_saldo,
                 COALESCE(SUM(cs.saldo_disponivel), 0) as total_saldo_acumulado,
-                COALESCE(SUM(cm.valor), 0) as total_saldo_usado,
+                COALESCE(SUM(tsu.valor_usado), 0) as total_saldo_usado,
                 COUNT(DISTINCT CASE WHEN l.status = 'aprovado' THEN l.id END) as lojas_aprovadas,
                 COUNT(DISTINCT CASE WHEN l.status = 'pendente' THEN l.id END) as lojas_pendentes
             FROM lojas l
-            LEFT JOIN cashback_saldos cs ON l.id = cs.loja_id AND cs.saldo_disponivel > 0
-            LEFT JOIN cashback_movimentacoes cm ON l.id = cm.loja_id AND cm.tipo_operacao = 'uso'
+            LEFT JOIN cashback_saldos cs ON l.id = cs.loja_id
+            LEFT JOIN transacoes_cashback tc ON l.id = tc.loja_id AND tc.status = 'aprovado'
+            LEFT JOIN transacoes_saldo_usado tsu ON tc.id = tsu.transacao_id
             $whereClause
         ";
         
         $statsStmt = $db->prepare($statsQuery);
         $statsStmt->execute(array_slice($params, 0, -2)); // Remove limit e offset
         $statistics = $statsStmt->fetch(PDO::FETCH_ASSOC);
+        
+        // Debug das estatísticas
+        error_log("DEBUG - Estatísticas: " . json_encode($statistics));
         
         // Obter categorias distintas
         $categoriesQuery = "SELECT DISTINCT categoria FROM lojas WHERE categoria IS NOT NULL AND categoria != '' ORDER BY categoria";

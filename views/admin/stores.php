@@ -274,7 +274,7 @@ try {
                                         <td class="balance-info">
                                             <?php if ($store['total_saldo_clientes'] > 0): ?>
                                                 <div class="balance-amount">R$ <?php echo number_format($store['total_saldo_clientes'], 2, ',', '.'); ?></div>
-                                                <div class="balance-clients"><?php echo $store['clientes_com_saldo']; ?> clientes</div>
+                                                <div class="balance-clients"><?php echo $store['clientes_com_saldo']; ?> cliente<?php echo $store['clientes_com_saldo'] != 1 ? 's' : ''; ?></div>
                                             <?php else: ?>
                                                 <span class="no-balance">Sem saldo</span>
                                             <?php endif; ?>
