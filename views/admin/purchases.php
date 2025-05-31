@@ -694,8 +694,7 @@ function buildQueryString($exclude = []) {
             modal.style.display = 'block';
             content.innerHTML = '<div class="loading">Carregando...</div>';
             
-            // Usar o caminho absoluto correto
-            fetch('/controllers/AdminController.php', {
+            fetch('https://klubecash.com/controllers/AdminController.php', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
@@ -704,21 +703,16 @@ function buildQueryString($exclude = []) {
             })
             .then(response => response.text())
             .then(text => {
-                console.log('Resposta:', text);
-                
-                try {
-                    const data = JSON.parse(text);
-                    if (data.status) {
-                        renderTransactionDetailsWithBalance(data.data);
-                    } else {
-                        content.innerHTML = `<div class="alert alert-danger">Erro: ${data.message}</div>`;
-                    }
-                } catch (e) {
-                    content.innerHTML = `<div class="alert alert-danger">Erro de resposta do servidor</div>`;
-                }
+                // Mostrar resposta raw para debug
+                content.innerHTML = `
+                    <div style="background: #f0f0f0; padding: 10px; border-radius: 5px;">
+                        <h4>Debug - Resposta do servidor:</h4>
+                        <pre style="white-space: pre-wrap; font-size: 12px; max-height: 400px; overflow-y: auto;">${text}</pre>
+                    </div>
+                `;
             })
             .catch(error => {
-                content.innerHTML = `<div class="alert alert-danger">Erro de conexão</div>`;
+                content.innerHTML = `<div class="alert alert-danger">Erro: ${error.message}</div>`;
             });
         }
 

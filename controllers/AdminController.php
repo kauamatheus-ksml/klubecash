@@ -2449,34 +2449,25 @@ public static function getAvailableStores() {
                     break;
 
                 case 'transaction_details_with_balance':
-                    error_log("Executando transaction_details_with_balance");
-                    
+                    header('Content-Type: application/json');
+
                     $transactionId = intval($_POST['transaction_id'] ?? 0);
-                    error_log("Transaction ID: " . $transactionId);
-                    
+
                     if ($transactionId <= 0) {
                         echo json_encode(['status' => false, 'message' => 'ID inválido']);
                         exit;
                     }
-                    
-                    try {
-                        $db = Database::getConnection();
-                        $stmt = $db->prepare("SELECT * FROM transacoes_cashback WHERE id = ?");
-                        $stmt->execute([$transactionId]);
-                        $transaction = $stmt->fetch(PDO::FETCH_ASSOC);
-                        
-                        if (!$transaction) {
-                            echo json_encode(['status' => false, 'message' => 'Transação não encontrada']);
-                            exit;
-                        }
-                        
-                        echo json_encode(['status' => true, 'data' => $transaction]);
-                        
-                    } catch (Exception $e) {
-                        error_log("Erro: " . $e->getMessage());
-                        echo json_encode(['status' => false, 'message' => 'Erro: ' . $e->getMessage()]);
-                    }
+
+                    echo json_encode([
+                        'status' => true, 
+                        'data' => [
+                            'id' => $transactionId,
+                            'teste' => 'Funcionando!',
+                            'data_atual' => date('Y-m-d H:i:s')
+                        ]
+                    ]);
                     exit;
+                    break;
 
                 case 'store_details':
                     // Forçar output JSON
