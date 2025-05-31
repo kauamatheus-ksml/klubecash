@@ -76,6 +76,7 @@ function getStatusBadge($status) {
     <title>Detalhes da Transação #<?php echo $transactionId; ?> - Klube Cash</title>
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
     <link rel="stylesheet" href="../../assets/css/views/admin/dashboard.css">
+    <link rel="stylesheet" href="../../assets/css/layout-fix.css">
     <link rel="stylesheet" href="../../assets/css/views/admin/transactions.css">
     
 </head>

@@ -285,6 +285,7 @@ try {
     <title>Configurações - Klube Cash</title>
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
     <link rel="stylesheet" href="../../assets/css/views/admin/settings.css">
+    <link rel="stylesheet" href="../../assets/css/layout-fix.css">
 </head>
 <body>
     <?php include_once '../components/sidebar.php'; ?>

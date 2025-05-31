@@ -95,6 +95,7 @@ function buildQueryString($exclude = []) {
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
     <link rel="stylesheet" href="../../assets/css/views/admin/dashboard.css">
     <link rel="stylesheet" href="../../assets/css/views/admin/purchases.css">
+    <link rel="stylesheet" href="../../assets/css/layout-fix.css">
     
 </head>
 <body>

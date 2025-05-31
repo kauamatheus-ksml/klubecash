@@ -157,6 +157,7 @@ try {
     <title>Dashboard - Klube Cash</title>
     <link rel="stylesheet" href="../../assets/css/views/admin/dashboard.css">
     <link rel="stylesheet" href="../../assets/css/views/admin/dashboard1.css">
+    <link rel="stylesheet" href="../../assets/css/layout-fix.css">
 </head>
 <body>
     <?php include_once '../components/sidebar.php'; ?>

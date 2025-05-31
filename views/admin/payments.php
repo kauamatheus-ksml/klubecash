@@ -242,6 +242,7 @@ if ($activeTab === 'balance') {
     <title>Gerenciar Pagamentos - Klube Cash</title>
     <link rel="stylesheet" href="../../assets/css/views/admin/dashboard.css">
     <link rel="stylesheet" href="../../assets/css/views/admin/payments.css">
+    <link rel="stylesheet" href="../../assets/css/layout-fix.css">
     <style>
         
 /* Estilos para as abas */

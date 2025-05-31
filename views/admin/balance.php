@@ -283,6 +283,7 @@ try {
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
     <title>Saldo da Administração - Klube Cash</title>
     <link rel="stylesheet" href="../../assets/css/views/admin/dashboard.css">
+    <link rel="stylesheet" href="../../assets/css/layout-fix.css">
     <link rel="stylesheet" href="../../assets/css/views/admin/balance.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>

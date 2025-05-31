@@ -96,6 +96,7 @@ try {
     <title>Gerenciar Lojas - Klube Cash</title>
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
     <link rel="stylesheet" href="../../assets/css/views/admin/stores.css">
+    <link rel="stylesheet" href="../../assets/css/layout-fix.css">
 </head>
 <body>
     <?php include_once '../components/sidebar.php'; ?>
