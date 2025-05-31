@@ -1,16 +1,21 @@
 :root {
     --primary-color: #FF7A00;
     --primary-light: #FFF0E6;
+    --primary-dark: #E06E00;
     --white: #FFFFFF;
-    --light-gray: #F5F5F5;
-    --dark-gray: #333333;
-    --medium-gray: #666666;
-    --border-radius: 15px;
-    --shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-    --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    --light-gray: #F8F9FA;
+    --medium-gray: #6C757D;
+    --dark-gray: #212529;
+    --border-color: #E9ECEF;
+    --shadow-light: 0 2px 10px rgba(0, 0, 0, 0.08);
+    --shadow-medium: 0 4px 20px rgba(0, 0, 0, 0.12);
+    --border-radius: 12px;
+    --border-radius-small: 8px;
+    --font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Reset e estilos gerais para o componente sidebar */
+/* Reset e estilos gerais */
 * {
     margin: 0;
     padding: 0;
@@ -18,67 +23,101 @@
     font-family: var(--font-family);
 }
 
-/* Sidebar */
+/* Sidebar Principal */
 .sidebar {
-    width: 250px;
+    width: 280px;
     height: 100vh;
-    background-color: var(--white);
+    background: linear-gradient(180deg, var(--white) 0%, #FCFCFC 100%);
     position: fixed;
     top: 0;
     left: 0;
-    z-index: 100;
-    transition: transform 0.3s ease;
-    border-right: 1px solid #EEEEEE;
+    z-index: 1000;
+    transition: var(--transition);
+    border-right: 1px solid var(--border-color);
+    box-shadow: var(--shadow-light);
+    display: flex;
+    flex-direction: column;
 }
 
+/* Header da Sidebar */
 .sidebar-header {
-    padding: 20px;
-    border-bottom: 1px solid #EEEEEE;
+    padding: 24px 20px;
+    border-bottom: 1px solid var(--border-color);
     display: flex;
     align-items: center;
+    background: var(--white);
+    min-height: 80px;
 }
 
 .sidebar-logo {
-    height: 40px;
+    height: 42px;
+    width: auto;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
 }
 
+/* Navegação */
 .sidebar-nav {
-    padding: 0;
+    padding: 16px 0;
     list-style: none;
+    flex: 1;
+    overflow-y: auto;
 }
 
 .sidebar-nav-item {
-    display: block;
-    padding: 15px 20px;
+    display: flex;
+    align-items: center;
+    padding: 14px 20px;
+    margin: 4px 16px;
     text-decoration: none;
-    color: var(--dark-gray);
-    border-left: 3px solid transparent;
-    transition: all 0.2s ease;
+    color: var(--medium-gray);
+    border-radius: var(--border-radius-small);
+    transition: var(--transition);
+    font-weight: 500;
+    font-size: 15px;
+    position: relative;
+    border: 1px solid transparent;
 }
 
 .sidebar-nav-item:hover {
-    background-color: var(--primary-light);
+    background: linear-gradient(135deg, var(--primary-light) 0%, #FFF5ED 100%);
     color: var(--primary-color);
+    border-color: rgba(255, 122, 0, 0.1);
+    transform: translateX(4px);
 }
 
 .sidebar-nav-item.active {
-    background-color: var(--primary-light);
-    color: var(--primary-color);
-    border-left-color: var(--primary-color);
+    background: linear-gradient(135deg, var(--primary-color) 0%, #FF8A1A 100%);
+    color: var(--white);
+    box-shadow: 0 4px 12px rgba(255, 122, 0, 0.3);
+    border-color: var(--primary-dark);
+}
+
+.sidebar-nav-item.active::before {
+    content: '';
+    position: absolute;
+    left: -16px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 4px;
+    height: 24px;
+    background: var(--primary-color);
+    border-radius: 0 4px 4px 0;
 }
 
 .sidebar-nav-item svg {
-    margin-right: 10px;
-    font-size: 18px;
-    vertical-align: middle;
+    margin-right: 12px;
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
 }
 
+/* Footer da Sidebar */
 .sidebar-footer {
-    position: absolute;
-    bottom: 0;
-    width: 100%;
     padding: 20px;
-    border-top: 1px solid #EEEEEE;
+    border-top: 1px solid var(--border-color);
+    background: var(--light-gray);
+    margin-top: auto;
 }
 
 .logout-btn {
@@ -86,59 +125,88 @@
     align-items: center;
     justify-content: center;
     width: 100%;
-    padding: 10px;
-    background-color: var(--primary-color);
+    padding: 14px 16px;
+    background: linear-gradient(135deg, var(--primary-color) 0%, #FF8A1A 100%);
     border: none;
-    border-radius: 8px;
+    border-radius: var(--border-radius);
     color: var(--white);
     font-weight: 600;
+    font-size: 15px;
     cursor: pointer;
-    transition: background-color 0.2s ease;
+    transition: var(--transition);
     text-decoration: none;
+    box-shadow: 0 2px 8px rgba(255, 122, 0, 0.2);
 }
 
 .logout-btn:hover {
-    background-color: #E06E00;
+    background: linear-gradient(135deg, var(--primary-dark) 0%, #D65F00 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(255, 122, 0, 0.3);
+}
+
+.logout-btn:active {
+    transform: translateY(0);
 }
 
 .logout-btn svg {
-    margin-right: 8px;
+    margin-right: 10px;
+    width: 18px;
+    height: 18px;
 }
 
-/* Container principal - ajuste para a sidebar */
+/* Container principal */
 .main-content {
-    
-    transition: padding-left 0.3s ease;
+    margin-left: 280px;
+    transition: var(--transition);
+    min-height: 100vh;
 }
 
-/* Mostrar/ocultar sidebar em dispositivos móveis */
+/* Toggle da Sidebar para Mobile */
 .sidebar-toggle {
     position: fixed;
     top: 20px;
     left: 20px;
-    width: 40px;
-    height: 40px;
-    background-color: var(--white);
-    border-radius: 8px;
-    display: flex;
+    width: 48px;
+    height: 48px;
+    background: var(--white);
+    border-radius: var(--border-radius);
+    display: none;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    box-shadow: var(--shadow);
-    z-index: 99;
-    display: none;
+    box-shadow: var(--shadow-medium);
+    z-index: 1001;
+    border: 1px solid var(--border-color);
+    transition: var(--transition);
 }
 
-/* Overlay para dispositivos móveis */
+.sidebar-toggle:hover {
+    background: var(--primary-light);
+    border-color: var(--primary-color);
+    transform: scale(1.05);
+}
+
+.sidebar-toggle svg {
+    color: var(--dark-gray);
+    transition: var(--transition);
+}
+
+.sidebar-toggle:hover svg {
+    color: var(--primary-color);
+}
+
+/* Overlay para Mobile */
 .overlay {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
-    z-index: 90;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 999;
     display: none;
+    backdrop-filter: blur(4px);
+    transition: var(--transition);
 }
 
 .overlay.active {
@@ -148,16 +216,111 @@
 /* Responsividade */
 @media (max-width: 768px) {
     .sidebar {
+        width: 320px;
         transform: translateX(-100%);
+        box-shadow: var(--shadow-medium);
     }
     
     .sidebar.open {
         transform: translateX(0);
     }
     
-    
+    .main-content {
+        margin-left: 0;
+    }
     
     .sidebar-toggle {
         display: flex;
     }
+    
+    /* Ajuste específico para o footer no mobile */
+    .sidebar-footer {
+        position: static;
+        margin-top: auto;
+        padding: 24px 20px;
+        background: var(--white);
+        border-top: 2px solid var(--border-color);
+    }
+    
+    .logout-btn {
+        padding: 16px;
+        font-size: 16px;
+        border-radius: var(--border-radius);
+    }
+    
+    /* Garantir que a sidebar tenha scroll interno se necessário */
+    .sidebar-nav {
+        flex: 1;
+        overflow-y: auto;
+        max-height: calc(100vh - 160px); /* Deixa espaço para header e footer */
+    }
+}
+
+/* Animações suaves */
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.sidebar-nav-item {
+    animation: slideIn 0.3s ease-out;
+}
+
+/* Melhorias para acessibilidade */
+.sidebar-nav-item:focus {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+.logout-btn:focus {
+    outline: 2px solid var(--white);
+    outline-offset: 2px;
+}
+
+/* Scrollbar customizada para a navegação */
+.sidebar-nav::-webkit-scrollbar {
+    width: 6px;
+}
+
+.sidebar-nav::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 3px;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb:hover {
+    background: var(--medium-gray);
+}
+
+/* Estados de loading */
+.sidebar-nav-item.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+/* Indicador de notificações (para futuras implementações) */
+.sidebar-nav-item .notification-badge {
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: #DC3545;
+    color: white;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
 }
