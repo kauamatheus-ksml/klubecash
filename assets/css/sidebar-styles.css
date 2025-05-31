@@ -13,6 +13,7 @@
     --border-radius-small: 8px;
     --font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --sidebar-width: 280px; /* Definir como variável */
 }
 
 /* Reset e estilos gerais */
@@ -25,7 +26,7 @@
 
 /* Sidebar Principal */
 .sidebar {
-    width: 280px;
+    width: var(--sidebar-width);
     height: 100vh;
     background: linear-gradient(180deg, var(--white) 0%, #FCFCFC 100%);
     position: fixed;
@@ -154,9 +155,9 @@
     height: 18px;
 }
 
-/* Container principal */
+/* Container principal - CORREÇÃO PRINCIPAL */
 .main-content {
-    margin-left: 25px;
+    margin-left: var(--sidebar-width); /* CORRIGIDO: era 25px, agora usa a variável */
     transition: var(--transition);
     min-height: 100vh;
 }
@@ -226,7 +227,7 @@
     }
     
     .main-content {
-        margin-left: 0;
+        margin-left: 0; /* No mobile, sem margin */
     }
     
     .sidebar-toggle {
