@@ -106,6 +106,12 @@ RewriteRule ^admin/usuarios/([0-9]+)/?$ views/admin/user-details.php?id=$1 [L]
 RewriteRule ^admin/usuarios/editar/([0-9]+)/?$ views/admin/users.php?edit=$1 [L]
 RewriteRule ^admin/usuarios/novo/?$ views/admin/users.php?new=1 [L]
 
+# Permitir acesso direto aos controladores para AJAX
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteCond %{REQUEST_URI} /controllers/.*\.php$ [NC]
+RewriteRule ^(.*)$ - [L]
+
+
 # API routes para usuários
 RewriteRule ^api/users/?$ api/users.php [L,QSA]
 RewriteRule ^api/users/([0-9]+)/?$ api/users.php?id=$1 [L,QSA]

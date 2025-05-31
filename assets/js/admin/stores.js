@@ -125,9 +125,19 @@ function loadStoreData(storeId) {
 }
 
 function loadStoreDetails(storeId) {
-    // Primeiro tentar com o método simples
-    makeRequest('store_details', { store_id: storeId })
+    // Primeiro testar a conexão
+    console.log('Testando conexão antes de carregar detalhes...');
+    
+    makeRequest('test_store_connection')
+        .then(testData => {
+            console.log('Teste de conexão:', testData);
+            
+            // Se o teste passou, carregar os detalhes
+            return makeRequest('store_details', { store_id: storeId });
+        })
         .then(data => {
+            console.log('Dados da loja recebidos:', data);
+            
             if (data.status && data.data && data.data.loja) {
                 renderStoreDetailsSimple(data.data);
             } else {
@@ -136,7 +146,7 @@ function loadStoreDetails(storeId) {
             }
         })
         .catch(error => {
-            console.error('Erro:', error);
+            console.error('Erro completo:', error);
             document.getElementById('storeDetailsContent').innerHTML = 
                 `<div class="alert alert-danger">Erro ao carregar detalhes: ${error.message}</div>`;
         });
@@ -492,7 +502,8 @@ function bulkApprove() {
 // ========== FUNÇÕES UTILITÁRIAS ==========
 
 function makeRequest(action, data = {}, method = 'POST') {
-    const url = '../../controllers/AdminController.php';
+    // URL absoluta para evitar problemas de redirecionamento
+    const url = '/controllers/AdminController.php';
     
     let body;
     let headers = {};
@@ -512,22 +523,29 @@ function makeRequest(action, data = {}, method = 'POST') {
         body = params.toString();
     }
     
+    console.log('Making request to:', url, 'Action:', action, 'Data:', data);
+    
     return fetch(url, {
         method: method,
         headers: headers,
-        body: body
+        body: body,
+        credentials: 'same-origin' // Importante para manter a sessão
     })
     .then(response => {
+        console.log('Response status:', response.status, response.statusText);
+        
         if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
         return response.text();
     })
     .then(text => {
+        console.log('Response text (first 500 chars):', text.substring(0, 500));
+        
         try {
             return JSON.parse(text);
         } catch (e) {
-            console.error('Response text:', text);
+            console.error('Response is not JSON:', text);
             throw new Error('Resposta inválida do servidor');
         }
     });

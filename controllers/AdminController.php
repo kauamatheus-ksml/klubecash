@@ -6,6 +6,29 @@ require_once __DIR__ . '/../config/constants.php';
 require_once __DIR__ . '/../config/email.php';
 require_once __DIR__ . '/../utils/Validator.php';
 require_once __DIR__ . '/AuthController.php';
+
+
+// Verificar se é uma requisição AJAX
+$isAjax = (
+    !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && 
+    strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest'
+) || isset($_POST['action']) || isset($_GET['action']);
+
+// Se não for AJAX e acessar diretamente, redirecionar
+if (!$isAjax && basename($_SERVER['PHP_SELF']) === 'AdminController.php') {
+    // Verificar se o usuário está autenticado
+    session_start();
+    if (!isset($_SESSION['user_id']) || $_SESSION['user_type'] !== USER_TYPE_ADMIN) {
+        header('Location: ' . LOGIN_URL . '?error=' . urlencode('Você precisa fazer login para acessar esta página.'));
+        exit;
+    }
+    
+    // Se está autenticado mas não é AJAX, ir para dashboard
+    header('Location: /admin/dashboard');
+    exit;
+}
+
+
 // No início do arquivo, após os includes
 ini_set('display_errors', 0);
 error_reporting(E_ALL);
@@ -2347,16 +2370,13 @@ public static function getAvailableStores() {
                     $result = self::getTransactionDetailsWithBalance($transactionId);
                     echo json_encode($result);
                     break;
-                case 'store_details_with_balance':
+                case 'store_details':
+                    // Forçar output JSON
+                    ob_clean();
+                    header('Content-Type: application/json; charset=UTF-8');
+                    header('Cache-Control: no-cache, must-revalidate');
+                    
                     try {
-                        // Limpar qualquer output anterior
-                        if (ob_get_level()) {
-                            ob_clean();
-                        }
-                        
-                        // Headers para JSON
-                        header('Content-Type: application/json; charset=UTF-8');
-                        
                         // Verificar autenticação
                         if (!AuthController::isAuthenticated() || !AuthController::isAdmin()) {
                             echo json_encode(['status' => false, 'message' => 'Acesso não autorizado']);
@@ -2370,14 +2390,51 @@ public static function getAvailableStores() {
                             exit;
                         }
                         
-                        $result = AdminController::getStoreDetailsWithBalance($storeId);
-                        echo json_encode($result);
+                        // Buscar dados básicos da loja
+                        $db = Database::getConnection();
+                        $stmt = $db->prepare("SELECT * FROM lojas WHERE id = ?");
+                        $stmt->execute([$storeId]);
+                        $store = $stmt->fetch(PDO::FETCH_ASSOC);
+                        
+                        if (!$store) {
+                            echo json_encode(['status' => false, 'message' => 'Loja não encontrada']);
+                            exit;
+                        }
+                        
+                        // Buscar estatísticas básicas
+                        $statsStmt = $db->prepare("
+                            SELECT 
+                                COUNT(*) as total_transacoes,
+                                COALESCE(SUM(valor_total), 0) as total_vendas,
+                                COALESCE(SUM(valor_cliente), 0) as total_cashback
+                            FROM transacoes_cashback
+                            WHERE loja_id = ? AND status = 'aprovado'
+                        ");
+                        $statsStmt->execute([$storeId]);
+                        $statistics = $statsStmt->fetch(PDO::FETCH_ASSOC);
+                        
+                        // Buscar endereço se existir
+                        $addrStmt = $db->prepare("SELECT * FROM lojas_endereco WHERE loja_id = ?");
+                        $addrStmt->execute([$storeId]);
+                        $address = $addrStmt->fetch(PDO::FETCH_ASSOC);
+                        
+                        if ($address) {
+                            $store['endereco'] = $address;
+                        }
+                        
+                        echo json_encode([
+                            'status' => true,
+                            'data' => [
+                                'loja' => $store,
+                                'estatisticas' => $statistics
+                            ]
+                        ]);
                         
                     } catch (Exception $e) {
-                        error_log('Erro em store_details_with_balance: ' . $e->getMessage());
+                        error_log('Erro em store_details: ' . $e->getMessage());
                         echo json_encode([
-                            'status' => false, 
-                            'message' => 'Erro interno do servidor'
+                            'status' => false,
+                            'message' => 'Erro interno: ' . $e->getMessage()
                         ]);
                     }
                     exit;
