@@ -1,5 +1,4 @@
 <?php
-// views/auth/login.php
 // Incluir arquivos de configuração
 require_once '../../config/constants.php';
 require_once '../../config/database.php';
@@ -161,7 +160,7 @@ if (!empty($urlError)) {
 
     <script src="../../assets/js/components/toast.js"></script>
     <script>
-        // Mostrar mensagens de erro/sucesso com toast
+        // Mostrar mensagens usando toasts
         document.addEventListener('DOMContentLoaded', function() {
             <?php if (!empty($error)): ?>
                 KlubeToast.error('<?php echo addslashes($error); ?>');
@@ -186,18 +185,15 @@ if (!empty($urlError)) {
             }
         }
 
-        // Função REAL para login com Google
+        // Função para login com Google
         function loginWithGoogle() {
-            // Mostrar spinner
             KlubeSpinner.show();
             
-            // Desabilitar botão
             const googleBtn = document.querySelector('.google-btn');
             const originalText = googleBtn.innerHTML;
             googleBtn.innerHTML = '<img src="../../assets/images/icons/google.svg" alt="Google"> Conectando...';
             googleBtn.disabled = true;
             
-            // Fazer requisição para obter a URL de autorização do Google
             fetch('<?php echo SITE_URL; ?>/auth/google/auth', {
                 method: 'GET',
                 headers: {
@@ -213,7 +209,6 @@ if (!empty($urlError)) {
             .then(data => {
                 KlubeSpinner.hide();
                 if (data.status && data.auth_url) {
-                    // Redirecionar para o Google
                     window.location.href = data.auth_url;
                 } else {
                     throw new Error(data.message || 'Erro desconhecido');
@@ -224,13 +219,11 @@ if (!empty($urlError)) {
                 KlubeSpinner.hide();
                 KlubeToast.error('Erro ao conectar com o Google: ' + error.message);
                 
-                // Restaurar botão
                 googleBtn.innerHTML = originalText;
                 googleBtn.disabled = false;
             });
         }
 
-        // Funções placeholder para outros provedores
         function loginWithFacebook() {
             KlubeToast.info('Login com Facebook será implementado em breve.');
         }
@@ -239,7 +232,7 @@ if (!empty($urlError)) {
             KlubeToast.info('Login com Apple será implementado em breve.');
         }
 
-        // Validação do formulário no lado do cliente
+        // Validação do formulário
         document.getElementById('login-form').addEventListener('submit', function(event) {
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
@@ -269,15 +262,9 @@ if (!empty($urlError)) {
             // Mostrar spinner durante o login
             KlubeSpinner.show();
             
-            // Desabilitar botão de submit
             const submitBtn = document.querySelector('.login-btn');
-            const originalText = submitBtn.textContent;
             submitBtn.textContent = 'Entrando...';
             submitBtn.disabled = true;
-
-            // Se for via AJAX (opcional)
-            // Aqui você pode interceptar e fazer via AJAX se quiser
-            // Por enquanto vamos deixar o submit normal do form
         });
         
         function isValidEmail(email) {
@@ -285,35 +272,12 @@ if (!empty($urlError)) {
             return emailRegex.test(email);
         }
 
-        // Verifica o tamanho da tela e aplica ajustes específicos
-        function checkScreenSize() {
-            const socialBtns = document.querySelectorAll('.social-btn');
-            const googleBtn = document.querySelector('.google-btn span');
-            
-            if (window.innerWidth < 768) {
-                socialBtns.forEach(btn => {
-                    if (!btn.classList.contains('google-btn')) {
-                        btn.querySelector('span')?.classList.add('hide');
-                    }
-                });
-                
-                if (googleBtn) {
-                    googleBtn.textContent = 'Login com Google';
-                }
-            } else {
-                socialBtns.forEach(btn => {
-                    btn.querySelector('span')?.classList.remove('hide');
-                });
-                
-                if (googleBtn) {
-                    googleBtn.textContent = 'Entre com Google';
-                }
-            }
-        }
-
-        // Executa verificação no carregamento e redimensionamento
-        window.addEventListener('load', checkScreenSize);
-        window.addEventListener('resize', checkScreenSize);
+        // Teste dos toasts (remover depois)
+        setTimeout(() => {
+            console.log('Testando toast...');
+            // Descomente para testar:
+            // KlubeToast.success('Toast funcionando!');
+        }, 1000);
     </script>
 </body>
 </html>

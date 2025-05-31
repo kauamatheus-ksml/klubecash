@@ -1,4 +1,4 @@
-/* assets/css/components/toast.css */
+/* Sistema de Toast Notifications para Klube Cash */
 :root {
     --toast-primary: #FF7A00;
     --toast-success: #22c55e;
@@ -65,6 +65,7 @@
     border-radius: 50%;
     font-size: 14px;
     font-weight: bold;
+    color: white;
 }
 
 /* Conteúdo do toast */
@@ -78,6 +79,7 @@
     font-size: 14px;
     margin: 0 0 4px 0;
     line-height: 1.2;
+    color: var(--toast-dark);
 }
 
 .toast-message {
@@ -85,6 +87,7 @@
     margin: 0;
     opacity: 0.8;
     line-height: 1.4;
+    color: var(--toast-dark);
 }
 
 /* Botão de fechar */
@@ -104,6 +107,7 @@
     transition: opacity 0.2s;
     font-size: 16px;
     line-height: 1;
+    color: var(--toast-dark);
 }
 
 .toast-close:hover {
@@ -116,7 +120,7 @@
     bottom: 0;
     left: 0;
     height: 3px;
-    background: rgba(255, 255, 255, 0.3);
+    background: var(--toast-primary);
     transition: width linear;
     border-radius: 0 0 12px 0;
 }
@@ -128,7 +132,6 @@
 
 .toast.success .toast-icon {
     background: var(--toast-success);
-    color: white;
 }
 
 .toast.success .toast-progress {
@@ -141,7 +144,6 @@
 
 .toast.error .toast-icon {
     background: var(--toast-error);
-    color: white;
 }
 
 .toast.error .toast-progress {
@@ -154,7 +156,6 @@
 
 .toast.warning .toast-icon {
     background: var(--toast-warning);
-    color: white;
 }
 
 .toast.warning .toast-progress {
@@ -167,7 +168,6 @@
 
 .toast.info .toast-icon {
     background: var(--toast-info);
-    color: white;
 }
 
 .toast.info .toast-progress {
@@ -237,7 +237,6 @@
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    box-sizing: border-box;
     animation: rotationBack 0.5s linear infinite;
     transform-origin: center center;
 }
@@ -250,24 +249,11 @@
 }
 
 @keyframes rotation {
-    0% {
-        transform: rotate(0deg);
-    }
-    100% {
-        transform: rotate(360deg);
-    }
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
 
 @keyframes rotationBack {
-    0% {
-        transform: rotate(0deg);
-    }
-    100% {
-        transform: rotate(-360deg);
-    }
-}
-
-/* Efeitos hover nos toasts */
-.toast:hover .toast-progress {
-    animation-play-state: paused;
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(-360deg); }
 }
