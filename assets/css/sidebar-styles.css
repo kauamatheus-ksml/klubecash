@@ -13,7 +13,6 @@
     --border-radius-small: 8px;
     --font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    --sidebar-width: 250px; /* VOLTA PARA 250px COMO ESTAVA ORIGINALMENTE */
 }
 
 /* Reset e estilos gerais */
@@ -26,7 +25,7 @@
 
 /* Sidebar Principal */
 .sidebar {
-    width: var(--sidebar-width);
+    width: 280px;
     height: 100vh;
     background: linear-gradient(180deg, var(--white) 0%, #FCFCFC 100%);
     position: fixed;
@@ -155,8 +154,12 @@
     height: 18px;
 }
 
-/* Container principal - REMOVIDO DAQUI */
-/* Não definir .main-content aqui para evitar conflitos */
+/* Container principal */
+.main-content {
+    margin-left: 2px;
+    transition: var(--transition);
+    min-height: 100vh;
+}
 
 /* Toggle da Sidebar para Mobile */
 .sidebar-toggle {
@@ -220,6 +223,10 @@
     
     .sidebar.open {
         transform: translateX(0);
+    }
+    
+    .main-content {
+        margin-left: 0;
     }
     
     .sidebar-toggle {
