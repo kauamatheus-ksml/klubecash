@@ -2409,7 +2409,7 @@ public static function getAvailableStores() {
                 
                 case 'test_connection':
                     header('Content-Type: application/json; charset=UTF-8');
-                    
+
                     try {
                         $db = Database::getConnection();
                         $stmt = $db->query("SELECT COUNT(*) as total FROM lojas");
