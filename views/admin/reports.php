@@ -1,201 +1,89 @@
 <?php
 // views/admin/reports.php
-// Definir o menu ativo na sidebar
 $activeMenu = 'relatorios';
 
-// Incluir conexão com o banco de dados e arquivos necessários
 require_once '../../config/database.php';
 require_once '../../config/constants.php';
 require_once '../../controllers/AuthController.php';
 require_once '../../controllers/AdminController.php';
 
-// Iniciar sessão
 session_start();
 
-// Verificar se o usuário está logado e é administrador
-if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION['user_type'] !== USER_TYPE_ADMIN) {
-    // Redirecionar para a página de login com mensagem de erro
+// Verificar autenticação
+if (!isset($_SESSION['user_id']) || $_SESSION['user_type'] !== USER_TYPE_ADMIN) {
     header("Location: " . LOGIN_URL . "?error=acesso_restrito");
     exit;
 }
 
-// Inicializar variáveis de filtro
+// Processar filtros
 $filters = [];
-
-// Processar filtros se enviados
 if (isset($_GET['data_inicio']) && !empty($_GET['data_inicio'])) {
     $filters['data_inicio'] = $_GET['data_inicio'];
 }
-
 if (isset($_GET['data_fim']) && !empty($_GET['data_fim'])) {
     $filters['data_fim'] = $_GET['data_fim'];
 }
 
-// Período padrão (último mês) se nenhum filtro for aplicado
+// Período padrão (último mês) se nenhum filtro
 if (empty($filters)) {
     $filters['data_inicio'] = date('Y-m-d', strtotime('-1 month'));
     $filters['data_fim'] = date('Y-m-d');
 }
 
 try {
-    // Obter dados do relatório financeiro
-    $result = AdminController::generateReport('financeiro', $filters);
-
-    // Verificar se houve erro
-    $hasError = !$result['status'];
-    $errorMessage = $hasError ? $result['message'] : '';
-
-    // Dados para exibição na página
-    if (!$hasError) {
-        $reportData = $result['data']['resultados'];
-        
-        // Valores totais
-        $totalCashback = $reportData['financeiro']['total_cashback'] ?? 0;
-        $totalComissao = $reportData['comissao_admin'] ?? 0;
-        $lucro = $totalComissao;
-        
-        // Dados mensais
-        $monthlyData = $reportData['por_mes'] ?? [];
+    // Obter dados dos relatórios - USANDO O CONTROLLER
+    $result = AdminController::getFinancialReports($filters);
+    
+    if (!$result['status']) {
+        throw new Exception($result['message']);
     }
-
-    // Obter relatório de saldos
-    $db = Database::getConnection();
     
-    // Estatísticas de saldos
-    $saldoQuery = "
-        SELECT 
-            COUNT(DISTINCT cs.usuario_id) as total_clientes_com_saldo,
-            COUNT(DISTINCT cs.loja_id) as total_lojas_com_saldo,
-            SUM(cs.saldo_disponivel) as total_saldo_disponivel,
-            SUM(cs.total_creditado) as total_saldo_creditado,
-            SUM(cs.total_usado) as total_saldo_usado,
-            AVG(cs.saldo_disponivel) as media_saldo_por_cliente
-        FROM cashback_saldos cs
-        WHERE cs.saldo_disponivel > 0
-    ";
+    $reportData = $result['data'];
     
-    $saldoStmt = $db->query($saldoQuery);
-    $saldoStats = $saldoStmt->fetch(PDO::FETCH_ASSOC);
+    // Extrair dados para facilitar o uso na view
+    $saldoStats = $reportData['saldo_stats'];
+    $movimentacoesStats = $reportData['movimentacoes_stats'];
+    $vendasComparacao = $reportData['vendas_comparacao'];
+    $lojasSaldo = $reportData['lojas_saldo'];
+    $financialData = $reportData['financial_data'];
+    $adminComission = $reportData['admin_comission'];
+    $monthlyData = $reportData['monthly_data'];
     
-    // Movimentações de saldo no período selecionado
-    $movimentacoesQuery = "
-        SELECT 
-            SUM(CASE WHEN tipo_operacao = 'credito' THEN valor ELSE 0 END) as creditos_periodo,
-            SUM(CASE WHEN tipo_operacao = 'uso' THEN valor ELSE 0 END) as usos_periodo,
-            SUM(CASE WHEN tipo_operacao = 'estorno' THEN valor ELSE 0 END) as estornos_periodo,
-            COUNT(CASE WHEN tipo_operacao = 'credito' THEN 1 END) as qtd_creditos,
-            COUNT(CASE WHEN tipo_operacao = 'uso' THEN 1 END) as qtd_usos,
-            COUNT(CASE WHEN tipo_operacao = 'estorno' THEN 1 END) as qtd_estornos
-        FROM cashback_movimentacoes
-        WHERE data_operacao >= :data_inicio 
-        AND data_operacao <= :data_fim
-    ";
+    $hasError = false;
+    $errorMessage = '';
     
-    $params = [
-        ':data_inicio' => $filters['data_inicio'] . ' 00:00:00',
-        ':data_fim' => $filters['data_fim'] . ' 23:59:59'
-    ];
-    
-    $movimentacoesStmt = $db->prepare($movimentacoesQuery);
-    foreach ($params as $param => $value) {
-        $movimentacoesStmt->bindValue($param, $value);
-    }
-    $movimentacoesStmt->execute();
-    $movimentacoesStats = $movimentacoesStmt->fetch(PDO::FETCH_ASSOC);
-    
-    // Comparação vendas originais vs vendas líquidas (descontando saldo usado)
-    $vendasComparacaoQuery = "
-        SELECT 
-            DATE_FORMAT(t.data_transacao, '%Y-%m') as mes,
-            SUM(t.valor_total) as vendas_originais,
-            SUM(t.valor_total - COALESCE(
-                (SELECT SUM(cm.valor) 
-                 FROM cashback_movimentacoes cm 
-                 WHERE cm.transacao_uso_id = t.id AND cm.tipo_operacao = 'uso'), 0
-            )) as vendas_liquidas,
-            COALESCE(SUM(
-                (SELECT SUM(cm.valor) 
-                 FROM cashback_movimentacoes cm 
-                 WHERE cm.transacao_uso_id = t.id AND cm.tipo_operacao = 'uso')
-            ), 0) as total_saldo_usado_mes
-        FROM transacoes_cashback t
-        WHERE t.data_transacao >= :data_inicio 
-        AND t.data_transacao <= :data_fim
-        AND t.status = 'aprovado'
-        GROUP BY DATE_FORMAT(t.data_transacao, '%Y-%m')
-        ORDER BY mes ASC
-    ";
-    
-    $vendasStmt = $db->prepare($vendasComparacaoQuery);
-    foreach ($params as $param => $value) {
-        $vendasStmt->bindValue($param, $value);
-    }
-    $vendasStmt->execute();
-    $vendasComparacao = $vendasStmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    // Lojas com mais uso de saldo
-    $lojasSaldoQuery = "
-        SELECT 
-            l.nome_fantasia,
-            SUM(cs.saldo_disponivel) as saldo_atual,
-            SUM(cs.total_creditado) as total_creditado,
-            SUM(cs.total_usado) as total_usado,
-            COUNT(DISTINCT cs.usuario_id) as clientes_com_saldo,
-            SUM(cs.total_usado) / SUM(cs.total_creditado) * 100 as percentual_uso
-        FROM cashback_saldos cs
-        JOIN lojas l ON cs.loja_id = l.id
-        WHERE cs.total_creditado > 0
-        GROUP BY l.id, l.nome_fantasia
-        ORDER BY total_usado DESC
-        LIMIT 10
-    ";
-    
-    $lojasSaldoStmt = $db->query($lojasSaldoQuery);
-    $lojasSaldo = $lojasSaldoStmt->fetchAll(PDO::FETCH_ASSOC);
-
 } catch (Exception $e) {
     $hasError = true;
     $errorMessage = "Erro ao processar a requisição: " . $e->getMessage();
-    $reportData = [];
-    $totalCashback = 0;
-    $totalComissao = 0;
-    $lucro = 0;
-    $monthlyData = [];
+    
+    // Valores padrão em caso de erro
     $saldoStats = [];
     $movimentacoesStats = [];
     $vendasComparacao = [];
     $lojasSaldo = [];
+    $financialData = ['total_cashback' => 0, 'total_vendas' => 0];
+    $adminComission = 0;
+    $monthlyData = [];
 }
 
-// Função para formatar valor
+// Funções auxiliares
 function formatCurrency($value) {
     return 'R$ ' . number_format($value ?: 0, 2, ',', '.');
 }
 
-// Função para formatar porcentagem
 function formatPercentage($value) {
     return number_format($value ?: 0, 1, ',', '.') . '%';
 }
 
-// Função para formatar mês
 function formatMonth($yearMonth) {
     $parts = explode('-', $yearMonth);
     $year = $parts[0];
     $month = $parts[1];
     
     $monthNames = [
-        '01' => 'Janeiro',
-        '02' => 'Fevereiro',
-        '03' => 'Março',
-        '04' => 'Abril',
-        '05' => 'Maio',
-        '06' => 'Junho',
-        '07' => 'Julho',
-        '08' => 'Agosto',
-        '09' => 'Setembro',
-        '10' => 'Outubro',
-        '11' => 'Novembro',
-        '12' => 'Dezembro'
+        '01' => 'Janeiro', '02' => 'Fevereiro', '03' => 'Março', '04' => 'Abril',
+        '05' => 'Maio', '06' => 'Junho', '07' => 'Julho', '08' => 'Agosto',
+        '09' => 'Setembro', '10' => 'Outubro', '11' => 'Novembro', '12' => 'Dezembro'
     ];
     
     return $monthNames[$month] . '/' . $year;
@@ -243,12 +131,12 @@ function formatMonth($yearMonth) {
             <div class="cards-row">
                 <div class="card">
                     <h3 class="card-title">Cashback Pago</h3>
-                    <div class="card-value"><?php echo formatCurrency($totalCashback); ?></div>
+                    <div class="card-value"><?php echo formatCurrency($financialData['total_cashback']); ?></div>
                 </div>
                 
                 <div class="card">
                     <h3 class="card-title">Receita (Comissão Admin)</h3>
-                    <div class="card-value"><?php echo formatCurrency($lucro); ?></div>
+                    <div class="card-value"><?php echo formatCurrency($adminComission); ?></div>
                 </div>
                 
                 <div class="card">
@@ -340,7 +228,7 @@ function formatMonth($yearMonth) {
                     <tbody>
                         <?php if (empty($vendasComparacao)): ?>
                             <tr>
-                                <td colspan="5" style="text-align: center;">Nenhum dado disponível para o período selecionado</td>
+                                <td colspan="5" class="no-data">Nenhum dado disponível para o período selecionado</td>
                             </tr>
                         <?php else: ?>
                             <?php foreach ($vendasComparacao as $data): ?>
@@ -380,7 +268,7 @@ function formatMonth($yearMonth) {
                     <tbody>
                         <?php if (empty($lojasSaldo)): ?>
                             <tr>
-                                <td colspan="6" style="text-align: center;">Nenhuma loja com movimentação de saldo</td>
+                                <td colspan="6" class="no-data">Nenhuma loja com movimentação de saldo</td>
                             </tr>
                         <?php else: ?>
                             <?php foreach ($lojasSaldo as $loja): ?>
@@ -398,7 +286,7 @@ function formatMonth($yearMonth) {
                 </table>
             </div>
             
-            <!-- Tabela Original: Cashback Pago X Lucro -->
+            <!-- Tabela: Cashback Pago X Lucro -->
             <h2 class="section-title">Cashback Pago X Receita</h2>
             <div class="table-container">
                 <table class="comparison-table">
@@ -412,19 +300,14 @@ function formatMonth($yearMonth) {
                     <tbody>
                         <?php if (empty($monthlyData)): ?>
                             <tr>
-                                <td colspan="3" style="text-align: center;">Nenhum dado disponível para o período selecionado</td>
+                                <td colspan="3" class="no-data">Nenhum dado disponível para o período selecionado</td>
                             </tr>
                         <?php else: ?>
                             <?php foreach ($monthlyData as $data): ?>
-                                <?php
-                                $monthCashback = $data['total_cashback'] ?? 0;
-                                // Considerando o lucro como um percentual do cashback (ajuste conforme sua lógica de negócio)
-                                $monthLucro = isset($data['comissao_admin']) ? $data['comissao_admin'] : ($monthCashback * 0.2);
-                                ?>
                                 <tr>
                                     <td><?php echo formatMonth($data['mes']); ?></td>
-                                    <td><?php echo formatCurrency($monthCashback); ?></td>
-                                    <td><?php echo formatCurrency($monthLucro); ?></td>
+                                    <td><?php echo formatCurrency($data['total_cashback']); ?></td>
+                                    <td><?php echo formatCurrency($data['comissao_admin']); ?></td>
                                 </tr>
                             <?php endforeach; ?>
                         <?php endif; ?>
@@ -463,19 +346,16 @@ function formatMonth($yearMonth) {
     </div>
     
     <script>
-        // Abrir/fechar modal de filtro de data
         function toggleDateFilter() {
             const modal = document.getElementById('dateFilterModal');
             modal.classList.toggle('active');
         }
         
-        // Limpar filtros
         function clearFilters() {
             document.getElementById('dataInicio').value = '';
             document.getElementById('dataFim').value = '';
         }
         
-        // Fechar modal ao clicar fora
         window.onclick = function(event) {
             const modal = document.getElementById('dateFilterModal');
             if (event.target == modal) {
