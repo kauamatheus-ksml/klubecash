@@ -515,11 +515,12 @@ body {
     font-style: italic;
 }
 
-/* Ações da Tabela - CSS Corrigido */
+/* Ações da Tabela - Versão Corrigida */
 .table-actions {
     display: flex;
     gap: 0.375rem;
     justify-content: center;
+    align-items: center;
 }
 
 .action-btn {
@@ -532,54 +533,93 @@ body {
     justify-content: center;
     cursor: pointer;
     transition: var(--transition);
-    font-size: 0.875rem;
-    /* Removemos o background e color fixos daqui */
+    font-size: 14px; /* Tamanho específico para garantir visibilidade */
+    position: relative;
+    outline: none;
 }
 
 /* Estados padrão para cada tipo de botão */
 .action-btn.edit {
-    background: #E3F2FD;
+    background-color: #E3F2FD;
     color: #1976D2;
 }
 
 .action-btn.view {
-    background: #F3E5F5;
+    background-color: #F3E5F5;
     color: #7B1FA2;
 }
 
 .action-btn.activate {
-    background: #E8F5E8;
-    color: var(--success-color);
+    background-color: #E8F5E8;
+    color: #2E7D32;
 }
 
 .action-btn.deactivate {
-    background: #FFF8E1;
-    color: var(--warning-color);
+    background-color: #FFF8E1;
+    color: #F57C00;
 }
 
-/* Estados hover mais distintos */
+/* Estados hover mais visíveis */
 .action-btn:hover {
     transform: scale(1.1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .action-btn.edit:hover {
-    background: #1976D2;
+    background-color: #1976D2;
     color: white;
 }
 
 .action-btn.view:hover {
-    background: #7B1FA2;
+    background-color: #7B1FA2;
     color: white;
 }
 
 .action-btn.activate:hover {
-    background: var(--success-color);
+    background-color: #2E7D32;
     color: white;
 }
 
 .action-btn.deactivate:hover {
-    background: var(--warning-color);
-    color: var(--dark-gray);
+    background-color: #F57C00;
+    color: white;
+}
+
+/* Garantir que os ícones sejam sempre visíveis */
+.action-btn i {
+    font-size: inherit !important;
+    line-height: 1 !important;
+    display: inline-block !important;
+    font-style: normal !important;
+    font-variant: normal !important;
+    text-rendering: auto !important;
+    -webkit-font-smoothing: antialiased !important;
+}
+
+/* Fallback para casos onde Font Awesome não carrega */
+.action-btn.edit::before {
+    content: "✏️";
+    font-family: Arial, sans-serif;
+}
+
+.action-btn.view::before {
+    content: "👁️";
+    font-family: Arial, sans-serif;
+}
+
+.action-btn.activate::before {
+    content: "✅";
+    font-family: Arial, sans-serif;
+}
+
+.action-btn.deactivate::before {
+    content: "⏸️";
+    font-family: Arial, sans-serif;
+}
+
+/* Ocultar fallback quando Font Awesome funciona */
+.action-btn i + ::before {
+    display: none;
 }
 
 /* Checkbox Personalizado */
