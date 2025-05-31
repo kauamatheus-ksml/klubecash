@@ -1,4 +1,5 @@
 <?php
+// views/auth/login.php
 // Incluir arquivos de configuração
 require_once '../../config/constants.php';
 require_once '../../config/database.php';
@@ -84,6 +85,7 @@ if (!empty($urlError)) {
     <title>Login - Klube Cash</title>
     <link rel="stylesheet" href="../../assets/css/auth.css">
     <link rel="stylesheet" href="../../assets/css/responsive.css">
+    <link rel="stylesheet" href="../../assets/css/components/toast.css">
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
     <link rel="stylesheet" href="../../assets/css/views/auth/login.css">
 </head>
@@ -107,18 +109,6 @@ if (!empty($urlError)) {
 
         <div class="right-panel">
             <div class="login-container">
-                <?php if (!empty($error)): ?>
-                    <div class="error-message">
-                        <?php echo htmlspecialchars($error); ?>
-                    </div>
-                <?php endif; ?>
-
-                <?php if (!empty($urlSuccess)): ?>
-                    <div class="success-message">
-                        <?php echo htmlspecialchars($urlSuccess); ?>
-                    </div>
-                <?php endif; ?>
-
                 <div class="login-header">
                     <h1>Seja <span>BEM VINDO</span></h1>
                     <h2>Login</h2>
@@ -169,7 +159,19 @@ if (!empty($urlError)) {
         </div>
     </div>
 
+    <script src="../../assets/js/components/toast.js"></script>
     <script>
+        // Mostrar mensagens de erro/sucesso com toast
+        document.addEventListener('DOMContentLoaded', function() {
+            <?php if (!empty($error)): ?>
+                KlubeToast.error('<?php echo addslashes($error); ?>');
+            <?php endif; ?>
+
+            <?php if (!empty($urlSuccess)): ?>
+                KlubeToast.success('<?php echo addslashes($urlSuccess); ?>');
+            <?php endif; ?>
+        });
+
         // Função para alternar a visibilidade da senha
         function togglePassword() {
             const passwordField = document.getElementById('password');
@@ -186,7 +188,10 @@ if (!empty($urlError)) {
 
         // Função REAL para login com Google
         function loginWithGoogle() {
-            // Mostrar indicador de carregamento
+            // Mostrar spinner
+            KlubeSpinner.show();
+            
+            // Desabilitar botão
             const googleBtn = document.querySelector('.google-btn');
             const originalText = googleBtn.innerHTML;
             googleBtn.innerHTML = '<img src="../../assets/images/icons/google.svg" alt="Google"> Conectando...';
@@ -206,6 +211,7 @@ if (!empty($urlError)) {
                 return response.json();
             })
             .then(data => {
+                KlubeSpinner.hide();
                 if (data.status && data.auth_url) {
                     // Redirecionar para o Google
                     window.location.href = data.auth_url;
@@ -215,7 +221,8 @@ if (!empty($urlError)) {
             })
             .catch(error => {
                 console.error('Erro no login Google:', error);
-                alert('Erro ao conectar com o Google: ' + error.message);
+                KlubeSpinner.hide();
+                KlubeToast.error('Erro ao conectar com o Google: ' + error.message);
                 
                 // Restaurar botão
                 googleBtn.innerHTML = originalText;
@@ -225,11 +232,11 @@ if (!empty($urlError)) {
 
         // Funções placeholder para outros provedores
         function loginWithFacebook() {
-            alert('Login com Facebook será implementado com a API do Facebook.');
+            KlubeToast.info('Login com Facebook será implementado em breve.');
         }
 
         function loginWithApple() {
-            alert('Login com Apple será implementado com a API da Apple.');
+            KlubeToast.info('Login com Apple será implementado em breve.');
         }
 
         // Validação do formulário no lado do cliente
@@ -255,8 +262,22 @@ if (!empty($urlError)) {
             
             if (!isValid) {
                 event.preventDefault();
-                alert(errorMessage);
+                KlubeToast.error(errorMessage);
+                return false;
             }
+
+            // Mostrar spinner durante o login
+            KlubeSpinner.show();
+            
+            // Desabilitar botão de submit
+            const submitBtn = document.querySelector('.login-btn');
+            const originalText = submitBtn.textContent;
+            submitBtn.textContent = 'Entrando...';
+            submitBtn.disabled = true;
+
+            // Se for via AJAX (opcional)
+            // Aqui você pode interceptar e fazer via AJAX se quiser
+            // Por enquanto vamos deixar o submit normal do form
         });
         
         function isValidEmail(email) {
