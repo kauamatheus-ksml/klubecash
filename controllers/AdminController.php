@@ -559,6 +559,9 @@ public static function getUserDetails($userId) {
  * @param int $page Página atual
  * @return array Resultado com dados das lojas e estatísticas
  */
+/**
+ * Gerencia lojas com informações detalhadas de saldo e uso (VERSÃO CORRIGIDA)
+ */
 public static function manageStoresWithBalance($filters = [], $page = 1) {
     try {
         if (!AuthController::isAdmin()) {
@@ -566,7 +569,7 @@ public static function manageStoresWithBalance($filters = [], $page = 1) {
         }
         
         $db = Database::getConnection();
-        $limit = ITEMS_PER_PAGE;
+        $limit = defined('ITEMS_PER_PAGE') ? ITEMS_PER_PAGE : 10;
         $offset = ($page - 1) * $limit;
         
         // Construir condições WHERE
@@ -595,21 +598,18 @@ public static function manageStoresWithBalance($filters = [], $page = 1) {
         
         $whereClause = "WHERE " . implode(" AND ", $whereConditions);
         
-        // QUERY CORRIGIDA - O problema estava aqui
+        // QUERY CORRIGIDA - Usando a mesma que funcionou no debug
         $query = "
             SELECT 
                 l.*,
-                -- Contar clientes com saldo ativo nesta loja
+                -- Saldo dos clientes (CORRIGIDO)
                 COALESCE(saldo_info.clientes_com_saldo, 0) as clientes_com_saldo,
-                -- Somar saldo total dos clientes nesta loja
                 COALESCE(saldo_info.total_saldo_clientes, 0) as total_saldo_clientes,
-                -- Contar total de transações da loja
+                -- Transações (CORRIGIDO)
                 COALESCE(trans_info.total_transacoes, 0) as total_transacoes,
-                -- Contar transações onde houve uso de saldo
                 COALESCE(trans_info.transacoes_com_saldo, 0) as transacoes_com_saldo,
-                -- Valor total usado em saldo
                 COALESCE(trans_info.total_saldo_usado, 0) as total_saldo_usado,
-                -- Informações do usuário associado
+                -- Informações do usuário
                 u.nome as usuario_nome,
                 u.status as usuario_status
             FROM lojas l
@@ -639,29 +639,26 @@ public static function manageStoresWithBalance($filters = [], $page = 1) {
             LIMIT ? OFFSET ?
         ";
         
-        // Adicionar limit e offset aos parâmetros
-        $params[] = $limit;
-        $params[] = $offset;
-        
+        // Executar query principal
+        $allParams = array_merge($params, [$limit, $offset]);
         $stmt = $db->prepare($query);
-        $stmt->execute($params);
+        $stmt->execute($allParams);
         $stores = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
-        // Debug: vamos verificar os dados retornados
-        error_log("DEBUG - Lojas retornadas: " . json_encode($stores));
+        // Debug: log dos dados retornados
+        error_log("STORES DEBUG: " . json_encode($stores));
         
-        // Query para contar total de registros
-        $countQuery = "
-            SELECT COUNT(DISTINCT l.id) as total
-            FROM lojas l
-            $whereClause
-        ";
-        
+        // Query para contar total (SEM LIMIT)
+        $countQuery = str_replace(
+            ["LIMIT ? OFFSET ?"],
+            [""],
+            $query
+        );
         $countStmt = $db->prepare($countQuery);
-        $countStmt->execute(array_slice($params, 0, -2)); // Remove limit e offset
-        $totalCount = $countStmt->fetch(PDO::FETCH_ASSOC)['total'];
+        $countStmt->execute($params);
+        $totalCount = count($countStmt->fetchAll());
         
-        // ESTATÍSTICAS CORRIGIDAS
+        // ESTATÍSTICAS CORRIGIDAS - Usando a mesma lógica do debug
         $statsQuery = "
             SELECT 
                 COUNT(DISTINCT l.id) as total_lojas,
@@ -678,18 +675,18 @@ public static function manageStoresWithBalance($filters = [], $page = 1) {
         ";
         
         $statsStmt = $db->prepare($statsQuery);
-        $statsStmt->execute(array_slice($params, 0, -2)); // Remove limit e offset
+        $statsStmt->execute($params);
         $statistics = $statsStmt->fetch(PDO::FETCH_ASSOC);
         
         // Debug das estatísticas
-        error_log("DEBUG - Estatísticas: " . json_encode($statistics));
+        error_log("STATS DEBUG: " . json_encode($statistics));
         
         // Obter categorias distintas
         $categoriesQuery = "SELECT DISTINCT categoria FROM lojas WHERE categoria IS NOT NULL AND categoria != '' ORDER BY categoria";
         $categoriesStmt = $db->query($categoriesQuery);
         $categories = $categoriesStmt->fetchAll(PDO::FETCH_COLUMN);
         
-        // Calcular informações de paginação
+        // Calcular paginação
         $totalPages = ceil($totalCount / $limit);
         
         return [
