@@ -142,7 +142,7 @@ if (!empty($urlError)) {
 
                     <button type="submit" class="login-btn" id="login-btn">Entrar</button>
                 </form>
-
+                <!--
                 <div class="or-divider">Ou</div>
 
                 <div class="social-login">
@@ -156,7 +156,7 @@ if (!empty($urlError)) {
                     <button class="social-btn apple-btn" onclick="loginWithApple()">
                         <img src="../../assets/images/icons/apple.svg" alt="Apple">
                     </button>
-                </div>
+                </div>-->
 
                 <div class="register-link">
                     <p>Não tem conta? <a href="<?php echo REGISTER_URL; ?>">Registre-se</a></p>
