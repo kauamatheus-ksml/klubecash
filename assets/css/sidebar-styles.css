@@ -224,11 +224,12 @@
 /* Responsividade - CORREÇÕES PRINCIPAIS */
 @media (max-width: 768px) {
     .sidebar {
+        height: 850px;
         width: 300px; /* REDUZIDO de 320px para 300px */
         transform: translateX(-100%);
         box-shadow: var(--shadow-medium);
         /* CORREÇÃO: Garantir altura fixa */
-        height: 100vh;
+        
         max-height: 100vh;
         overflow: hidden;
     }
