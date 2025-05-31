@@ -526,13 +526,13 @@ body {
     height: 32px;
     border-radius: 50%;
     border: none;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    display: flex; /* Importante para centralizar o ícone filho */
+    align-items: center; /* Centraliza verticalmente */
+    justify-content: center; /* Centraliza horizontalmente */
     cursor: pointer;
     transition: var(--transition);
     background: transparent;
-    color: var(--medium-gray);
+    color: var(--medium-gray); /* Define a cor do ícone, --medium-gray é #6C757D */
 }
 
 .action-btn:hover {
@@ -543,6 +543,8 @@ body {
     background: #E3F2FD;
     color: #1976D2;
 }
+
+
 
 .action-btn.view:hover {
     background: #F3E5F5;
