@@ -1,179 +1,81 @@
 <?php
 // views/client/dashboard.php
-// Definir o menu ativo na sidebar
-$activeMenu = 'painel';
-
-// Incluir conexão com o banco de dados e arquivos necessários
-require_once '../../config/database.php';
-require_once '../../config/constants.php';
-require_once '../../controllers/ClientController.php';
-require_once '../../controllers/AuthController.php';
-
-// Iniciar sessão
 session_start();
 
-// Verificar se o usuário está logado e é cliente
-if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION['user_type'] !== USER_TYPE_CLIENT) {
-    // Redirecionar para a página de login com mensagem de erro
-    header("Location: " . LOGIN_URL . "?error=acesso_restrito");
+// Verificar autenticação
+if (!isset($_SESSION['user_id']) || $_SESSION['user_type'] !== 'cliente') {
+    header("Location: /login?error=acesso_restrito");
     exit;
 }
 
-// Obter dados do dashboard para o cliente logado
-$userId = $_SESSION['user_id'];
+// Incluir dependências
+require_once '../../config/database.php';
+require_once '../../config/constants.php';
+require_once '../../controllers/ClientController.php';
 
+$userId = $_SESSION['user_id'];
+$userName = $_SESSION['user_name'] ?? 'Cliente';
+
+// Buscar dados para o dashboard
 try {
+    // Obter saldo detalhado do cliente
+    $balanceResult = ClientController::getClientBalanceDetails($userId);
+    $balanceData = $balanceResult['status'] ? $balanceResult['data'] : [
+        'saldo_total' => 0,
+        'saldos_por_loja' => [],
+        'total_lojas' => 0
+    ];
+
+    // Obter movimentações recentes
     $db = Database::getConnection();
     
-    // Obter dados básicos do dashboard
-    $result = ClientController::getDashboardData($userId);
-    
-    // Verificar se houve erro
-    $hasError = !$result['status'];
-    $errorMessage = $hasError ? $result['message'] : '';
-    
-    // Dados para exibição no dashboard
-    $dashboardData = $hasError ? [] : $result['data'];
-    
-    // Obter dados detalhados de saldo
-    require_once '../../models/CashbackBalance.php';
-    $balanceModel = new CashbackBalance();
-    
-    // Saldo total disponível
-    $saldoTotalDisponivel = $balanceModel->getTotalBalance($userId);
-    
-    // Saldos por loja
-    $saldosPorLoja = $balanceModel->getAllUserBalances($userId);
-    
-    // Saldos pendentes (cashback não liberado ainda)
-    $saldoPendenteQuery = "
-        SELECT 
-            SUM(t.valor_cliente) as total_pendente,
-            l.nome_fantasia,
-            COUNT(*) as qtd_transacoes
-        FROM transacoes_cashback t
-        JOIN lojas l ON t.loja_id = l.id
-        WHERE t.usuario_id = :user_id 
-        AND t.status = 'pendente'
-        GROUP BY l.id, l.nome_fantasia
-        ORDER BY total_pendente DESC
-    ";
-    $saldoPendenteStmt = $db->prepare($saldoPendenteQuery);
-    $saldoPendenteStmt->bindParam(':user_id', $userId);
-    $saldoPendenteStmt->execute();
-    $saldosPendentes = $saldoPendenteStmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    $totalSaldoPendente = array_sum(array_column($saldosPendentes, 'total_pendente'));
-    
-    // Movimentações recentes de saldo
-    $movimentacoesQuery = "
+    // Buscar últimas movimentações de todas as lojas
+    $recentMovementsStmt = $db->prepare("
         SELECT 
             cm.*,
             l.nome_fantasia as loja_nome,
-            CASE 
-                WHEN cm.transacao_origem_id IS NOT NULL THEN 'compra'
-                WHEN cm.transacao_uso_id IS NOT NULL THEN 'compra_com_desconto'
-                ELSE 'outro'
-            END as origem_tipo
+            l.logo as loja_logo,
+            l.categoria as loja_categoria
         FROM cashback_movimentacoes cm
         JOIN lojas l ON cm.loja_id = l.id
-        WHERE cm.usuario_id = :user_id
+        WHERE cm.usuario_id = ?
         ORDER BY cm.data_operacao DESC
-        LIMIT 10
-    ";
-    $movimentacoesStmt = $db->prepare($movimentacoesQuery);
-    $movimentacoesStmt->bindParam(':user_id', $userId);
-    $movimentacoesStmt->execute();
-    $movimentacoesRecentes = $movimentacoesStmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    // Estatísticas de uso de saldo
-    $usoSaldoQuery = "
-        SELECT 
-            SUM(CASE WHEN tipo_operacao = 'credito' THEN valor ELSE 0 END) as total_creditado,
-            SUM(CASE WHEN tipo_operacao = 'uso' THEN valor ELSE 0 END) as total_usado,
-            SUM(CASE WHEN tipo_operacao = 'estorno' THEN valor ELSE 0 END) as total_estornado,
-            COUNT(CASE WHEN tipo_operacao = 'uso' THEN 1 END) as total_usos
-        FROM cashback_movimentacoes 
-        WHERE usuario_id = :user_id
-    ";
-    $usoSaldoStmt = $db->prepare($usoSaldoQuery);
-    $usoSaldoStmt->bindParam(':user_id', $userId);
-    $usoSaldoStmt->execute();
-    $estatisticasUso = $usoSaldoStmt->fetch(PDO::FETCH_ASSOC);
-    
-    // Lojas onde mais usa saldo
-    $lojasMaisUsadasQuery = "
-        SELECT 
-            l.nome_fantasia,
-            SUM(cm.valor) as total_usado,
-            COUNT(*) as qtd_usos
-        FROM cashback_movimentacoes cm
-        JOIN lojas l ON cm.loja_id = l.id
-        WHERE cm.usuario_id = :user_id 
-        AND cm.tipo_operacao = 'uso'
-        GROUP BY l.id, l.nome_fantasia
-        ORDER BY total_usado DESC
         LIMIT 5
-    ";
-    $lojasMaisUsadasStmt = $db->prepare($lojasMaisUsadasQuery);
-    $lojasMaisUsadasStmt->bindParam(':user_id', $userId);
-    $lojasMaisUsadasStmt->execute();
-    $lojasMaisUsadas = $lojasMaisUsadasStmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    // Transações com uso de saldo
-    $transacoesComSaldoQuery = "
+    ");
+    $recentMovementsStmt->execute([$userId]);
+    $recentMovements = $recentMovementsStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Buscar estatísticas do mês atual
+    $currentMonth = date('Y-m');
+    $monthStatsStmt = $db->prepare("
         SELECT 
-            t.*,
-            l.nome_fantasia as loja_nome,
-            COALESCE(
-                (SELECT SUM(cm.valor) 
-                FROM cashback_movimentacoes cm 
-                WHERE cm.transacao_uso_id = t.id AND cm.tipo_operacao = 'uso'), 0
-            ) as saldo_usado
-        FROM transacoes_cashback t
-        JOIN lojas l ON t.loja_id = l.id
-        WHERE t.usuario_id = :user_id
-        ORDER BY t.data_transacao DESC
-        LIMIT 10
-    ";
-    $transacoesComSaldoStmt = $db->prepare($transacoesComSaldoQuery);
-    $transacoesComSaldoStmt->bindParam(':user_id', $userId);
-    $transacoesComSaldoStmt->execute();
-    $transacoesRecentes = $transacoesComSaldoStmt->fetchAll(PDO::FETCH_ASSOC);
-    
+            COUNT(DISTINCT cm.id) as total_movimentacoes,
+            COALESCE(SUM(CASE WHEN cm.tipo_operacao = 'credito' THEN cm.valor ELSE 0 END), 0) as cashback_recebido,
+            COALESCE(SUM(CASE WHEN cm.tipo_operacao = 'uso' THEN cm.valor ELSE 0 END), 0) as saldo_usado,
+            COUNT(DISTINCT cm.loja_id) as lojas_ativas
+        FROM cashback_movimentacoes cm
+        WHERE cm.usuario_id = ? 
+        AND DATE_FORMAT(cm.data_operacao, '%Y-%m') = ?
+    ");
+    $monthStatsStmt->execute([$userId, $currentMonth]);
+    $monthStats = $monthStatsStmt->fetch(PDO::FETCH_ASSOC);
+
+    // Buscar notificações não lidas
+    $notificationsStmt = $db->prepare("
+        SELECT * FROM notificacoes 
+        WHERE usuario_id = ? AND lida = 0 
+        ORDER BY data_criacao DESC 
+        LIMIT 3
+    ");
+    $notificationsStmt->execute([$userId]);
+    $notifications = $notificationsStmt->fetchAll(PDO::FETCH_ASSOC);
+
 } catch (Exception $e) {
-    error_log('Erro ao carregar dashboard do cliente: ' . $e->getMessage());
-    $hasError = true;
-    $errorMessage = 'Erro ao carregar dados do dashboard.';
-    $dashboardData = [];
-    $saldoTotalDisponivel = 0;
-    $saldosPorLoja = [];
-    $saldosPendentes = [];
-    $totalSaldoPendente = 0;
-    $movimentacoesRecentes = [];
-    $estatisticasUso = [
-        'total_creditado' => 0,
-        'total_usado' => 0,
-        'total_estornado' => 0,
-        'total_usos' => 0
-    ];
-    $lojasMaisUsadas = [];
-    $transacoesRecentes = [];
-}
-
-// Função para formatar moeda
-function formatCurrency($value) {
-    return 'R$ ' . number_format($value, 2, ',', '.');
-}
-
-// Função para formatar data
-function formatDate($date) {
-    return date('d/m/Y', strtotime($date));
-}
-
-// Função para formatar data e hora
-function formatDateTime($dateTime) {
-    return date('d/m/Y H:i', strtotime($dateTime));
+    error_log('Erro no dashboard: ' . $e->getMessage());
+    $balanceData = ['saldo_total' => 0, 'saldos_por_loja' => [], 'total_lojas' => 0];
+    $recentMovements = [];
+    $monthStats = ['total_movimentacoes' => 0, 'cashback_recebido' => 0, 'saldo_usado' => 0, 'lojas_ativas' => 0];
+    $notifications = [];
 }
 ?>
 
@@ -182,377 +84,425 @@ function formatDateTime($dateTime) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - Klube Cash</title>
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
-    
-    <!-- Inclusão de bibliotecas externas (Chart.js para gráficos) -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    
+    <title>Meu Cashback - Klube Cash</title>
     <link rel="stylesheet" href="../../assets/css/views/client/dashboard.css">
+    <!-- Ícones modernos -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
 <body>
-    <!-- Incluir navegação sidebar e/ou navbar -->
-    <?php include_once '../components/navbar.php'; ?>
-    
-    <div class="container" style="margin-top: 80px;">
-        <!-- Cabeçalho do Dashboard -->
-        <div class="dashboard-header">
-            <div>
-                <h1>Olá, <?php echo htmlspecialchars($_SESSION['user_name']); ?>!</h1>
-                <p class="dashboard-subtitle">Bem-vindo ao seu painel de cashback</p>
+    <!-- Cabeçalho Mobile/Desktop -->
+    <header class="main-header">
+        <div class="header-content">
+            <div class="header-left">
+                <img src="../../assets/images/logo.png" alt="Klube Cash" class="logo" onerror="this.style.display='none'">
+                <h1 class="brand-name">Klube Cash</h1>
             </div>
-            <div>
-                <a href="<?php echo CLIENT_BALANCE_URL; ?>" class="btn btn-secondary">Ver Saldos</a>
-                <a href="<?php echo CLIENT_STATEMENT_URL; ?>" class="btn btn-primary">Ver Extrato Completo</a>
-            </div>
-        </div>
-        
-        <?php if ($hasError): ?>
-            <div class="alert alert-danger">
-                <?php echo htmlspecialchars($errorMessage); ?>
-            </div>
-        <?php else: ?>
-        
-        <!-- Cards de Resumo -->
-        <div class="summary-cards">
-            <div class="card summary-card">
-                <h3 class="card-title">Saldo Disponível</h3>
-                <div class="card-value"><?php echo formatCurrency($saldoTotalDisponivel); ?></div>
-                <div class="card-change positive">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="18 15 12 9 6 15"></polyline>
-                    </svg>
-                    Pronto para usar
-                </div>
-            </div>
-            
-            <div class="card summary-card">
-                <h3 class="card-title">Saldo Pendente</h3>
-                <div class="card-value"><?php echo formatCurrency($totalSaldoPendente); ?></div>
-                <div class="card-change warning">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <line x1="12" y1="8" x2="12" y2="12"></line>
-                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                    </svg>
-                    Aguardando liberação
-                </div>
-            </div>
-            
-            <div class="card summary-card">
-                <h3 class="card-title">Total Usado</h3>
-                <div class="card-value"><?php echo formatCurrency($estatisticasUso['total_usado']); ?></div>
-                <div class="card-change">
-                    <?php echo $estatisticasUso['total_usos']; ?> usos
-                </div>
-            </div>
-            
-            <div class="card summary-card">
-                <h3 class="card-title">Total Recebido</h3>
-                <div class="card-value"><?php echo formatCurrency($estatisticasUso['total_creditado']); ?></div>
-                <div class="card-change">
-                    Histórico completo
+            <div class="header-right">
+                <span class="welcome-text">Olá, <?php echo htmlspecialchars($userName); ?>!</span>
+                <div class="user-menu">
+                    <button class="user-button" onclick="toggleUserMenu()">
+                        <i class="fas fa-user-circle"></i>
+                    </button>
+                    <div class="user-dropdown" id="userDropdown">
+                        <a href="/cliente/perfil"><i class="fas fa-user"></i> Meu Perfil</a>
+                        <a href="/cliente/extrato"><i class="fas fa-list"></i> Extrato Completo</a>
+                        <a href="/logout"><i class="fas fa-sign-out-alt"></i> Sair</a>
+                    </div>
                 </div>
             </div>
         </div>
+    </header>
+
+    <!-- Container Principal -->
+    <div class="dashboard-container">
         
-        <!-- Grade Principal do Dashboard -->
-        <div class="dashboard-grid">
-            <!-- Coluna da Esquerda -->
-            <div>
-                <!-- Transações Recentes -->
-                <div class="card">
-                    <h3 class="card-title">Transações Recentes</h3>
-                    <div class="table-container">
-                        <table class="table">
-                            <thead>
-                                <tr>
-                                    <th>Loja</th>
-                                    <th>Data</th>
-                                    <th>Valor Original</th>
-                                    <th>Saldo Usado</th>
-                                    <th>Valor Pago</th>
-                                    <th>Cashback Recebido</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php if (empty($transacoesRecentes)): ?>
-                                    <tr>
-                                        <td colspan="7" style="text-align: center;">Nenhuma transação encontrada</td>
-                                    </tr>
-                                <?php else: ?>
-                                    <?php foreach ($transacoesRecentes as $transacao): ?>
-                                        <?php
-                                        $valorOriginal = $transacao['valor_total'];
-                                        $saldoUsado = $transacao['saldo_usado'];
-                                        $valorPago = $valorOriginal - $saldoUsado;
-                                        ?>
-                                        <tr>
-                                            <td><?php echo htmlspecialchars($transacao['loja_nome']); ?></td>
-                                            <td><?php echo formatDate($transacao['data_transacao']); ?></td>
-                                            <td><?php echo formatCurrency($valorOriginal); ?></td>
-                                            <td>
-                                                <?php if ($saldoUsado > 0): ?>
-                                                    <span style="color: #4CAF50;"><?php echo formatCurrency($saldoUsado); ?></span>
-                                                <?php else: ?>
-                                                    -
-                                                <?php endif; ?>
-                                            </td>
-                                            <td><?php echo formatCurrency($valorPago); ?></td>
-                                            <!-- CORREÇÃO: Mostrar o cashback que o CLIENTE vai receber, não o da loja -->
-                                            <td><?php echo formatCurrency($transacao['valor_cliente']); ?></td>
-                                            <td>
-                                                <?php 
-                                                $statusClass = '';
-                                                switch ($transacao['status']) {
-                                                    case 'aprovado':
-                                                        $statusClass = 'badge-success';
-                                                        break;
-                                                    case 'pendente':
-                                                        $statusClass = 'badge-warning';
-                                                        break;
-                                                    case 'cancelado':
-                                                        $statusClass = 'badge-danger';
-                                                        break;
-                                                }
-                                                ?>
-                                                <span class="badge <?php echo $statusClass; ?>">
-                                                    <?php echo ucfirst($transacao['status']); ?>
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                <?php endif; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                    <a href="<?php echo CLIENT_STATEMENT_URL; ?>" class="see-all">Ver todas as transações</a>
+        <!-- Notificações Importantes (se houver) -->
+        <?php if (!empty($notifications)): ?>
+        <div class="notifications-bar">
+            <div class="notifications-content">
+                <i class="fas fa-bell notification-icon"></i>
+                <div class="notifications-text">
+                    <strong>Você tem <?php echo count($notifications); ?> notificação(ões)</strong>
+                    <span><?php echo htmlspecialchars($notifications[0]['titulo']); ?></span>
                 </div>
-                
-                <!-- Movimentações de Saldo -->
-                <div class="card" style="margin-top: 20px;">
-                    <h3 class="card-title">Movimentações de Saldo Recentes</h3>
-                    <div class="movements-list">
-                        <?php if (empty($movimentacoesRecentes)): ?>
-                            <p style="text-align: center; padding: 20px;">Nenhuma movimentação de saldo encontrada</p>
-                        <?php else: ?>
-                            <?php foreach ($movimentacoesRecentes as $movimento): ?>
-                                <div class="movement-item">
-                                    <div class="movement-icon">
-                                        <?php 
-                                        $iconClass = '';
-                                        $iconColor = '';
-                                        switch ($movimento['tipo_operacao']) {
-                                            case 'credito':
-                                                $iconClass = 'arrow-down';
-                                                $iconColor = '#4CAF50';
-                                                break;
-                                            case 'uso':
-                                                $iconClass = 'arrow-up';
-                                                $iconColor = '#FF9800';
-                                                break;
-                                            case 'estorno':
-                                                $iconClass = 'rotate-ccw';
-                                                $iconColor = '#2196F3';
-                                                break;
-                                        }
-                                        ?>
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="<?php echo $iconColor; ?>" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                            <?php if ($movimento['tipo_operacao'] === 'credito'): ?>
-                                                <line x1="12" y1="5" x2="12" y2="19"></line>
-                                                <polyline points="19 12 12 19 5 12"></polyline>
-                                            <?php elseif ($movimento['tipo_operacao'] === 'uso'): ?>
-                                                <line x1="12" y1="19" x2="12" y2="5"></line>
-                                                <polyline points="5 12 12 5 19 12"></polyline>
-                                            <?php else: ?>
-                                                <polyline points="1 4 1 10 7 10"></polyline>
-                                                <path d="m1 10 6-6v6"></path>
-                                                <path d="M19 4a2 2 0 01-2 2H5"></path>
-                                            <?php endif; ?>
-                                        </svg>
-                                    </div>
-                                    <div class="movement-details">
-                                        <div class="movement-description">
-                                            <?php 
-                                            switch ($movimento['tipo_operacao']) {
-                                                case 'credito':
-                                                    echo 'Cashback recebido - ' . htmlspecialchars($movimento['loja_nome']);
-                                                    break;
-                                                case 'uso':
-                                                    echo 'Saldo usado - ' . htmlspecialchars($movimento['loja_nome']);
-                                                    break;
-                                                case 'estorno':
-                                                    echo 'Estorno - ' . htmlspecialchars($movimento['loja_nome']);
-                                                    break;
-                                            }
-                                            ?>
-                                        </div>
-                                        <div class="movement-date"><?php echo formatDateTime($movimento['data_operacao']); ?></div>
-                                    </div>
-                                    <div class="movement-amount">
-                                        <?php 
-                                        $amountClass = '';
-                                        $prefix = '';
-                                        switch ($movimento['tipo_operacao']) {
-                                            case 'credito':
-                                            case 'estorno':
-                                                $amountClass = 'positive';
-                                                $prefix = '+';
-                                                break;
-                                            case 'uso':
-                                                $amountClass = 'negative';
-                                                $prefix = '-';
-                                                break;
-                                        }
-                                        ?>
-                                        <span class="amount <?php echo $amountClass; ?>">
-                                            <?php echo $prefix . formatCurrency($movimento['valor']); ?>
-                                        </span>
-                                    </div>
-                                </div>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
-                    </div>
-                    <a href="<?php echo CLIENT_BALANCE_URL; ?>" class="see-all">Ver histórico completo de saldo</a>
-                </div>
-            </div>
-            
-            <!-- Coluna da Direita -->
-            <div>
-                <!-- Saldos por Loja -->
-                <div class="card">
-                    <h3 class="card-title">Saldos por Loja</h3>
-                    <div class="balance-by-store">
-                        <?php if (empty($saldosPorLoja)): ?>
-                            <p style="text-align: center; padding: 20px;">Nenhum saldo disponível</p>
-                        <?php else: ?>
-                            <?php foreach (array_slice($saldosPorLoja, 0, 5) as $saldo): ?>
-                                <div class="store-balance-item">
-                                    <div class="store-logo">
-                                        <?php echo strtoupper(substr($saldo['nome_fantasia'], 0, 1)); ?>
-                                    </div>
-                                    <div class="store-info">
-                                        <h4 class="store-name"><?php echo htmlspecialchars($saldo['nome_fantasia']); ?></h4>
-                                        <p class="store-balance"><?php echo formatCurrency($saldo['saldo_disponivel']); ?></p>
-                                    </div>
-                                    <div class="store-stats">
-                                        <span><?php echo $saldo['total_transacoes']; ?> transações</span>
-                                    </div>
-                                </div>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
-                    </div>
-                    <a href="<?php echo CLIENT_BALANCE_URL; ?>" class="see-all">Ver todos os saldos</a>
-                </div>
-                
-                <!-- Saldos Pendentes -->
-                <?php if (!empty($saldosPendentes)): ?>
-                <div class="card" style="margin-top: 20px;">
-                    <h3 class="card-title">Saldos Pendentes</h3>
-                    <div class="pending-balances">
-                        <div class="pending-info">
-                            <p>Você tem cashback aguardando liberação. Estes valores serão disponibilizados assim que as lojas confirmarem o pagamento.</p>
-                        </div>
-                        <?php foreach ($saldosPendentes as $pendente): ?>
-                            <div class="pending-item">
-                                <div class="pending-store"><?php echo htmlspecialchars($pendente['nome_fantasia']); ?></div>
-                                <div class="pending-details">
-                                    <span class="pending-amount"><?php echo formatCurrency($pendente['total_pendente']); ?></span>
-                                    <span class="pending-count"><?php echo $pendente['qtd_transacoes']; ?> transações</span>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-                <?php endif; ?>
-                
-                <!-- Lojas Onde Mais Usa Saldo -->
-                <?php if (!empty($lojasMaisUsadas)): ?>
-                <div class="card" style="margin-top: 20px;">
-                    <h3 class="card-title">Lojas Onde Mais Usa Saldo</h3>
-                    <div class="top-stores-usage">
-                        <?php foreach ($lojasMaisUsadas as $loja): ?>
-                            <div class="usage-item">
-                                <div class="usage-store"><?php echo htmlspecialchars($loja['nome_fantasia']); ?></div>
-                                <div class="usage-stats">
-                                    <span class="usage-amount"><?php echo formatCurrency($loja['total_usado']); ?></span>
-                                    <span class="usage-count"><?php echo $loja['qtd_usos']; ?> usos</span>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-                <?php endif; ?>
-                
-                <!-- Gráfico de Cashback -->
-                <div class="card" style="margin-top: 20px;">
-                    <h3 class="card-title">Histórico de Cashback</h3>
-                    <div class="chart-container">
-                        <canvas id="cashbackChart"></canvas>
-                    </div>
-                </div>
+                <button class="notifications-close" onclick="this.parentElement.parentElement.style.display='none'">
+                    <i class="fas fa-times"></i>
+                </button>
             </div>
         </div>
         <?php endif; ?>
-    </div>
-    
-    <!-- Arquivos JavaScript -->
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Configurar gráfico de cashback
-            const ctx = document.getElementById('cashbackChart');
+
+        <!-- Seção Principal: Meu Saldo -->
+        <section class="balance-hero">
+            <div class="balance-card">
+                <div class="balance-header">
+                    <h2><i class="fas fa-wallet"></i> Meu Saldo Total</h2>
+                    <p class="balance-subtitle">Dinheiro que você pode usar nas suas lojas</p>
+                </div>
+                <div class="balance-amount">
+                    <span class="currency">R$</span>
+                    <span class="amount" id="totalBalance"><?php echo number_format($balanceData['saldo_total'], 2, ',', '.'); ?></span>
+                </div>
+                <div class="balance-actions">
+                    <button class="action-btn primary" onclick="window.location.href='/cliente/lojas-parceiras'">
+                        <i class="fas fa-shopping-bag"></i>
+                        <span>Usar Saldo</span>
+                    </button>
+                    <button class="action-btn secondary" onclick="window.location.href='/cliente/extrato'">
+                        <i class="fas fa-history"></i>
+                        <span>Ver Histórico</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Estatísticas Rápidas do Mês -->
+        <section class="quick-stats">
+            <h3><i class="fas fa-chart-line"></i> Este Mês</h3>
+            <div class="stats-grid">
+                <div class="stat-card green">
+                    <div class="stat-icon">
+                        <i class="fas fa-plus-circle"></i>
+                    </div>
+                    <div class="stat-content">
+                        <span class="stat-value">R$ <?php echo number_format($monthStats['cashback_recebido'], 2, ',', '.'); ?></span>
+                        <span class="stat-label">Cashback Ganho</span>
+                    </div>
+                </div>
+                
+                <div class="stat-card blue">
+                    <div class="stat-icon">
+                        <i class="fas fa-minus-circle"></i>
+                    </div>
+                    <div class="stat-content">
+                        <span class="stat-value">R$ <?php echo number_format($monthStats['saldo_usado'], 2, ',', '.'); ?></span>
+                        <span class="stat-label">Saldo Usado</span>
+                    </div>
+                </div>
+                
+                <div class="stat-card orange">
+                    <div class="stat-icon">
+                        <i class="fas fa-store"></i>
+                    </div>
+                    <div class="stat-content">
+                        <span class="stat-value"><?php echo $monthStats['lojas_ativas']; ?></span>
+                        <span class="stat-label">Lojas Visitadas</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Meus Saldos por Loja -->
+        <section class="stores-balance">
+            <div class="section-header">
+                <h3><i class="fas fa-store-alt"></i> Meus Saldos por Loja</h3>
+                <p class="section-subtitle">Cada loja tem seu próprio saldo para você usar</p>
+            </div>
             
-            <?php if (!$hasError && !empty($dashboardData)): ?>
-            // Dados para o gráfico (você pode ajustar com dados reais do PHP)
-            const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'];
-            const cashbackValues = [120, 190, 300, 250, 400, 350];
-            const usageValues = [50, 80, 150, 100, 200, 180];
-            
-            new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: months,
-                    datasets: [{
-                        label: 'Cashback Recebido (R$)',
-                        data: cashbackValues,
-                        borderColor: '#FF7A00',
-                        backgroundColor: 'rgba(255, 122, 0, 0.1)',
-                        tension: 0.3,
-                        fill: true
-                    }, {
-                        label: 'Saldo Usado (R$)',
-                        data: usageValues,
-                        borderColor: '#4CAF50',
-                        backgroundColor: 'rgba(76, 175, 80, 0.1)',
-                        tension: 0.3,
-                        fill: false
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'bottom'
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            grid: {
-                                color: 'rgba(0, 0, 0, 0.05)'
-                            }
-                        },
-                        x: {
-                            grid: {
-                                display: false
-                            }
-                        }
-                    }
-                }
-            });
+            <?php if (!empty($balanceData['saldos_por_loja'])): ?>
+                <div class="stores-grid">
+                    <?php foreach ($balanceData['saldos_por_loja'] as $loja): ?>
+                    <div class="store-card" onclick="openStoreDetails(<?php echo $loja['loja_id']; ?>)">
+                        <div class="store-header">
+                            <div class="store-logo">
+                                <?php if (!empty($loja['logo'])): ?>
+                                    <img src="<?php echo htmlspecialchars($loja['logo']); ?>" alt="<?php echo htmlspecialchars($loja['nome_fantasia']); ?>">
+                                <?php else: ?>
+                                    <i class="fas fa-store"></i>
+                                <?php endif; ?>
+                            </div>
+                            <div class="store-info">
+                                <h4><?php echo htmlspecialchars($loja['nome_fantasia']); ?></h4>
+                                <span class="store-category"><?php echo htmlspecialchars($loja['categoria']); ?></span>
+                            </div>
+                        </div>
+                        <div class="store-balance">
+                            <span class="balance-label">Saldo disponível:</span>
+                            <span class="balance-value">R$ <?php echo number_format($loja['saldo_disponivel'], 2, ',', '.'); ?></span>
+                        </div>
+                        <div class="store-stats">
+                            <small><i class="fas fa-chart-bar"></i> <?php echo $loja['porcentagem_cashback']; ?>% de cashback</small>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+            <?php else: ?>
+                <div class="empty-state">
+                    <div class="empty-icon">
+                        <i class="fas fa-wallet"></i>
+                    </div>
+                    <h4>Ainda não há saldo acumulado</h4>
+                    <p>Comece a fazer compras nas nossas lojas parceiras para ganhar cashback!</p>
+                    <button class="action-btn primary" onclick="window.location.href='/cliente/lojas-parceiras'">
+                        <i class="fas fa-shopping-bag"></i>
+                        Ver Lojas Parceiras
+                    </button>
+                </div>
             <?php endif; ?>
+        </section>
+
+        <!-- Últimas Movimentações -->
+        <section class="recent-activity">
+            <div class="section-header">
+                <h3><i class="fas fa-clock"></i> Atividade Recente</h3>
+                <button class="link-button" onclick="window.location.href='/cliente/extrato'">
+                    Ver tudo <i class="fas fa-arrow-right"></i>
+                </button>
+            </div>
+            
+            <?php if (!empty($recentMovements)): ?>
+                <div class="activity-list">
+                    <?php foreach ($recentMovements as $movement): ?>
+                    <div class="activity-item <?php echo $movement['tipo_operacao']; ?>">
+                        <div class="activity-icon">
+                            <?php if ($movement['tipo_operacao'] === 'credito'): ?>
+                                <i class="fas fa-plus-circle"></i>
+                            <?php elseif ($movement['tipo_operacao'] === 'uso'): ?>
+                                <i class="fas fa-minus-circle"></i>
+                            <?php else: ?>
+                                <i class="fas fa-undo"></i>
+                            <?php endif; ?>
+                        </div>
+                        <div class="activity-content">
+                            <div class="activity-main">
+                                <span class="activity-description">
+                                    <?php 
+                                    switch($movement['tipo_operacao']) {
+                                        case 'credito':
+                                            echo 'Cashback recebido';
+                                            break;
+                                        case 'uso':
+                                            echo 'Saldo usado na compra';
+                                            break;
+                                        case 'estorno':
+                                            echo 'Estorno de saldo';
+                                            break;
+                                    }
+                                    ?>
+                                </span>
+                                <span class="activity-store"><?php echo htmlspecialchars($movement['loja_nome']); ?></span>
+                            </div>
+                            <div class="activity-details">
+                                <span class="activity-date"><?php echo date('d/m/Y H:i', strtotime($movement['data_operacao'])); ?></span>
+                            </div>
+                        </div>
+                        <div class="activity-amount <?php echo $movement['tipo_operacao'] === 'credito' ? 'positive' : 'negative'; ?>">
+                            <?php echo $movement['tipo_operacao'] === 'credito' ? '+' : '-'; ?>R$ <?php echo number_format($movement['valor'], 2, ',', '.'); ?>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+            <?php else: ?>
+                <div class="empty-activity">
+                    <i class="fas fa-history"></i>
+                    <p>Nenhuma atividade recente</p>
+                </div>
+            <?php endif; ?>
+        </section>
+
+        <!-- Ações Rápidas -->
+        <section class="quick-actions">
+            <h3><i class="fas fa-zap"></i> Ações Rápidas</h3>
+            <div class="actions-grid">
+                <button class="quick-action-btn" onclick="window.location.href='/cliente/lojas-parceiras'">
+                    <i class="fas fa-map-marker-alt"></i>
+                    <span>Encontrar Lojas</span>
+                </button>
+                <button class="quick-action-btn" onclick="window.location.href='/cliente/extrato'">
+                    <i class="fas fa-file-alt"></i>
+                    <span>Meu Extrato</span>
+                </button>
+                <button class="quick-action-btn" onclick="window.location.href='/cliente/perfil'">
+                    <i class="fas fa-user-cog"></i>
+                    <span>Meu Perfil</span>
+                </button>
+                <button class="quick-action-btn" onclick="shareApp()">
+                    <i class="fas fa-share-alt"></i>
+                    <span>Indicar Amigo</span>
+                </button>
+            </div>
+        </section>
+    </div>
+
+    <!-- Modal para Detalhes da Loja -->
+    <div class="modal-overlay" id="storeModal" onclick="closeStoreModal()">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h3>Detalhes do Saldo</h3>
+                <button class="modal-close" onclick="closeStoreModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body" id="storeModalContent">
+                <!-- Conteúdo carregado via JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script>
+        // Alternar menu do usuário
+        function toggleUserMenu() {
+            const dropdown = document.getElementById('userDropdown');
+            dropdown.classList.toggle('show');
+        }
+
+        // Fechar menu ao clicar fora
+        document.addEventListener('click', function(event) {
+            const userMenu = document.querySelector('.user-menu');
+            const dropdown = document.getElementById('userDropdown');
+            
+            if (!userMenu.contains(event.target)) {
+                dropdown.classList.remove('show');
+            }
+        });
+
+        // Abrir detalhes da loja
+        function openStoreDetails(lojaId) {
+            const modal = document.getElementById('storeModal');
+            const content = document.getElementById('storeModalContent');
+            
+            // Mostrar loading
+            content.innerHTML = `
+                <div class="loading">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <p>Carregando...</p>
+                </div>
+            `;
+            modal.style.display = 'flex';
+            
+            // Buscar dados da loja
+            fetch('/cliente/actions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `action=store_balance_details&loja_id=${lojaId}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status) {
+                    showStoreDetails(data.data);
+                } else {
+                    content.innerHTML = `
+                        <div class="error">
+                            <i class="fas fa-exclamation-circle"></i>
+                            <p>Erro ao carregar dados da loja</p>
+                        </div>
+                    `;
+                }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                content.innerHTML = `
+                    <div class="error">
+                        <i class="fas fa-exclamation-circle"></i>
+                        <p>Erro de conexão</p>
+                    </div>
+                `;
+            });
+        }
+
+        // Mostrar detalhes da loja no modal
+        function showStoreDetails(data) {
+            const content = document.getElementById('storeModalContent');
+            const loja = data.loja;
+            const saldo = data.saldo;
+            const movimentacoes = data.movimentacoes || [];
+            
+            content.innerHTML = `
+                <div class="store-details">
+                    <div class="store-info-detailed">
+                        <h4>${loja.nome_fantasia}</h4>
+                        <p class="store-category">${loja.categoria}</p>
+                        <p class="store-cashback">${loja.porcentagem_cashback}% de cashback</p>
+                    </div>
+                    
+                    <div class="balance-info">
+                        <div class="balance-item">
+                            <span class="label">Saldo Disponível:</span>
+                            <span class="value">R$ ${parseFloat(saldo.saldo_disponivel || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                        </div>
+                        <div class="balance-item">
+                            <span class="label">Total Creditado:</span>
+                            <span class="value">R$ ${parseFloat(saldo.total_creditado || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                        </div>
+                        <div class="balance-item">
+                            <span class="label">Total Usado:</span>
+                            <span class="value">R$ ${parseFloat(saldo.total_usado || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                        </div>
+                    </div>
+                    
+                    ${movimentacoes.length > 0 ? `
+                        <div class="recent-movements">
+                            <h5>Últimas Movimentações</h5>
+                            <div class="movements-list">
+                                ${movimentacoes.map(mov => `
+                                    <div class="movement-item">
+                                        <span class="movement-type ${mov.tipo_operacao}">
+                                            ${mov.tipo_operacao === 'credito' ? 'Ganhou' : mov.tipo_operacao === 'uso' ? 'Usou' : 'Estorno'}
+                                        </span>
+                                        <span class="movement-amount">R$ ${parseFloat(mov.valor).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                                        <span class="movement-date">${new Date(mov.data_operacao).toLocaleDateString('pt-BR')}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    ` : ''}
+                    
+                    <div class="store-actions">
+                        <button class="action-btn primary" onclick="window.location.href='/cliente/lojas-parceiras'">
+                            <i class="fas fa-shopping-bag"></i>
+                            Visitar Loja
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Fechar modal
+        function closeStoreModal() {
+            document.getElementById('storeModal').style.display = 'none';
+        }
+
+        // Compartilhar app
+        function shareApp() {
+            if (navigator.share) {
+                navigator.share({
+                    title: 'Klube Cash',
+                    text: 'Conheça o Klube Cash e ganhe cashback nas suas compras!',
+                    url: window.location.origin
+                });
+            } else {
+                // Fallback para browsers que não suportam Web Share API
+                const text = `Conheça o Klube Cash e ganhe cashback nas suas compras! ${window.location.origin}`;
+                navigator.clipboard.writeText(text).then(() => {
+                    alert('Link copiado para a área de transferência!');
+                });
+            }
+        }
+
+        // Animação do valor do saldo
+        document.addEventListener('DOMContentLoaded', function() {
+            const balanceElement = document.getElementById('totalBalance');
+            const finalValue = parseFloat(balanceElement.textContent.replace('.', '').replace(',', '.'));
+            
+            if (finalValue > 0) {
+                let currentValue = 0;
+                const increment = finalValue / 30;
+                const timer = setInterval(() => {
+                    currentValue += increment;
+                    if (currentValue >= finalValue) {
+                        currentValue = finalValue;
+                        clearInterval(timer);
+                    }
+                    balanceElement.textContent = currentValue.toLocaleString('pt-BR', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                    });
+                }, 50);
+            }
         });
     </script>
 </body>
