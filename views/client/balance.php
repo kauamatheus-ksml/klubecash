@@ -1,5 +1,5 @@
 <?php
-// views/client/balance.php
+// views/client/balance.php - Versão Reformulada
 // Definir o menu ativo na sidebar
 $activeMenu = 'saldo';
 
@@ -14,18 +14,18 @@ session_start();
 
 // Verificar se o usuário está logado e é cliente
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION['user_type'] !== USER_TYPE_CLIENT) {
-    // Redirecionar para a página de login com mensagem de erro
     header("Location: " . LOGIN_URL . "?error=acesso_restrito");
     exit;
 }
 
-// Obter saldo do cliente logado
+// Obter saldo do cliente logado (mantendo toda a lógica original)
 $userId = $_SESSION['user_id'];
+$userName = $_SESSION['user_name'] ?? 'Cliente';
 
 try {
     $db = Database::getConnection();
     
-    // Obter saldo total disponível
+    // Saldo total disponível
     $saldoTotalQuery = "
         SELECT 
             SUM(saldo_disponivel) as total_disponivel,
@@ -38,7 +38,7 @@ try {
     $saldoTotalStmt->execute();
     $saldoTotal = $saldoTotalStmt->fetch(PDO::FETCH_ASSOC);
     
-    // Obter saldos por loja
+    // Saldos por loja (mantendo consulta original)
     $saldosPorLojaQuery = "
         SELECT 
             cs.*,
@@ -62,7 +62,7 @@ try {
     $saldosPorLojaStmt->execute();
     $saldosPorLoja = $saldosPorLojaStmt->fetchAll(PDO::FETCH_ASSOC);
     
-    // Obter saldos pendentes (cashback não liberado ainda)
+    // Saldos pendentes (mantendo consulta original)
     $saldoPendenteQuery = "
         SELECT 
             SUM(t.valor_cliente) as total_pendente,
@@ -83,7 +83,7 @@ try {
     
     $totalSaldoPendente = array_sum(array_column($saldosPendentes, 'total_pendente'));
     
-    // Estatísticas gerais
+    // Estatísticas gerais (mantendo consulta original)
     $estatisticasQuery = "
         SELECT 
             SUM(CASE WHEN tipo_operacao = 'credito' THEN valor ELSE 0 END) as total_creditado,
@@ -100,7 +100,7 @@ try {
     $estatisticasStmt->execute();
     $estatisticas = $estatisticasStmt->fetch(PDO::FETCH_ASSOC);
     
-    // Movimentações recentes
+    // Movimentações recentes (mantendo consulta original)
     $movimentacoesQuery = "
         SELECT 
             cm.*,
@@ -116,28 +116,7 @@ try {
     $movimentacoesStmt->execute();
     $movimentacoesRecentes = $movimentacoesStmt->fetchAll(PDO::FETCH_ASSOC);
     
-    // Top 5 lojas mais usadas (por valor)
-    $topLojasQuery = "
-        SELECT 
-            l.nome_fantasia,
-            SUM(cm.valor) as total_usado,
-            COUNT(*) as qtd_usos,
-            cs.saldo_disponivel
-        FROM cashback_movimentacoes cm
-        JOIN lojas l ON cm.loja_id = l.id
-        LEFT JOIN cashback_saldos cs ON cs.loja_id = l.id AND cs.usuario_id = cm.usuario_id
-        WHERE cm.usuario_id = :user_id 
-        AND cm.tipo_operacao = 'uso'
-        GROUP BY l.id, l.nome_fantasia, cs.saldo_disponivel
-        ORDER BY total_usado DESC
-        LIMIT 5
-    ";
-    $topLojasStmt = $db->prepare($topLojasQuery);
-    $topLojasStmt->bindParam(':user_id', $userId);
-    $topLojasStmt->execute();
-    $topLojas = $topLojasStmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    // Dados mensais para gráfico (últimos 6 meses)
+    // Dados mensais para gráfico (mantendo consulta original)
     $dadosMensaisQuery = "
         SELECT 
             DATE_FORMAT(data_operacao, '%Y-%m') as mes,
@@ -161,7 +140,7 @@ try {
 } catch (Exception $e) {
     error_log('Erro ao carregar dados de saldo: ' . $e->getMessage());
     $hasError = true;
-    $errorMessage = 'Erro ao carregar dados de saldo.';
+    $errorMessage = 'Ops! Não conseguimos carregar seus saldos no momento.';
     
     // Valores padrão em caso de erro
     $saldoTotal = ['total_disponivel' => 0, 'total_lojas_com_saldo' => 0];
@@ -169,19 +148,14 @@ try {
     $saldosPendentes = [];
     $totalSaldoPendente = 0;
     $estatisticas = [
-        'total_creditado' => 0,
-        'total_usado' => 0,
-        'total_estornado' => 0,
-        'total_usos' => 0,
-        'total_creditos' => 0,
-        'total_lojas_utilizadas' => 0
+        'total_creditado' => 0, 'total_usado' => 0, 'total_estornado' => 0,
+        'total_usos' => 0, 'total_creditos' => 0, 'total_lojas_utilizadas' => 0
     ];
     $movimentacoesRecentes = [];
-    $topLojas = [];
     $dadosMensais = [];
 }
 
-// Funções auxiliares
+// Funções auxiliares (mantendo as originais)
 function formatCurrency($value) {
     return 'R$ ' . number_format($value ?: 0, 2, ',', '.');
 }
@@ -203,10 +177,9 @@ function formatMonth($yearMonth) {
     $month = $parts[1];
     
     $monthNames = [
-        '01' => 'Jan', '02' => 'Fev', '03' => 'Mar',
-        '04' => 'Abr', '05' => 'Mai', '06' => 'Jun',
-        '07' => 'Jul', '08' => 'Ago', '09' => 'Set',
-        '10' => 'Out', '11' => 'Nov', '12' => 'Dez'
+        '01' => 'Jan', '02' => 'Fev', '03' => 'Mar', '04' => 'Abr', 
+        '05' => 'Mai', '06' => 'Jun', '07' => 'Jul', '08' => 'Ago', 
+        '09' => 'Set', '10' => 'Out', '11' => 'Nov', '12' => 'Dez'
     ];
     
     return $monthNames[$month] . '/' . substr($year, 2);
@@ -218,138 +191,192 @@ function formatMonth($yearMonth) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Meu Saldo - Klube Cash</title>
+    <title>Meus Saldos - Klube Cash</title>
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
-    <link rel="stylesheet" href="../../assets/css/views/client/balance.css">
+    <link rel="stylesheet" href="../../assets/css/views/client/balance-new.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <!-- Incluir navegação navbar -->
     <?php include_once '../components/navbar.php'; ?>
     
-    <div class="container" style="margin-top: 80px;">
-        <!-- Cabeçalho da Página -->
-        <div class="page-header">
-            <div>
-                <h1>Meu Saldo de Cashback</h1>
-                <p class="page-subtitle">Veja seus saldos disponíveis e histórico de movimentações</p>
+    <div class="balance-container">
+        <!-- Cabeçalho Explicativo -->
+        <div class="balance-header">
+            <div class="header-content">
+                <h1>💰 Seus Saldos de Cashback</h1>
+                <p class="header-subtitle">
+                    Aqui você encontra todo o dinheiro que ganhou de volta nas suas compras. 
+                    <strong>Lembre-se:</strong> cada loja tem sua própria "carteira" de saldo!
+                </p>
             </div>
             <div class="header-actions">
-                <a href="<?php echo CLIENT_STATEMENT_URL; ?>" class="btn btn-secondary">Ver Extrato</a>
-                <a href="<?php echo CLIENT_DASHBOARD_URL; ?>" class="btn btn-primary">Voltar ao Dashboard</a>
+                <a href="<?php echo CLIENT_STATEMENT_URL; ?>" class="action-btn secondary">
+                    📄 Ver Extrato Completo
+                </a>
+                <a href="<?php echo CLIENT_DASHBOARD_URL; ?>" class="action-btn primary">
+                    🏠 Voltar ao Início
+                </a>
             </div>
         </div>
-        
+
         <?php if ($hasError): ?>
-            <div class="alert alert-danger">
-                <?php echo htmlspecialchars($errorMessage); ?>
+            <div class="error-card">
+                <div class="error-icon">⚠️</div>
+                <div class="error-content">
+                    <h3>Oops! Algo deu errado</h3>
+                    <p><?php echo htmlspecialchars($errorMessage); ?></p>
+                    <button onclick="location.reload()" class="retry-btn">Tentar Novamente</button>
+                </div>
             </div>
         <?php else: ?>
-        
-        <!-- Card de Resumo Geral -->
-        <div class="summary-section">
-            <div class="card total-balance-card">
-                <div class="card-header">
-                    <h2 class="card-title">
-                        <div class="balance-icon">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-                            </svg>
-                        </div>
-                        Saldo Total Disponível
-                    </h2>
+
+        <!-- Cards de Resumo Principal -->
+        <div class="summary-cards">
+            <!-- Saldo Total Disponível -->
+            <div class="summary-card main-balance">
+                <div class="card-content">
+                    <div class="card-icon">💳</div>
+                    <div class="card-info">
+                        <h3>Dinheiro Pronto para Usar</h3>
+                        <p>Valor que você pode usar nas suas próximas compras</p>
+                    </div>
                 </div>
-                <div class="card-body">
-                    <div class="total-amount"><?php echo formatCurrency($saldoTotal['total_disponivel']); ?></div>
-                    <div class="summary-stats">
-                        <div class="stat">
-                            <span class="stat-label">Lojas com saldo</span>
-                            <span class="stat-value"><?php echo $saldoTotal['total_lojas_com_saldo']; ?></span>
-                        </div>
-                        <div class="stat">
-                            <span class="stat-label">Total usado</span>
-                            <span class="stat-value"><?php echo formatCurrency($estatisticas['total_usado']); ?></span>
-                        </div>
-                        <div class="stat">
-                            <span class="stat-label">Usos realizados</span>
-                            <span class="stat-value"><?php echo $estatisticas['total_usos']; ?></span>
-                        </div>
+                <div class="card-value">
+                    <span class="currency">R$</span>
+                    <span class="amount" data-value="<?php echo $saldoTotal['total_disponivel']; ?>">
+                        <?php echo number_format($saldoTotal['total_disponivel'], 2, ',', '.'); ?>
+                    </span>
+                </div>
+                <div class="card-stats">
+                    <div class="stat">
+                        <span class="stat-value"><?php echo $saldoTotal['total_lojas_com_saldo']; ?></span>
+                        <span class="stat-label">
+                            <?php echo $saldoTotal['total_lojas_com_saldo'] == 1 ? 'loja com saldo' : 'lojas com saldo'; ?>
+                        </span>
                     </div>
                 </div>
             </div>
-            
-            <!-- Informações sobre saldos pendentes -->
-            <?php if (!empty($saldosPendentes)): ?>
-            <div class="card pending-balance-card">
-                <div class="card-header">
-                    <h3 class="card-title">Saldos Pendentes</h3>
-                    <span class="pending-badge">Aguardando aprovação</span>
+
+            <!-- Saldo Aguardando -->
+            <?php if ($totalSaldoPendente > 0): ?>
+            <div class="summary-card pending-balance">
+                <div class="card-content">
+                    <div class="card-icon">⏳</div>
+                    <div class="card-info">
+                        <h3>Chegando em Breve</h3>
+                        <p>Cashback que ainda vai ser liberado pelas lojas</p>
+                    </div>
                 </div>
-                <div class="card-body">
-                    <div class="total-pending"><?php echo formatCurrency($totalSaldoPendente); ?></div>
-                    <p class="pending-description">
-                        Você tem cashback aguardando confirmação de pagamento das lojas. 
-                        Estes valores serão liberados assim que as lojas quitarem suas comissões.
-                    </p>
-                    <div class="pending-stores">
-                        <?php foreach ($saldosPendentes as $pendente): ?>
+                <div class="card-value pending">
+                    <span class="currency">R$</span>
+                    <span class="amount"><?php echo number_format($totalSaldoPendente, 2, ',', '.'); ?></span>
+                </div>
+                <div class="pending-details">
+                    <?php foreach (array_slice($saldosPendentes, 0, 2) as $pendente): ?>
                         <div class="pending-item">
                             <span class="store-name"><?php echo htmlspecialchars($pendente['nome_fantasia']); ?></span>
-                            <div>
-                                <span class="pending-amount"><?php echo formatCurrency($pendente['total_pendente']); ?></span>
-                                <small class="pending-count"><?php echo $pendente['qtd_transacoes']; ?> transações</small>
-                            </div>
+                            <span class="pending-amount"><?php echo formatCurrency($pendente['total_pendente']); ?></span>
                         </div>
-                        <?php endforeach; ?>
-                    </div>
+                    <?php endforeach; ?>
+                    <?php if (count($saldosPendentes) > 2): ?>
+                        <div class="pending-more">
+                            +<?php echo count($saldosPendentes) - 2; ?> outras lojas
+                        </div>
+                    <?php endif; ?>
                 </div>
             </div>
             <?php endif; ?>
+
+            <!-- Total Já Economizado -->
+            <div class="summary-card total-savings">
+                <div class="card-content">
+                    <div class="card-icon">🎯</div>
+                    <div class="card-info">
+                        <h3>Total que Você Economizou</h3>
+                        <p>Quanto dinheiro você já ganhou de volta</p>
+                    </div>
+                </div>
+                <div class="card-value">
+                    <span class="currency">R$</span>
+                    <span class="amount"><?php echo number_format($estatisticas['total_creditado'], 2, ',', '.'); ?></span>
+                </div>
+                <div class="savings-breakdown">
+                    <div class="breakdown-row">
+                        <span class="label">💰 Já usei:</span>
+                        <span class="value used"><?php echo formatCurrency($estatisticas['total_usado']); ?></span>
+                    </div>
+                    <div class="breakdown-row">
+                        <span class="label">🏦 Disponível:</span>
+                        <span class="value available"><?php echo formatCurrency($saldoTotal['total_disponivel']); ?></span>
+                    </div>
+                </div>
+            </div>
         </div>
-        
-        <!-- Lista de Saldos por Loja -->
+
+        <!-- Como Usar Seu Saldo -->
+        <div class="info-section">
+            <div class="info-card how-to-use">
+                <h3>🤔 Como Usar Meu Saldo?</h3>
+                <div class="usage-steps">
+                    <div class="step">
+                        <div class="step-icon">1️⃣</div>
+                        <div class="step-content">
+                            <strong>Escolha a loja</strong>
+                            <p>Vá até uma das lojas onde você tem saldo</p>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-icon">2️⃣</div>
+                        <div class="step-content">
+                            <strong>Mostre que é cliente Klube Cash</strong>
+                            <p>Informe na hora do pagamento que quer usar o saldo</p>
+                        </div>
+                    </div>
+                    <div class="step">
+                        <div class="step-icon">3️⃣</div>
+                        <div class="step-content">
+                            <strong>Economize na compra!</strong>
+                            <p>O valor do seu saldo será descontado do total</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="important-note">
+                    <div class="note-icon">💡</div>
+                    <p>
+                        <strong>Importante:</strong> Você só pode usar o saldo na mesma loja onde o ganhou. 
+                        É como ter uma carteira separada para cada loja!
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Seus Saldos por Loja -->
         <div class="stores-section">
             <div class="section-header">
-                <h2>Saldos por Loja</h2>
-                <div class="view-options">
-                    <button class="view-btn active" data-view="grid">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="3" y="3" width="7" height="7"></rect>
-                            <rect x="14" y="3" width="7" height="7"></rect>
-                            <rect x="14" y="14" width="7" height="7"></rect>
-                            <rect x="3" y="14" width="7" height="7"></rect>
-                        </svg>
-                    </button>
-                    <button class="view-btn" data-view="list">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <line x1="8" y1="6" x2="21" y2="6"></line>
-                            <line x1="8" y1="12" x2="21" y2="12"></line>
-                            <line x1="8" y1="18" x2="21" y2="18"></line>
-                            <line x1="3" y1="6" x2="3.01" y2="6"></line>
-                            <line x1="3" y1="12" x2="3.01" y2="12"></line>
-                            <line x1="3" y1="18" x2="3.01" y2="18"></line>
-                        </svg>
-                    </button>
-                </div>
+                <h2>🏪 Suas Carteiras por Loja</h2>
+                <p class="section-subtitle">Cada loja tem seu próprio saldo que você pode usar</p>
             </div>
             
             <?php if (empty($saldosPorLoja)): ?>
                 <div class="empty-state">
-                    <div class="empty-icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <line x1="12" y1="8" x2="12" y2="12"></line>
-                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                        </svg>
+                    <div class="empty-illustration">
+                        <div class="empty-icon">🛍️</div>
+                        <div class="empty-coins">💰💰💰</div>
                     </div>
-                    <h3>Nenhum saldo disponível</h3>
-                    <p>Você ainda não possui saldo de cashback em nenhuma loja. Comece a fazer compras em nossas lojas parceiras para acumular cashback!</p>
-                    <a href="<?php echo CLIENT_STORES_URL; ?>" class="btn btn-primary">Ver Lojas Parceiras</a>
+                    <h3>Você ainda não tem saldo em nenhuma loja</h3>
+                    <p>
+                        Quando fizer compras nas lojas parceiras, o cashback aparecerá aqui. 
+                        Que tal começar a economizar agora?
+                    </p>
+                    <a href="<?php echo CLIENT_STORES_URL; ?>" class="start-shopping-btn">
+                        🛒 Ver Lojas Parceiras
+                    </a>
                 </div>
             <?php else: ?>
-                <div class="stores-grid" id="storesContainer">
+                <div class="stores-grid">
                     <?php foreach ($saldosPorLoja as $loja): ?>
-                    <div class="store-balance-card">
+                    <div class="store-card <?php echo $loja['saldo_disponivel'] <= 0 ? 'no-balance' : ''; ?>">
                         <div class="store-header">
                             <div class="store-logo">
                                 <?php if (!empty($loja['logo']) && file_exists('../../uploads/store_logos/' . $loja['logo'])): ?>
@@ -367,213 +394,195 @@ function formatMonth($yearMonth) {
                             </div>
                             <div class="store-info">
                                 <h3 class="store-name"><?php echo htmlspecialchars($loja['nome_fantasia']); ?></h3>
-                                <span class="store-category"><?php echo htmlspecialchars($loja['categoria'] ?? 'Geral'); ?></span>
+                                <span class="store-category">
+                                    <?php echo htmlspecialchars($loja['categoria'] ?? 'Geral'); ?>
+                                </span>
+                                <div class="cashback-rate">
+                                    Você ganha <?php echo number_format($loja['porcentagem_cashback'] / 2, 1); ?>% de volta
+                                </div>
                             </div>
                         </div>
                         
                         <div class="store-balance">
-                            <div class="balance-amount">
-                                <?php echo formatCurrency($loja['saldo_disponivel']); ?>
-                            </div>
-                            <div class="balance-label">Saldo disponível</div>
+                            <?php if ($loja['saldo_disponivel'] > 0): ?>
+                                <div class="balance-available">
+                                    <div class="balance-label">Você pode usar:</div>
+                                    <div class="balance-amount">
+                                        <?php echo formatCurrency($loja['saldo_disponivel']); ?>
+                                    </div>
+                                </div>
+                            <?php else: ?>
+                                <div class="balance-empty">
+                                    <div class="empty-message">Sem saldo disponível</div>
+                                    <div class="encourage-text">Faça compras para ganhar cashback! 🛍️</div>
+                                </div>
+                            <?php endif; ?>
                         </div>
                         
                         <div class="store-stats">
-                            <div class="store-stat">
-                                <span class="stat-icon">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-                                    </svg>
-                                </span>
-                                <span class="stat-text"><?php echo formatCurrency($loja['total_usado']); ?> usado</span>
+                            <div class="stat-item">
+                                <span class="stat-icon">💰</span>
+                                <div class="stat-info">
+                                    <span class="stat-value"><?php echo formatCurrency($loja['total_creditado']); ?></span>
+                                    <span class="stat-label">Total recebido</span>
+                                </div>
                             </div>
-                            <div class="store-stat">
-                                <span class="stat-icon">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <circle cx="12" cy="12" r="10"></circle>
-                                        <polyline points="12 6 12 12 16 14"></polyline>
-                                    </svg>
-                                </span>
-                                <span class="stat-text">
-                                    Última movimentação: <?php echo formatDate($loja['ultima_movimentacao']); ?>
-                                </span>
+                            <div class="stat-item">
+                                <span class="stat-icon">🛒</span>
+                                <div class="stat-info">
+                                    <span class="stat-value"><?php echo formatCurrency($loja['total_usado']); ?></span>
+                                    <span class="stat-label">Já usado</span>
+                                </div>
                             </div>
                         </div>
 
                         <div class="store-actions">
-                            <button class="btn btn-outline btn-sm" onclick="viewStoreDetails(<?php echo $loja['loja_id']; ?>)">
-                                Ver detalhes
+                            <button class="details-btn" onclick="viewStoreDetails(<?php echo $loja['loja_id']; ?>)">
+                                📊 Ver Detalhes
                             </button>
-                            <span class="cashback-rate"><?php echo number_format($loja['porcentagem_cashback'] / 2, 1); ?>% seu cashback</span>
+                            <?php if (!empty($loja['website'])): ?>
+                                <a href="<?php echo htmlspecialchars($loja['website']); ?>" 
+                                   target="_blank" class="visit-btn">
+                                    🌐 Visitar Loja
+                                </a>
+                            <?php endif; ?>
                         </div>
+
+                        <?php if ($loja['ultima_movimentacao']): ?>
+                            <div class="last-activity">
+                                Última atividade: <?php echo formatDate($loja['ultima_movimentacao']); ?>
+                            </div>
+                        <?php endif; ?>
                     </div>
                     <?php endforeach; ?>
                 </div>
             <?php endif; ?>
         </div>
-        
-        <!-- Seção de Estatísticas e Movimentações -->
-        <div class="dashboard-grid">
-            <div>
-                <!-- Movimentações Recentes -->
-                <div class="card">
-                    <div class="card-header">
-                        <h3 class="card-title">Movimentações Recentes</h3>
-                    </div>
-                    <div class="card-body">
-                        <div class="movements-list">
-                            <?php if (empty($movimentacoesRecentes)): ?>
-                                <p style="text-align: center; padding: 20px; color: var(--text-muted);">Nenhuma movimentação encontrada</p>
-                            <?php else: ?>
-                                <?php foreach ($movimentacoesRecentes as $movimento): ?>
-                                    <div class="movement-item">
-                                        <div class="movement-icon">
-                                            <?php 
-                                            $iconColor = '';
-                                            switch ($movimento['tipo_operacao']) {
-                                                case 'credito':
-                                                    $iconColor = '#4CAF50';
-                                                    break;
-                                                case 'uso':
-                                                    $iconColor = '#FF9800';
-                                                    break;
-                                                case 'estorno':
-                                                    $iconColor = '#2196F3';
-                                                    break;
-                                            }
-                                            ?>
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="<?php echo $iconColor; ?>" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                                <?php if ($movimento['tipo_operacao'] === 'credito'): ?>
-                                                    <line x1="12" y1="5" x2="12" y2="19"></line>
-                                                    <polyline points="19 12 12 19 5 12"></polyline>
-                                                <?php elseif ($movimento['tipo_operacao'] === 'uso'): ?>
-                                                    <line x1="12" y1="19" x2="12" y2="5"></line>
-                                                    <polyline points="5 12 12 5 19 12"></polyline>
-                                                <?php else: ?>
-                                                    <polyline points="1 4 1 10 7 10"></polyline>
-                                                    <path d="m1 10 6-6v6"></path>
-                                                    <path d="M19 4a2 2 0 01-2 2H5"></path>
-                                                <?php endif; ?>
-                                            </svg>
-                                        </div>
-                                        <div class="movement-details">
-                                            <div class="movement-description">
-                                                <?php 
-                                                switch ($movimento['tipo_operacao']) {
-                                                    case 'credito':
-                                                        echo 'Cashback recebido - ' . htmlspecialchars($movimento['loja_nome']);
-                                                        break;
-                                                    case 'uso':
-                                                        echo 'Saldo usado - ' . htmlspecialchars($movimento['loja_nome']);
-                                                        break;
-                                                    case 'estorno':
-                                                        echo 'Estorno - ' . htmlspecialchars($movimento['loja_nome']);
-                                                        break;
-                                                }
-                                                ?>
-                                            </div>
-                                            <div class="movement-date"><?php echo formatDateTime($movimento['data_operacao']); ?></div>
-                                        </div>
-                                        <div class="movement-amount">
-                                            <?php 
-                                            $amountClass = '';
-                                            $prefix = '';
-                                            switch ($movimento['tipo_operacao']) {
-                                                case 'credito':
-                                                case 'estorno':
-                                                    $amountClass = 'positive';
-                                                    $prefix = '+';
-                                                    break;
-                                                case 'uso':
-                                                    $amountClass = 'negative';
-                                                    $prefix = '-';
-                                                    break;
-                                            }
-                                            ?>
-                                            <span class="amount <?php echo $amountClass; ?>">
-                                                <?php echo $prefix . formatCurrency($movimento['valor']); ?>
-                                            </span>
-                                        </div>
-                                    </div>
-                                <?php endforeach; ?>
-                            <?php endif; ?>
-                        </div>
-                        <a href="<?php echo CLIENT_STATEMENT_URL; ?>" class="see-all">Ver histórico completo</a>
-                    </div>
+
+        <!-- Seção de Atividades e Estatísticas -->
+        <div class="activity-section">
+            <!-- Suas Últimas Atividades -->
+            <div class="activity-card">
+                <div class="activity-header">
+                    <h3>📈 Suas Últimas Atividades</h3>
+                    <a href="<?php echo CLIENT_STATEMENT_URL; ?>" class="see-all-link">Ver Todas →</a>
                 </div>
                 
-                <!-- Top Lojas Mais Usadas -->
-                <?php if (!empty($topLojas)): ?>
-                <div class="card" style="margin-top: 20px;">
-                    <div class="card-header">
-                        <h3 class="card-title">Top 5 - Lojas Onde Mais Uso Saldo</h3>
+                <?php if (empty($movimentacoesRecentes)): ?>
+                    <div class="no-activity">
+                        <div class="no-activity-icon">📊</div>
+                        <p>Ainda não há atividades para mostrar</p>
+                        <span class="tip">Faça compras para ver suas movimentações aqui!</span>
                     </div>
-                    <div class="card-body">
-                        <div class="top-stores-usage">
-                            <?php foreach ($topLojas as $loja): ?>
-                                <div class="usage-item">
-                                    <div class="usage-store"><?php echo htmlspecialchars($loja['nome_fantasia']); ?></div>
-                                    <div class="usage-stats">
-                                        <span class="usage-amount"><?php echo formatCurrency($loja['total_usado']); ?></span>
-                                        <span class="usage-count"><?php echo $loja['qtd_usos']; ?> usos</span>
-                                        <?php if ($loja['saldo_disponivel'] > 0): ?>
-                                            <small class="current-balance">Saldo: <?php echo formatCurrency($loja['saldo_disponivel']); ?></small>
-                                        <?php endif; ?>
+                <?php else: ?>
+                    <div class="activities-list">
+                        <?php foreach ($movimentacoesRecentes as $movimento): ?>
+                            <div class="activity-item">
+                                <div class="activity-icon">
+                                    <?php 
+                                    switch ($movimento['tipo_operacao']) {
+                                        case 'credito': echo '💰'; break;
+                                        case 'uso': echo '🛒'; break;
+                                        case 'estorno': echo '↩️'; break;
+                                        default: echo '📊';
+                                    }
+                                    ?>
+                                </div>
+                                <div class="activity-details">
+                                    <div class="activity-description">
+                                        <?php 
+                                        switch ($movimento['tipo_operacao']) {
+                                            case 'credito':
+                                                echo 'Você ganhou cashback';
+                                                break;
+                                            case 'uso':
+                                                echo 'Você usou seu saldo';
+                                                break;
+                                            case 'estorno':
+                                                echo 'Estorno de saldo';
+                                                break;
+                                        }
+                                        ?>
+                                        <span class="store-name-small"> - <?php echo htmlspecialchars($movimento['loja_nome']); ?></span>
+                                    </div>
+                                    <div class="activity-date">
+                                        <?php echo formatDateTime($movimento['data_operacao']); ?>
                                     </div>
                                 </div>
-                            <?php endforeach; ?>
-                        </div>
+                                <div class="activity-amount">
+                                    <span class="amount-value <?php echo $movimento['tipo_operacao'] === 'uso' ? 'negative' : 'positive'; ?>">
+                                        <?php echo $movimento['tipo_operacao'] === 'uso' ? '-' : '+'; ?>
+                                        <?php echo formatCurrency($movimento['valor']); ?>
+                                    </span>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
                     </div>
-                </div>
                 <?php endif; ?>
             </div>
-            
-            <div>
-                <!-- Estatísticas Gerais -->
-                <div class="card">
-                    <div class="card-header">
-                        <h3 class="card-title">Estatísticas Gerais</h3>
+
+            <!-- Gráfico de Evolução -->
+            <?php if (!empty($dadosMensais)): ?>
+            <div class="chart-card">
+                <h3>📊 Evolução dos Últimos 6 Meses</h3>
+                <div class="chart-container">
+                    <canvas id="balanceChart"></canvas>
+                </div>
+                <div class="chart-legend">
+                    <div class="legend-item">
+                        <span class="legend-color earned"></span>
+                        <span>Cashback Recebido</span>
                     </div>
-                    <div class="card-body">
-                        <div class="stats-grid">
-                            <div class="stat-card">
-                                <div class="stat-value"><?php echo formatCurrency($estatisticas['total_creditado']); ?></div>
-                                <div class="stat-label">Total Creditado</div>
-                            </div>
-                            <div class="stat-card">
-                                <div class="stat-value"><?php echo formatCurrency($estatisticas['total_usado']); ?></div>
-                                <div class="stat-label">Total Usado</div>
-                            </div>
-                            <div class="stat-card">
-                                <div class="stat-value"><?php echo $estatisticas['total_usos']; ?></div>
-                                <div class="stat-label">Usos Realizados</div>
-                            </div>
-                            <div class="stat-card">
-                                <div class="stat-value"><?php echo $estatisticas['total_lojas_utilizadas']; ?></div>
-                                <div class="stat-label">Lojas Diferentes</div>
-                            </div>
+                    <div class="legend-item">
+                        <span class="legend-color used"></span>
+                        <span>Saldo Usado</span>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+        </div>
+
+        <!-- Estatísticas Resumidas -->
+        <div class="stats-section">
+            <h3>📈 Resumo da Sua Jornada</h3>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">🏆</div>
+                    <div class="stat-content">
+                        <div class="stat-number"><?php echo $estatisticas['total_creditos']; ?></div>
+                        <div class="stat-description">vezes que você ganhou cashback</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🛍️</div>
+                    <div class="stat-content">
+                        <div class="stat-number"><?php echo $estatisticas['total_usos']; ?></div>
+                        <div class="stat-description">vezes que você usou o saldo</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">🏪</div>
+                    <div class="stat-content">
+                        <div class="stat-number"><?php echo $estatisticas['total_lojas_utilizadas']; ?></div>
+                        <div class="stat-description">
+                            <?php echo $estatisticas['total_lojas_utilizadas'] == 1 ? 'loja diferente' : 'lojas diferentes'; ?>
                         </div>
                     </div>
                 </div>
-                
-                <!-- Gráfico de Movimentações -->
-                <div class="card" style="margin-top: 20px;">
-                    <div class="card-header">
-                        <h3 class="card-title">Movimentações dos Últimos 6 Meses</h3>
-                    </div>
-                    <div class="card-body">
-                        <div class="chart-container">
-                            <canvas id="balanceChart"></canvas>
-                        </div>
+                <div class="stat-card highlight">
+                    <div class="stat-icon">💎</div>
+                    <div class="stat-content">
+                        <div class="stat-number"><?php echo formatCurrency($estatisticas['total_creditado']); ?></div>
+                        <div class="stat-description">total economizado até hoje</div>
                     </div>
                 </div>
             </div>
         </div>
-        
+
         <?php endif; ?>
     </div>
     
-    <!-- Modal de Detalhes da Loja -->
+    <!-- Modal de Detalhes da Loja (mantendo funcionalidade original) -->
     <div id="storeDetailsModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -591,466 +600,6 @@ function formatMonth($yearMonth) {
         </div>
     </div>
     
-    <!-- JavaScript -->
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Alternar visualização entre grid e lista
-            const viewButtons = document.querySelectorAll('.view-btn');
-            const storesContainer = document.getElementById('storesContainer');
-            
-            viewButtons.forEach(button => {
-                button.addEventListener('click', function() {
-                    // Remover classe active de todos os botões
-                    viewButtons.forEach(btn => btn.classList.remove('active'));
-                    
-                    // Adicionar classe active ao botão clicado
-                    this.classList.add('active');
-                    
-                    // Alterar classe do container
-                    const view = this.getAttribute('data-view');
-                    storesContainer.className = view === 'list' ? 'stores-list' : 'stores-grid';
-                });
-            });
-            
-            // Configurar gráfico de movimentações
-            const ctx = document.getElementById('balanceChart');
-            
-            <?php if (!empty($dadosMensais)): ?>
-            // Dados do gráfico
-            const labels = <?php echo json_encode(array_map('formatMonth', array_column($dadosMensais, 'mes'))); ?>;
-            const creditos = <?php echo json_encode(array_column($dadosMensais, 'creditos')); ?>;
-            const usos = <?php echo json_encode(array_column($dadosMensais, 'usos')); ?>;
-            const estornos = <?php echo json_encode(array_column($dadosMensais, 'estornos')); ?>;
-            
-            new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Créditos',
-                        data: creditos,
-                        borderColor: '#4CAF50',
-                        backgroundColor: 'rgba(76, 175, 80, 0.1)',
-                        tension: 0.3,
-                        fill: false
-                    }, {
-                        label: 'Usos',
-                        data: usos,
-                        borderColor: '#FF9800',
-                        backgroundColor: 'rgba(255, 152, 0, 0.1)',
-                        tension: 0.3,
-                        fill: false
-                    }, {
-                        label: 'Estornos',
-                        data: estornos,
-                        borderColor: '#2196F3',
-                        backgroundColor: 'rgba(33, 150, 243, 0.1)',
-                        tension: 0.3,
-                        fill: false
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: {
-                        intersect: false,
-                        mode: 'index'
-                    },
-                    plugins: {
-                        legend: {
-                            position: 'bottom'
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                callback: function(value) {
-                                    return 'R$ ' + value.toLocaleString('pt-BR', {
-                                        minimumFractionDigits: 0,
-                                        maximumFractionDigits: 0
-                                    });
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-            <?php endif; ?>
-        });
-
-        // Função para visualizar detalhes da loja - VERSÃO COM DEBUG COMPLETO
-function viewStoreDetails(storeId) {
-    console.log('viewStoreDetails chamada com storeId:', storeId);
-    
-    const modal = document.getElementById('storeDetailsModal');
-    const modalTitle = document.getElementById('modalStoreTitle');
-    const modalContent = document.getElementById('modalStoreContent');
-    
-    // Mostrar modal e loading
-    modal.style.display = 'block';
-    modalTitle.textContent = 'Carregando...';
-    modalContent.innerHTML = '<div class="loading-spinner">Carregando detalhes da loja...</div>';
-    
-    // URL correta - caminho absoluto da raiz
-    const url = `../../api/store_details.php?loja_id=${storeId}`;
-    console.log('URL da requisição:', url);
-    
-    fetch(url)
-        .then(response => {
-            console.log('Response status:', response.status);
-            
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-            
-            return response.json();
-        })
-        .then(data => {
-            console.log('Dados recebidos:', data);
-            
-            if (data.status) {
-                renderStoreDetails(data.data);
-            } else {
-                modalContent.innerHTML = `<div class="error-message">${data.message}</div>`;
-            }
-        })
-        .catch(error => {
-            console.error('Erro na requisição:', error);
-            modalContent.innerHTML = `<div class="error-message">Erro ao carregar detalhes: ${error.message}</div>`;
-        });
-}
-
-function tryFetchWithUrl(urls, index, storeId) {
-    if (index >= urls.length) {
-        document.getElementById('modalStoreContent').innerHTML = 
-            '<div class="error-message">Nenhuma URL funcionou. Verifique o console para mais detalhes.</div>';
-        return;
-    }
-    
-    const url = urls[index];
-    console.log(`Tentando URL ${index + 1}/${urls.length}: ${url}`);
-    
-    fetch(url, {
-        method: 'GET',
-        headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-        },
-        credentials: 'same-origin'
-    })
-    .then(response => {
-        console.log(`URL ${url} - Status:`, response.status);
-        console.log(`URL ${url} - OK:`, response.ok);
-        
-        if (response.ok) {
-            return response.text();
-        } else {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-    })
-    .then(text => {
-        console.log(`URL ${url} - Response text:`, text);
-        
-        try {
-            const data = JSON.parse(text);
-            console.log(`URL ${url} - Parsed data:`, data);
-            
-            if (data.status) {
-                console.log('Sucesso! Renderizando dados...');
-                renderStoreDetails(data.data);
-                return; // Sucesso, não precisa tentar outras URLs
-            } else {
-                throw new Error(data.message || 'Status false na resposta');
-            }
-        } catch (parseError) {
-            console.error(`URL ${url} - Erro ao parsear JSON:`, parseError);
-            throw new Error('Resposta não é JSON válido: ' + text.substring(0, 100));
-        }
-    })
-    .catch(error => {
-        console.error(`URL ${url} - Erro:`, error);
-        
-        // Tentar próxima URL
-        tryFetchWithUrl(urls, index + 1, storeId);
-    });
-}
-
-    // Versão simplificada da renderização para testar
-    // Função para visualizar detalhes da loja - VERSÃO CORRIGIDA
-    function viewStoreDetails(storeId) {
-        console.log('viewStoreDetails chamada com storeId:', storeId);
-        
-        const modal = document.getElementById('storeDetailsModal');
-        const modalTitle = document.getElementById('modalStoreTitle');
-        const modalContent = document.getElementById('modalStoreContent');
-        
-        // Mostrar modal e loading
-        modal.style.display = 'block';
-        modalTitle.textContent = 'Carregando...';
-        modalContent.innerHTML = '<div class="loading-spinner">Carregando detalhes da loja...</div>';
-        
-        // URL correta - caminho absoluto da raiz
-        const url = `../../simple_store_details.php?loja_id=${storeId}`;
-        console.log('URL da requisição:', url);
-        
-        fetch(url)
-            .then(response => {
-                console.log('Response status:', response.status);
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-                
-                return response.json();
-            })
-            .then(data => {
-                console.log('Dados recebidos:', data);
-                
-                if (data.status) {
-                    renderStoreDetails(data.data);
-                } else {
-                    modalContent.innerHTML = `<div class="error-message">${data.message}</div>`;
-                }
-            })
-            .catch(error => {
-                console.error('Erro na requisição:', error);
-                modalContent.innerHTML = `<div class="error-message">Erro ao carregar detalhes: ${error.message}</div>`;
-            });
-    }
-
-    // Função para renderizar os detalhes da loja no modal
-    function renderStoreDetails(data) {
-        const modalTitle = document.getElementById('modalStoreTitle');
-        const modalContent = document.getElementById('modalStoreContent');
-        
-        modalTitle.textContent = data.loja.nome_fantasia;
-        
-        const logoHtml = data.loja.logo ? 
-            `<img src="../../uploads/store_logos/${data.loja.logo}" alt="${data.loja.nome_fantasia}" 
-                style="max-width: 80px; height: auto; border-radius: 8px;" 
-                onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-            <div class="store-initial" style="width: 60px; height: 60px; font-size: 1.5rem; display: none;">
-                ${data.loja.nome_fantasia.charAt(0).toUpperCase()}
-            </div>` : 
-            `<div class="store-initial" style="width: 60px; height: 60px; font-size: 1.5rem; background: linear-gradient(135deg, #FF7A00, #FFB366); color: white; display: flex; align-items: center; justify-content: center; border-radius: 12px; box-shadow: 0 2px 8px rgba(255, 122, 0, 0.2);">
-                ${data.loja.nome_fantasia.charAt(0).toUpperCase()}
-            </div>`;
-        
-        const html = `
-            <div class="store-detail-container">
-                <!-- Informações Básicas da Loja -->
-                <div class="store-detail-header">
-                    <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
-                        ${logoHtml}
-                        <div>
-                            <h3 style="margin: 0; color: var(--text-primary);">${data.loja.nome_fantasia}</h3>
-                            <p style="margin: 5px 0 0 0; color: var(--text-muted);">${data.loja.categoria || 'Categoria não informada'}</p>
-                        </div>
-                    </div>
-                    
-                    <div class="store-info-grid">
-                        <div class="info-item">
-                            <span class="info-label">Cashback para você:</span>
-                            <span class="info-value highlight">${(parseFloat(data.loja.porcentagem_cashback) / 2).toFixed(1)}%</span>
-                        </div>
-                        ${data.loja.website ? `
-                        <div class="info-item">
-                            <span class="info-label">Website:</span>
-                            <a href="${data.loja.website}" target="_blank" class="info-link">${data.loja.website}</a>
-                        </div>
-                        ` : ''}
-                    </div>
-                    
-                    ${data.loja.descricao ? `
-                    <div class="store-description">
-                        <p>${data.loja.descricao}</p>
-                    </div>
-                    ` : ''}
-                </div>
-                
-                <!-- Cards de saldo -->
-                <div class="balance-cards-grid">
-                    <div class="balance-card">
-                        <div class="balance-card-icon success">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-                            </svg>
-                        </div>
-                        <div class="balance-card-content">
-                            <div class="balance-amount">R$ ${parseFloat(data.saldo.saldo_disponivel).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
-                            <div class="balance-label">Saldo Disponível</div>
-                        </div>
-                    </div>
-                    
-                    <div class="balance-card">
-                        <div class="balance-card-icon primary">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <line x1="12" y1="5" x2="12" y2="19"></line>
-                                <polyline points="19 12 12 19 5 12"></polyline>
-                            </svg>
-                        </div>
-                        <div class="balance-card-content">
-                            <div class="balance-amount">R$ ${parseFloat(data.saldo.total_creditado).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
-                            <div class="balance-label">Total Recebido</div>
-                        </div>
-                    </div>
-                    
-                    <div class="balance-card">
-                        <div class="balance-card-icon warning">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <line x1="12" y1="19" x2="12" y2="5"></line>
-                                <polyline points="5 12 12 5 19 12"></polyline>
-                            </svg>
-                        </div>
-                        <div class="balance-card-content">
-                            <div class="balance-amount">R$ ${parseFloat(data.saldo.total_usado).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</div>
-                            <div class="balance-label">Total Usado</div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Simulador de uso de saldo -->
-                ${parseFloat(data.saldo.saldo_disponivel) > 0 ? `
-                <div class="balance-simulator">
-                    <h4>💡 Simular Uso do Saldo</h4>
-                    <div class="simulator-form">
-                        <div class="input-group">
-                            <label for="simulateValue">Valor a usar:</label>
-                            <input type="number" id="simulateValue" placeholder="0,00" step="0.01" max="${data.saldo.saldo_disponivel}">
-                        </div>
-                        <button onclick="simulateBalanceUse(${data.loja.id})" class="btn btn-primary btn-sm">Simular</button>
-                    </div>
-                    <div id="simulationResult" class="simulation-result" style="display: none;"></div>
-                </div>
-                ` : ''}
-                
-                <!-- Estatísticas -->
-                <div class="statistics-section">
-                    <h4>📊 Estatísticas da Loja</h4>
-                    <div class="stats-grid">
-                        <div class="stat-item">
-                            <span class="stat-number">${data.estatisticas.total_movimentacoes}</span>
-                            <span class="stat-label">Movimentações</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-number">${data.movimentacoes.filter(m => m.tipo_operacao === 'credito').length}</span>
-                            <span class="stat-label">Créditos</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-number">${data.movimentacoes.filter(m => m.tipo_operacao === 'uso').length}</span>
-                            <span class="stat-label">Usos</span>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Histórico de Movimentações -->
-                <div class="movements-history">
-                    <h4>📝 Histórico de Movimentações</h4>
-                    ${data.movimentacoes && data.movimentacoes.length > 0 ? `
-                    <div class="movements-list-modal">
-                        ${data.movimentacoes.map(mov => `
-                            <div class="movement-item-modal">
-                                <div class="movement-icon-modal ${mov.tipo_operacao}">
-                                    ${getMovementIcon(mov.tipo_operacao)}
-                                </div>
-                                <div class="movement-details-modal">
-                                    <div class="movement-description-modal">
-                                        ${getMovementDescription(mov.tipo_operacao, mov.descricao)}
-                                    </div>
-                                    <div class="movement-date-modal">${formatDateTime(mov.data_operacao)}</div>
-                                </div>
-                                <div class="movement-amount-modal ${mov.tipo_operacao === 'uso' ? 'negative' : 'positive'}">
-                                    ${mov.tipo_operacao === 'uso' ? '-' : '+'}R$ ${parseFloat(mov.valor).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                                </div>
-                            </div>
-                        `).join('')}
-                    </div>
-                    ` : '<p class="no-movements">Nenhuma movimentação encontrada para esta loja.</p>'}
-                </div>
-            </div>
-        `;
-        
-        modalContent.innerHTML = html;
-    }
-
-    // Função para simular uso de saldo
-    function simulateBalanceUse(storeId) {
-        const valueInput = document.getElementById('simulateValue');
-        const resultDiv = document.getElementById('simulationResult');
-        const value = parseFloat(valueInput.value || 0);
-        
-        if (value <= 0) {
-            showSimulationResult('⚠️ Informe um valor válido maior que zero.', 'error');
-            return;
-        }
-        
-        // Obter saldo disponível do card
-        const saldoDisponivel = parseFloat(document.querySelector('.balance-card .balance-amount').textContent.replace('R$ ', '').replace(',', '.'));
-        
-        if (value > saldoDisponivel) {
-            showSimulationResult(`❌ Saldo insuficiente. Disponível: R$ ${saldoDisponivel.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, 'error');
-        } else {
-            const restante = saldoDisponivel - value;
-            showSimulationResult(`✅ Você pode usar R$ ${value.toLocaleString('pt-BR', {minimumFractionDigits: 2})}! Restará R$ ${restante.toLocaleString('pt-BR', {minimumFractionDigits: 2})}.`, 'success');
-        }
-    }
-
-    // Função para mostrar resultado da simulação
-    function showSimulationResult(message, type) {
-        const resultDiv = document.getElementById('simulationResult');
-        resultDiv.innerHTML = `<div class="simulation-message ${type}">${message}</div>`;
-        resultDiv.style.display = 'block';
-        
-        // Ocultar após 5 segundos
-        setTimeout(() => {
-            resultDiv.style.display = 'none';
-        }, 5000);
-    }
-
-    // Funções auxiliares
-    function getMovementIcon(tipo) {
-        const icons = {
-            'credito': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>',
-            'uso': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>',
-            'estorno': '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"></polyline><path d="m1 10 6-6v6"></path></svg>'
-        };
-        return icons[tipo] || icons['credito'];
-    }
-
-    function getMovementDescription(tipo, descricao) {
-        const tipos = {
-            'credito': '💰 Cashback recebido',
-            'uso': '🛒 Saldo usado',
-            'estorno': '↩️ Estorno'
-        };
-        return descricao || tipos[tipo] || 'Movimentação';
-    }
-
-    function formatDateTime(datetime) {
-        if (!datetime) return 'Data não informada';
-        const date = new Date(datetime);
-        return date.toLocaleString('pt-BR');
-    }
-        function formatMonth(yearMonth) {
-            if (!yearMonth) return '';
-            const [year, month] = yearMonth.split('-');
-            const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-            return `${monthNames[parseInt(month) - 1]}/${year.substr(2)}`;
-        }
-
-        // Função para fechar o modal
-        function closeStoreModal() {
-            document.getElementById('storeDetailsModal').style.display = 'none';
-        }
-
-        // Fechar modal ao clicar fora dele
-        window.onclick = function(event) {
-            const modal = document.getElementById('storeDetailsModal');
-            if (event.target === modal) {
-                modal.style.display = 'none';
-            }
-        }
-    </script>
+    <script src="../../assets/js/client/balance-new.js"></script>
 </body>
 </html>
