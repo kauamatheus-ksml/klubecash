@@ -2365,6 +2365,9 @@ public static function getAvailableStores() {
     /**
  * Obtém dados completos para relatórios financeiros
  */
+    /**
+ * Obtém dados completos para relatórios financeiros
+ */
 public static function getFinancialReports($filters = []) {
     try {
         if (!self::validateAdmin()) {
@@ -2374,20 +2377,9 @@ public static function getFinancialReports($filters = []) {
         $db = Database::getConnection();
         
         // Preparar condições de filtro
-        $dateCondition = "";
         $params = [];
         
-        if (!empty($filters['data_inicio'])) {
-            $dateCondition .= " AND t.data_transacao >= :data_inicio";
-            $params[':data_inicio'] = $filters['data_inicio'] . ' 00:00:00';
-        }
-        
-        if (!empty($filters['data_fim'])) {
-            $dateCondition .= " AND t.data_transacao <= :data_fim";
-            $params[':data_fim'] = $filters['data_fim'] . ' 23:59:59';
-        }
-        
-        // 1. ESTATÍSTICAS DE SALDO (corrigido)
+        // 1. ESTATÍSTICAS DE SALDO
         $saldoQuery = "
             SELECT 
                 COUNT(DISTINCT cs.usuario_id) as total_clientes_com_saldo,
@@ -2402,15 +2394,25 @@ public static function getFinancialReports($filters = []) {
         
         $saldoStmt = $db->query($saldoQuery);
         $saldoStats = $saldoStmt->fetch(PDO::FETCH_ASSOC) ?: [
-            'total_clientes_com_saldo' => 0,
-            'total_lojas_com_saldo' => 0,
-            'total_saldo_disponivel' => 0,
-            'total_saldo_creditado' => 0,
-            'total_saldo_usado' => 0,
-            'media_saldo_por_cliente' => 0
+            'total_clientes_com_saldo' => 0, 'total_lojas_com_saldo' => 0,
+            'total_saldo_disponivel' => 0, 'total_saldo_creditado' => 0,
+            'total_saldo_usado' => 0, 'media_saldo_por_cliente' => 0
         ];
         
-        // 2. MOVIMENTAÇÕES DO PERÍODO (corrigido)
+        // 2. MOVIMENTAÇÕES DO PERÍODO (CORRIGIDO)
+        $movCondition = "1=1";
+        $movParams = [];
+        
+        if (!empty($filters['data_inicio'])) {
+            $movCondition .= " AND cm.data_operacao >= :data_inicio";
+            $movParams[':data_inicio'] = $filters['data_inicio'] . ' 00:00:00';
+        }
+        
+        if (!empty($filters['data_fim'])) {
+            $movCondition .= " AND cm.data_operacao <= :data_fim";
+            $movParams[':data_fim'] = $filters['data_fim'] . ' 23:59:59';
+        }
+        
         $movQuery = "
             SELECT 
                 COALESCE(SUM(CASE WHEN cm.tipo_operacao = 'credito' THEN cm.valor ELSE 0 END), 0) as creditos_periodo,
@@ -2420,11 +2422,11 @@ public static function getFinancialReports($filters = []) {
                 COUNT(CASE WHEN cm.tipo_operacao = 'uso' THEN 1 END) as qtd_usos,
                 COUNT(CASE WHEN cm.tipo_operacao = 'estorno' THEN 1 END) as qtd_estornos
             FROM cashback_movimentacoes cm
-            WHERE 1=1 $dateCondition
+            WHERE $movCondition
         ";
         
         $movStmt = $db->prepare($movQuery);
-        foreach ($params as $param => $value) {
+        foreach ($movParams as $param => $value) {
             $movStmt->bindValue($param, $value);
         }
         $movStmt->execute();
@@ -2433,7 +2435,20 @@ public static function getFinancialReports($filters = []) {
             'qtd_creditos' => 0, 'qtd_usos' => 0, 'qtd_estornos' => 0
         ];
         
-        // 3. VENDAS ORIGINAIS VS LÍQUIDAS (simplificado)
+        // 3. VENDAS ORIGINAIS VS LÍQUIDAS (CORRIGIDO)
+        $vendasCondition = "t.status = 'aprovado'";
+        $vendasParams = [];
+        
+        if (!empty($filters['data_inicio'])) {
+            $vendasCondition .= " AND t.data_transacao >= :data_inicio";
+            $vendasParams[':data_inicio'] = $filters['data_inicio'] . ' 00:00:00';
+        }
+        
+        if (!empty($filters['data_fim'])) {
+            $vendasCondition .= " AND t.data_transacao <= :data_fim";
+            $vendasParams[':data_fim'] = $filters['data_fim'] . ' 23:59:59';
+        }
+        
         $vendasQuery = "
             SELECT 
                 DATE_FORMAT(t.data_transacao, '%Y-%m') as mes,
@@ -2442,19 +2457,19 @@ public static function getFinancialReports($filters = []) {
                 COALESCE(SUM(t.valor_total - COALESCE(tsu.valor_usado, 0)), 0) as vendas_liquidas
             FROM transacoes_cashback t
             LEFT JOIN transacoes_saldo_usado tsu ON t.id = tsu.transacao_id
-            WHERE t.status = 'aprovado' $dateCondition
+            WHERE $vendasCondition
             GROUP BY DATE_FORMAT(t.data_transacao, '%Y-%m')
             ORDER BY mes ASC
         ";
         
         $vendasStmt = $db->prepare($vendasQuery);
-        foreach ($params as $param => $value) {
+        foreach ($vendasParams as $param => $value) {
             $vendasStmt->bindValue($param, $value);
         }
         $vendasStmt->execute();
         $vendasComparacao = $vendasStmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
         
-        // 4. RANKING LOJAS (simplificado)
+        // 4. RANKING LOJAS
         $lojasQuery = "
             SELECT 
                 l.nome_fantasia,
@@ -2486,11 +2501,11 @@ public static function getFinancialReports($filters = []) {
                 COALESCE(SUM(valor_cliente), 0) as total_cashback,
                 COUNT(*) as total_transacoes
             FROM transacoes_cashback t
-            WHERE t.status = 'aprovado' $dateCondition
+            WHERE $vendasCondition
         ";
         
         $financeStmt = $db->prepare($financeQuery);
-        foreach ($params as $param => $value) {
+        foreach ($vendasParams as $param => $value) {
             $financeStmt->bindValue($param, $value);
         }
         $financeStmt->execute();
@@ -2498,22 +2513,34 @@ public static function getFinancialReports($filters = []) {
             'total_vendas' => 0, 'total_cashback' => 0, 'total_transacoes' => 0
         ];
         
-        // 6. COMISSÃO DO ADMIN
+        // 6. COMISSÃO DO ADMIN (CORRIGIDO)
+        $adminCondition = "tc.tipo_usuario = 'admin' AND tc.status = 'aprovado'";
+        $adminParams = [];
+        
+        if (!empty($filters['data_inicio'])) {
+            $adminCondition .= " AND tc.data_transacao >= :data_inicio";
+            $adminParams[':data_inicio'] = $filters['data_inicio'] . ' 00:00:00';
+        }
+        
+        if (!empty($filters['data_fim'])) {
+            $adminCondition .= " AND tc.data_transacao <= :data_fim";
+            $adminParams[':data_fim'] = $filters['data_fim'] . ' 23:59:59';
+        }
+        
         $adminQuery = "
             SELECT COALESCE(SUM(valor_comissao), 0) as total_comissao
             FROM transacoes_comissao tc
-            JOIN transacoes_cashback t ON tc.transacao_id = t.id
-            WHERE tc.tipo_usuario = 'admin' AND tc.status = 'aprovado' $dateCondition
+            WHERE $adminCondition
         ";
         
         $adminStmt = $db->prepare($adminQuery);
-        foreach ($params as $param => $value) {
+        foreach ($adminParams as $param => $value) {
             $adminStmt->bindValue($param, $value);
         }
         $adminStmt->execute();
         $adminComission = $adminStmt->fetch(PDO::FETCH_ASSOC)['total_comissao'] ?? 0;
         
-        // 7. DADOS MENSAIS
+        // 7. DADOS MENSAIS (CORRIGIDO)
         $monthlyQuery = "
             SELECT 
                 DATE_FORMAT(tc.data_transacao, '%Y-%m') as mes,
@@ -2521,13 +2548,13 @@ public static function getFinancialReports($filters = []) {
                 COALESCE(SUM(t.valor_cliente), 0) as total_cashback
             FROM transacoes_comissao tc
             JOIN transacoes_cashback t ON tc.transacao_id = t.id
-            WHERE tc.status = 'aprovado' $dateCondition
+            WHERE tc.status = 'aprovado' AND $vendasCondition
             GROUP BY DATE_FORMAT(tc.data_transacao, '%Y-%m')
             ORDER BY mes ASC
         ";
         
         $monthlyStmt = $db->prepare($monthlyQuery);
-        foreach ($params as $param => $value) {
+        foreach ($vendasParams as $param => $value) {
             $monthlyStmt->bindValue($param, $value);
         }
         $monthlyStmt->execute();
@@ -2549,9 +2576,6 @@ public static function getFinancialReports($filters = []) {
     } catch (PDOException $e) {
         error_log('Erro SQL relatórios: ' . $e->getMessage());
         return ['status' => false, 'message' => 'Erro na consulta: ' . $e->getMessage()];
-    } catch (Exception $e) {
-        error_log('Erro geral relatórios: ' . $e->getMessage());
-        return ['status' => false, 'message' => 'Erro interno: ' . $e->getMessage()];
     }
 }
     /**
