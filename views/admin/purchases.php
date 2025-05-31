@@ -752,236 +752,236 @@ function buildQueryString($exclude = []) {
 
 
         function renderTransactionDetailsWithBalance(transaction) {
-            // Garantir que os valores sejam números
-            const valorOriginal = parseFloat(transaction.valor_total) || 0;
-            const valorCliente = parseFloat(transaction.valor_cliente) || 0;
-            const valorAdmin = parseFloat(transaction.valor_admin) || 0;
-            const valorLoja = parseFloat(transaction.valor_loja) || 0;
-            const saldoUsado = parseFloat(transaction.saldo_usado) || 0;
-            const valorPago = valorOriginal - saldoUsado;
-            
-            const content = document.getElementById('modalTransactionContent');
-            
-            let html = `
-                <div class="transaction-details" style="max-width: none;">
-                    <div class="detail-grid" style="grid-template-columns: 1fr; gap: 20px;">
-                        <!-- Informações Básicas -->
-                        <div class="detail-card">
-                            <h4 style="color: var(--primary-color); margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                                    <polyline points="14,2 14,8 20,8"/>
-                                </svg>
-                                Informações da Transação
-                            </h4>
-                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
-                                <div class="detail-item" style="flex-direction: column; align-items: flex-start; padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                                    <span class="detail-label" style="margin-bottom: 5px;">Código da Transação</span>
-                                    <span class="detail-value" style="font-weight: 600; color: var(--dark-gray);">${transaction.codigo_transacao || 'Não informado'}</span>
-                                </div>
-                                <div class="detail-item" style="flex-direction: column; align-items: flex-start; padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                                    <span class="detail-label" style="margin-bottom: 5px;">Data da Transação</span>
-                                    <span class="detail-value" style="font-weight: 600; color: var(--dark-gray);">${formatDate(transaction.data_transacao)}</span>
-                                </div>
-                                <div class="detail-item" style="flex-direction: column; align-items: flex-start; padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                                    <span class="detail-label" style="margin-bottom: 5px;">Cliente</span>
-                                    <span class="detail-value" style="font-weight: 600; color: var(--dark-gray);">
-                                        ${transaction.cliente_nome || 'Não identificado'}
-                                        <br><small style="color: #666;">${transaction.cliente_email || ''}</small>
-                                        ${saldoUsado > 0 ? '<br><span class="balance-indicator" style="margin-top: 5px; display: inline-block;">💰 Usou Saldo</span>' : ''}
-                                    </span>
-                                </div>
-                                <div class="detail-item" style="flex-direction: column; align-items: flex-start; padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                                    <span class="detail-label" style="margin-bottom: 5px;">Loja</span>
-                                    <span class="detail-value" style="font-weight: 600; color: var(--dark-gray);">
-                                        ${transaction.loja_nome || 'Não identificada'}
-                                        ${transaction.loja_categoria ? `<br><small style="color: #666;">${transaction.loja_categoria}</small>` : ''}
-                                    </span>
-                                </div>
-                                <div class="detail-item" style="flex-direction: column; align-items: flex-start; padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                                    <span class="detail-label" style="margin-bottom: 5px;">Status da Transação</span>
-                                    <span class="detail-value">${getStatusBadge(transaction.status)}</span>
-                                </div>
-                                ${transaction.status_pagamento ? `
-                                    <div class="detail-item" style="flex-direction: column; align-items: flex-start; padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                                        <span class="detail-label" style="margin-bottom: 5px;">Status do Pagamento</span>
-                                        <span class="detail-value">${getPaymentStatusBadge(transaction.status_pagamento)}</span>
-                                    </div>
-                                ` : ''}
-                            </div>
-                            ${transaction.descricao ? `
-                                <div style="margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                                    <span class="detail-label" style="display: block; margin-bottom: 5px;">Descrição</span>
-                                    <span class="detail-value">${transaction.descricao}</span>
-                                </div>
-                            ` : ''}
+    // Garantir que os valores sejam números
+    const valorOriginal = parseFloat(transaction.valor_total) || 0;
+    const valorCliente = parseFloat(transaction.valor_cliente) || 0;
+    const valorAdmin = parseFloat(transaction.valor_admin) || 0;
+    const valorLoja = parseFloat(transaction.valor_loja) || 0;
+    const saldoUsado = parseFloat(transaction.saldo_usado) || 0;
+    const valorPago = valorOriginal - saldoUsado;
+    
+    const content = document.getElementById('modalTransactionContent');
+    
+    let html = `
+        <div class="transaction-details" style="max-width: none;">
+            <div class="detail-grid" style="grid-template-columns: 1fr; gap: 20px;">
+                <!-- Informações Básicas -->
+                <div class="detail-card">
+                    <h4 style="color: var(--primary-color); margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14,2 14,8 20,8"/>
+                        </svg>
+                        Informações da Transação
+                    </h4>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                        <div class="detail-item" style="flex-direction: column; align-items: flex-start; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                            <span class="detail-label" style="margin-bottom: 5px;">Código da Transação</span>
+                            <span class="detail-value" style="font-weight: 600; color: var(--dark-gray);">${transaction.codigo_transacao || 'Não informado'}</span>
                         </div>
+                        <div class="detail-item" style="flex-direction: column; align-items: flex-start; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                            <span class="detail-label" style="margin-bottom: 5px;">Data da Transação</span>
+                            <span class="detail-value" style="font-weight: 600; color: var(--dark-gray);">${formatDate(transaction.data_transacao)}</span>
+                        </div>
+                        <div class="detail-item" style="flex-direction: column; align-items: flex-start; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                            <span class="detail-label" style="margin-bottom: 5px;">Cliente</span>
+                            <span class="detail-value" style="font-weight: 600; color: var(--dark-gray);">
+                                ${transaction.cliente_nome || 'Não identificado'}
+                                <br><small style="color: #666;">${transaction.cliente_email || ''}</small>
+                                ${saldoUsado > 0 ? '<br><span class="balance-indicator" style="margin-top: 5px; display: inline-block;">💰 Usou Saldo</span>' : ''}
+                            </span>
+                        </div>
+                        <div class="detail-item" style="flex-direction: column; align-items: flex-start; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                            <span class="detail-label" style="margin-bottom: 5px;">Loja</span>
+                            <span class="detail-value" style="font-weight: 600; color: var(--dark-gray);">
+                                ${transaction.loja_nome || 'Não identificada'}
+                                ${transaction.loja_categoria ? `<br><small style="color: #666;">${transaction.loja_categoria}</small>` : ''}
+                            </span>
+                        </div>
+                        <div class="detail-item" style="flex-direction: column; align-items: flex-start; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                            <span class="detail-label" style="margin-bottom: 5px;">Status da Transação</span>
+                            <span class="detail-value">${getStatusBadge(transaction.status)}</span>
+                        </div>
+                        ${transaction.status_pagamento ? `
+                            <div class="detail-item" style="flex-direction: column; align-items: flex-start; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                                <span class="detail-label" style="margin-bottom: 5px;">Status do Pagamento</span>
+                                <span class="detail-value">${getPaymentStatusBadge(transaction.status_pagamento)}</span>
+                            </div>
+                        ` : ''}
+                    </div>
+                    ${transaction.descricao ? `
+                        <div style="margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                            <span class="detail-label" style="display: block; margin-bottom: 5px;">Descrição</span>
+                            <span class="detail-value">${transaction.descricao}</span>
+                        </div>
+                    ` : ''}
+                </div>
+                
+                <!-- Informações Financeiras -->
+                <div class="detail-card">
+                    <h4 style="color: var(--primary-color); margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="1" x2="12" y2="23"/>
+                            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                        </svg>
+                        Valores Financeiros
+                    </h4>
+                    
+                    <div class="financial-breakdown" style="margin: 0;">
+                        <div class="breakdown-item">
+                            <span>Valor original da venda:</span>
+                            <span class="value" style="color: var(--dark-gray); font-size: 16px;">${formatCurrency(valorOriginal)}</span>
+                        </div>
+                        ${saldoUsado > 0 ? `
+                            <div class="breakdown-item" style="color: #e74c3c;">
+                                <span>Saldo usado pelo cliente:</span>
+                                <span class="value">-${formatCurrency(saldoUsado)}</span>
+                            </div>
+                            <div class="breakdown-item total">
+                                <span>Valor efetivamente pago:</span>
+                                <span class="value" style="color: #28a745; font-size: 18px;">${formatCurrency(valorPago)}</span>
+                            </div>
+                        ` : ''}
                         
-                        <!-- Informações Financeiras -->
-                        <div class="detail-card">
-                            <h4 style="color: var(--primary-color); margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <line x1="12" y1="1" x2="12" y2="23"/>
-                                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-                                </svg>
-                                Valores Financeiros
-                            </h4>
-                            
-                            <div class="financial-breakdown" style="margin: 0;">
-                                <div class="breakdown-item">
-                                    <span>Valor original da venda:</span>
-                                    <span class="value" style="color: var(--dark-gray); font-size: 16px;">${formatCurrency(valorOriginal)}</span>
-                                </div>
-                                ${saldoUsado > 0 ? `
-                                    <div class="breakdown-item" style="color: #e74c3c;">
-                                        <span>Saldo usado pelo cliente:</span>
-                                        <span class="value">-${formatCurrency(saldoUsado)}</span>
-                                    </div>
-                                    <div class="breakdown-item total">
-                                        <span>Valor efetivamente pago:</span>
-                                        <span class="value" style="color: #28a745; font-size: 18px;">${formatCurrency(valorPago)}</span>
-                                    </div>
-                                ` : ''}
-                                
-                                <div style="margin-top: 20px; padding-top: 20px; border-top: 2px solid #e9ecef;">
-                                    <h5 style="margin-bottom: 10px; color: #666;">Distribuição do Cashback (10% do valor pago)</h5>
-                                    <div class="breakdown-item">
-                                        <span>Cashback do cliente (5%):</span>
-                                        <span class="value" style="color: var(--primary-color);">${formatCurrency(valorCliente)}</span>
-                                    </div>
-                                    <div class="breakdown-item">
-                                        <span>Comissão Klube Cash (5%):</span>
-                                        <span class="value" style="color: var(--primary-color);">${formatCurrency(valorAdmin)}</span>
-                                    </div>
-                                    <div class="breakdown-item">
-                                        <span>Comissão da Loja:</span>
-                                        <span class="value" style="color: #666;">${formatCurrency(valorLoja)}</span>
-                                    </div>
-                                    <div class="breakdown-item total">
-                                        <span>Total de Comissões:</span>
-                                        <span class="value" style="color: #28a745;">${formatCurrency(valorCliente + valorAdmin + valorLoja)}</span>
-                                    </div>
-                                </div>
+                        <div style="margin-top: 20px; padding-top: 20px; border-top: 2px solid #e9ecef;">
+                            <h5 style="margin-bottom: 10px; color: #666;">Distribuição do Cashback (10% do valor pago)</h5>
+                            <div class="breakdown-item">
+                                <span>Cashback do cliente (5%):</span>
+                                <span class="value" style="color: var(--primary-color);">${formatCurrency(valorCliente)}</span>
                             </div>
-                        </div>
-            `;
-            
-            // Se houver informações de pagamento
-            if (transaction.pagamento_id) {
-                html += `
-                    <div class="detail-card">
-                        <h4 style="color: var(--primary-color); margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="2" y="5" width="20" height="14" rx="2"/>
-                                <line x1="2" y1="10" x2="22" y2="10"/>
-                            </svg>
-                            Informações de Pagamento
-                        </h4>
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
-                            <div class="detail-item" style="flex-direction: column; align-items: flex-start; padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                                <span class="detail-label" style="margin-bottom: 5px;">ID do Pagamento</span>
-                                <span class="detail-value" style="font-weight: 600;">#${transaction.pagamento_id}</span>
+                            <div class="breakdown-item">
+                                <span>Comissão Klube Cash (5%):</span>
+                                <span class="value" style="color: var(--primary-color);">${formatCurrency(valorAdmin)}</span>
                             </div>
-                            <div class="detail-item" style="flex-direction: column; align-items: flex-start; padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                                <span class="detail-label" style="margin-bottom: 5px;">Método</span>
-                                <span class="detail-value" style="font-weight: 600;">${transaction.metodo_pagamento || 'Não informado'}</span>
+                            <div class="breakdown-item">
+                                <span>Comissão da Loja:</span>
+                                <span class="value" style="color: #666;">${formatCurrency(valorLoja)}</span>
                             </div>
-                            ${transaction.numero_referencia ? `
-                                <div class="detail-item" style="flex-direction: column; align-items: flex-start; padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                                    <span class="detail-label" style="margin-bottom: 5px;">Referência</span>
-                                    <span class="detail-value" style="font-weight: 600;">${transaction.numero_referencia}</span>
-                                </div>
-                            ` : ''}
-                            ${transaction.data_pagamento ? `
-                                <div class="detail-item" style="flex-direction: column; align-items: flex-start; padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                                    <span class="detail-label" style="margin-bottom: 5px;">Data de Aprovação</span>
-                                    <span class="detail-value" style="font-weight: 600;">${formatDate(transaction.data_pagamento)}</span>
-                                </div>
-                            ` : ''}
-                        </div>
-                    </div>
-                `;
-            }
-            
-            // Se há movimentações
-            if (transaction.movimentacoes && transaction.movimentacoes.length > 0) {
-                html += `
-                    <div class="detail-card">
-                        <h4 style="color: var(--primary-color); margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M3 3v18h18"/>
-                                <path d="m19 9-5 5-4-4-3 3"/>
-                            </svg>
-                            Histórico de Movimentações
-                        </h4>
-                        <div style="max-height: 300px; overflow-y: auto;">
-                            <table style="width: 100%; font-size: 14px;">
-                                <thead>
-                                    <tr style="background: #f8f9fa;">
-                                        <th style="padding: 10px; text-align: left;">Data</th>
-                                        <th style="padding: 10px; text-align: left;">Tipo</th>
-                                        <th style="padding: 10px; text-align: left;">Descrição</th>
-                                        <th style="padding: 10px; text-align: right;">Valor</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${transaction.movimentacoes.map(mov => `
-                                        <tr style="border-bottom: 1px solid #e9ecef;">
-                                            <td style="padding: 10px;">${formatDate(mov.data_operacao)}</td>
-                                            <td style="padding: 10px;">
-                                                <span class="badge ${mov.tipo_operacao === 'credito' ? 'badge-success' : 'badge-danger'}">
-                                                    ${mov.tipo_operacao.toUpperCase()}
-                                                </span>
-                                            </td>
-                                            <td style="padding: 10px;">${mov.descricao || 'Sem descrição'}</td>
-                                            <td style="padding: 10px; text-align: right; font-weight: 600; color: ${mov.tipo_operacao === 'credito' ? '#28a745' : '#e74c3c'};">
-                                                ${mov.tipo_operacao === 'credito' ? '+' : '-'}${formatCurrency(mov.valor)}
-                                            </td>
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                `;
-            }
-            
-            if (saldoUsado > 0) {
-                html += `
-                    <!-- Análise do Impacto -->
-                    <div class="detail-card" style="background: linear-gradient(135deg, #f8fff8 0%, #e8f5e9 100%); border-left: 4px solid #28a745;">
-                        <h4 style="color: #2e7d32; margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <circle cx="12" cy="12" r="10"/>
-                                <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
-                                <line x1="9" y1="9" x2="9.01" y2="9"/>
-                                <line x1="15" y1="9" x2="15.01" y2="9"/>
-                            </svg>
-                            💰 Análise do Uso de Saldo
-                        </h4>
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
-                            <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-                                <div style="font-size: 12px; color: #666; margin-bottom: 5px; font-weight: 600; text-transform: uppercase;">Economia do Cliente</div>
-                                <div style="font-size: 16px; font-weight: 700; color: #2e7d32;">${formatCurrency(saldoUsado)}</div>
-                            </div>
-                            <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-                                <div style="font-size: 12px; color: #666; margin-bottom: 5px; font-weight: 600; text-transform: uppercase;">Redução na Comissão</div>
-                                <div style="font-size: 16px; font-weight: 700; color: #dc3545;">-${formatCurrency(saldoUsado * 0.1)}</div>
-                                <small style="color: #666;">10% do valor usado</small>
-                            </div>
-                            <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-                                <div style="font-size: 12px; color: #666; margin-bottom: 5px; font-weight: 600; text-transform: uppercase;">Percentual Usado</div>
-                                <div style="font-size: 16px; font-weight: 700; color: #2e7d32;">${((saldoUsado / valorOriginal) * 100).toFixed(1)}%</div>
-                                <small style="color: #666;">do valor total</small>
+                            <div class="breakdown-item total">
+                                <span>Total de Comissões:</span>
+                                <span class="value" style="color: #28a745;">${formatCurrency(valorCliente + valorAdmin + valorLoja)}</span>
                             </div>
                         </div>
                     </div>
-                `;
-            }
-            
-            html += `</div></div>`;
-            content.innerHTML = html;
-        }
+                </div>
+    `;
+    
+    // Se houver informações de pagamento
+    if (transaction.pagamento_id) {
+        html += `
+            <div class="detail-card">
+                <h4 style="color: var(--primary-color); margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="2" y="5" width="20" height="14" rx="2"/>
+                        <line x1="2" y1="10" x2="22" y2="10"/>
+                    </svg>
+                    Informações de Pagamento
+                </h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                    <div class="detail-item" style="flex-direction: column; align-items: flex-start; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                        <span class="detail-label" style="margin-bottom: 5px;">ID do Pagamento</span>
+                        <span class="detail-value" style="font-weight: 600;">#${transaction.pagamento_id}</span>
+                    </div>
+                    <div class="detail-item" style="flex-direction: column; align-items: flex-start; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                        <span class="detail-label" style="margin-bottom: 5px;">Método</span>
+                        <span class="detail-value" style="font-weight: 600;">${transaction.metodo_pagamento || 'Não informado'}</span>
+                    </div>
+                    ${transaction.numero_referencia ? `
+                        <div class="detail-item" style="flex-direction: column; align-items: flex-start; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                            <span class="detail-label" style="margin-bottom: 5px;">Referência</span>
+                            <span class="detail-value" style="font-weight: 600;">${transaction.numero_referencia}</span>
+                        </div>
+                    ` : ''}
+                    ${transaction.data_pagamento ? `
+                        <div class="detail-item" style="flex-direction: column; align-items: flex-start; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                            <span class="detail-label" style="margin-bottom: 5px;">Data de Aprovação</span>
+                            <span class="detail-value" style="font-weight: 600;">${formatDate(transaction.data_pagamento)}</span>
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+    }
+    
+    // Se há movimentações
+    if (transaction.movimentacoes && transaction.movimentacoes.length > 0) {
+        html += `
+            <div class="detail-card">
+                <h4 style="color: var(--primary-color); margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 3v18h18"/>
+                        <path d="m19 9-5 5-4-4-3 3"/>
+                    </svg>
+                    Histórico de Movimentações
+                </h4>
+                <div style="max-height: 300px; overflow-y: auto;">
+                    <table style="width: 100%; font-size: 14px;">
+                        <thead>
+                            <tr style="background: #f8f9fa;">
+                                <th style="padding: 10px; text-align: left;">Data</th>
+                                <th style="padding: 10px; text-align: left;">Tipo</th>
+                                <th style="padding: 10px; text-align: left;">Descrição</th>
+                                <th style="padding: 10px; text-align: right;">Valor</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${transaction.movimentacoes.map(mov => `
+                                <tr style="border-bottom: 1px solid #e9ecef;">
+                                    <td style="padding: 10px;">${formatDate(mov.data_operacao)}</td>
+                                    <td style="padding: 10px;">
+                                        <span class="badge ${mov.tipo_operacao === 'credito' ? 'badge-success' : 'badge-danger'}">
+                                            ${mov.tipo_operacao.toUpperCase()}
+                                        </span>
+                                    </td>
+                                    <td style="padding: 10px;">${mov.descricao || 'Sem descrição'}</td>
+                                    <td style="padding: 10px; text-align: right; font-weight: 600; color: ${mov.tipo_operacao === 'credito' ? '#28a745' : '#e74c3c'};">
+                                        ${mov.tipo_operacao === 'credito' ? '+' : '-'}${formatCurrency(mov.valor)}
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+    }
+    
+    if (saldoUsado > 0) {
+        html += `
+            <!-- Análise do Impacto -->
+            <div class="detail-card" style="background: linear-gradient(135deg, #f8fff8 0%, #e8f5e9 100%); border-left: 4px solid #28a745;">
+                <h4 style="color: #2e7d32; margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M8 14s1.5 2 4 2 4-2 4-2"/>
+                        <line x1="9" y1="9" x2="9.01" y2="9"/>
+                        <line x1="15" y1="9" x2="15.01" y2="9"/>
+                    </svg>
+                    💰 Análise do Uso de Saldo
+                </h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                    <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                        <div style="font-size: 12px; color: #666; margin-bottom: 5px; font-weight: 600; text-transform: uppercase;">Economia do Cliente</div>
+                        <div style="font-size: 16px; font-weight: 700; color: #2e7d32;">${formatCurrency(saldoUsado)}</div>
+                    </div>
+                    <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                        <div style="font-size: 12px; color: #666; margin-bottom: 5px; font-weight: 600; text-transform: uppercase;">Redução na Comissão</div>
+                        <div style="font-size: 16px; font-weight: 700; color: #dc3545;">-${formatCurrency(saldoUsado * 0.1)}</div>
+                        <small style="color: #666;">10% do valor usado</small>
+                    </div>
+                    <div style="background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                        <div style="font-size: 12px; color: #666; margin-bottom: 5px; font-weight: 600; text-transform: uppercase;">Percentual Usado</div>
+                        <div style="font-size: 16px; font-weight: 700; color: #2e7d32;">${((saldoUsado / valorOriginal) * 100).toFixed(1)}%</div>
+                        <small style="color: #666;">do valor total</small>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    html += `</div></div>`;
+    content.innerHTML = html;
+}
 
         // Função auxiliar para formatar badge de status de pagamento
         function getPaymentStatusBadge(status) {
@@ -992,12 +992,8 @@ function buildQueryString($exclude = []) {
                 'rejeitado': '<span class="status-badge status-canceled">Rejeitado</span>'
             };
             return badges[status] || `<span class="status-badge status-pending">${status || 'Sem pagamento'}</span>`;
-
-            }
-            
-            html += `</div></div>`;
-            content.innerHTML = html;
         }
+        
         
         function closeTransactionModal() {
             const modal = document.getElementById('transactionDetailsModal');
