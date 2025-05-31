@@ -190,7 +190,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
 
             <div class="or-divider">Ou</div>
-
+            <!--    
             <div class="social-login">
                 <button class="social-btn google-btn" onclick="registerWithGoogle()">
                     <img src="../../assets/images/icons/google.svg" alt="Google">
@@ -202,7 +202,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <button class="social-btn apple-btn" onclick="registerWithApple()">
                     <img src="../../assets/images/icons/apple.svg" alt="Apple">
                 </button>
-            </div>
+            </div> -->
         </div>
     </div>
 
