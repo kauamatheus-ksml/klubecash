@@ -1,5 +1,6 @@
 <?php
-// views/admin/stores.php
+// views/admin/stores.php - Início do arquivo com melhor tratamento de erros
+
 $activeMenu = 'lojas';
 
 require_once '../../config/database.php';
@@ -28,6 +29,7 @@ if (!empty($status)) $filters['status'] = strtolower($status);
 if (!empty($category)) $filters['categoria'] = $category;
 
 try {
+    // Tentar carregar dados com o método corrigido
     $result = AdminController::manageStoresWithBalance($filters, $page);
     
     if (!$result['status']) {
@@ -42,13 +44,31 @@ try {
     $errorMessage = '';
     
 } catch (Exception $e) {
-    $hasError = true;
-    $errorMessage = $e->getMessage();
-    $stores = [];
-    $statistics = [];
-    $categories = [];
-    $pagination = [];
     error_log("Erro em stores.php: " . $e->getMessage());
+    
+    // Fallback: tentar método mais simples
+    try {
+        $result = AdminController::manageStores($filters, $page);
+        
+        if ($result['status']) {
+            $stores = $result['data']['lojas'] ?? [];
+            $statistics = $result['data']['estatisticas'] ?? [];
+            $categories = $result['data']['categorias'] ?? [];
+            $pagination = $result['data']['paginacao'] ?? [];
+            $hasError = false;
+            $errorMessage = '';
+        } else {
+            throw new Exception($result['message']);
+        }
+        
+    } catch (Exception $e2) {
+        $hasError = true;
+        $errorMessage = 'Erro ao carregar dados das lojas: ' . $e2->getMessage();
+        $stores = [];
+        $statistics = [];
+        $categories = [];
+        $pagination = [];
+    }
 }
 ?>
 
@@ -81,8 +101,12 @@ try {
             <?php if ($hasError): ?>
                 <div class="alert alert-danger">
                     <strong>Erro:</strong> <?php echo htmlspecialchars($errorMessage); ?>
+                    <br>
+                    <small>Tentativa automática de recuperação foi realizada. Se o problema persistir, verifique os logs do servidor.</small>
                 </div>
             <?php endif; ?>
+            
+            
             
             <!-- Estatísticas -->
             <?php if (!empty($statistics)): ?>

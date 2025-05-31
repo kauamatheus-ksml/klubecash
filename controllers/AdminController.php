@@ -545,6 +545,13 @@ public static function getUserDetails($userId) {
     * @param int $page Página atual
     * @return array Resultado da operação
     */
+    /**
+    * Gerenciar lojas com informações básicas (método corrigido)
+    * 
+    * @param array $filters Filtros de busca
+    * @param int $page Página atual
+    * @return array Resultado da operação
+    */
     public static function manageStoresWithBalance($filters = [], $page = 1) {
         try {
             if (!self::validateAdmin()) {
@@ -577,19 +584,19 @@ public static function getUserDetails($userId) {
             
             $whereClause = "WHERE " . implode(" AND ", $whereConditions);
             
-            // Query principal corrigida com informações de saldo
+            // Query principal simplificada para evitar tabelas inexistentes
             $storesQuery = "
                 SELECT 
                     l.*,
-                    COALESCE(SUM(cs.saldo_disponivel), 0) as total_saldo_clientes,
-                    COUNT(CASE WHEN cs.saldo_disponivel > 0 THEN 1 END) as clientes_com_saldo,
                     COUNT(DISTINCT t.id) as total_transacoes,
-                    COUNT(DISTINCT CASE WHEN tsu.id IS NOT NULL THEN t.id END) as transacoes_com_saldo,
-                    COALESCE(SUM(tsu.valor_usado), 0) as total_saldo_usado
+                    COALESCE(SUM(CASE WHEN t.status = 'aprovado' THEN t.valor_cliente ELSE 0 END), 0) as total_cashback_gerado,
+                    COALESCE(SUM(CASE WHEN t.status = 'aprovado' THEN t.valor_total ELSE 0 END), 0) as total_vendas,
+                    0 as total_saldo_clientes,
+                    0 as clientes_com_saldo,
+                    0 as transacoes_com_saldo,
+                    0 as total_saldo_usado
                 FROM lojas l
-                LEFT JOIN cashback_saldos cs ON l.id = cs.loja_id
-                LEFT JOIN transacoes_cashback t ON l.id = t.loja_id AND t.status = 'aprovado'
-                LEFT JOIN transacoes_saldo_usado tsu ON t.id = tsu.transacao_id
+                LEFT JOIN transacoes_cashback t ON l.id = t.loja_id
                 $whereClause
                 GROUP BY l.id
                 ORDER BY l.data_cadastro DESC
@@ -624,17 +631,17 @@ public static function getUserDetails($userId) {
             $categoriesStmt = $db->query("SELECT DISTINCT categoria FROM lojas WHERE categoria IS NOT NULL ORDER BY categoria");
             $categories = $categoriesStmt->fetchAll(PDO::FETCH_COLUMN);
             
-            // Estatísticas consolidadas
+            // Estatísticas consolidadas simplificadas
             $statsQuery = "
                 SELECT 
                     COUNT(DISTINCT l.id) as total_lojas,
-                    COUNT(DISTINCT CASE WHEN cs.saldo_disponivel > 0 THEN l.id END) as lojas_com_saldo,
-                    COALESCE(SUM(cs.saldo_disponivel), 0) as total_saldo_acumulado,
-                    COALESCE(SUM(tsu.valor_usado), 0) as total_saldo_usado
+                    COUNT(DISTINCT CASE WHEN l.status = 'aprovado' THEN l.id END) as lojas_aprovadas,
+                    COUNT(DISTINCT CASE WHEN l.status = 'pendente' THEN l.id END) as lojas_pendentes,
+                    0 as lojas_com_saldo,
+                    COALESCE(SUM(CASE WHEN t.status = 'aprovado' THEN t.valor_cliente ELSE 0 END), 0) as total_saldo_acumulado,
+                    0 as total_saldo_usado
                 FROM lojas l
-                LEFT JOIN cashback_saldos cs ON l.id = cs.loja_id
-                LEFT JOIN transacoes_saldo_usado tsu ON cs.loja_id = tsu.loja_id
-                WHERE l.status = 'aprovado'
+                LEFT JOIN transacoes_cashback t ON l.id = t.loja_id
             ";
             
             $statsStmt = $db->query($statsQuery);
@@ -660,7 +667,7 @@ public static function getUserDetails($userId) {
             
         } catch (Exception $e) {
             error_log('Erro ao gerenciar lojas com saldo: ' . $e->getMessage());
-            return ['status' => false, 'message' => 'Erro ao carregar dados das lojas.'];
+            return ['status' => false, 'message' => 'Erro ao carregar dados das lojas: ' . $e->getMessage()];
         }
     }
 

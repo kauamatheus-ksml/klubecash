@@ -1,5 +1,5 @@
 <?php
-// controllers/AjaxStoreController.php
+// controllers/AjaxStoreController.php - Versão melhorada
 
 // Iniciar sessão
 session_start();
@@ -27,7 +27,9 @@ try {
             echo json_encode([
                 'status' => true,
                 'message' => 'AJAX funcionando perfeitamente!',
-                'timestamp' => date('Y-m-d H:i:s')
+                'timestamp' => date('Y-m-d H:i:s'),
+                'user_id' => $_SESSION['user_id'] ?? null,
+                'user_type' => $_SESSION['user_type'] ?? null
             ]);
             break;
             
@@ -41,7 +43,7 @@ try {
             
             $db = Database::getConnection();
             
-            // Buscar dados da loja
+            // Buscar dados básicos da loja
             $stmt = $db->prepare("SELECT * FROM lojas WHERE id = ?");
             $stmt->execute([$storeId]);
             $store = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -51,7 +53,7 @@ try {
                 exit;
             }
             
-            // Buscar estatísticas
+            // Buscar estatísticas básicas
             $statsStmt = $db->prepare("
                 SELECT 
                     COUNT(*) as total_transacoes,
@@ -63,12 +65,35 @@ try {
             $statsStmt->execute([$storeId]);
             $statistics = $statsStmt->fetch(PDO::FETCH_ASSOC);
             
+            // Buscar endereço se existir
+            $addrStmt = $db->prepare("SELECT * FROM lojas_endereco WHERE loja_id = ?");
+            $addrStmt->execute([$storeId]);
+            $address = $addrStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($address) {
+                $store['endereco'] = $address;
+            }
+            
             echo json_encode([
                 'status' => true,
                 'data' => [
                     'loja' => $store,
                     'estatisticas' => $statistics
                 ]
+            ]);
+            break;
+
+        case 'test_connection':
+            $db = Database::getConnection();
+            $stmt = $db->query("SELECT COUNT(*) as total FROM lojas");
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            echo json_encode([
+                'status' => true,
+                'message' => 'Conexão funcionando!',
+                'total_lojas' => $result['total'],
+                'user_type' => $_SESSION['user_type'] ?? 'não definido',
+                'user_id' => $_SESSION['user_id'] ?? 'não definido'
             ]);
             break;
             
