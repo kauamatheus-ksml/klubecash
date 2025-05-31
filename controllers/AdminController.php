@@ -2348,52 +2348,36 @@ public static function getAvailableStores() {
                     echo json_encode($result);
                     break;
                 case 'store_details_with_balance':
-                    // Limpar qualquer output anterior
-                    if (ob_get_level()) {
-                        ob_clean();
-                    }
-                    
-                    // Headers para JSON
-                    header('Content-Type: application/json; charset=UTF-8');
-                    header('Cache-Control: no-cache, must-revalidate');
-                    
                     try {
-                        // Log para debug
-                        error_log("store_details_with_balance: Iniciando");
+                        // Limpar qualquer output anterior
+                        if (ob_get_level()) {
+                            ob_clean();
+                        }
                         
-                        // Verificar se usuário está logado
-                        if (!isset($_SESSION['user_id'])) {
-                            error_log("store_details_with_balance: Usuário não logado");
-                            echo json_encode(['status' => false, 'message' => 'Usuário não logado']);
+                        // Headers para JSON
+                        header('Content-Type: application/json; charset=UTF-8');
+                        
+                        // Verificar autenticação
+                        if (!AuthController::isAuthenticated() || !AuthController::isAdmin()) {
+                            echo json_encode(['status' => false, 'message' => 'Acesso não autorizado']);
                             exit;
                         }
                         
-                        // Verificar se é admin
-                        if (!AuthController::isAdmin()) {
-                            error_log("store_details_with_balance: Usuário não é admin");
-                            echo json_encode(['status' => false, 'message' => 'Acesso restrito a administradores']);
-                            exit;
-                        }
-                        
-                        // Validar storeId
+                        // Validar parâmetros
                         $storeId = isset($_POST['store_id']) ? intval($_POST['store_id']) : 0;
-                        error_log("store_details_with_balance: storeId = $storeId");
-                        
                         if ($storeId <= 0) {
-                            error_log("store_details_with_balance: ID inválido");
                             echo json_encode(['status' => false, 'message' => 'ID da loja inválido']);
                             exit;
                         }
                         
-                        // Usar o método da classe
                         $result = AdminController::getStoreDetailsWithBalance($storeId);
-                        echo json_encode($result, JSON_UNESCAPED_UNICODE);
+                        echo json_encode($result);
                         
                     } catch (Exception $e) {
-                        error_log('store_details_with_balance: Erro - ' . $e->getMessage());
+                        error_log('Erro em store_details_with_balance: ' . $e->getMessage());
                         echo json_encode([
                             'status' => false, 
-                            'message' => 'Erro interno: ' . $e->getMessage()
+                            'message' => 'Erro interno do servidor'
                         ]);
                     }
                     exit;
@@ -3126,51 +3110,28 @@ if (basename($_SERVER['PHP_SELF']) === 'AdminController.php') {
             break;
             
         case 'store_details':
-            header('Content-Type: application/json; charset=UTF-8');
-            
             try {
-                if (!AuthController::isAdmin()) {
-                    echo json_encode(['status' => false, 'message' => 'Acesso restrito a administradores']);
+                header('Content-Type: application/json; charset=UTF-8');
+                
+                if (!AuthController::isAuthenticated() || !AuthController::isAdmin()) {
+                    echo json_encode(['status' => false, 'message' => 'Acesso não autorizado']);
                     exit;
                 }
                 
                 $storeId = isset($_POST['store_id']) ? intval($_POST['store_id']) : 0;
-                
                 if ($storeId <= 0) {
                     echo json_encode(['status' => false, 'message' => 'ID da loja inválido']);
                     exit;
                 }
                 
-                $db = Database::getConnection();
-                
-                // Buscar dados da loja
-                $stmt = $db->prepare("SELECT * FROM lojas WHERE id = ?");
-                $stmt->execute([$storeId]);
-                $store = $stmt->fetch(PDO::FETCH_ASSOC);
-                
-                if (!$store) {
-                    echo json_encode(['status' => false, 'message' => 'Loja não encontrada']);
-                    exit;
-                }
-                
-                // Buscar endereço se existir
-                $addrStmt = $db->prepare("SELECT * FROM lojas_endereco WHERE loja_id = ?");
-                $addrStmt->execute([$storeId]);
-                $address = $addrStmt->fetch(PDO::FETCH_ASSOC);
-                
-                if ($address) {
-                    $store['endereco'] = $address;
-                }
-                
-                echo json_encode([
-                    'status' => true,
-                    'data' => ['loja' => $store]
-                ]);
+                $result = AdminController::getStoreDetails($storeId);
+                echo json_encode($result);
                 
             } catch (Exception $e) {
+                error_log('Erro em store_details: ' . $e->getMessage());
                 echo json_encode([
-                    'status' => false,
-                    'message' => 'Erro ao carregar dados: ' . $e->getMessage()
+                    'status' => false, 
+                    'message' => 'Erro interno do servidor'
                 ]);
             }
             exit;

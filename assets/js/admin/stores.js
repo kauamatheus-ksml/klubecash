@@ -125,10 +125,11 @@ function loadStoreData(storeId) {
 }
 
 function loadStoreDetails(storeId) {
-    makeRequest('store_details_with_balance', { store_id: storeId })
+    // Primeiro tentar com o método simples
+    makeRequest('store_details', { store_id: storeId })
         .then(data => {
             if (data.status && data.data && data.data.loja) {
-                renderStoreDetails(data.data);
+                renderStoreDetailsSimple(data.data);
             } else {
                 document.getElementById('storeDetailsContent').innerHTML = 
                     `<div class="alert alert-danger">Erro: ${data.message || 'Dados não encontrados'}</div>`;
@@ -157,9 +158,10 @@ function populateStoreForm(store) {
     });
 }
 
-function renderStoreDetails(data) {
+// Função simplificada para renderizar detalhes
+function renderStoreDetailsSimple(data) {
     const store = data.loja;
-    const stats = data.estatisticas_saldo || {};
+    const stats = data.estatisticas || {};
     
     const statusInfo = getStatusInfo(store.status);
     
@@ -204,23 +206,19 @@ function renderStoreDetails(data) {
             </div>
             
             <div class="details-section">
-                <h4>Informações de Saldo</h4>
+                <h4>Estatísticas</h4>
                 <div class="stats-mini-grid">
-                    <div class="stat-mini">
-                        <div class="stat-mini-value">R$ ${formatMoney(stats.total_saldo_clientes || 0)}</div>
-                        <div class="stat-mini-label">Saldo Total dos Clientes</div>
-                    </div>
-                    <div class="stat-mini">
-                        <div class="stat-mini-value">${stats.clientes_com_saldo || 0}</div>
-                        <div class="stat-mini-label">Clientes com Saldo</div>
-                    </div>
                     <div class="stat-mini">
                         <div class="stat-mini-value">${stats.total_transacoes || 0}</div>
                         <div class="stat-mini-label">Total de Transações</div>
                     </div>
                     <div class="stat-mini">
-                        <div class="stat-mini-value">${stats.transacoes_com_saldo || 0}</div>
-                        <div class="stat-mini-label">Transações com Saldo</div>
+                        <div class="stat-mini-value">R$ ${formatMoney(stats.total_vendas || 0)}</div>
+                        <div class="stat-mini-label">Total de Vendas</div>
+                    </div>
+                    <div class="stat-mini">
+                        <div class="stat-mini-value">R$ ${formatMoney(stats.total_cashback || 0)}</div>
+                        <div class="stat-mini-label">Total de Cashback</div>
                     </div>
                 </div>
             </div>
