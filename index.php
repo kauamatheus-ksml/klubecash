@@ -236,7 +236,7 @@ try {
                         </div>
                     <?php else: ?>
                         <a href="<?php echo LOGIN_URL; ?>" class="btn btn-ghost">Entrar</a>
-                        <a href="<?php echo REGISTER_URL; ?>" class="btn btn-primary">Cadastrar Grátis</a>
+                        
                     <?php endif; ?>
                 </div>
                 
@@ -901,7 +901,7 @@ try {
                 <div class="footer-brand">
                     <div class="brand-logo-footer">
                         <img src="assets/images/logolaranja.png" alt="Klube Cash">
-                        <span class="brand-name">Klube Cash</span>
+                        <span class="brand-name"></span>
                     </div>
                     <p class="brand-description">
                         Transformando suas compras em oportunidades de economia. 
