@@ -548,7 +548,7 @@ $isStore = $userType === 'loja';
                 <img src="../../assets/images/logolaranja.png" 
                      alt="Logo Klube Cash" 
                      class="navbar-logo">
-                <span class="navbar-title">Klube Cash</span>
+                <span class="navbar-title"></span>
             </a>
         </div>
 
