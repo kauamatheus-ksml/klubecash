@@ -193,360 +193,465 @@ function formatDate($date) {
     <title>Lojas Parceiras - Klube Cash</title>
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
     <link rel="stylesheet" href="../../assets/css/views/client/partner-stores.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
 <body>
     <!-- Incluir navbar -->
     <?php include_once '../components/navbar.php'; ?>
     
-    <div class="container" style="margin-top: 80px;">
-        <!-- Cabeçalho da Página -->
-        <div class="page-header">
-            <div>
-                <h1>Lojas Parceiras</h1>
-                <p>Conheça as lojas que oferecem cashback no Klube Cash</p>
-            </div>
-            <div class="header-actions">
-                <a href="<?php echo CLIENT_BALANCE_URL; ?>" class="btn btn-secondary">Meus Saldos</a>
-            </div>
-        </div>
-        
-        <?php if (!empty($favoriteMessage)): ?>
-            <div class="alert alert-success">
-                <?php echo htmlspecialchars($favoriteMessage); ?>
-            </div>
-        <?php endif; ?>
-        
-        <?php if ($hasError): ?>
-            <div class="alert alert-danger">
-                <?php echo htmlspecialchars($errorMessage); ?>
-            </div>
-        <?php else: ?>
-        
-        <!-- Resumo de Saldos -->
-        <div class="balance-summary-section">
-            <div class="balance-summary-cards">
-                <div class="balance-summary-card">
-                    <div class="balance-summary-title">Saldo Total Disponível</div>
-                    <div class="balance-summary-value"><?php echo formatCurrency($estatisticasGerais['total_saldo_disponivel']); ?></div>
-                </div>
-                
-                <div class="balance-summary-card">
-                    <div class="balance-summary-title">Lojas com Saldo</div>
-                    <div class="balance-summary-value"><?php echo $estatisticasGerais['lojas_saldo_disponivel']; ?></div>
-                </div>
-                
-                <div class="balance-summary-card">
-                    <div class="balance-summary-title">Total Usado</div>
-                    <div class="balance-summary-value"><?php echo formatCurrency($estatisticasGerais['total_usado_geral']); ?></div>
-                </div>
-                
-                <div class="balance-summary-card">
-                    <div class="balance-summary-title">Lojas Utilizadas</div>
-                    <div class="balance-summary-value"><?php echo $estatisticasGerais['lojas_com_saldo']; ?></div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Filtros -->
-        <div class="card filters-section">
-            <h3 style="margin-bottom: 15px; font-size: 16px; color: var(--dark-gray);">Filtros</h3>
-            <form action="" method="GET" class="filter-form">
-                <div class="form-group">
-                    <label class="form-label" for="categoria">Categoria</label>
-                    <select id="categoria" name="categoria" class="form-control">
-                        <option value="todas">Todas as Categorias</option>
-                        <?php if (!empty($storesData['categorias'])): ?>
-                            <?php foreach ($storesData['categorias'] as $categoria): ?>
-                                <option value="<?php echo htmlspecialchars($categoria); ?>" <?php echo (isset($filters['categoria']) && $filters['categoria'] == $categoria) ? 'selected' : ''; ?>>
-                                    <?php echo htmlspecialchars($categoria); ?>
-                                </option>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label class="form-label" for="nome">Nome da Loja</label>
-                    <input type="text" id="nome" name="nome" class="form-control" value="<?php echo $filters['nome'] ?? ''; ?>" placeholder="Buscar pelo nome">
-                </div>
-                
-                <div class="form-group">
-                    <label class="form-label" for="cashback_min">Cashback Mínimo (%)</label>
-                    <input type="number" id="cashback_min" name="cashback_min" class="form-control" value="<?php echo $filters['cashback_min'] ?? ''; ?>" min="0" step="0.5" placeholder="Ex: 3.5">
-                </div>
-                
-                <div class="form-group">
-                    <label class="form-label" for="tem_saldo">Saldo</label>
-                    <select id="tem_saldo" name="tem_saldo" class="form-control">
-                        <option value="todas">Todas as Lojas</option>
-                        <option value="com_saldo" <?php echo (isset($filters['tem_saldo']) && $filters['tem_saldo'] == 'com_saldo') ? 'selected' : ''; ?>>Com saldo disponível</option>
-                        <option value="sem_saldo" <?php echo (isset($filters['tem_saldo']) && $filters['tem_saldo'] == 'sem_saldo') ? 'selected' : ''; ?>>Sem saldo</option>
-                        <option value="ja_usei" <?php echo (isset($filters['tem_saldo']) && $filters['tem_saldo'] == 'ja_usei') ? 'selected' : ''; ?>>Já usei saldo</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label class="form-label" for="ordenar">Ordenar por</label>
-                    <select id="ordenar" name="ordenar" class="form-control">
-                        <option value="nome" <?php echo (!isset($filters['ordenar']) || $filters['ordenar'] == 'nome') ? 'selected' : ''; ?>>Nome</option>
-                        <option value="cashback" <?php echo (isset($filters['ordenar']) && $filters['ordenar'] == 'cashback') ? 'selected' : ''; ?>>% Cashback</option>
-                        <option value="saldo" <?php echo (isset($filters['ordenar']) && $filters['ordenar'] == 'saldo') ? 'selected' : ''; ?>>Saldo disponível</option>
-                        <option value="uso" <?php echo (isset($filters['ordenar']) && $filters['ordenar'] == 'uso') ? 'selected' : ''; ?>>Mais usadas</option>
-                    </select>
-                </div>
-                
-                <div class="form-group" style="display: flex; align-items: flex-end;">
-                    <button type="submit" name="filtrar" value="1" class="btn btn-primary">Filtrar</button>
-                </div>
-            </form>
-        </div>
-        
-        <!-- Estatísticas -->
-        <div class="summary-cards">
-            <div class="summary-card">
-                <div class="summary-card-title">Total de Lojas</div>
-                <div class="summary-card-value"><?php echo $storesData['estatisticas']['total_lojas'] ?? 0; ?></div>
-            </div>
-            
-            <div class="summary-card">
-                <div class="summary-card-title">Média de Cashback</div>
-                <div class="summary-card-value"><?php echo number_format($storesData['estatisticas']['media_cashback'] ?? 0, 2); ?>%</div>
-            </div>
-            
-            <div class="summary-card">
-                <div class="summary-card-title">Maior Cashback</div>
-                <div class="summary-card-value"><?php echo number_format($storesData['estatisticas']['maior_cashback'] ?? 0, 2); ?>%</div>
-            </div>
-            
-            <div class="summary-card">
-                <div class="summary-card-title">Menor Cashback</div>
-                <div class="summary-card-value"><?php echo number_format($storesData['estatisticas']['menor_cashback'] ?? 0, 2); ?>%</div>
-            </div>
-        </div>
-        
-        <!-- Lista de Lojas -->
-        <div class="stores-grid">
-            <?php if (empty($storesData['lojas'])): ?>
-                <div class="card" style="grid-column: 1 / -1; text-align: center; padding: 30px;">
-                    <p>Nenhuma loja encontrada com os filtros selecionados.</p>
-                </div>
-            <?php else: ?>
-                <?php foreach ($storesData['lojas'] as $loja): ?>
-                    <div class="store-card <?php echo $loja['saldo_disponivel'] > 0 ? 'has-balance' : ''; ?>">
-                        <div class="store-header">
-                            <div class="store-logo">
-                                <?php echo strtoupper(substr($loja['nome_fantasia'], 0, 1)); ?>
+    <div class="page-wrapper" style="margin-top: 80px;">
+        <!-- Hero Section com Resumo de Saldo -->
+        <div class="hero-section">
+            <div class="container">
+                <div class="hero-content">
+                    <div class="hero-text">
+                        <h1><i class="fas fa-store"></i> Suas Lojas Parceiras</h1>
+                        <p>Descubra onde você pode ganhar e usar seu cashback</p>
+                    </div>
+                    <div class="hero-stats">
+                        <div class="stat-card highlight">
+                            <div class="stat-icon">
+                                <i class="fas fa-wallet"></i>
                             </div>
-                            <h3 class="store-name"><?php echo htmlspecialchars($loja['nome_fantasia']); ?></h3>
-                            <p class="store-category">
-                                <span class="badge badge-primary">
-                                    <?php echo htmlspecialchars($loja['categoria']); ?>
-                                </span>
-                            </p>
-                            
-                            <!-- Indicador de saldo -->
-                            <?php if ($loja['saldo_disponivel'] > 0): ?>
-                                <div class="balance-indicator">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-                                    </svg>
-                                    Saldo: <?php echo formatCurrency($loja['saldo_disponivel']); ?>
-                                </div>
-                            <?php endif; ?>
-                            
-                            <form method="POST" style="display: inline;">
-                                <input type="hidden" name="store_id" value="<?php echo $loja['id']; ?>">
-                                <input type="hidden" name="is_favorite" value="<?php echo $loja['is_favorite'] ?? 0; ?>">
-                                <button type="submit" name="toggle_favorite" class="store-favorite <?php echo (!empty($loja['is_favorite'])) ? 'active' : ''; ?>">
-                                    <?php if (!empty($loja['is_favorite'])): ?>
-                                        &#10084;
-                                    <?php else: ?>
-                                        &#9825;
-                                    <?php endif; ?>
-                                </button>
-                            </form>
+                            <div class="stat-content">
+                                <span class="stat-label">Saldo Total</span>
+                                <span class="stat-value"><?php echo formatCurrency($estatisticasGerais['total_saldo_disponivel']); ?></span>
+                            </div>
                         </div>
-                        
-                        <div class="store-body">
-                            <p class="store-cashback">
-                                Cashback: <span><?php echo number_format($loja['porcentagem_cashback'], 2); ?>%</span>
-                            </p>
-                            
-                            <!-- Informações de saldo e uso - CORRIGIDO -->
-                            <div class="balance-info">
-                                <?php if ($loja['cashback_pendente'] > 0): ?>
-                                    <div class="balance-pending">
-                                        <span class="balance-label">Pendente:</span>
-                                        <span class="balance-value"><?php echo formatCurrency($loja['cashback_pendente']); ?></span>
-                                    </div>
-                                <?php endif; ?>
-                                
-                                <?php if ($loja['total_usado'] > 0): ?>
-                                    <div class="balance-used">
-                                        <span class="balance-label">Já usado:</span>
-                                        <span class="balance-value"><?php echo formatCurrency($loja['total_usado']); ?></span>
-                                        <small class="usage-count">(<?php echo $loja['total_usos']; ?> vezes)</small>
-                                    </div>
-                                <?php endif; ?>
-                                
-                                <?php if ($loja['ultimo_uso']): ?>
-                                    <div class="last-usage">
-                                        <span class="balance-label">Último uso:</span>
-                                        <span class="balance-value"><?php echo formatDate($loja['ultimo_uso']); ?></span>
-                                    </div>
-                                <?php endif; ?>
+                        <div class="stat-card">
+                            <div class="stat-icon">
+                                <i class="fas fa-shopping-bag"></i>
                             </div>
-
-                            <!-- ADICIONADO: Informação sobre como funciona o cashback -->
-                            <div class="cashback-info">
-                                <small class="info-text">
-                                    💡 Você recebe <?php echo number_format($loja['porcentagem_cashback'] / 2, 1); ?>% de cashback nas compras desta loja.
-                                </small>
-                            </div>
-                        
-                        <div class="store-footer">
-                            <div class="store-actions">
-                                <a href="#" class="store-button" onclick="verDetalhes(<?php echo $loja['id']; ?>)">Ver Detalhes</a>
-                                <?php if ($loja['saldo_disponivel'] > 0): ?>
-                                    <button class="btn-use-balance" onclick="usarSaldo(<?php echo $loja['id']; ?>)">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-                                        </svg>
-                                        Usar Saldo
-                                    </button>
-                                <?php endif; ?>
+                            <div class="stat-content">
+                                <span class="stat-label">Lojas com Saldo</span>
+                                <span class="stat-value"><?php echo $estatisticasGerais['lojas_saldo_disponivel']; ?></span>
                             </div>
                         </div>
                     </div>
-                <?php endforeach; ?>
+                </div>
+            </div>
+        </div>
+
+        <div class="container">
+            <?php if (!empty($favoriteMessage)): ?>
+                <div class="toast toast-success">
+                    <i class="fas fa-check-circle"></i>
+                    <?php echo htmlspecialchars($favoriteMessage); ?>
+                </div>
+            <?php endif; ?>
+            
+            <?php if ($hasError): ?>
+                <div class="toast toast-error">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <?php echo htmlspecialchars($errorMessage); ?>
+                </div>
+            <?php else: ?>
+            
+            <!-- Filtros Compactos -->
+            <div class="filters-bar">
+                <div class="filters-toggle">
+                    <button id="toggleFilters" class="btn-filter-toggle">
+                        <i class="fas fa-filter"></i>
+                        Filtrar Lojas
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+                </div>
+                
+                <div class="filters-content" id="filtersContent">
+                    <form action="" method="GET" class="filter-form">
+                        <div class="filter-row">
+                            <div class="filter-group">
+                                <label>Buscar Loja</label>
+                                <div class="search-input">
+                                    <i class="fas fa-search"></i>
+                                    <input type="text" name="nome" value="<?php echo $filters['nome'] ?? ''; ?>" placeholder="Digite o nome da loja">
+                                </div>
+                            </div>
+                            
+                            <div class="filter-group">
+                                <label>Categoria</label>
+                                <select name="categoria" class="filter-select">
+                                    <option value="todas">Todas</option>
+                                    <?php if (!empty($storesData['categorias'])): ?>
+                                        <?php foreach ($storesData['categorias'] as $categoria): ?>
+                                            <option value="<?php echo htmlspecialchars($categoria); ?>" <?php echo (isset($filters['categoria']) && $filters['categoria'] == $categoria) ? 'selected' : ''; ?>>
+                                                <?php echo htmlspecialchars($categoria); ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
+                                </select>
+                            </div>
+                            
+                            <div class="filter-group">
+                                <label>Situação</label>
+                                <select name="tem_saldo" class="filter-select">
+                                    <option value="todas">Todas</option>
+                                    <option value="com_saldo" <?php echo (isset($filters['tem_saldo']) && $filters['tem_saldo'] == 'com_saldo') ? 'selected' : ''; ?>>Com saldo</option>
+                                    <option value="ja_usei" <?php echo (isset($filters['tem_saldo']) && $filters['tem_saldo'] == 'ja_usei') ? 'selected' : ''; ?>>Já usei saldo</option>
+                                </select>
+                            </div>
+                            
+                            <div class="filter-group">
+                                <label>Ordenar</label>
+                                <select name="ordenar" class="filter-select">
+                                    <option value="nome">Nome</option>
+                                    <option value="cashback" <?php echo (isset($filters['ordenar']) && $filters['ordenar'] == 'cashback') ? 'selected' : ''; ?>>% Cashback</option>
+                                    <option value="saldo" <?php echo (isset($filters['ordenar']) && $filters['ordenar'] == 'saldo') ? 'selected' : ''; ?>>Saldo</option>
+                                </select>
+                            </div>
+                            
+                            <div class="filter-actions">
+                                <button type="submit" name="filtrar" value="1" class="btn-apply-filter">
+                                    <i class="fas fa-search"></i>
+                                    Aplicar
+                                </button>
+                                <a href="?" class="btn-clear-filter">
+                                    <i class="fas fa-times"></i>
+                                    Limpar
+                                </a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Lista de Lojas Reformulada -->
+            <div class="stores-section">
+                <!-- Cabeçalho com contadores -->
+                <div class="section-header">
+                    <div class="section-title">
+                        <h2>Suas Lojas Disponíveis</h2>
+                        <span class="store-count"><?php echo $storesData['estatisticas']['total_lojas'] ?? 0; ?> lojas encontradas</span>
+                    </div>
+                    
+                    <?php if (!empty($storesData['lojas'])): ?>
+                    <div class="quick-stats">
+                        <div class="quick-stat">
+                            <span class="stat-number"><?php echo number_format($storesData['estatisticas']['media_cashback'] ?? 0, 1); ?>%</span>
+                            <span class="stat-desc">Cashback médio</span>
+                        </div>
+                        <div class="quick-stat">
+                            <span class="stat-number"><?php echo number_format($storesData['estatisticas']['maior_cashback'] ?? 0, 1); ?>%</span>
+                            <span class="stat-desc">Maior cashback</span>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+                </div>
+                
+                <!-- Grid de Lojas -->
+                <div class="stores-grid">
+                    <?php if (empty($storesData['lojas'])): ?>
+                        <div class="empty-state">
+                            <div class="empty-icon">
+                                <i class="fas fa-store-slash"></i>
+                            </div>
+                            <h3>Nenhuma loja encontrada</h3>
+                            <p>Tente ajustar os filtros ou remover algumas opções de busca</p>
+                            <a href="?" class="btn-primary">Ver Todas as Lojas</a>
+                        </div>
+                    <?php else: ?>
+                        <?php foreach ($storesData['lojas'] as $loja): ?>
+                            <div class="store-card <?php echo $loja['saldo_disponivel'] > 0 ? 'has-balance' : ''; ?>">
+                                <!-- Header do Card -->
+                                <div class="store-card-header">
+                                    <div class="store-avatar">
+                                        <span><?php echo strtoupper(substr($loja['nome_fantasia'], 0, 2)); ?></span>
+                                    </div>
+                                    
+                                    <div class="store-info">
+                                        <h3 class="store-name"><?php echo htmlspecialchars($loja['nome_fantasia']); ?></h3>
+                                        <span class="store-category">
+                                            <i class="fas fa-tag"></i>
+                                            <?php echo htmlspecialchars($loja['categoria']); ?>
+                                        </span>
+                                    </div>
+                                    
+                                    <!-- Botão de Favorito -->
+                                    <form method="POST" class="favorite-form">
+                                        <input type="hidden" name="store_id" value="<?php echo $loja['id']; ?>">
+                                        <input type="hidden" name="is_favorite" value="<?php echo $loja['is_favorite'] ?? 0; ?>">
+                                        <button type="submit" name="toggle_favorite" class="btn-favorite <?php echo (!empty($loja['is_favorite'])) ? 'favorited' : ''; ?>" title="<?php echo (!empty($loja['is_favorite'])) ? 'Remover dos favoritos' : 'Adicionar aos favoritos'; ?>">
+                                            <i class="<?php echo (!empty($loja['is_favorite'])) ? 'fas fa-heart' : 'far fa-heart'; ?>"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                                
+                                <!-- Destaque do Cashback -->
+                                <div class="cashback-highlight">
+                                    <div class="cashback-percentage">
+                                        <span class="percentage"><?php echo number_format($loja['porcentagem_cashback'], 1); ?>%</span>
+                                        <span class="label">de cashback</span>
+                                    </div>
+                                    <div class="cashback-explanation">
+                                        <i class="fas fa-info-circle"></i>
+                                        <span>Você ganha <?php echo number_format($loja['porcentagem_cashback'] / 2, 1); ?>% do valor da compra</span>
+                                    </div>
+                                </div>
+                                
+                                <!-- Status do Saldo -->
+                                <?php if ($loja['saldo_disponivel'] > 0): ?>
+                                    <div class="balance-status available">
+                                        <div class="balance-icon">
+                                            <i class="fas fa-coins"></i>
+                                        </div>
+                                        <div class="balance-info">
+                                            <span class="balance-label">Saldo Disponível</span>
+                                            <span class="balance-amount"><?php echo formatCurrency($loja['saldo_disponivel']); ?></span>
+                                        </div>
+                                        <button class="btn-use-balance" onclick="usarSaldo(<?php echo $loja['id']; ?>, '<?php echo htmlspecialchars($loja['nome_fantasia']); ?>', <?php echo $loja['saldo_disponivel']; ?>)">
+                                            <i class="fas fa-shopping-cart"></i>
+                                            Usar Agora
+                                        </button>
+                                    </div>
+                                <?php elseif ($loja['cashback_pendente'] > 0): ?>
+                                    <div class="balance-status pending">
+                                        <div class="balance-icon">
+                                            <i class="fas fa-clock"></i>
+                                        </div>
+                                        <div class="balance-info">
+                                            <span class="balance-label">Cashback Pendente</span>
+                                            <span class="balance-amount"><?php echo formatCurrency($loja['cashback_pendente']); ?></span>
+                                        </div>
+                                        <span class="status-badge pending">Aguardando</span>
+                                    </div>
+                                <?php elseif ($loja['total_usado'] > 0): ?>
+                                    <div class="balance-status used">
+                                        <div class="balance-icon">
+                                            <i class="fas fa-check-circle"></i>
+                                        </div>
+                                        <div class="balance-info">
+                                            <span class="balance-label">Já Utilizado</span>
+                                            <span class="balance-amount"><?php echo formatCurrency($loja['total_usado']); ?></span>
+                                        </div>
+                                        <span class="usage-detail"><?php echo $loja['total_usos']; ?> vezes</span>
+                                    </div>
+                                <?php else: ?>
+                                    <div class="balance-status none">
+                                        <div class="balance-icon">
+                                            <i class="fas fa-shopping-bag"></i>
+                                        </div>
+                                        <div class="balance-info">
+                                            <span class="balance-label">Comece a Comprar</span>
+                                            <span class="balance-description">Ganhe cashback nesta loja</span>
+                                        </div>
+                                    </div>
+                                <?php endif; ?>
+                                
+                                <!-- Ações do Card -->
+                                <div class="card-actions">
+                                    <button class="btn-secondary" onclick="verDetalhes(<?php echo $loja['id']; ?>)">
+                                        <i class="fas fa-info-circle"></i>
+                                        Ver Detalhes
+                                    </button>
+                                    
+                                    <?php if ($loja['ultimo_uso']): ?>
+                                        <div class="last-use">
+                                            <i class="fas fa-calendar-alt"></i>
+                                            Último uso: <?php echo formatDate($loja['ultimo_uso']); ?>
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </div>
+            </div>
+            
+            <!-- Paginação -->
+            <?php if (!empty($storesData['paginacao']) && $storesData['paginacao']['total_paginas'] > 1): ?>
+                <div class="pagination-wrapper">
+                    <nav class="pagination">
+                        <?php 
+                        $currentPage = $storesData['paginacao']['pagina_atual'];
+                        $totalPages = $storesData['paginacao']['total_paginas'];
+                        
+                        // Construir parâmetros da URL
+                        $urlParams = [];
+                        foreach ($filters as $key => $value) {
+                            $urlParams[] = "$key=" . urlencode($value);
+                        }
+                        $urlParams[] = "filtrar=1";
+                        $queryString = !empty($urlParams) ? '&' . implode('&', $urlParams) : '';
+                        
+                        // Anterior
+                        if ($currentPage > 1): 
+                        ?>
+                            <a href="?page=<?php echo $currentPage - 1 . $queryString; ?>" class="pagination-btn prev">
+                                <i class="fas fa-chevron-left"></i>
+                                Anterior
+                            </a>
+                        <?php endif; ?>
+                        
+                        <!-- Páginas -->
+                        <div class="pagination-numbers">
+                            <?php 
+                            $start = max(1, $currentPage - 2);
+                            $end = min($totalPages, $start + 4);
+                            
+                            for ($i = $start; $i <= $end; $i++): 
+                            ?>
+                                <a href="?page=<?php echo $i . $queryString; ?>" class="pagination-number <?php echo ($i == $currentPage) ? 'active' : ''; ?>">
+                                    <?php echo $i; ?>
+                                </a>
+                            <?php endfor; ?>
+                        </div>
+                        
+                        <?php 
+                        // Próximo
+                        if ($currentPage < $totalPages): 
+                        ?>
+                            <a href="?page=<?php echo $currentPage + 1 . $queryString; ?>" class="pagination-btn next">
+                                Próximo
+                                <i class="fas fa-chevron-right"></i>
+                            </a>
+                        <?php endif; ?>
+                    </nav>
+                </div>
+            <?php endif; ?>
             <?php endif; ?>
         </div>
-        
-        <!-- Paginação -->
-        <?php if (!empty($storesData['paginacao']) && $storesData['paginacao']['total_paginas'] > 1): ?>
-            <ul class="pagination">
-                <?php 
-                $currentPage = $storesData['paginacao']['pagina_atual'];
-                $totalPages = $storesData['paginacao']['total_paginas'];
-                
-                // Construir parâmetros da URL
-                $urlParams = [];
-                foreach ($filters as $key => $value) {
-                    $urlParams[] = "$key=" . urlencode($value);
-                }
-                $urlParams[] = "filtrar=1";
-                $queryString = !empty($urlParams) ? '&' . implode('&', $urlParams) : '';
-                
-                // Anterior
-                if ($currentPage > 1): 
-                ?>
-                    <li class="pagination-item">
-                        <a href="?page=<?php echo $currentPage - 1 . $queryString; ?>" class="pagination-link">
-                            &laquo;
-                        </a>
-                    </li>
-                <?php endif; ?>
-                
-                <?php 
-                // Páginas
-                $start = max(1, $currentPage - 2);
-                $end = min($totalPages, $start + 4);
-                
-                for ($i = $start; $i <= $end; $i++): 
-                ?>
-                    <li class="pagination-item">
-                        <a href="?page=<?php echo $i . $queryString; ?>" class="pagination-link <?php echo ($i == $currentPage) ? 'active' : ''; ?>">
-                            <?php echo $i; ?>
-                        </a>
-                    </li>
-                <?php endfor; ?>
-                
-                <?php 
-                // Próximo
-                if ($currentPage < $totalPages): 
-                ?>
-                    <li class="pagination-item">
-                        <a href="?page=<?php echo $currentPage + 1 . $queryString; ?>" class="pagination-link">
-                            &raquo;
-                        </a>
-                    </li>
-                <?php endif; ?>
-            </ul>
-        <?php endif; ?>
-        <?php endif; ?>
     </div>
     
     <!-- Modal de Detalhes da Loja -->
     <div id="storeModal" class="modal">
+        <div class="modal-overlay" onclick="closeModal()"></div>
         <div class="modal-content">
-            <button onclick="closeModal()" class="modal-close">&times;</button>
-            <h3 class="modal-title">Detalhes da Loja</h3>
-            <div id="storeDetails">
-                <!-- Será preenchido via JavaScript -->
-                <p>Carregando detalhes...</p>
+            <div class="modal-header">
+                <h3>Detalhes da Loja</h3>
+                <button onclick="closeModal()" class="modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div id="storeDetails">
+                    <div class="loading">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        Carregando informações...
+                    </div>
+                </div>
             </div>
         </div>
     </div>
     
     <!-- Modal de Uso de Saldo -->
     <div id="useBalanceModal" class="modal">
+        <div class="modal-overlay" onclick="closeUseBalanceModal()"></div>
         <div class="modal-content">
-            <button onclick="closeUseBalanceModal()" class="modal-close">&times;</button>
-            <h3 class="modal-title">Usar Saldo</h3>
-            <div id="useBalanceContent">
-                <p>Funcionalidade de uso de saldo será implementada em breve!</p>
-                <p>Esta opção permitirá que você use seu saldo de cashback diretamente na loja.</p>
+            <div class="modal-header">
+                <h3>Usar Saldo de Cashback</h3>
+                <button onclick="closeUseBalanceModal()" class="modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div id="useBalanceContent">
+                    <div class="balance-usage-info">
+                        <div class="store-info-modal">
+                            <div class="store-avatar-modal">
+                                <span id="modalStoreInitials"></span>
+                            </div>
+                            <div>
+                                <h4 id="modalStoreName"></h4>
+                                <p>Saldo disponível: <strong id="modalStoreBalance"></strong></p>
+                            </div>
+                        </div>
+                        
+                        <div class="usage-instructions">
+                            <div class="instruction-item">
+                                <i class="fas fa-shopping-cart"></i>
+                                <span>Vá até a loja e faça sua compra</span>
+                            </div>
+                            <div class="instruction-item">
+                                <i class="fas fa-mobile-alt"></i>
+                                <span>Informe que quer usar saldo do Klube Cash</span>
+                            </div>
+                            <div class="instruction-item">
+                                <i class="fas fa-check-circle"></i>
+                                <span>O valor será descontado automaticamente</span>
+                            </div>
+                        </div>
+                        
+                        <div class="contact-store">
+                            <p><strong>Dica:</strong> Entre em contato com a loja antes de ir para confirmar que aceita o uso do saldo Klube Cash.</p>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
     
     <script>
+        // Toggle dos filtros
+        document.getElementById('toggleFilters').addEventListener('click', function() {
+            const content = document.getElementById('filtersContent');
+            const icon = this.querySelector('.fa-chevron-down');
+            
+            content.classList.toggle('active');
+            icon.style.transform = content.classList.contains('active') ? 'rotate(180deg)' : 'rotate(0deg)';
+        });
+        
         // Função para exibir detalhes da loja
         function verDetalhes(storeId) {
-            document.getElementById('storeModal').style.display = 'flex';
+            document.getElementById('storeModal').classList.add('active');
             
             // Simular carregamento de dados (em produção, faria uma chamada AJAX)
-            document.getElementById('storeDetails').innerHTML = `
-                <div style="text-align: center; padding: 20px;">
-                    <p>Carregando detalhes da loja #${storeId}...</p>
-                    <p>Esta funcionalidade incluirá:</p>
-                    <ul style="text-align: left; max-width: 300px; margin: 20px auto;">
-                        <li>Histórico completo de transações</li>
-                        <li>Detalhamento do saldo disponível</li>
-                        <li>Gráfico de movimentações</li>
-                        <li>Informações detalhadas da loja</li>
-                    </ul>
-                </div>
-            `;
+            setTimeout(() => {
+                document.getElementById('storeDetails').innerHTML = `
+                    <div class="store-details-content">
+                        <div class="detail-section">
+                            <h4><i class="fas fa-chart-line"></i> Histórico de Cashback</h4>
+                            <p>Aqui você verá todo o histórico de cashback ganho nesta loja, incluindo valores pendentes e já utilizados.</p>
+                        </div>
+                        
+                        <div class="detail-section">
+                            <h4><i class="fas fa-clock"></i> Movimentações Recentes</h4>
+                            <p>Últimas 10 movimentações de cashback desta loja aparecerão aqui.</p>
+                        </div>
+                        
+                        <div class="detail-section">
+                            <h4><i class="fas fa-info-circle"></i> Informações da Loja</h4>
+                            <p>Dados de contato, endereço e outras informações relevantes.</p>
+                        </div>
+                        
+                        <div class="coming-soon">
+                            <i class="fas fa-tools"></i>
+                            <p>Esta funcionalidade está sendo desenvolvida e estará disponível em breve!</p>
+                        </div>
+                    </div>
+                `;
+            }, 500);
         }
         
         // Função para usar saldo
-        function usarSaldo(storeId) {
-            document.getElementById('useBalanceModal').style.display = 'flex';
+        function usarSaldo(storeId, storeName, balance) {
+            document.getElementById('useBalanceModal').classList.add('active');
+            
+            // Preencher informações do modal
+            document.getElementById('modalStoreInitials').textContent = storeName.substring(0, 2).toUpperCase();
+            document.getElementById('modalStoreName').textContent = storeName;
+            document.getElementById('modalStoreBalance').textContent = 'R$ ' + balance.toFixed(2).replace('.', ',');
         }
         
         // Função para fechar modal principal
         function closeModal() {
-            document.getElementById('storeModal').style.display = 'none';
+            document.getElementById('storeModal').classList.remove('active');
         }
         
         // Função para fechar modal de uso de saldo
         function closeUseBalanceModal() {
-            document.getElementById('useBalanceModal').style.display = 'none';
+            document.getElementById('useBalanceModal').classList.remove('active');
         }
         
-        // Fechar modal ao clicar fora dele
-        window.onclick = function(event) {
-            const storeModal = document.getElementById('storeModal');
-            const useBalanceModal = document.getElementById('useBalanceModal');
-            
-            if (event.target === storeModal) {
-                closeModal();
-            }
-            if (event.target === useBalanceModal) {
-                closeUseBalanceModal();
-            }
-        };
+        // Auto-hide para toasts
+        document.addEventListener('DOMContentLoaded', function() {
+            const toasts = document.querySelectorAll('.toast');
+            toasts.forEach(toast => {
+                setTimeout(() => {
+                    toast.style.opacity = '0';
+                    setTimeout(() => toast.remove(), 300);
+                }, 5000);
+            });
+        });
     </script>
 </body>
 </html>
