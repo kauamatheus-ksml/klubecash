@@ -1,396 +1,811 @@
 <?php
 /**
- * Componente de Navbar para o Sistema Klube Cash
+ * Componente de Navbar Reestruturada - Klube Cash
  * 
- * Este componente cria uma barra de navegação responsiva para todas as páginas do sistema.
+ * Navbar intuitiva e responsiva para todos os tipos de usuário
+ * Mantém toda a lógica original com melhorias na experiência do usuário
  */
-// Iniciar sessão se não estiver ativa
+
+// Iniciar sessão se não estiver ativa - mantendo lógica original
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Verificar login e tipo de usuário
+// Verificar login e tipo de usuário - lógica preservada
 $isLoggedIn = isset($_SESSION['user_id']);
 $userName = $isLoggedIn ? $_SESSION['user_name'] ?? 'Usuário' : '';
 $userType = $isLoggedIn ? $_SESSION['user_type'] ?? '' : '';
 
-// Identificar tipo de usuário
+// Identificar tipo de usuário - mantendo classificação original
 $isAdmin = $userType === 'admin';
 $isClient = $userType === 'cliente';
 $isStore = $userType === 'loja';
 ?>
 
 <style>
-    .navbar {
-        background-color: #FFFFFF;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-        padding: 15px 20px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
+    /* === VARIÁVEIS CSS PARA CONSISTÊNCIA === */
+    :root {
+        --primary-color: #FF7A00;
+        --primary-light: #FFB366;
+        --primary-dark: #E65C00;
+        --white: #FFFFFF;
+        --gray-50: #F9FAFB;
+        --gray-100: #F3F4F6;
+        --gray-200: #E5E7EB;
+        --gray-300: #D1D5DB;
+        --gray-600: #4B5563;
+        --gray-700: #374151;
+        --gray-800: #1F2937;
+        --gray-900: #111827;
+        --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        --nav-height: 70px;
+        --transition-fast: 0.15s ease;
+        --transition-normal: 0.3s ease;
+    }
+
+    /* === RESET E BASE === */
+    * {
+        box-sizing: border-box;
+    }
+
+    /* === NAVBAR PRINCIPAL === */
+    .klube-navbar {
+        background: linear-gradient(135deg, var(--white) 0%, var(--gray-50) 100%);
+        backdrop-filter: blur(10px);
+        border-bottom: 1px solid var(--gray-200);
+        box-shadow: var(--shadow-md);
         position: fixed;
         top: 0;
         left: 0;
         right: 0;
-        z-index: 100;
-        
+        z-index: 1000;
+        height: var(--nav-height);
+        display: flex;
+        align-items: center;
+        padding: 0 1rem;
     }
-    
-    .navbar-brand {
+
+    /* === CONTAINER PRINCIPAL === */
+    .navbar-container {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    /* === SEÇÃO DA MARCA/LOGO === */
+    .navbar-brand-section {
+        display: flex;
+        align-items: center;
+        flex-shrink: 0;
+    }
+
+    .navbar-brand-link {
         display: flex;
         align-items: center;
         text-decoration: none;
+        transition: var(--transition-fast);
+        padding: 0.5rem;
+        border-radius: 0.5rem;
     }
-    
+
+    .navbar-brand-link:hover {
+        background-color: var(--gray-100);
+        transform: translateY(-1px);
+    }
+
     .navbar-logo {
         height: 40px;
-        margin-right: 10px;
+        width: auto;
+        margin-right: 0.75rem;
     }
-    
+
     .navbar-title {
-        font-size: 20px;
-        font-weight: 600;
-        color: #FF7A00;
-        margin: 0;
+        font-size: 1.5rem;
+        font-weight: 700;
+        background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        letter-spacing: -0.025em;
     }
-    
+
+    /* === NAVEGAÇÃO PRINCIPAL === */
+    .navbar-navigation {
+        display: flex;
+        align-items: center;
+        flex: 1;
+        justify-content: center;
+    }
+
     .navbar-menu {
         display: flex;
         align-items: center;
-    }
-    
-    .navbar-links {
-        display: flex;
         list-style: none;
         margin: 0;
         padding: 0;
+        gap: 0.25rem;
     }
-    
-    .navbar-item {
-        margin: 0 12px;
-    }
-    
-    .navbar-link {
-        text-decoration: none;
-        color: #333333;
-        font-weight: 500;
-        font-size: 14px;
-        transition: color 0.3s;
-        display: flex;
-        align-items: center;
-    }
-    
-    .navbar-link:hover {
-        color: #FF7A00;
-    }
-    
-    .navbar-link svg {
-        margin-right: 5px;
-    }
-    
-    .navbar-user {
-        display: flex;
-        align-items: center;
-        margin-left: 15px;
+
+    .navbar-menu-item {
         position: relative;
     }
-    
-    .user-avatar {
+
+    .navbar-menu-link {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1rem;
+        text-decoration: none;
+        color: var(--gray-700);
+        font-weight: 500;
+        font-size: 0.875rem;
+        border-radius: 0.5rem;
+        transition: var(--transition-normal);
+        position: relative;
+        overflow: hidden;
+    }
+
+    /* Efeito hover mais suave e moderno */
+    .navbar-menu-link::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255, 122, 0, 0.1), transparent);
+        transition: var(--transition-normal);
+    }
+
+    .navbar-menu-link:hover::before {
+        left: 100%;
+    }
+
+    .navbar-menu-link:hover {
+        color: var(--primary-color);
+        background-color: rgba(255, 122, 0, 0.05);
+        transform: translateY(-1px);
+    }
+
+    .navbar-menu-icon {
+        width: 18px;
+        height: 18px;
+        transition: var(--transition-fast);
+    }
+
+    .navbar-menu-link:hover .navbar-menu-icon {
+        transform: scale(1.1);
+    }
+
+    /* === ÁREA DO USUÁRIO === */
+    .navbar-user-section {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        flex-shrink: 0;
+    }
+
+    /* Botão de login melhorado para visitantes */
+    .navbar-login-btn {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.625rem 1.25rem;
+        background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+        color: var(--white);
+        text-decoration: none;
+        border-radius: 0.75rem;
+        font-weight: 600;
+        font-size: 0.875rem;
+        transition: var(--transition-normal);
+        box-shadow: var(--shadow-sm);
+    }
+
+    .navbar-login-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-lg);
+        background: linear-gradient(135deg, var(--primary-dark), var(--primary-color));
+    }
+
+    .navbar-register-btn {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.625rem 1.25rem;
+        background: transparent;
+        color: var(--primary-color);
+        text-decoration: none;
+        border: 2px solid var(--primary-color);
+        border-radius: 0.75rem;
+        font-weight: 600;
+        font-size: 0.875rem;
+        transition: var(--transition-normal);
+    }
+
+    .navbar-register-btn:hover {
+        background: var(--primary-color);
+        color: var(--white);
+        transform: translateY(-1px);
+    }
+
+    /* === PERFIL DO USUÁRIO LOGADO === */
+    .navbar-user-profile {
+        position: relative;
+        display: flex;
+        align-items: center;
+    }
+
+    .navbar-user-trigger {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.5rem;
+        background: var(--white);
+        border: 2px solid var(--gray-200);
+        border-radius: 0.75rem;
+        cursor: pointer;
+        transition: var(--transition-normal);
+        box-shadow: var(--shadow-sm);
+    }
+
+    .navbar-user-trigger:hover {
+        border-color: var(--primary-color);
+        transform: translateY(-1px);
+        box-shadow: var(--shadow-md);
+    }
+
+    .navbar-user-avatar {
         width: 36px;
         height: 36px;
         border-radius: 50%;
-        background-color: #FFD9B3;
+        background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
         display: flex;
         align-items: center;
         justify-content: center;
-        color: #FF7A00;
-        font-weight: 600;
-        font-size: 16px;
-        margin-right: 8px;
+        color: var(--white);
+        font-weight: 700;
+        font-size: 0.875rem;
+        text-transform: uppercase;
     }
-    
-    .user-name {
-        font-size: 14px;
-        font-weight: 600;
-        color: #333333;
-        cursor: pointer;
+
+    .navbar-user-info {
         display: flex;
-        align-items: center;
+        flex-direction: column;
+        align-items: flex-start;
     }
-    
-    .user-dropdown {
+
+    .navbar-user-name {
+        font-weight: 600;
+        font-size: 0.875rem;
+        color: var(--gray-800);
+        line-height: 1.2;
+    }
+
+    .navbar-user-type {
+        font-size: 0.75rem;
+        color: var(--gray-600);
+        text-transform: uppercase;
+        letter-spacing: 0.025em;
+    }
+
+    .navbar-chevron {
+        width: 16px;
+        height: 16px;
+        color: var(--gray-600);
+        transition: var(--transition-fast);
+    }
+
+    .navbar-user-trigger:hover .navbar-chevron {
+        transform: rotate(180deg);
+    }
+
+    /* === DROPDOWN DO USUÁRIO === */
+    .navbar-user-dropdown {
         position: absolute;
-        top: 100%;
+        top: calc(100% + 0.5rem);
         right: 0;
-        background-color: #FFFFFF;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        padding: 10px 0;
-        min-width: 180px;
-        display: none;
-        z-index: 101;
+        background: var(--white);
+        border: 1px solid var(--gray-200);
+        border-radius: 0.75rem;
+        box-shadow: var(--shadow-lg);
+        min-width: 220px;
+        opacity: 0;
+        visibility: hidden;
+        transform: translateY(-10px);
+        transition: var(--transition-normal);
+        z-index: 100;
     }
-    
-    .user-dropdown.open {
-        display: block;
+
+    .navbar-user-dropdown.open {
+        opacity: 1;
+        visibility: visible;
+        transform: translateY(0);
     }
-    
-    .dropdown-item {
-        padding: 8px 15px;
+
+    .navbar-dropdown-item {
         display: flex;
         align-items: center;
-        color: #333333;
+        gap: 0.75rem;
+        padding: 0.75rem 1rem;
+        color: var(--gray-700);
         text-decoration: none;
-        font-size: 14px;
-        transition: background-color 0.3s;
+        font-size: 0.875rem;
+        transition: var(--transition-fast);
+        border-bottom: 1px solid var(--gray-100);
     }
-    
-    .dropdown-item:hover {
-        background-color: #FFF0E6;
+
+    .navbar-dropdown-item:last-child {
+        border-bottom: none;
     }
-    
-    .dropdown-item svg {
-        margin-right: 10px;
-        color: #666666;
+
+    .navbar-dropdown-item:hover {
+        background-color: var(--gray-50);
+        color: var(--primary-color);
     }
-    
-    .navbar-toggle {
+
+    .navbar-dropdown-item:first-child {
+        border-top-left-radius: 0.75rem;
+        border-top-right-radius: 0.75rem;
+    }
+
+    .navbar-dropdown-item:last-child {
+        border-bottom-left-radius: 0.75rem;
+        border-bottom-right-radius: 0.75rem;
+    }
+
+    .navbar-dropdown-icon {
+        width: 18px;
+        height: 18px;
+        color: var(--gray-500);
+        transition: var(--transition-fast);
+    }
+
+    .navbar-dropdown-item:hover .navbar-dropdown-icon {
+        color: var(--primary-color);
+        transform: scale(1.1);
+    }
+
+    /* === BOTÃO MOBILE === */
+    .navbar-mobile-toggle {
         display: none;
-        background: none;
-        border: none;
+        align-items: center;
+        justify-content: center;
+        width: 44px;
+        height: 44px;
+        background: var(--white);
+        border: 2px solid var(--gray-200);
+        border-radius: 0.5rem;
         cursor: pointer;
-        padding: 0;
+        transition: var(--transition-normal);
+        position: relative;
+        overflow: hidden;
     }
-    
-    /* Responsividade */
+
+    .navbar-mobile-toggle:hover {
+        border-color: var(--primary-color);
+        background-color: var(--gray-50);
+    }
+
+    /* Animação do hambúrguer */
+    .navbar-hamburger {
+        width: 20px;
+        height: 20px;
+        position: relative;
+        transform: rotate(0deg);
+        transition: var(--transition-normal);
+    }
+
+    .navbar-hamburger span {
+        display: block;
+        position: absolute;
+        height: 2px;
+        width: 100%;
+        background: var(--gray-700);
+        border-radius: 1px;
+        opacity: 1;
+        left: 0;
+        transform: rotate(0deg);
+        transition: var(--transition-normal);
+    }
+
+    .navbar-hamburger span:nth-child(1) { top: 4px; }
+    .navbar-hamburger span:nth-child(2) { top: 9px; }
+    .navbar-hamburger span:nth-child(3) { top: 14px; }
+
+    .navbar-mobile-toggle.open .navbar-hamburger span:nth-child(1) {
+        top: 9px;
+        transform: rotate(135deg);
+    }
+
+    .navbar-mobile-toggle.open .navbar-hamburger span:nth-child(2) {
+        opacity: 0;
+        left: -20px;
+    }
+
+    .navbar-mobile-toggle.open .navbar-hamburger span:nth-child(3) {
+        top: 9px;
+        transform: rotate(-135deg);
+    }
+
+    /* === RESPONSIVIDADE === */
     @media (max-width: 768px) {
-        .navbar-links {
-            display: none;
+        .klube-navbar {
+            padding: 0 1rem;
+            height: 60px;
+        }
+
+        .navbar-mobile-toggle {
+            display: flex;
+        }
+
+        .navbar-navigation {
             position: absolute;
             top: 100%;
             left: 0;
             right: 0;
-            background-color: #FFFFFF;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            background: var(--white);
+            border-top: 1px solid var(--gray-200);
+            box-shadow: var(--shadow-lg);
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-20px);
+            transition: var(--transition-normal);
+        }
+
+        .navbar-navigation.open {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .navbar-menu {
             flex-direction: column;
-            padding: 10px 0;
+            padding: 1rem;
+            gap: 0.5rem;
         }
-        
-        .navbar-links.open {
-            display: flex;
-        }
-        
-        .navbar-item {
-            margin: 5px 0;
+
+        .navbar-menu-item {
             width: 100%;
         }
-        
-        .navbar-link {
-            padding: 10px 20px;
+
+        .navbar-menu-link {
+            justify-content: flex-start;
+            padding: 1rem;
+            border-radius: 0.5rem;
             width: 100%;
         }
-        
-        .navbar-toggle {
-            display: block;
-            margin-right: 15px;
-        }
-        
-        .user-name span {
+
+        .navbar-user-info {
             display: none;
         }
+
+        .navbar-user-dropdown {
+            right: 0;
+            left: auto;
+            min-width: 200px;
+        }
+
+        /* Ocultar botões de login/registro em mobile se logado */
+        .navbar-login-btn,
+        .navbar-register-btn {
+            display: none;
+        }
+
+        /* Mostrar apenas se não logado */
+        .navbar-user-section:not(.logged-in) .navbar-login-btn {
+            display: flex;
+            padding: 0.5rem 1rem;
+            font-size: 0.8rem;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .navbar-title {
+            font-size: 1.25rem;
+        }
+
+        .navbar-logo {
+            height: 32px;
+        }
+
+        .navbar-user-dropdown {
+            min-width: 180px;
+        }
+    }
+
+    /* === MELHORIAS DE ACESSIBILIDADE === */
+    @media (prefers-reduced-motion: reduce) {
+        * {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+        }
+    }
+
+    /* Focus states para acessibilidade */
+    .navbar-menu-link:focus,
+    .navbar-user-trigger:focus,
+    .navbar-mobile-toggle:focus {
+        outline: 2px solid var(--primary-color);
+        outline-offset: 2px;
     }
 </style>
 
-<!-- Navbar -->
-<nav class="navbar">
-    <!-- Botão Toggle para mobile -->
-    <button class="navbar-toggle" id="navbarToggle">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="3" y1="12" x2="21" y2="12"></line>
-            <line x1="3" y1="6" x2="21" y2="6"></line>
-            <line x1="3" y1="18" x2="21" y2="18"></line>
-        </svg>
-    </button>
-    
-    <!-- Logo e Título -->
-    <a href="<?php echo $isLoggedIn ? ($isAdmin ? ADMIN_DASHBOARD_URL : CLIENT_DASHBOARD_URL) : SITE_URL; ?>" class="navbar-brand">
-        <img src="../../assets/images/logolaranja.png" alt="Klube Cash" class="navbar-logo">
+<!-- === NAVBAR HTML === -->
+<nav class="klube-navbar" role="navigation" aria-label="Navegação principal">
+    <div class="navbar-container">
         
-    </a>
-    
-    <!-- Menu de Navegação -->
-    <div class="navbar-menu">
-        <ul class="navbar-links" id="navbarLinks">
-            <?php if (!$isLoggedIn): ?>
-                <!-- Menu para visitantes -->
-                <li class="navbar-item">
-                    <a href="<?php echo SITE_URL; ?>" class="navbar-link">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                            <polyline points="9 22 9 12 15 12 15 22"></polyline>
-                        </svg>
-                        Início
-                    </a>
-                </li>
-                <li class="navbar-item">
-                    <a href="<?php echo STORE_REGISTER_URL; ?>" class="navbar-link">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M3 3h18v18H3zM21 9H3M21 15H3M12 3v18"></path>
-                        </svg>
-                        Seja um Parceiro
-                    </a>
-                </li>
-                <li class="navbar-item">
-                    <a href="<?php echo LOGIN_URL; ?>" class="navbar-link">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
-                            <polyline points="10 17 15 12 10 7"></polyline>
-                            <line x1="15" y1="12" x2="3" y2="12"></line>
-                        </svg>
-                        Entrar
-                    </a>
-                </li>
-                <li class="navbar-item">
-                    <a href="<?php echo REGISTER_URL; ?>" class="navbar-link"></a>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                            <circle cx="8.5" cy="7" r="4"></circle>
-                            <line x1="20" y1="8" x2="20" y2="14"></line>
-                            <line x1="23" y1="11" x2="17" y2="11"></line>
-                        </svg>
-                        Cadastrar
-                    </a>
-                </li>
-            <?php elseif ($isClient): ?>
-                <!-- Menu para clientes -->
-                <li class="navbar-item">
-                <a href="<?php echo CLIENT_DASHBOARD_URL; ?>" class="navbar-link">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                            <polyline points="9 22 9 12 15 12 15 22"></polyline>
-                        </svg>
-                        Painel
-                    </a>
-                </li>
-                <li class="navbar-item">
-                    <a href="<?php echo CLIENT_BALANCE_URL; ?>" class="navbar-link">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <path d="M12 6v6l4 2"></path>
-                        </svg>
-                        Saldo
-                    </a>
-                </li>
-                <li class="navbar-item">
-                <a href="<?php echo CLIENT_STATEMENT_URL; ?>" class="navbar-link">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                            <line x1="16" y1="2" x2="16" y2="6"></line>
-                            <line x1="8" y1="2" x2="8" y2="6"></line>
-                            <line x1="3" y1="10" x2="21" y2="10"></line>
-                        </svg>
-                        Extrato
-                    </a>
-                </li>
-                <li class="navbar-item">
-                    <a href="<?php echo CLIENT_STORES_URL; ?>" class="navbar-link">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M3 3h18v18H3zM21 9H3M21 15H3M12 3v18"></path>
-                        </svg>
-                        Lojas Parceiras
-                    </a>
-                </li>
-            <?php elseif ($isAdmin): ?>
-                <!-- Menu reduzido para admin (já tem sidebar) -->
-                <li class="navbar-item">
-                    <a href="<?php echo ADMIN_DASHBOARD_URL; ?>" class="navbar-link">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                            <polyline points="9 22 9 12 15 12 15 22"></polyline>
-                        </svg>
-                        Dashboard
-                    </a>
-                </li>
-            <?php endif; ?>
-        </ul>
-        
-        <?php if ($isLoggedIn): ?>
-            <!-- Menu do Usuário -->
-            <div class="navbar-user">
-                <div class="user-avatar">
-                    <?php echo strtoupper(substr($userName, 0, 1)); ?>
-                </div>
-                <div class="user-name" id="userDropdownToggle">
-                    <span><?php echo htmlspecialchars($userName); ?></span>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="6 9 12 15 18 9"></polyline>
-                    </svg>
-                </div>
-                
-                <!-- Dropdown do Usuário -->
-                <div class="user-dropdown" id="userDropdown">
-                    <?php if ($isClient): ?>
-                        <a href="<?php echo CLIENT_PROFILE_URL; ?>" class="dropdown-item">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                                <circle cx="12" cy="7" r="4"></circle>
-                            </svg>
-                            Meu Perfil
-                        </a>
-                    <?php elseif ($isAdmin): ?>
-                        <a href="<?php echo ADMIN_SETTINGS_URL; ?>" class="dropdown-item">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <circle cx="12" cy="12" r="3"></circle>
-                                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-                            </svg>
-                            Configurações
-                        </a>
-                    <?php endif; ?>
-                    
-                    <a href="../../controllers/AuthController.php?action=logout" class="dropdown-item">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                            <polyline points="16 17 21 12 16 7"></polyline>
-                            <line x1="21" y1="12" x2="9" y2="12"></line>
-                        </svg>
-                        Sair
-                    </a>
-                </div>
+        <!-- === SEÇÃO DA MARCA === -->
+        <div class="navbar-brand-section">
+            <a href="<?php echo $isLoggedIn ? ($isAdmin ? ADMIN_DASHBOARD_URL : ($isStore ? STORE_DASHBOARD_URL : CLIENT_DASHBOARD_URL)) : SITE_URL; ?>" 
+               class="navbar-brand-link" 
+               aria-label="Ir para página inicial do Klube Cash">
+                <img src="../../assets/images/logolaranja.png" 
+                     alt="Logo Klube Cash" 
+                     class="navbar-logo">
+                <span class="navbar-title">Klube Cash</span>
+            </a>
+        </div>
+
+        <!-- === BOTÃO MOBILE === -->
+        <button class="navbar-mobile-toggle" 
+                id="mobileToggle" 
+                aria-label="Abrir menu de navegação"
+                aria-expanded="false">
+            <div class="navbar-hamburger">
+                <span></span>
+                <span></span>
+                <span></span>
             </div>
-        <?php endif; ?>
+        </button>
+
+        <!-- === NAVEGAÇÃO PRINCIPAL === -->
+        <div class="navbar-navigation" id="navbarMenu">
+            <ul class="navbar-menu">
+                <?php if (!$isLoggedIn): ?>
+                    <!-- Menu para visitantes -->
+                    <li class="navbar-menu-item">
+                        <a href="<?php echo SITE_URL; ?>" class="navbar-menu-link">
+                            <svg class="navbar-menu-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+                            </svg>
+                            <span>Início</span>
+                        </a>
+                    </li>
+                    <li class="navbar-menu-item">
+                        <a href="<?php echo STORE_REGISTER_URL; ?>" class="navbar-menu-link">
+                            <svg class="navbar-menu-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                            </svg>
+                            <span>Seja Parceiro</span>
+                        </a>
+                    </li>
+
+                <?php elseif ($isClient): ?>
+                    <!-- Menu para clientes -->
+                    <li class="navbar-menu-item">
+                        <a href="<?php echo CLIENT_DASHBOARD_URL; ?>" class="navbar-menu-link">
+                            <svg class="navbar-menu-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5a2 2 0 012-2h4a2 2 0 012 2v0M8 5a2 2 0 000 4h8a2 2 0 000-4M8 5v0"></path>
+                            </svg>
+                            <span>Meu Painel</span>
+                        </a>
+                    </li>
+                    <li class="navbar-menu-item">
+                        <a href="<?php echo CLIENT_BALANCE_URL; ?>" class="navbar-menu-link">
+                            <svg class="navbar-menu-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <span>Meu Saldo</span>
+                        </a>
+                    </li>
+                    <li class="navbar-menu-item">
+                        <a href="<?php echo CLIENT_STATEMENT_URL; ?>" class="navbar-menu-link">
+                            <svg class="navbar-menu-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                            <span>Meu Extrato</span>
+                        </a>
+                    </li>
+                    <li class="navbar-menu-item">
+                        <a href="<?php echo CLIENT_STORES_URL; ?>" class="navbar-menu-link">
+                            <svg class="navbar-menu-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                            </svg>
+                            <span>Lojas Parceiras</span>
+                        </a>
+                    </li>
+
+                <?php elseif ($isAdmin): ?>
+                    <!-- Menu simplificado para admin -->
+                    <li class="navbar-menu-item">
+                        <a href="<?php echo ADMIN_DASHBOARD_URL; ?>" class="navbar-menu-link">
+                            <svg class="navbar-menu-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                            </svg>
+                            <span>Dashboard Admin</span>
+                        </a>
+                    </li>
+
+                <?php elseif ($isStore): ?>
+                    <!-- Menu para lojas -->
+                    <li class="navbar-menu-item">
+                        <a href="<?php echo STORE_DASHBOARD_URL; ?>" class="navbar-menu-link">
+                            <svg class="navbar-menu-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                            </svg>
+                            <span>Minha Loja</span>
+                        </a>
+                    </li>
+                <?php endif; ?>
+            </ul>
+        </div>
+
+        <!-- === SEÇÃO DO USUÁRIO === -->
+        <div class="navbar-user-section <?php echo $isLoggedIn ? 'logged-in' : ''; ?>">
+            <?php if ($isLoggedIn): ?>
+                <!-- Perfil do usuário logado -->
+                <div class="navbar-user-profile">
+                    <button class="navbar-user-trigger" 
+                            id="userDropdownToggle" 
+                            aria-label="Abrir menu do usuário"
+                            aria-expanded="false">
+                        <div class="navbar-user-avatar">
+                            <?php echo strtoupper(substr($userName, 0, 1)); ?>
+                        </div>
+                        <div class="navbar-user-info">
+                            <span class="navbar-user-name"><?php echo htmlspecialchars($userName); ?></span>
+                            <span class="navbar-user-type">
+                                <?php 
+                                echo $isAdmin ? 'Administrador' : ($isStore ? 'Loja Parceira' : 'Cliente');
+                                ?>
+                            </span>
+                        </div>
+                        <svg class="navbar-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+
+                    <!-- Dropdown do usuário -->
+                    <div class="navbar-user-dropdown" id="userDropdown">
+                        <?php if ($isClient): ?>
+                            <a href="<?php echo CLIENT_PROFILE_URL; ?>" class="navbar-dropdown-item">
+                                <svg class="navbar-dropdown-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                                </svg>
+                                <span>Meu Perfil</span>
+                            </a>
+                        <?php elseif ($isAdmin): ?>
+                            <a href="<?php echo ADMIN_SETTINGS_URL; ?>" class="navbar-dropdown-item">
+                                <svg class="navbar-dropdown-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                </svg>
+                                <span>Configurações</span>
+                            </a>
+                        <?php elseif ($isStore): ?>
+                            <a href="<?php echo STORE_PROFILE_URL; ?>" class="navbar-dropdown-item">
+                                <svg class="navbar-dropdown-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                                </svg>
+                                <span>Perfil da Loja</span>
+                            </a>
+                        <?php endif; ?>
+                        
+                        <a href="../../controllers/AuthController.php?action=logout" class="navbar-dropdown-item">
+                            <svg class="navbar-dropdown-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                            </svg>
+                            <span>Sair</span>
+                        </a>
+                    </div>
+                </div>
+            <?php else: ?>
+                <!-- Botões para visitantes -->
+                <a href="<?php echo LOGIN_URL; ?>" class="navbar-login-btn">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path>
+                    </svg>
+                    <span>Entrar</span>
+                </a>
+                <a href="<?php echo REGISTER_URL; ?>" class="navbar-register-btn">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path>
+                    </svg>
+                    <span>Cadastrar</span>
+                </a>
+            <?php endif; ?>
+        </div>
     </div>
 </nav>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Toggle do menu mobile
-    const navbarToggle = document.getElementById('navbarToggle');
-    const navbarLinks = document.getElementById('navbarLinks');
-    
-    if (navbarToggle) {
-        navbarToggle.addEventListener('click', function() {
-            navbarLinks.classList.toggle('open');
-        });
-    }
-    
-    // Toggle do dropdown do usuário
+    // === ELEMENTOS DOM ===
+    const mobileToggle = document.getElementById('mobileToggle');
+    const navbarMenu = document.getElementById('navbarMenu');
     const userDropdownToggle = document.getElementById('userDropdownToggle');
     const userDropdown = document.getElementById('userDropdown');
-    
-    if (userDropdownToggle) {
-        userDropdownToggle.addEventListener('click', function(e) {
-            e.stopPropagation();
-            userDropdown.classList.toggle('open');
+
+    // === TOGGLE MENU MOBILE ===
+    if (mobileToggle && navbarMenu) {
+        mobileToggle.addEventListener('click', function() {
+            const isOpen = navbarMenu.classList.contains('open');
+            
+            // Toggle classes
+            navbarMenu.classList.toggle('open');
+            mobileToggle.classList.toggle('open');
+            
+            // Update ARIA attributes
+            mobileToggle.setAttribute('aria-expanded', !isOpen);
+            mobileToggle.setAttribute('aria-label', isOpen ? 'Abrir menu de navegação' : 'Fechar menu de navegação');
         });
     }
-    
-    // Fechar dropdown ao clicar fora
+
+    // === DROPDOWN DO USUÁRIO ===
+    if (userDropdownToggle && userDropdown) {
+        userDropdownToggle.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const isOpen = userDropdown.classList.contains('open');
+            
+            // Toggle dropdown
+            userDropdown.classList.toggle('open');
+            
+            // Update ARIA attributes
+            userDropdownToggle.setAttribute('aria-expanded', !isOpen);
+        });
+    }
+
+    // === FECHAR DROPDOWN AO CLICAR FORA ===
     document.addEventListener('click', function(e) {
+        // Fechar dropdown do usuário
         if (userDropdown && userDropdownToggle) {
             if (!userDropdown.contains(e.target) && !userDropdownToggle.contains(e.target)) {
                 userDropdown.classList.remove('open');
+                userDropdownToggle.setAttribute('aria-expanded', 'false');
             }
         }
+        
+        // Fechar menu mobile ao clicar em link
+        if (navbarMenu && mobileToggle) {
+            if (e.target.closest('.navbar-menu-link')) {
+                navbarMenu.classList.remove('open');
+                mobileToggle.classList.remove('open');
+                mobileToggle.setAttribute('aria-expanded', 'false');
+                mobileToggle.setAttribute('aria-label', 'Abrir menu de navegação');
+            }
+        }
+    });
+
+    // === FECHAR MENU MOBILE NO REDIMENSIONAMENTO ===
+    window.addEventListener('resize', function() {
+        if (window.innerWidth > 768) {
+            if (navbarMenu && mobileToggle) {
+                navbarMenu.classList.remove('open');
+                mobileToggle.classList.remove('open');
+                mobileToggle.setAttribute('aria-expanded', 'false');
+            }
+        }
+    });
+
+    // === SMOOTH SCROLL PARA ÂNCORAS ===
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function (e) {
+            e.preventDefault();
+            const target = document.querySelector(this.getAttribute('href'));
+            if (target) {
+                target.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'start'
+                });
+            }
+        });
     });
 });
 </script>
