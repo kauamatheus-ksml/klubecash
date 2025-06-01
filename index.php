@@ -192,7 +192,7 @@ try {
                 <!-- Logo Responsivo -->
                 <a href="<?php echo SITE_URL; ?>" class="brand-logo" aria-label="Klube Cash - Página Inicial">
                     <img src="assets/images/logolaranja.png" alt="Klube Cash" class="logo-image">
-                    <span class="logo-text">Klube Cash</span>
+                    <span class="logo-text"></span>
                 </a>
                 
                 <!-- Menu Desktop -->
