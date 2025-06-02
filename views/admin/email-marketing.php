@@ -182,6 +182,7 @@ function cancelarCampanha($campaignId) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
     <title>📧 Email Marketing - Klube Cash Admin</title>
     <style>
         :root {
