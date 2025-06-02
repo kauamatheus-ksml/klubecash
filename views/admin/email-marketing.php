@@ -543,6 +543,7 @@ function cancelarCampanha($campaignId) {
     </style>
 </head>
 <body>
+    <?php include_once '../components/sidebar.php'; ?>
     <div class="container">
         <!-- Header Principal -->
         <div class="header">
