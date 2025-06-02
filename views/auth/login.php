@@ -669,10 +669,10 @@ if (!empty($urlError)) {
                 Entre na sua conta e continue transformando suas compras em dinheiro de volta.
             </p>
             <ul class="features-list">
-                <li>Cashback real em dinheiro</li>
-                <li>Centenas de lojas parceiras</li>
+                <li>Cashback real</li>
+                <li>Muitas lojas parceiras</li>
                 <li>Sem taxas ou anuidades</li>
-                <li>Saque quando quiser</li>
+                <li>Utilize em lojas que ele fopi gerado</li>
             </ul>
         </div>
 
