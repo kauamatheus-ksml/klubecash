@@ -729,7 +729,7 @@ if (isset($_GET['token']) && !empty($_GET['token'])) {
         <!-- Header com estado dinâmico -->
         <div class="recover-header">
             <div class="brand-logo">
-                <img src="../../assets/images/logolaranja.png" alt="Klube Cash">
+                <img src="../../assets/images/logo-icon.png" alt="Klube Cash">
             </div>
             
             <?php if ($validToken): ?>
