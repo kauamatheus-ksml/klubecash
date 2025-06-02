@@ -146,7 +146,15 @@ if (session_status() === PHP_SESSION_NONE) {
     ini_set('session.cookie_samesite', 'Strict');
     session_start();
 }
+// === EMAIL MARKETING (ADICIONE ao final do seu constants.php) ===
+define('ADMIN_EMAIL_MARKETING_URL', SITE_URL . '/admin/email-marketing');
+define('ADMIN_EMAIL_TEMPLATES_URL', SITE_URL . '/admin/email-templates');
+define('ADMIN_EMAIL_CAMPAIGNS_URL', SITE_URL . '/admin/email-campanhas');
 
+// Configurações de envio em lote
+define('EMAIL_BATCH_SIZE', 50); // Quantos emails enviar por vez
+define('EMAIL_SEND_DELAY', 100000); // Pausa entre emails (microssegundos)
+define('EMAIL_MAX_RETRIES', 3); // Tentativas máximas para emails falhados
 // === PERFORMANCE CONFIGS ===
 define('CACHE_DURATION', 3600); // 1 hora
 define('MAX_UPLOAD_SIZE', 10 * 1024 * 1024); // 10MB

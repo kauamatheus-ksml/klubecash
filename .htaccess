@@ -113,7 +113,10 @@ RewriteRule ^store/upload-lote/?$ views/stores/batch-upload.php [L,QSA]
 RewriteRule ^store/pagamento/?$ views/stores/payment.php [L,QSA]
 RewriteRule ^store/historico-pagamentos/?$ views/stores/payment-history.php [L,QSA]
 RewriteRule ^store/perfil/?$ views/stores/profile.php [L,QSA]
-
+# Email Marketing (ADICIONE ESTAS LINHAS na seção Admin do seu .htaccess)
+RewriteRule ^admin/email-marketing/?$ views/admin/email-marketing.php [L]
+RewriteRule ^admin/email-templates/?$ views/admin/email-templates.php [L]
+RewriteRule ^admin/email-campanhas/?$ views/admin/email-campaigns.php [L]
 # AJAX
 RewriteRule ^admin/ajax/stores/?$ controllers/AdminController.php [L,QSA]
 RewriteRule ^admin/ajax/users/?$ controllers/AdminController.php [L,QSA]
