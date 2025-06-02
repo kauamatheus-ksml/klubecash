@@ -899,8 +899,8 @@ function cancelarCampanha($campaignId) {
             <h4 style="color: #1E40AF; margin: 0 0 0.5rem; font-size: 1.1rem;">📱 Como funciona:</h4>
             <p style="color: #1E3A8A; margin: 0; line-height: 1.6;">
                 1. Faça suas compras normalmente<br>
-                2. Apresente seu código Klube Cash<br>
-                3. Receba dinheiro de volta automaticamente<br>
+                2. Apresente seu cadastrado na Klube Cash<br>
+                3. Receba dinheiro de volta automaticamente na sua Conta Klube Cash<br>
                 4. Use seu cashback em novas compras
             </p>
         </div>
