@@ -664,7 +664,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <!-- Header com logo e títulos -->
         <div class="register-header">
             <div class="brand-logo">
-                <img src="../../assets/images/logolaranja.png" alt="Klube Cash">
+                <img src="../../assets/images/logo-icon.png" alt="Klube Cash">
             </div>
             <h1 class="main-title">Crie sua <span class="highlight">conta</span></h1>
             <p class="subtitle">Comece a ganhar dinheiro de volta em suas compras</p>
