@@ -804,7 +804,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="benefits-list">
                 <div class="benefit-item">
                     <div class="benefit-icon">💰</div>
-                    <span class="benefit-text">Cashback real em dinheiro</span>
+                    <span class="benefit-text">Cashback real</span>
                 </div>
                 <div class="benefit-item">
                     <div class="benefit-icon">⚡</div>
@@ -812,7 +812,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
                 <div class="benefit-item">
                     <div class="benefit-icon">🎯</div>
-                    <span class="benefit-text">Centenas de lojas parceiras</span>
+                    <span class="benefit-text">Muitas de lojas parceiras</span>
                 </div>
             </div>
         </div>
