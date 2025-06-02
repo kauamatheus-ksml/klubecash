@@ -1,11 +1,9 @@
 <?php
 /**
  * Componente de Sidebar Modernizada para o Painel Administrativo
- * 
- * Este componente cria uma sidebar responsiva moderna que pode ser utilizada em todas as páginas
+ * * Este componente cria uma sidebar responsiva moderna que pode ser utilizada em todas as páginas
  * do painel administrativo.
- * 
- * @param string $activeMenu - O ID do menu ativo atual (ex: 'painel', 'usuarios', etc.)
+ * * @param string $activeMenu - O ID do menu ativo atual (ex: 'painel', 'usuarios', etc.)
  * @param string $userName - Nome do usuário logado para exibição
  */
 // Iniciar sessão apenas se ainda não estiver ativa
@@ -15,20 +13,48 @@ if (session_status() === PHP_SESSION_NONE) {
 
 // Verificar se o usuário está logado
 if (!isset($_SESSION['user_id'])) {
-    header('Location: ' . LOGIN_URL);
+    header('Location: ' . LOGIN_URL); // Certifique-se que LOGIN_URL está definido
     exit;
 }
 
 // Verificar se $activeMenu está definido, caso contrário definir como 'painel'
 $activeMenu = $activeMenu ?? 'painel';
+
+// Certifique-se que as constantes de URL estão definidas. Exemplo:
+// define('ADMIN_DASHBOARD_URL', SITE_URL . '/admin/dashboard.php');
+// define('ADMIN_USERS_URL', SITE_URL . '/admin/users.php');
+// define('ADMIN_BALANCE_URL', SITE_URL . '/admin/balance.php');
+// define('ADMIN_STORES_URL', SITE_URL . '/admin/stores.php');
+// define('ADMIN_PAYMENTS_URL', SITE_URL . '/admin/payments.php');
+// define('ADMIN_TRANSACTIONS_URL', SITE_URL . '/admin/purchases.php'); // Assumindo que 'compras' refere-se a transações/purchases
+// define('ADMIN_REPORTS_URL', SITE_URL . '/admin/reports.php'); // ou /admin/relatorios.php
+// define('ADMIN_EMAIL_MARKETING_URL', SITE_URL . '/admin/email-marketing.php'); // Adicione esta constante
+// define('ADMIN_SETTINGS_URL', SITE_URL . '/admin/settings.php');
+// define('SITE_URL', 'http://localhost/klubecash'); // Exemplo, ajuste conforme sua configuração
+// define('LOGIN_URL', SITE_URL . '/views/auth/login.php'); // Exemplo
+
+// Para este exemplo, se as constantes não estiverem definidas globalmente, vamos defini-las aqui para evitar erros.
+// O ideal é que elas venham do seu arquivo de configuração (ex: config/constants.php)
+if (!defined('ADMIN_DASHBOARD_URL')) define('ADMIN_DASHBOARD_URL', (defined('SITE_URL') ? SITE_URL : '') . '/admin/dashboard.php');
+if (!defined('ADMIN_USERS_URL')) define('ADMIN_USERS_URL', (defined('SITE_URL') ? SITE_URL : '') . '/admin/users.php');
+if (!defined('ADMIN_BALANCE_URL')) define('ADMIN_BALANCE_URL', (defined('SITE_URL') ? SITE_URL : '') . '/admin/balance.php');
+if (!defined('ADMIN_STORES_URL')) define('ADMIN_STORES_URL', (defined('SITE_URL') ? SITE_URL : '') . '/admin/stores.php');
+if (!defined('ADMIN_PAYMENTS_URL')) define('ADMIN_PAYMENTS_URL', (defined('SITE_URL') ? SITE_URL : '') . '/admin/payments.php');
+if (!defined('ADMIN_TRANSACTIONS_URL')) define('ADMIN_TRANSACTIONS_URL', (defined('SITE_URL') ? SITE_URL : '') . '/admin/purchases.php');
+if (!defined('ADMIN_REPORTS_URL')) define('ADMIN_REPORTS_URL', (defined('SITE_URL') ? SITE_URL : '') . '/admin/relatorios.php'); // Mantendo como estava no original /admin/relatorios
+if (!defined('ADMIN_EMAIL_MARKETING_URL')) define('ADMIN_EMAIL_MARKETING_URL', (defined('SITE_URL') ? SITE_URL : '') . '/admin/email-marketing.php');
+if (!defined('ADMIN_SETTINGS_URL')) define('ADMIN_SETTINGS_URL', (defined('SITE_URL') ? SITE_URL : '') . '/admin/settings.php');
+if (!defined('SITE_URL')) define('SITE_URL', '../..'); // Fallback genérico se não definido
+if (!defined('LOGIN_URL')) define('LOGIN_URL', (defined('SITE_URL') ? SITE_URL : '') . '/views/auth/login.php');
+
+
 ?>
 
-<link rel="stylesheet" href="../../assets/css/sidebar-styles.css">
+<link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/sidebar-styles.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-<!-- Sidebar Toggle Button (visível apenas em dispositivos móveis) -->
 <div class="sidebar-toggle" id="sidebarToggle" aria-label="Abrir menu">
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <line x1="3" y1="12" x2="21" y2="12"></line>
@@ -37,19 +63,14 @@ $activeMenu = $activeMenu ?? 'painel';
     </svg>
 </div>
 
-<!-- Overlay para dispositivos móveis -->
 <div class="overlay" id="overlay"></div>
 
-<!-- Sidebar -->
 <div class="sidebar" id="sidebar">
-    <!-- CORREÇÃO: Wrapper para controle de layout no mobile -->
     <div class="sidebar-content">
-        <!-- Header da Sidebar -->
         <div class="sidebar-header">
-            <img src="../../assets/images/logo.png" alt="KlubeCash" class="sidebar-logo">
+            <img src="<?php echo SITE_URL; ?>/assets/images/logo.png" alt="KlubeCash" class="sidebar-logo">
         </div>
         
-        <!-- Navegação Principal -->
         <nav class="sidebar-nav" role="navigation">
             <a href="<?php echo ADMIN_DASHBOARD_URL; ?>" 
                class="sidebar-nav-item <?php echo ($activeMenu == 'painel') ? 'active' : ''; ?>"
@@ -112,7 +133,7 @@ $activeMenu = $activeMenu ?? 'painel';
                 Compras
             </a>
             
-            <a href="<?php echo SITE_URL; ?>/admin/relatorios" 
+            <a href="<?php echo ADMIN_REPORTS_URL; ?>" 
                class="sidebar-nav-item <?php echo ($activeMenu == 'relatorios') ? 'active' : ''; ?>"
                aria-current="<?php echo ($activeMenu == 'relatorios') ? 'page' : 'false'; ?>">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -124,7 +145,16 @@ $activeMenu = $activeMenu ?? 'painel';
                 </svg>
                 Relatórios
             </a>
-            
+
+            <a href="<?php echo ADMIN_EMAIL_MARKETING_URL; ?>" 
+               class="sidebar-nav-item <?php echo ($activeMenu == 'email-marketing') ? 'active' : ''; ?>"
+               aria-current="<?php echo ($activeMenu == 'email-marketing') ? 'page' : 'false'; ?>">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                    <polyline points="22,6 12,13 2,6"></polyline>
+                </svg>
+                Email Marketing
+            </a>
             <a href="<?php echo ADMIN_SETTINGS_URL; ?>" 
                class="sidebar-nav-item <?php echo ($activeMenu == 'configuracoes') ? 'active' : ''; ?>"
                aria-current="<?php echo ($activeMenu == 'configuracoes') ? 'page' : 'false'; ?>">
@@ -137,7 +167,6 @@ $activeMenu = $activeMenu ?? 'painel';
         </nav>
     </div>
     
-    <!-- CORREÇÃO: Footer fora do wrapper para fixar no bottom em mobile -->
     <div class="sidebar-footer">
         <a href="<?php echo SITE_URL; ?>/controllers/AuthController.php?action=logout" 
            class="logout-btn" 
@@ -152,7 +181,6 @@ $activeMenu = $activeMenu ?? 'painel';
     </div>
 </div>
 
-<!-- Script da Sidebar Corrigido -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // Elementos da DOM
@@ -277,7 +305,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const observer = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
-                entry.target.style.animationDelay = `${Array.from(navItems).indexOf(entry.target) * 0.1}s`;
+                // Corrigido para verificar se navItems é um NodeList antes de chamar Array.from
+                const index = navItems instanceof NodeList ? Array.from(navItems).indexOf(entry.target) : -1;
+                if (index !== -1) {
+                    entry.target.style.animationDelay = `${index * 0.1}s`;
+                }
             }
         });
     });
@@ -294,7 +326,6 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
-<!-- CORREÇÃO: CSS adicional para controle específico da classe sidebar-open -->
 <style>
 /* Prevenir scroll do body quando sidebar está aberta */
 body.sidebar-open {
