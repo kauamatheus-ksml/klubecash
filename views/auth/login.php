@@ -81,11 +81,516 @@ if (!empty($urlError)) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Klube Cash</title>
+    <title>Entrar na Sua Conta - Klube Cash</title>
     <link rel="stylesheet" href="../../assets/css/auth.css">
     <link rel="stylesheet" href="../../assets/css/responsive.css">
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
-    <link rel="stylesheet" href="../../assets/css/views/auth/login.css">
+    
+    <!-- Fonte Google mais amigável -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* Reset e base mais amigável */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #FF7A00 0%, #FF9A3D 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* Elementos decorativos de fundo */
+        body::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+            background-size: 50px 50px;
+            animation: float 20s ease-in-out infinite;
+            pointer-events: none;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-20px) rotate(180deg); }
+        }
+
+        /* Container principal mais amigável */
+        .login-main-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 24px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 480px;
+            padding: 40px;
+            position: relative;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        /* Header mais acolhedor */
+        .login-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .logo-container {
+            margin-bottom: 24px;
+        }
+
+        .logo-container img {
+            height: 60px;
+            width: auto;
+            filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1));
+        }
+
+        .welcome-text {
+            color: #2D3748;
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            line-height: 1.2;
+        }
+
+        .welcome-subtitle {
+            color: #718096;
+            font-size: 16px;
+            font-weight: 400;
+            margin-bottom: 8px;
+        }
+
+        .login-title {
+            color: #FF7A00;
+            font-size: 18px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Formulário mais intuitivo */
+        .login-form {
+            margin-bottom: 30px;
+        }
+
+        .input-wrapper {
+            margin-bottom: 24px;
+            position: relative;
+        }
+
+        .input-label {
+            display: block;
+            color: #4A5568;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 8px;
+            transition: color 0.2s ease;
+        }
+
+        .input-field {
+            width: 100%;
+            padding: 16px 20px;
+            background: #F7FAFC;
+            border: 2px solid #E2E8F0;
+            border-radius: 12px;
+            font-size: 16px;
+            color: #2D3748;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .input-field:focus {
+            outline: none;
+            border-color: #FF7A00;
+            background: #FFFFFF;
+            box-shadow: 0 0 0 3px rgba(255, 122, 0, 0.1);
+        }
+
+        .input-field:focus + .input-label {
+            color: #FF7A00;
+        }
+
+        /* Campo de senha melhorado */
+        .password-container {
+            position: relative;
+        }
+
+        .password-toggle {
+            position: absolute;
+            right: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 8px;
+            color: #A0AEC0;
+            transition: color 0.2s ease;
+            border-radius: 6px;
+        }
+
+        .password-toggle:hover {
+            color: #FF7A00;
+            background: rgba(255, 122, 0, 0.1);
+        }
+
+        .password-toggle img {
+            width: 20px;
+            height: 20px;
+        }
+
+        /* Link esqueceu senha */
+        .forgot-password {
+            text-align: right;
+            margin-bottom: 32px;
+        }
+
+        .forgot-password a {
+            color: #FF7A00;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            transition: color 0.2s ease;
+        }
+
+        .forgot-password a:hover {
+            color: #E86E00;
+            text-decoration: underline;
+        }
+
+        /* Botão de login mais atrativo */
+        .login-button {
+            width: 100%;
+            padding: 18px 24px;
+            background: linear-gradient(135deg, #FF7A00, #FF9A3D);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            box-shadow: 0 4px 15px rgba(255, 122, 0, 0.3);
+        }
+
+        .login-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(255, 122, 0, 0.4);
+        }
+
+        .login-button:active {
+            transform: translateY(0);
+        }
+
+        .login-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Link de registro */
+        .register-section {
+            text-align: center;
+            padding-top: 24px;
+            border-top: 1px solid #E2E8F0;
+        }
+
+        .register-text {
+            color: #718096;
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+
+        .register-link {
+            display: inline-block;
+            padding: 12px 24px;
+            background: transparent;
+            color: #FF7A00;
+            border: 2px solid #FF7A00;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .register-link:hover {
+            background: #FF7A00;
+            color: white;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(255, 122, 0, 0.3);
+        }
+
+        /* Toast Messages - Sistema mais amigável */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            max-width: 400px;
+            width: 100%;
+        }
+
+        .toast {
+            display: flex;
+            align-items: center;
+            padding: 16px 20px;
+            margin-bottom: 12px;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            transform: translateX(100%);
+            opacity: 0;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .toast.show {
+            transform: translateX(0);
+            opacity: 1;
+        }
+
+        .toast.hide {
+            transform: translateX(100%);
+            opacity: 0;
+        }
+
+        .toast.success {
+            background: linear-gradient(135deg, rgba(72, 187, 120, 0.95), rgba(72, 187, 120, 0.9));
+            color: white;
+            border-left: 4px solid #48BB78;
+        }
+
+        .toast.error {
+            background: linear-gradient(135deg, rgba(245, 101, 101, 0.95), rgba(245, 101, 101, 0.9));
+            color: white;
+            border-left: 4px solid #F56565;
+        }
+
+        .toast.warning {
+            background: linear-gradient(135deg, rgba(237, 137, 54, 0.95), rgba(237, 137, 54, 0.9));
+            color: white;
+            border-left: 4px solid #ED8936;
+        }
+
+        .toast.info {
+            background: linear-gradient(135deg, rgba(66, 153, 225, 0.95), rgba(66, 153, 225, 0.9));
+            color: white;
+            border-left: 4px solid #4299E1;
+        }
+
+        .toast-icon {
+            font-size: 20px;
+            margin-right: 12px;
+            flex-shrink: 0;
+        }
+
+        .toast-content {
+            flex: 1;
+        }
+
+        .toast-title {
+            font-weight: 600;
+            font-size: 16px;
+            margin-bottom: 4px;
+        }
+
+        .toast-message {
+            font-size: 14px;
+            opacity: 0.9;
+            line-height: 1.4;
+        }
+
+        .toast-close {
+            background: none;
+            border: none;
+            color: inherit;
+            font-size: 18px;
+            cursor: pointer;
+            opacity: 0.7;
+            margin-left: 12px;
+            padding: 4px;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: all 0.2s ease;
+        }
+
+        .toast-close:hover {
+            opacity: 1;
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Spinner overlay mais elegante */
+        .spinner-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.95);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            backdrop-filter: blur(8px);
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .spinner-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .loader {
+            width: 50px;
+            height: 50px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #FF7A00;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Responsividade melhorada */
+        @media (max-width: 768px) {
+            body {
+                padding: 16px;
+            }
+
+            .login-main-container {
+                padding: 32px 24px;
+                border-radius: 20px;
+            }
+
+            .welcome-text {
+                font-size: 28px;
+            }
+
+            .welcome-subtitle {
+                font-size: 15px;
+            }
+
+            .input-field {
+                padding: 14px 16px;
+                font-size: 16px; /* Importante para iOS não dar zoom */
+            }
+
+            .login-button {
+                padding: 16px 20px;
+                font-size: 15px;
+            }
+
+            .toast-container {
+                top: 10px;
+                right: 10px;
+                left: 10px;
+                max-width: none;
+            }
+
+            .toast {
+                transform: translateY(-100%);
+            }
+
+            .toast.show {
+                transform: translateY(0);
+            }
+
+            .toast.hide {
+                transform: translateY(-100%);
+            }
+        }
+
+        @media (max-width: 480px) {
+            .login-main-container {
+                padding: 24px 20px;
+            }
+
+            .welcome-text {
+                font-size: 24px;
+            }
+
+            .logo-container img {
+                height: 50px;
+            }
+        }
+
+        /* Estados de carregamento para UX melhor */
+        .loading .login-button {
+            position: relative;
+        }
+
+        .loading .login-button::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            margin: auto;
+            border: 2px solid transparent;
+            border-top-color: #ffffff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+        }
+
+        /* Acessibilidade */
+        .input-field:focus-visible {
+            outline: 2px solid #FF7A00;
+            outline-offset: 2px;
+        }
+
+        .login-button:focus-visible {
+            outline: 2px solid #FF7A00;
+            outline-offset: 4px;
+        }
+
+        /* Animações suaves */
+        .login-main-container {
+            animation: slideUp 0.6s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
 </head>
 <body>
     <!-- Container para Toast Messages -->
@@ -93,80 +598,72 @@ if (!empty($urlError)) {
     
     <!-- Spinner Overlay -->
     <div class="spinner-overlay" id="spinner-overlay">
-        <span class="loader"></span>
+        <div class="loader"></div>
     </div>
 
-    <!-- Versão Mobile -->
-    <div class="logo-container">
-        <img src="../../assets/images/logobranco.png" alt="KlubeCash">
-    </div>
-
-    <!-- Versão Desktop -->
-    <div class="login-page">
-        <div class="left-panel">
-            <div class="logo-container-desktop">
-                <img src="../../assets/images/logobranco.png" alt="KlubeCash">
+    <!-- Container Principal de Login -->
+    <div class="login-main-container">
+        <!-- Cabeçalho Amigável -->
+        <div class="login-header">
+            <div class="logo-container">
+                <img src="../../assets/images/logolaranja.png" alt="Klube Cash - Seu dinheiro de volta">
             </div>
-            <div class="illustrations">
-                <img src="../../assets/images/illustrations/businessman-coin.svg" alt="" class="illustration-left">
-                <img src="../../assets/images/illustrations/man-money.svg" alt="" class="illustration-right">
-            </div>
+            <h1 class="welcome-text">Bem-vindo de volta!</h1>
+            <p class="welcome-subtitle">Acesse sua conta para continuar economizando</p>
+            <div class="login-title">Fazer Login</div>
         </div>
 
-        <div class="right-panel">
-            <div class="login-container">
-                <div class="login-header">
-                    <h1>Seja <span>BEM VINDO</span></h1>
-                    <h2>Login</h2>
-                </div>
+        <!-- Formulário de Login -->
+        <form method="post" action="" id="login-form" class="login-form">
+            <div class="input-wrapper">
+                <label for="email" class="input-label">Seu email</label>
+                <input 
+                    type="email" 
+                    id="email" 
+                    name="email" 
+                    class="input-field"
+                    placeholder="Digite seu email aqui"
+                    required
+                    autocomplete="email"
+                >
+            </div>
 
-                <form method="post" action="" id="login-form">
-                    <div class="input-group">
-                        <label for="email">Entre com seu email</label>
-                        <input type="email" id="email" name="email" placeholder="Email" required>
-                    </div>
-
-                    <div class="input-group">
-                        <label for="password">Entre com sua senha</label>
-                        <div class="password-field">
-                            <input type="password" id="password" name="password" placeholder="Senha" required>
-                            <span class="password-toggle" onclick="togglePassword()">
-                                <img src="../../assets/images/icons/eye.svg" alt="Mostrar senha">
-                            </span>
-                        </div>
-                    </div>
-
-                    <div class="forgot-password">
-                        <a href="<?php echo RECOVER_PASSWORD_URL; ?>">Esqueci minha senha</a>
-                    </div>
-
-                    <button type="submit" class="login-btn" id="login-btn">Entrar</button>
-                </form>
-                <!--
-                <div class="or-divider">Ou</div>
-
-                <div class="social-login">
-                    <button class="social-btn google-btn" onclick="loginWithGoogle()" id="google-btn">
-                        <img src="../../assets/images/icons/google.svg" alt="Google">
-                        <span class="hide-on-mobile">Entre com Google</span>
+            <div class="input-wrapper">
+                <label for="password" class="input-label">Sua senha</label>
+                <div class="password-container">
+                    <input 
+                        type="password" 
+                        id="password" 
+                        name="password" 
+                        class="input-field"
+                        placeholder="Digite sua senha"
+                        required
+                        autocomplete="current-password"
+                    >
+                    <button type="button" class="password-toggle" onclick="togglePassword()" aria-label="Mostrar/esconder senha">
+                        <img src="../../assets/images/icons/eye.svg" alt="Ver senha" id="password-icon">
                     </button>
-                    <button class="social-btn facebook-btn" onclick="loginWithFacebook()">
-                        <img src="../../assets/images/icons/facebook.svg" alt="Facebook">
-                    </button>
-                    <button class="social-btn apple-btn" onclick="loginWithApple()">
-                        <img src="../../assets/images/icons/apple.svg" alt="Apple">
-                    </button>
-                </div>-->
-
-                <div class="register-link">
-                    <p>Não tem conta? <a href="<?php echo REGISTER_URL; ?>">Registre-se</a></p>
                 </div>
             </div>
+
+            <div class="forgot-password">
+                <a href="<?php echo RECOVER_PASSWORD_URL; ?>">Esqueci minha senha</a>
+            </div>
+
+            <button type="submit" class="login-button" id="login-btn">
+                <span id="login-btn-text">Entrar na Minha Conta</span>
+            </button>
+        </form>
+
+        <!-- Seção de Registro -->
+        <div class="register-section">
+            <p class="register-text">Ainda não tem uma conta?</p>
+            <a href="<?php echo REGISTER_URL; ?>" class="register-link">Criar Conta Grátis</a>
         </div>
     </div>
 
     <script>
-        // Sistema de Toast Messages
+        // Sistema de Toast Messages mais intuitivo
         class ToastManager {
             constructor() {
                 this.container = document.getElementById('toast-container');
@@ -194,15 +691,15 @@ if (!empty($urlError)) {
                 toast.className = `toast ${type}`;
                 
                 const icons = {
-                    success: '✓',
-                    error: '✕',
-                    warning: '⚠',
-                    info: 'ℹ'
+                    success: '✅',
+                    error: '❌',
+                    warning: '⚠️',
+                    info: 'ℹ️'
                 };
 
                 const titles = {
-                    success: title || 'Sucesso!',
-                    error: title || 'Erro!',
+                    success: title || 'Tudo certo!',
+                    error: title || 'Ops, algo deu errado!',
                     warning: title || 'Atenção!',
                     info: title || 'Informação'
                 };
@@ -213,8 +710,7 @@ if (!empty($urlError)) {
                         <div class="toast-title">${titles[type]}</div>
                         <div class="toast-message">${message}</div>
                     </div>
-                    <button class="toast-close" onclick="toastManager.hide(this.parentElement)">×</button>
-                    <div class="toast-progress"></div>
+                    <button class="toast-close" onclick="toastManager.hide(this.parentElement)" aria-label="Fechar notificação">×</button>
                 `;
 
                 return toast;
@@ -302,143 +798,91 @@ if (!empty($urlError)) {
             }
         });
 
-        // Função para alternar a visibilidade da senha
+        // Função para alternar a visibilidade da senha - mais intuitiva
         function togglePassword() {
             const passwordField = document.getElementById('password');
-            const passwordToggle = document.querySelector('.password-toggle img');
+            const passwordIcon = document.getElementById('password-icon');
             
             if (passwordField.type === 'password') {
                 passwordField.type = 'text';
-                passwordToggle.src = '../../assets/images/icons/eye-slash.svg';
+                passwordIcon.src = '../../assets/images/icons/eye-slash.svg';
+                passwordIcon.alt = 'Esconder senha';
             } else {
                 passwordField.type = 'password';
-                passwordToggle.src = '../../assets/images/icons/eye.svg';
+                passwordIcon.src = '../../assets/images/icons/eye.svg';
+                passwordIcon.alt = 'Ver senha';
             }
         }
 
-        // Função para login com Google
-        function loginWithGoogle() {
-            const googleBtn = document.getElementById('google-btn');
-            const originalHTML = googleBtn.innerHTML;
-            
-            // Mostrar loading no botão
-            googleBtn.innerHTML = '<span class="loader" style="width: 20px; height: 20px; margin-right: 10px;"></span>Conectando...';
-            googleBtn.disabled = true;
-            
-            // Mostrar spinner geral
-            spinnerManager.show();
-            
-            fetch('<?php echo SITE_URL; ?>/auth/google/auth', {
-                method: 'GET',
-                headers: {
-                    'Accept': 'application/json'
-                }
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Erro na requisição: ' + response.status);
-                }
-                return response.json();
-            })
-            .then(data => {
-                if (data.status && data.auth_url) {
-                    toastManager.info('Redirecionando para o Google...', 'Aguarde');
-                    setTimeout(() => {
-                        window.location.href = data.auth_url;
-                    }, 1000);
-                } else {
-                    throw new Error(data.message || 'Erro desconhecido');
-                }
-            })
-            .catch(error => {
-                console.error('Erro no login Google:', error);
-                toastManager.error('Erro ao conectar com o Google: ' + error.message);
-                
-                // Restaurar botão
-                googleBtn.innerHTML = originalHTML;
-                googleBtn.disabled = false;
-                spinnerManager.hide();
-            });
-        }
-
-        // Funções placeholder para outros provedores
-        function loginWithFacebook() {
-            toastManager.info('Login com Facebook será implementado em breve.', 'Em desenvolvimento');
-        }
-
-        function loginWithApple() {
-            toastManager.info('Login com Apple será implementado em breve.', 'Em desenvolvimento');
-        }
-
-        // Validação e envio do formulário
+        // Validação e envio do formulário - mais amigável
         document.getElementById('login-form').addEventListener('submit', function(event) {
             event.preventDefault();
             
-            const email = document.getElementById('email').value;
+            const email = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value;
             const loginBtn = document.getElementById('login-btn');
+            const loginBtnText = document.getElementById('login-btn-text');
             
-            // Validação básica
+            // Validação básica mais amigável
             if (!email) {
-                toastManager.error('Por favor, informe seu email.');
+                toastManager.warning('Por favor, digite seu email para continuar.');
+                document.getElementById('email').focus();
                 return;
             }
             
             if (!isValidEmail(email)) {
-                toastManager.error('Por favor, informe um email válido.');
+                toastManager.warning('O email digitado não parece estar correto. Verifique e tente novamente.');
+                document.getElementById('email').focus();
                 return;
             }
             
             if (!password) {
-                toastManager.error('Por favor, informe sua senha.');
+                toastManager.warning('Não esqueça de digitar sua senha!');
+                document.getElementById('password').focus();
                 return;
             }
             
-            // Mostrar loading
-            const originalText = loginBtn.innerHTML;
-            loginBtn.innerHTML = '<span class="loader" style="width: 20px; height: 20px; margin-right: 10px;"></span>Entrando...';
+            // Mostrar loading de forma mais elegante
             loginBtn.disabled = true;
+            loginBtn.classList.add('loading');
+            loginBtnText.textContent = 'Entrando...';
             spinnerManager.show();
             
-            // Simular delay para mostrar o loading (remover em produção)
+            // Simular delay para UX mais suave
             setTimeout(() => {
                 this.submit();
-            }, 1000);
+            }, 800);
         });
         
+        // Validação de email mais robusta
         function isValidEmail(email) {
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             return emailRegex.test(email);
         }
 
-        // Verificar tamanho da tela para ajustes responsivos
-        function checkScreenSize() {
-            const socialBtns = document.querySelectorAll('.social-btn');
-            const googleBtn = document.querySelector('.google-btn span');
-            
-            if (window.innerWidth < 768) {
-                socialBtns.forEach(btn => {
-                    if (!btn.classList.contains('google-btn')) {
-                        btn.querySelector('span')?.classList.add('hide');
-                    }
-                });
-                
-                if (googleBtn && !googleBtn.textContent.includes('Conectando')) {
-                    googleBtn.textContent = 'Login com Google';
-                }
-            } else {
-                socialBtns.forEach(btn => {
-                    btn.querySelector('span')?.classList.remove('hide');
-                });
-                
-                if (googleBtn && !googleBtn.textContent.includes('Conectando')) {
-                    googleBtn.textContent = 'Entre com Google';
-                }
+        // Melhorar acessibilidade - permitir Enter nos campos
+        document.getElementById('email').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                document.getElementById('password').focus();
             }
-        }
+        });
 
-        window.addEventListener('load', checkScreenSize);
-        window.addEventListener('resize', checkScreenSize);
+        document.getElementById('password').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                document.getElementById('login-form').dispatchEvent(new Event('submit'));
+            }
+        });
+
+        // Feedback visual nos campos
+        document.querySelectorAll('.input-field').forEach(field => {
+            field.addEventListener('input', function() {
+                if (this.value.length > 0) {
+                    this.style.borderColor = '#48BB78';
+                } else {
+                    this.style.borderColor = '#E2E8F0';
+                }
+            });
+        });
     </script>
 </body>
 </html>
