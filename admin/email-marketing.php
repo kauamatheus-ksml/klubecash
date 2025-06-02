@@ -1103,6 +1103,7 @@ function cancelarCampanha($campaignId) {
         </p>
     </div>
 </div>`;
+
         }
     </script>
 </body>
