@@ -52,9 +52,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $updateStmt->bindParam(':id', $user['id']);
                     $updateStmt->execute();
                     
-                    // Redirecionar com base no tipo de usuário
+                    // Redirecionar com base no tipo de usuário - CORRIGIDO
                     if ($user['tipo'] == USER_TYPE_ADMIN) {
                         header('Location: ' . ADMIN_DASHBOARD_URL);
+                    } else if ($user['tipo'] == USER_TYPE_STORE) {
+                        header('Location: ' . STORE_DASHBOARD_URL);
                     } else {
                         header('Location: ' . CLIENT_DASHBOARD_URL);
                     }
