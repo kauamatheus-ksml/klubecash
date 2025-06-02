@@ -879,11 +879,11 @@ function cancelarCampanha($campaignId) {
         <h3 style="color: #333; margin: 2rem 0 1rem; font-size: 1.3rem;">🎁 Benefícios exclusivos para primeiros cadastrados:</h3>
         <div style="background: #F8FAFC; border-left: 4px solid #FF7A00; padding: 1.5rem; border-radius: 0 8px 8px 0;">
             <ul style="color: #444; line-height: 2; margin: 0; padding-left: 1.5rem; font-size: 1rem;">
-                <li><strong style="color: #FF7A00;">Bônus de R$ 20</strong> para suas primeiras compras</li>
-                <li><strong style="color: #FF7A00;">Cashback dobrado</strong> na primeira semana (até 10%)</li>
+                
+                <li><strong style="color: #FF7A00;">Cashback Garantido</strong> de 5%</li>
                 <li><strong style="color: #FF7A00;">Acesso antecipado</strong> às melhores ofertas</li>
-                <li><strong style="color: #FF7A00;">Suporte premium</strong> por 60 dias</li>
-                <li><strong style="color: #FF7A00;">Zero taxas</strong> nos primeiros 3 meses</li>
+                <li><strong style="color: #FF7A00;">Suporte premium</strong></li>
+                <li><strong style="color: #FF7A00;">Zero taxas
             </ul>
         </div>
         
