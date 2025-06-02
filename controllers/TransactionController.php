@@ -1657,6 +1657,150 @@ class TransactionController {
             return false;
         }
     }
+
+    public static function approvePaymentAutomatically($paymentId, $observacao = '') {
+        try {
+            $db = Database::getConnection();
+            
+            // Verificar se o pagamento existe e está pendente
+            $paymentStmt = $db->prepare("
+                SELECT p.*, l.nome_fantasia as loja_nome
+                FROM pagamentos_comissao p
+                JOIN lojas l ON p.loja_id = l.id
+                WHERE p.id = ? AND p.status IN ('pendente', 'pix_aguardando')
+            ");
+            $paymentStmt->execute([$paymentId]);
+            $payment = $paymentStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$payment) {
+                return ['status' => false, 'message' => 'Pagamento não encontrado ou já processado.'];
+            }
+            
+            // Usar o mesmo processo de aprovação mas sem verificação de admin
+            $db->beginTransaction();
+            
+            // Atualizar pagamento para aprovado
+            $updateStmt = $db->prepare("
+                UPDATE pagamentos_comissao
+                SET status = 'aprovado', 
+                    data_aprovacao = NOW(), 
+                    observacao_admin = ?,
+                    pix_paid_at = NOW()
+                WHERE id = ?
+            ");
+            $updateStmt->execute([$observacao, $paymentId]);
+            
+            // Buscar transações associadas
+            $transStmt = $db->prepare("
+                SELECT t.id, t.usuario_id, t.loja_id, t.valor_cliente
+                FROM pagamentos_transacoes pt
+                JOIN transacoes_cashback t ON pt.transacao_id = t.id
+                WHERE pt.pagamento_id = ?
+            ");
+            $transStmt->execute([$paymentId]);
+            $transactions = $transStmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            // Atualizar status das transações
+            if (!empty($transactions)) {
+                $transactionIds = array_column($transactions, 'id');
+                $placeholders = implode(',', array_fill(0, count($transactionIds), '?'));
+                
+                $updateTransStmt = $db->prepare("
+                    UPDATE transacoes_cashback 
+                    SET status = 'aprovado' 
+                    WHERE id IN ($placeholders)
+                ");
+                $updateTransStmt->execute($transactionIds);
+                
+                // Atualizar comissões
+                $updateCommissionStmt = $db->prepare("
+                    UPDATE transacoes_comissao 
+                    SET status = 'aprovado' 
+                    WHERE transacao_id IN ($placeholders)
+                ");
+                $updateCommissionStmt->execute($transactionIds);
+            }
+            
+            $db->commit();
+            
+            // Creditar saldos dos clientes (fora da transação)
+            require_once __DIR__ . '/../models/CashbackBalance.php';
+            require_once __DIR__ . '/AdminController.php';
+            $balanceModel = new CashbackBalance();
+            $totalCashbackReservado = 0;
+            
+            foreach ($transactions as $transaction) {
+                if ($transaction['valor_cliente'] > 0) {
+                    $description = "Cashback da compra - Transação #{$transaction['id']} (PIX aprovado automaticamente)";
+                    
+                    $creditResult = $balanceModel->addBalance(
+                        $transaction['usuario_id'],
+                        $transaction['loja_id'],
+                        $transaction['valor_cliente'],
+                        $description,
+                        $transaction['id']
+                    );
+                    
+                    if ($creditResult) {
+                        $totalCashbackReservado += $transaction['valor_cliente'];
+                    }
+                }
+            }
+            
+            // Criar reserva de cashback
+            if ($totalCashbackReservado > 0) {
+                self::createCashbackReserve(
+                    $totalCashbackReservado, 
+                    $paymentId, 
+                    "Reserva de cashback - Pagamento PIX #{$paymentId} aprovado automaticamente"
+                );
+            }
+            
+            // Criar notificações
+            foreach ($transactions as $transaction) {
+                // Notificar cliente
+                self::createNotification(
+                    $transaction['usuario_id'],
+                    'Cashback disponível!',
+                    'Seu cashback foi liberado automaticamente após confirmação do pagamento PIX.',
+                    'success'
+                );
+            }
+            
+            // Notificar loja
+            $storeUserStmt = $db->prepare("SELECT usuario_id FROM lojas WHERE id = ?");
+            $storeUserStmt->execute([$payment['loja_id']]);
+            $storeUser = $storeUserStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($storeUser && !empty($storeUser['usuario_id'])) {
+                self::createNotification(
+                    $storeUser['usuario_id'],
+                    'Pagamento PIX confirmado',
+                    'Seu pagamento PIX foi confirmado automaticamente e o cashback foi liberado para os clientes.',
+                    'success'
+                );
+            }
+            
+            return [
+                'status' => true,
+                'message' => 'Pagamento PIX aprovado automaticamente',
+                'data' => [
+                    'payment_id' => $paymentId,
+                    'transacoes_aprovadas' => count($transactions),
+                    'cashback_liberado' => $totalCashbackReservado
+                ]
+            ];
+            
+        } catch (Exception $e) {
+            if (isset($db) && $db->inTransaction()) {
+                $db->rollBack();
+            }
+            error_log('Erro na aprovação automática PIX: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro interno do servidor'];
+        }
+    }
+
+
     /**
      * Rejeita um pagamento de comissão
      * 

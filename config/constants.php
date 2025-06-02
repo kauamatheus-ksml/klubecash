@@ -53,7 +53,13 @@ define('STORE_REJECTED', 'rejeitado');
 define('PASSWORD_MIN_LENGTH', 8);
 define('SESSION_LIFETIME', 86400);
 define('TOKEN_EXPIRATION', 7200);
+// === OPENPIX CONFIGURAÇÕES ===
+define('OPENPIX_API_KEY', 'YOUR_OPENPIX_API_KEY_HERE'); // Chave da OpenPix
+define('OPENPIX_WEBHOOK_URL', SITE_URL . '/api/openpix?action=webhook');
 
+// === URLs OPENPIX ===
+define('OPENPIX_CREATE_CHARGE_URL', SITE_URL . '/api/openpix?action=create_charge');
+define('OPENPIX_CHECK_STATUS_URL', SITE_URL . '/api/openpix?action=status');
 // === PAGINAÇÃO ===
 define('ITEMS_PER_PAGE', 10);
 

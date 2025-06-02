@@ -1,0 +1,141 @@
+/* assets/css/views/stores/payment-pix.css */
+.payment-card {
+    max-width: 600px;
+    margin: 0 auto 2rem;
+}
+
+.payment-details {
+    padding: 1.5rem;
+}
+
+.detail-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #eee;
+}
+
+.detail-row:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.label {
+    font-weight: 600;
+    color: var(--medium-gray);
+}
+
+.value {
+    font-weight: 700;
+    color: var(--dark-gray);
+}
+
+.status-badge {
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.status-pending {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.status-success {
+    background: #d4edda;
+    color: #155724;
+}
+
+.pix-section {
+    text-align: center;
+    padding: 2rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    margin: 1.5rem 0;
+}
+
+.qr-container img {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+}
+
+.qr-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.timeline-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 2rem;
+    opacity: 0.5;
+    transition: opacity 0.3s ease;
+}
+
+.timeline-item.active {
+    opacity: 1;
+}
+
+.timeline-marker {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #ddd;
+    margin-right: 1rem;
+    transition: background 0.3s ease;
+}
+
+.timeline-item.active .timeline-marker {
+    background: var(--success-color);
+}
+
+.timeline-content h4 {
+    margin: 0 0 0.5rem;
+    color: var(--dark-gray);
+}
+
+.timeline-content p {
+    margin: 0;
+    color: var(--medium-gray);
+    font-size: 0.9rem;
+}
+
+.info-content ul {
+    list-style: none;
+    padding: 0;
+}
+
+.info-content li {
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 6px;
+    border-left: 4px solid var(--primary-color);
+}
+
+@media (max-width: 768px) {
+    .qr-actions {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .detail-row {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .timeline-item {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .timeline-marker {
+        margin-right: 0;
+        margin-bottom: 0.5rem;
+    }
+}

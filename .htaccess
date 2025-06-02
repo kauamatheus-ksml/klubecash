@@ -101,7 +101,11 @@ RewriteRule ^admin/saldo/?$ views/admin/balance.php [L]
 RewriteRule ^admin/comissoes/?$ views/admin/commissions.php [L]
 RewriteRule ^admin/pagamentos/?$ views/admin/payments.php [L]
 RewriteRule ^admin/relatorios/?$ views/admin/reports.php [L]
+# PIX
+RewriteRule ^store/pagamento-pix/?$ views/stores/payment-pix.php [L,QSA]
 
+# API OpenPix
+RewriteRule ^api/openpix/?$ api/openpix.php [L,QSA]
 # Lojas
 RewriteRule ^lojas/cadastro/?$ views/stores/register.php [L]
 RewriteRule ^lojas/detalhes/([0-9]+)/?$ views/stores/details.php?id=$1 [L]
