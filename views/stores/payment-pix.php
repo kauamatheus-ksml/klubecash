@@ -51,120 +51,320 @@ $activeMenu = 'payment-pix';
     <title>Pagamento PIX - Klube Cash</title>
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
     <link rel="stylesheet" href="../../assets/css/views/stores/payment-pix.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <?php include_once '../components/sidebar-store.php'; ?>
     
     <div class="main-content" id="mainContent">
-        <div class="dashboard-header">
-            <h1>Pagamento PIX via Mercado Pago</h1>
-            <p class="subtitle">Pague suas comissões via PIX e tenha aprovação automática</p>
-        </div>
-        
-        <!-- Card do Pagamento -->
-        <div class="card payment-card">
-            <div class="card-header">
-                <h2>Detalhes do Pagamento</h2>
-            </div>
-            
-            <div class="payment-details">
-                <div class="detail-row">
-                    <span class="label">Valor Total:</span>
-                    <span class="value">R$ <?php echo number_format($payment['valor_total'], 2, ',', '.'); ?></span>
+        <!-- Header Moderno -->
+        <div class="pix-header">
+            <div class="header-content">
+                <div class="header-icon">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/>
+                        <line x1="1" y1="10" x2="23" y2="10"/>
+                    </svg>
                 </div>
-                <div class="detail-row">
-                    <span class="label">Número de Transações:</span>
-                    <span class="value" id="transactionCount">Carregando...</span>
+                <div class="header-text">
+                    <h1>Pagamento via PIX</h1>
+                    <p>Pague suas comissões de forma rápida e segura</p>
                 </div>
-                <div class="detail-row">
-                    <span class="label">Status:</span>
-                    <span class="value status-badge status-pending">Aguardando Pagamento</span>
-                </div>
-            </div>
-            
-            <div class="pix-section" id="pixSection" style="display: none;">
-                <h3>QR Code PIX - Mercado Pago</h3>
-                <div class="qr-container">
-                    <img id="qrCodeImage" src="" alt="QR Code PIX" style="display: none; max-width: 300px;">
-                    <div class="qr-code-text">
-                        <label for="pixCode">Código PIX:</label>
-                        <textarea id="pixCode" readonly style="width: 100%; height: 80px; font-family: monospace; font-size: 12px;"></textarea>
-                    </div>
-                    <div class="qr-actions">
-                        <button class="btn btn-secondary" onclick="copyPixCode()">Copiar Código PIX</button>
-                        <button class="btn btn-primary" onclick="checkPaymentStatus()">Verificar Pagamento</button>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="action-buttons">
-                <button class="btn btn-primary" onclick="generatePix()" id="generatePixBtn">
-                    Gerar PIX via Mercado Pago
-                </button>
-                <a href="<?php echo STORE_PENDING_TRANSACTIONS_URL; ?>" class="btn btn-secondary">
-                    Voltar
-                </a>
-            </div>
-        </div>
-        
-        <!-- Status do Pagamento -->
-        <div class="card status-card">
-            <div class="card-header">
-                <h3>Status do Pagamento</h3>
-            </div>
-            <div class="status-timeline">
-                <div class="timeline-item active" id="step1">
-                    <div class="timeline-marker"></div>
-                    <div class="timeline-content">
-                        <h4>PIX Gerado</h4>
-                        <p>QR Code criado via Mercado Pago</p>
-                    </div>
-                </div>
-                <div class="timeline-item" id="step2">
-                    <div class="timeline-marker"></div>
-                    <div class="timeline-content">
-                        <h4>Pagamento Confirmado</h4>
-                        <p>PIX processado e valor confirmado</p>
-                    </div>
-                </div>
-                <div class="timeline-item" id="step3">
-                    <div class="timeline-marker"></div>
-                    <div class="timeline-content">
-                        <h4>Cashback Liberado</h4>
-                        <p>Cashback automaticamente disponibilizado para os clientes</p>
-                    </div>
+                <div class="header-amount">
+                    <span class="amount-label">Valor total</span>
+                    <span class="amount-value">R$ <?php echo number_format($payment['valor_total'], 2, ',', '.'); ?></span>
                 </div>
             </div>
         </div>
-        
-        <!-- Informações -->
-        <div class="card info-card">
-            <div class="card-header">
-                <h3>Como Funciona o PIX via Mercado Pago</h3>
+
+        <!-- Container Principal -->
+        <div class="pix-container">
+            <!-- Painel de Etapas -->
+            <div class="steps-panel">
+                <div class="step" id="step1" data-step="1">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <h3>Gerar PIX</h3>
+                        <p>Criar código de pagamento</p>
+                    </div>
+                </div>
+                
+                <div class="step" id="step2" data-step="2">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <h3>Pagar</h3>
+                        <p>Usar app do seu banco</p>
+                    </div>
+                </div>
+                
+                <div class="step" id="step3" data-step="3">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <h3>Confirmado</h3>
+                        <p>Cashback liberado</p>
+                    </div>
+                </div>
             </div>
-            <div class="info-content">
-                <ul>
-                    <li>✅ <strong>Gere o PIX:</strong> Clique em "Gerar PIX" para criar o QR Code via Mercado Pago</li>
-                    <li>📱 <strong>Pague pelo App:</strong> Use qualquer app bancário para pagar</li>
-                    <li>⚡ <strong>Aprovação Automática:</strong> Em até 2 minutos após o pagamento</li>
-                    <li>🎉 <strong>Cashback Liberado:</strong> Clientes recebem notificação automática</li>
-                    <li>🔒 <strong>Segurança MP:</strong> Transação protegida pelo Mercado Pago</li>
-                </ul>
+
+            <!-- Painel Principal de Conteúdo -->
+            <div class="content-panel">
+                <!-- Estado Inicial -->
+                <div class="payment-state" id="initialState">
+                    <div class="state-icon">
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M12 2v4"/>
+                            <path d="m16.2 7.8 2.9-2.9"/>
+                            <path d="M18 12h4"/>
+                            <path d="m16.2 16.2 2.9 2.9"/>
+                            <path d="M12 18v4"/>
+                            <path d="m4.9 19.1 2.9-2.9"/>
+                            <path d="M2 12h4"/>
+                            <path d="m4.9 4.9 2.9 2.9"/>
+                        </svg>
+                    </div>
+                    <h2>Vamos gerar seu PIX?</h2>
+                    <p class="state-description">
+                        Clique no botão abaixo para criar o código PIX. 
+                        Em seguida, você poderá pagar usando o app do seu banco.
+                    </p>
+                    <div class="payment-details-summary">
+                        <div class="detail-item">
+                            <span class="label">Transações:</span>
+                            <span class="value" id="transactionCount">Carregando...</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="label">Método:</span>
+                            <span class="value">PIX Instantâneo</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="label">Aprovação:</span>
+                            <span class="value">Automática</span>
+                        </div>
+                    </div>
+                    
+                    <button class="pix-action-btn primary" onclick="generatePix()" id="generatePixBtn">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/>
+                            <line x1="1" y1="10" x2="23" y2="10"/>
+                        </svg>
+                        Gerar PIX Agora
+                    </button>
+                </div>
+
+                <!-- Estado do QR Code -->
+                <div class="payment-state" id="qrCodeState" style="display: none;">
+                    <div class="qr-section">
+                        <h2>Escaneie o QR Code</h2>
+                        <p class="qr-instruction">
+                            Abra o app do seu banco e escaneie o código abaixo, 
+                            ou copie e cole o código PIX.
+                        </p>
+                        
+                        <div class="qr-display">
+                            <div class="qr-image-container">
+                                <img id="qrCodeImage" src="" alt="QR Code PIX" style="display: none;">
+                                <div class="qr-loading" id="qrLoading">
+                                    <div class="spinner"></div>
+                                    <span>Gerando QR Code...</span>
+                                </div>
+                            </div>
+                            
+                            <div class="qr-code-section">
+                                <label for="pixCode" class="code-label">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+                                        <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
+                                    </svg>
+                                    Código PIX
+                                </label>
+                                <div class="code-input-container">
+                                    <textarea id="pixCode" readonly placeholder="Código PIX será exibido aqui..."></textarea>
+                                    <button class="copy-btn" onclick="copyPixCode()" id="copyBtn" disabled>
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                                        </svg>
+                                        Copiar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="qr-actions">
+                            <button class="pix-action-btn secondary" onclick="checkPaymentStatus()">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 12c-1 0-3-1-3-3s2-3 3-3 3 1 3 3-2 3-3 3"/>
+                                    <path d="M9 12c1 0 3-1 3-3s-2-3-3-3-3 1-3 3 2 3 3 3"/>
+                                    <path d="M21 12c-1 0-3 1-3 3s2 3 3 3 3-1 3-3-2-3-3-3"/>
+                                    <path d="M9 12c1 0 3 1 3 3s-2 3-3 3-3-1-3-3 2-3 3-3"/>
+                                </svg>
+                                Verificar Pagamento
+                            </button>
+                        </div>
+
+                        <div class="payment-timer">
+                            <div class="timer-icon">⏱️</div>
+                            <span>Aguardando pagamento...</span>
+                            <div class="pulse-indicator"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Estado de Sucesso -->
+                <div class="payment-state success-state" id="successState" style="display: none;">
+                    <div class="success-animation">
+                        <div class="success-icon">
+                            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                                <polyline points="22 4 12 14.01 9 11.01"/>
+                            </svg>
+                        </div>
+                    </div>
+                    <h2>Pagamento Confirmado!</h2>
+                    <p class="success-description">
+                        Seu PIX foi processado com sucesso. 
+                        O cashback foi liberado automaticamente para seus clientes.
+                    </p>
+                    <div class="success-actions">
+                        <a href="<?php echo STORE_PAYMENT_HISTORY_URL; ?>" class="pix-action-btn primary">
+                            Ver Histórico de Pagamentos
+                        </a>
+                        <a href="<?php echo STORE_PENDING_TRANSACTIONS_URL; ?>" class="pix-action-btn secondary">
+                            Voltar às Comissões
+                        </a>
+                    </div>
+                </div>
             </div>
+
+            <!-- Painel de Informações -->
+            <div class="info-panel">
+                <div class="info-section">
+                    <h3>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <line x1="12" y1="16" x2="12" y2="12"/>
+                            <line x1="12" y1="8" x2="12.01" y2="8"/>
+                        </svg>
+                        Como funciona
+                    </h3>
+                    <div class="info-list">
+                        <div class="info-item">
+                            <span class="info-number">1</span>
+                            <div class="info-text">
+                                <strong>Gere o PIX</strong>
+                                <p>Clique para criar o código de pagamento instantâneo</p>
+                            </div>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-number">2</span>
+                            <div class="info-text">
+                                <strong>Pague pelo app</strong>
+                                <p>Use qualquer banco para escanear ou colar o código</p>
+                            </div>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-number">3</span>
+                            <div class="info-text">
+                                <strong>Aprovação automática</strong>
+                                <p>Em até 2 minutos o cashback é liberado</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="security-info">
+                    <div class="security-badge">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/>
+                            <path d="M9 12l2 2 4-4"/>
+                        </svg>
+                        Seguro
+                    </div>
+                    <span>Transação protegida pelo Mercado Pago</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Botão de Voltar Fixo -->
+        <div class="fixed-back-btn">
+            <a href="<?php echo STORE_PENDING_TRANSACTIONS_URL; ?>" class="back-btn">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="15 18 9 12 15 6"/>
+                </svg>
+                Voltar
+            </a>
         </div>
     </div>
     
+    <!-- Dados ocultos para JavaScript -->
     <input type="hidden" id="mpPaymentId" value="">
+    <input type="hidden" id="paymentId" value="<?php echo $paymentId; ?>">
     
     <script>
-        const paymentId = <?php echo $paymentId; ?>;
+        // Variáveis globais - mantendo a lógica original
+        const paymentId = document.getElementById('paymentId').value;
         let pollingInterval = null;
         
-        // Gerar PIX via Mercado Pago
+        // Elementos do DOM
+        const initialState = document.getElementById('initialState');
+        const qrCodeState = document.getElementById('qrCodeState');
+        const successState = document.getElementById('successState');
+        const generatePixBtn = document.getElementById('generatePixBtn');
+        const qrCodeImage = document.getElementById('qrCodeImage');
+        const qrLoading = document.getElementById('qrLoading');
+        const pixCodeTextarea = document.getElementById('pixCode');
+        const copyBtn = document.getElementById('copyBtn');
+        const mpPaymentIdInput = document.getElementById('mpPaymentId');
+        
+        // Função para atualizar etapas visuais
+        function updateStep(stepNumber) {
+            // Remove active de todas as etapas
+            document.querySelectorAll('.step').forEach(step => {
+                step.classList.remove('active', 'completed');
+            });
+            
+            // Marca etapas anteriores como completadas
+            for (let i = 1; i < stepNumber; i++) {
+                const step = document.getElementById(`step${i}`);
+                if (step) step.classList.add('completed');
+            }
+            
+            // Marca etapa atual como ativa
+            const currentStep = document.getElementById(`step${stepNumber}`);
+            if (currentStep) currentStep.classList.add('active');
+        }
+        
+        // Função para mostrar estado específico
+        function showState(stateName) {
+            // Esconder todos os estados
+            initialState.style.display = 'none';
+            qrCodeState.style.display = 'none';
+            successState.style.display = 'none';
+            
+            // Mostrar estado solicitado
+            switch(stateName) {
+                case 'initial':
+                    initialState.style.display = 'block';
+                    updateStep(1);
+                    break;
+                case 'qrcode':
+                    qrCodeState.style.display = 'block';
+                    updateStep(2);
+                    break;
+                case 'success':
+                    successState.style.display = 'block';
+                    updateStep(3);
+                    break;
+            }
+        }
+        
+        // Gerar PIX - mantendo lógica original com melhorias visuais
         async function generatePix() {
-            const btn = document.getElementById('generatePixBtn');
-            btn.disabled = true;
-            btn.textContent = 'Gerando PIX...';
+            generatePixBtn.disabled = true;
+            generatePixBtn.innerHTML = `
+                <div class="btn-spinner"></div>
+                Gerando PIX...
+            `;
             
             console.log('Iniciando geração PIX para payment_id:', paymentId);
             
@@ -180,7 +380,6 @@ $activeMenu = 'payment-pix';
                 });
                 
                 console.log('Response status:', response.status);
-                console.log('Response headers:', response.headers);
                 
                 const responseText = await response.text();
                 console.log('Response text:', responseText);
@@ -190,59 +389,79 @@ $activeMenu = 'payment-pix';
                     result = JSON.parse(responseText);
                 } catch (e) {
                     console.error('Erro ao fazer parse da resposta:', e);
-                    alert('Erro: Resposta inválida do servidor');
-                    btn.disabled = false;
-                    btn.textContent = 'Gerar PIX via Mercado Pago';
+                    showError('Erro: Resposta inválida do servidor');
                     return;
                 }
                 
                 console.log('Parsed result:', result);
                 
                 if (result.status) {
-                    // Exibir QR Code
-                    const qrImg = document.getElementById('qrCodeImage');
-                    qrImg.src = 'data:image/png;base64,' + result.data.qr_code_base64;
-                    qrImg.style.display = 'block';
+                    // Mostrar estado do QR Code
+                    showState('qrcode');
                     
-                    document.getElementById('pixCode').value = result.data.qr_code;
-                    document.getElementById('mpPaymentId').value = result.data.mp_payment_id;
-                    document.getElementById('pixSection').style.display = 'block';
-                    
-                    updateTimelineStep(1);
-                    btn.style.display = 'none';
-                    
-                    // Iniciar polling automático
-                    startPaymentPolling();
+                    // Simular carregamento do QR
+                    setTimeout(() => {
+                        // Exibir QR Code
+                        qrCodeImage.src = 'data:image/png;base64,' + result.data.qr_code_base64;
+                        qrCodeImage.style.display = 'block';
+                        qrLoading.style.display = 'none';
+                        
+                        // Preencher código PIX
+                        pixCodeTextarea.value = result.data.qr_code;
+                        copyBtn.disabled = false;
+                        
+                        // Salvar ID do pagamento MP
+                        mpPaymentIdInput.value = result.data.mp_payment_id;
+                        
+                        // Iniciar polling automático
+                        startPaymentPolling();
+                        
+                        // Mostrar notificação de sucesso
+                        showNotification('QR Code gerado com sucesso!', 'success');
+                    }, 1500);
                     
                 } else {
                     console.error('Erro na API:', result);
-                    alert('Erro ao gerar PIX: ' + result.message + (result.details ? '\n\nDetalhes: ' + JSON.stringify(result.details) : ''));
-                    btn.disabled = false;
-                    btn.textContent = 'Gerar PIX via Mercado Pago';
+                    showError('Erro ao gerar PIX: ' + result.message);
                 }
                 
             } catch (error) {
                 console.error('Erro de conexão:', error);
-                alert('Erro de conexão: ' + error.message);
-                btn.disabled = false;
-                btn.textContent = 'Gerar PIX via Mercado Pago';
+                showError('Erro de conexão: ' + error.message);
             }
         }
         
-        // Copiar código PIX
+        // Copiar código PIX - mantendo lógica original
         function copyPixCode() {
-            const pixCode = document.getElementById('pixCode').value;
+            const pixCode = pixCodeTextarea.value;
             navigator.clipboard.writeText(pixCode).then(() => {
-                alert('Código PIX copiado!');
+                // Feedback visual no botão
+                const originalText = copyBtn.innerHTML;
+                copyBtn.innerHTML = `
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                    Copiado!
+                `;
+                copyBtn.classList.add('copied');
+                
+                setTimeout(() => {
+                    copyBtn.innerHTML = originalText;
+                    copyBtn.classList.remove('copied');
+                }, 2000);
+                
+                showNotification('Código PIX copiado!', 'success');
+            }).catch(() => {
+                showNotification('Erro ao copiar código', 'error');
             });
         }
         
-        // Verificar status do pagamento
+        // Verificar status do pagamento - mantendo lógica original
         async function checkPaymentStatus() {
-            const mpPaymentId = document.getElementById('mpPaymentId').value;
+            const mpPaymentId = mpPaymentIdInput.value;
             
             if (!mpPaymentId) {
-                alert('PIX não foi gerado ainda');
+                showNotification('PIX não foi gerado ainda', 'warning');
                 return;
             }
             
@@ -254,46 +473,85 @@ $activeMenu = 'payment-pix';
                     handlePaymentCompleted();
                 } else if (result.data.status === 'rejected') {
                     clearInterval(pollingInterval);
-                    alert('❌ Pagamento foi rejeitado. Tente novamente.');
-                    window.location.reload();
+                    showError('❌ Pagamento foi rejeitado. Tente novamente.');
+                    setTimeout(() => window.location.reload(), 3000);
+                } else {
+                    showNotification('Pagamento ainda pendente', 'info');
                 }
             } catch (error) {
                 console.error('Erro ao verificar status:', error);
+                showNotification('Erro ao verificar status', 'error');
             }
         }
         
-        // Iniciar polling automático
+        // Iniciar polling automático - mantendo lógica original
         function startPaymentPolling() {
             pollingInterval = setInterval(() => {
                 checkPaymentStatus();
             }, 10000); // Verificar a cada 10 segundos
         }
         
-        // Quando pagamento for confirmado
+        // Quando pagamento for confirmado - mantendo lógica original
         function handlePaymentCompleted() {
             clearInterval(pollingInterval);
             
-            updateTimelineStep(2);
-            setTimeout(() => updateTimelineStep(3), 2000);
+            // Mostrar estado de sucesso
+            showState('success');
             
-            document.querySelector('.status-badge').textContent = 'Pago via PIX';
-            document.querySelector('.status-badge').className = 'value status-badge status-success';
+            // Animação de sucesso
+            setTimeout(() => {
+                document.querySelector('.success-animation').classList.add('animate');
+            }, 500);
             
-            alert('✅ Pagamento PIX confirmado! O cashback foi liberado para os clientes.');
+            showNotification('✅ Pagamento PIX confirmado! O cashback foi liberado para os clientes.', 'success');
             
+            // Redirecionar após alguns segundos
             setTimeout(() => {
                 window.location.href = '<?php echo STORE_PAYMENT_HISTORY_URL; ?>';
-            }, 3000);
+            }, 5000);
         }
         
-        // Atualizar timeline
-        function updateTimelineStep(step) {
-            for (let i = 1; i <= step; i++) {
-                document.getElementById(`step${i}`).classList.add('active');
-            }
+        // Sistema de notificações
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.innerHTML = `
+                <div class="notification-content">
+                    <span class="notification-icon">
+                        ${type === 'success' ? '✅' : type === 'error' ? '❌' : type === 'warning' ? '⚠️' : 'ℹ️'}
+                    </span>
+                    <span class="notification-message">${message}</span>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Animar entrada
+            setTimeout(() => notification.classList.add('show'), 100);
+            
+            // Remover após 4 segundos
+            setTimeout(() => {
+                notification.classList.remove('show');
+                setTimeout(() => document.body.removeChild(notification), 300);
+            }, 4000);
         }
         
-        // Buscar quantidade de transações
+        // Mostrar erro e voltar ao estado inicial
+        function showError(message) {
+            showNotification(message, 'error');
+            
+            // Restaurar botão
+            generatePixBtn.disabled = false;
+            generatePixBtn.innerHTML = `
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/>
+                    <line x1="1" y1="10" x2="23" y2="10"/>
+                </svg>
+                Gerar PIX Agora
+            `;
+        }
+        
+        // Buscar quantidade de transações - mantendo lógica original
         document.addEventListener('DOMContentLoaded', async function() {
             try {
                 const response = await fetch(`../../controllers/TransactionController.php?action=payment_details&payment_id=${paymentId}`, {
@@ -310,7 +568,11 @@ $activeMenu = 'payment-pix';
                 }
             } catch (error) {
                 console.error('Erro ao buscar detalhes:', error);
+                document.getElementById('transactionCount').textContent = 'N/A';
             }
+            
+            // Inicializar no estado inicial
+            showState('initial');
         });
     </script>
 </body>
