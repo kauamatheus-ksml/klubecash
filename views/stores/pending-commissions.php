@@ -479,8 +479,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Função para criar pagamento PIX
-    const testResponse = await fetch('/controllers/TransactionController.php?action=test');
-    console.log('Teste:', await testResponse.text());
     
     async function createPixPayment() {
         // Calcular valor total das comissões selecionadas

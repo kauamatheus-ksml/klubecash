@@ -1204,9 +1204,9 @@ class TransactionController {
             }
             
             // Verificar se o usuário está autenticado e é loja ou admin
-            if (!AuthController::isAuthenticated()) {
-                return ['status' => false, 'message' => 'Usuário não autenticado.'];
-            }
+            //if (!AuthController::isAuthenticated()) {
+            //    return ['status' => false, 'message' => 'Usuário não autenticado.'];
+            //}
             
             if (!AuthController::isStore() && !AuthController::isAdmin()) {
                 return ['status' => false, 'message' => 'Apenas lojas e administradores podem registrar pagamentos.'];
