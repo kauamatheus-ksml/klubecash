@@ -7,7 +7,6 @@ require_once __DIR__ . '/AuthController.php';
 require_once __DIR__ . '/StoreController.php';
 require_once __DIR__ . '/../utils/Validator.php';
 
-header('Content-Type: application/json; charset=UTF-8');
 /**
  * Controlador de Transações
  * Gerencia operações relacionadas a transações, comissões e cashback
@@ -2412,9 +2411,6 @@ class TransactionController {
 
 // Processar requisições diretas de acesso ao controlador
 if (basename($_SERVER['PHP_SELF']) === 'TransactionController.php') {
-     // Verificar se é requisição AJAX
-    $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && 
-              strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
     // Verificar se o usuário está autenticado
     if (!AuthController::isAuthenticated()) {
         header('Location: ' . LOGIN_URL . '?error=' . urlencode('Você precisa fazer login para acessar esta página.'));
