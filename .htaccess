@@ -13,7 +13,7 @@ RewriteBase /
     Header set Referrer-Policy "strict-origin-when-cross-origin"
     
     # CSP otimizado para o novo design
-    Header set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' unpkg.com googleapis.com; style-src 'self' 'unsafe-inline' fonts.googleapis.com; font-src 'self' fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' viacep.com.br"
+    Header set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' unpkg.com googleapis.com sdk.mercadopago.com; style-src 'self' 'unsafe-inline' fonts.googleapis.com; font-src 'self' fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' viacep.com.br api.mercadopago.com"
     
     # HSTS para HTTPS
     Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" env=HTTPS
@@ -101,14 +101,15 @@ RewriteRule ^admin/saldo/?$ views/admin/balance.php [L]
 RewriteRule ^admin/comissoes/?$ views/admin/commissions.php [L]
 RewriteRule ^admin/pagamentos/?$ views/admin/payments.php [L]
 RewriteRule ^admin/relatorios/?$ views/admin/reports.php [L]
-# PIX
+
+# PIX e Mercado Pago
 RewriteRule ^store/pagamento-pix/?$ views/stores/payment-pix.php [L,QSA]
+RewriteRule ^api/mercadopago/?$ api/mercadopago.php [L,QSA]
+RewriteRule ^api/mercadopago-webhook/?$ api/mercadopago-webhook.php [L,QSA]
 
 RewriteRule ^controllers/TransactionController\.php$ controllers/TransactionController.php [L,QSA]
 RewriteRule ^api/store-payment/?$ api/store-payment.php [L,QSA]
 
-# API OpenPix
-RewriteRule ^api/openpix/?$ api/openpix.php [L,QSA]
 # Lojas
 RewriteRule ^lojas/cadastro/?$ views/stores/register.php [L]
 RewriteRule ^lojas/detalhes/([0-9]+)/?$ views/stores/details.php?id=$1 [L]
@@ -120,10 +121,12 @@ RewriteRule ^store/upload-lote/?$ views/stores/batch-upload.php [L,QSA]
 RewriteRule ^store/pagamento/?$ views/stores/payment.php [L,QSA]
 RewriteRule ^store/historico-pagamentos/?$ views/stores/payment-history.php [L,QSA]
 RewriteRule ^store/perfil/?$ views/stores/profile.php [L,QSA]
-# Email Marketing (ADICIONE ESTAS LINHAS na seção Admin do seu .htaccess)
+
+# Email Marketing
 RewriteRule ^admin/email-marketing/?$ views/admin/email-marketing.php [L]
 RewriteRule ^admin/email-templates/?$ views/admin/email-templates.php [L]
 RewriteRule ^admin/email-campanhas/?$ views/admin/email-campaigns.php [L]
+
 # AJAX
 RewriteRule ^admin/ajax/stores/?$ controllers/AdminController.php [L,QSA]
 RewriteRule ^admin/ajax/users/?$ controllers/AdminController.php [L,QSA]

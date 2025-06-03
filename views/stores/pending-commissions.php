@@ -477,9 +477,8 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
-    
+
     // Função para criar pagamento PIX
-    
     async function createPixPayment() {
         // Calcular valor total das comissões selecionadas
         const selectedCheckboxes = document.querySelectorAll('.transaction-checkbox:checked');
@@ -495,30 +494,14 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         const formData = new FormData(paymentForm);
-        formData.append('metodo_pagamento', 'pix_automatico');
+        formData.append('metodo_pagamento', 'pix_mercadopago');
         formData.append('valor_total', totalCommission.toFixed(2));
 
         try {
-            // CORREÇÃO 1: URL correto sem barra inicial
             const response = await fetch('../../api/store-payment.php', {
                 method: 'POST',
-                // CORREÇÃO 2: Adicionar headers
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
-                body: formData,
-                // CORREÇÃO 3: Incluir cookies para manter sessão
-                credentials: 'same-origin'
+                body: formData
             });
-
-            // CORREÇÃO 4: Verificar se resposta é JSON antes de fazer parse
-            const contentType = response.headers.get('content-type');
-            if (!contentType || !contentType.includes('application/json')) {
-                const text = await response.text();
-                console.error('Resposta não é JSON:', text);
-                alert('Erro no servidor. Verifique se você está logado.');
-                return;
-            }
 
             const result = await response.json();
             

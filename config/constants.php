@@ -53,13 +53,16 @@ define('STORE_REJECTED', 'rejeitado');
 define('PASSWORD_MIN_LENGTH', 8);
 define('SESSION_LIFETIME', 86400);
 define('TOKEN_EXPIRATION', 7200);
-// === OPENPIX CONFIGURAÇÕES ===
-define('OPENPIX_API_KEY', 'Q2xpZW50X0lkXzE3MzBhOTFiLWNhOTItNDhlMy1hOGU0LWRjZmE3MGM4MDVmMDpDbGllbnRfU2VjcmV0X0NJS09SdmllUFpOWWJBak1EYmZ4c1hiRHkzNmhFcDcxQ0F3eTJvTUk5dEE9'); // Chave da OpenPix
-define('OPENPIX_WEBHOOK_URL', SITE_URL . '/api/openpix?action=webhook');
 
-// === URLs OPENPIX ===
-define('OPENPIX_CREATE_CHARGE_URL', SITE_URL . '/api/openpix?action=create_charge');
-define('OPENPIX_CHECK_STATUS_URL', SITE_URL . '/api/openpix?action=status');
+// === MERCADO PAGO CONFIGURAÇÕES ===
+define('MP_PUBLIC_KEY', 'TEST-e07f4dfa-abe6-4d46-8f8c-840cfde27a86'); // Chave pública de teste
+define('MP_ACCESS_TOKEN', 'TEST-8622491157025652-060223-41f1c7f74b1918ac122f00870f6d742f-2320640278'); // Access token de teste
+define('MP_WEBHOOK_URL', SITE_URL . '/api/mercadopago-webhook');
+
+// === URLs MERCADO PAGO ===
+define('MP_CREATE_PAYMENT_URL', SITE_URL . '/api/mercadopago?action=create_payment');
+define('MP_CHECK_STATUS_URL', SITE_URL . '/api/mercadopago?action=status');
+
 // === PAGINAÇÃO ===
 define('ITEMS_PER_PAGE', 10);
 
@@ -102,6 +105,7 @@ define('STORE_BATCH_UPLOAD_URL', SITE_URL . '/store/upload-lote');
 define('STORE_PAYMENT_URL', SITE_URL . '/store/pagamento');
 define('STORE_PAYMENT_HISTORY_URL', SITE_URL . '/store/historico-pagamentos');
 define('STORE_PROFILE_URL', SITE_URL . '/store/perfil');
+define('STORE_PAYMENT_PIX_URL', SITE_URL . '/store/pagamento-pix');
 
 // === CONFIGURAÇÕES DE ASSETS ===
 define('ASSETS_VERSION', '2.0.0'); // Para cache busting
@@ -152,18 +156,20 @@ if (session_status() === PHP_SESSION_NONE) {
     ini_set('session.cookie_samesite', 'Strict');
     session_start();
 }
-// === EMAIL MARKETING (ADICIONE ao final do seu constants.php) ===
+
+// === EMAIL MARKETING ===
 define('ADMIN_EMAIL_MARKETING_URL', SITE_URL . '/admin/email-marketing');
 define('ADMIN_EMAIL_TEMPLATES_URL', SITE_URL . '/admin/email-templates');
 define('ADMIN_EMAIL_CAMPAIGNS_URL', SITE_URL . '/admin/email-campanhas');
 
 // Configurações de envio em lote
-define('EMAIL_BATCH_SIZE', 50); // Quantos emails enviar por vez
-define('EMAIL_SEND_DELAY', 100000); // Pausa entre emails (microssegundos)
-define('EMAIL_MAX_RETRIES', 3); // Tentativas máximas para emails falhados
+define('EMAIL_BATCH_SIZE', 50);
+define('EMAIL_SEND_DELAY', 100000);
+define('EMAIL_MAX_RETRIES', 3);
+
 // === PERFORMANCE CONFIGS ===
-define('CACHE_DURATION', 3600); // 1 hora
-define('MAX_UPLOAD_SIZE', 10 * 1024 * 1024); // 10MB
+define('CACHE_DURATION', 3600);
+define('MAX_UPLOAD_SIZE', 10 * 1024 * 1024);
 define('ALLOWED_IMAGE_TYPES', ['jpg', 'jpeg', 'png', 'webp', 'gif']);
 
 // === SEO E META ===

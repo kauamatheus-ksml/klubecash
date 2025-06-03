@@ -30,7 +30,7 @@ $storeId = $store['id'];
 // Buscar dados do pagamento
 $paymentStmt = $db->prepare("
     SELECT * FROM pagamentos_comissao 
-    WHERE id = ? AND loja_id = ? AND status = 'pendente'
+    WHERE id = ? AND loja_id = ? AND status IN ('pendente', 'pix_aguardando')
 ");
 $paymentStmt->execute([$paymentId, $storeId]);
 $payment = $paymentStmt->fetch(PDO::FETCH_ASSOC);
@@ -57,7 +57,7 @@ $activeMenu = 'payment-pix';
     
     <div class="main-content" id="mainContent">
         <div class="dashboard-header">
-            <h1>Pagamento PIX Automático</h1>
+            <h1>Pagamento PIX via Mercado Pago</h1>
             <p class="subtitle">Pague suas comissões via PIX e tenha aprovação automática</p>
         </div>
         
@@ -83,14 +83,13 @@ $activeMenu = 'payment-pix';
             </div>
             
             <div class="pix-section" id="pixSection" style="display: none;">
-                <h3>QR Code PIX</h3>
+                <h3>QR Code PIX - Mercado Pago</h3>
                 <div class="qr-container">
                     <img id="qrCodeImage" src="" alt="QR Code PIX" style="display: none; max-width: 300px;">
-                    
-                    <!-- ADICIONAR ESTES CAMPOS HIDDEN -->
-                    <input type="hidden" id="pixCode" value="">
-                    <input type="hidden" id="chargeId" value="">
-                    
+                    <div class="qr-code-text">
+                        <label for="pixCode">Código PIX:</label>
+                        <textarea id="pixCode" readonly style="width: 100%; height: 80px; font-family: monospace; font-size: 12px;"></textarea>
+                    </div>
                     <div class="qr-actions">
                         <button class="btn btn-secondary" onclick="copyPixCode()">Copiar Código PIX</button>
                         <button class="btn btn-primary" onclick="checkPaymentStatus()">Verificar Pagamento</button>
@@ -100,10 +99,7 @@ $activeMenu = 'payment-pix';
             
             <div class="action-buttons">
                 <button class="btn btn-primary" onclick="generatePix()" id="generatePixBtn">
-                    Gerar PIX
-                </button>
-                <button class="btn btn-success" onclick="handlePaymentCompleted()">
-                    Confirmar Pagamento Manualmente
+                    Gerar PIX via Mercado Pago
                 </button>
                 <a href="<?php echo STORE_PENDING_TRANSACTIONS_URL; ?>" class="btn btn-secondary">
                     Voltar
@@ -121,7 +117,7 @@ $activeMenu = 'payment-pix';
                     <div class="timeline-marker"></div>
                     <div class="timeline-content">
                         <h4>PIX Gerado</h4>
-                        <p>QR Code criado e aguardando pagamento</p>
+                        <p>QR Code criado via Mercado Pago</p>
                     </div>
                 </div>
                 <div class="timeline-item" id="step2">
@@ -144,34 +140,34 @@ $activeMenu = 'payment-pix';
         <!-- Informações -->
         <div class="card info-card">
             <div class="card-header">
-                <h3>Como Funciona o PIX Automático</h3>
+                <h3>Como Funciona o PIX via Mercado Pago</h3>
             </div>
             <div class="info-content">
                 <ul>
-                    <li>✅ <strong>Gere o PIX:</strong> Clique em "Gerar PIX" para criar o QR Code</li>
+                    <li>✅ <strong>Gere o PIX:</strong> Clique em "Gerar PIX" para criar o QR Code via Mercado Pago</li>
                     <li>📱 <strong>Pague pelo App:</strong> Use qualquer app bancário para pagar</li>
                     <li>⚡ <strong>Aprovação Automática:</strong> Em até 2 minutos após o pagamento</li>
                     <li>🎉 <strong>Cashback Liberado:</strong> Clientes recebem notificação automática</li>
+                    <li>🔒 <strong>Segurança MP:</strong> Transação protegida pelo Mercado Pago</li>
                 </ul>
             </div>
         </div>
     </div>
     
+    <input type="hidden" id="mpPaymentId" value="">
+    
     <script>
         const paymentId = <?php echo $paymentId; ?>;
         let pollingInterval = null;
         
-        // Gerar PIX
-        // Substituir a função generatePix() por:
+        // Gerar PIX via Mercado Pago
         async function generatePix() {
             const btn = document.getElementById('generatePixBtn');
             btn.disabled = true;
             btn.textContent = 'Gerando PIX...';
             
-
             try {
-                // Fazer chamada real para API OpenPix
-                const response = await fetch('../../api/openpix.php?action=create_charge', {
+                const response = await fetch('<?php echo MP_CREATE_PAYMENT_URL; ?>', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -181,35 +177,35 @@ $activeMenu = 'payment-pix';
                     })
                 });
                 
-
                 const result = await response.json();
                 
                 if (result.status) {
-                    // QR Code gerado com sucesso
+                    // Exibir QR Code
                     const qrImg = document.getElementById('qrCodeImage');
-                    qrImg.src = result.data.qr_code_image;
+                    qrImg.src = 'data:image/png;base64,' + result.data.qr_code_base64;
                     qrImg.style.display = 'block';
                     
-                    // Salvar dados do PIX
                     document.getElementById('pixCode').value = result.data.qr_code;
-                    document.getElementById('chargeId').value = result.data.charge_id;
+                    document.getElementById('mpPaymentId').value = result.data.mp_payment_id;
                     document.getElementById('pixSection').style.display = 'block';
                     
                     updateTimelineStep(1);
                     btn.style.display = 'none';
                     
-                    // Iniciar verificação automática
+                    // Iniciar polling automático
                     startPaymentPolling();
                     
                 } else {
-                    throw new Error(result.message || 'Erro ao gerar PIX');
+                    alert('Erro ao gerar PIX: ' + result.message);
+                    btn.disabled = false;
+                    btn.textContent = 'Gerar PIX via Mercado Pago';
                 }
                 
             } catch (error) {
-                console.error('Erro ao gerar PIX:', error);
-                alert('Erro ao gerar PIX: ' + error.message);
+                console.error('Erro:', error);
+                alert('Erro de conexão: ' + error.message);
                 btn.disabled = false;
-                btn.textContent = 'Gerar PIX';
+                btn.textContent = 'Gerar PIX via Mercado Pago';
             }
         }
         
@@ -223,19 +219,23 @@ $activeMenu = 'payment-pix';
         
         // Verificar status do pagamento
         async function checkPaymentStatus() {
-            const chargeId = document.getElementById('chargeId').value;
+            const mpPaymentId = document.getElementById('mpPaymentId').value;
             
-            if (!chargeId) {
+            if (!mpPaymentId) {
                 alert('PIX não foi gerado ainda');
                 return;
             }
             
             try {
-                const response = await fetch(`<?php echo OPENPIX_CHECK_STATUS_URL; ?>&charge_id=${chargeId}`);
+                const response = await fetch(`<?php echo MP_CHECK_STATUS_URL; ?>&mp_payment_id=${mpPaymentId}`);
                 const result = await response.json();
                 
-                if (result.status && result.data.charge.status === 'COMPLETED') {
+                if (result.status && result.data.status === 'approved') {
                     handlePaymentCompleted();
+                } else if (result.data.status === 'rejected') {
+                    clearInterval(pollingInterval);
+                    alert('❌ Pagamento foi rejeitado. Tente novamente.');
+                    window.location.reload();
                 }
             } catch (error) {
                 console.error('Erro ao verificar status:', error);
@@ -253,28 +253,17 @@ $activeMenu = 'payment-pix';
         function handlePaymentCompleted() {
             clearInterval(pollingInterval);
             
-            // Chamar aprovação manual via API
-            fetch(`/controllers/TransactionController.php?action=approve_payment_pix`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ payment_id: paymentId })
-            })
-            .then(response => response.json())
-            .then(result => {
-                if (result.status) {
-                    updateTimelineStep(2);
-                    setTimeout(() => updateTimelineStep(3), 2000);
-                    
-                    document.querySelector('.status-badge').textContent = 'Pago';
-                    document.querySelector('.status-badge').className = 'value status-badge status-success';
-                    
-                    alert('✅ Pagamento confirmado! O cashback foi liberado para os clientes.');
-                    
-                    setTimeout(() => {
-                        window.location.href = '/store/historico-pagamentos';
-                    }, 3000);
-                }
-            });
+            updateTimelineStep(2);
+            setTimeout(() => updateTimelineStep(3), 2000);
+            
+            document.querySelector('.status-badge').textContent = 'Pago via PIX';
+            document.querySelector('.status-badge').className = 'value status-badge status-success';
+            
+            alert('✅ Pagamento PIX confirmado! O cashback foi liberado para os clientes.');
+            
+            setTimeout(() => {
+                window.location.href = '<?php echo STORE_PAYMENT_HISTORY_URL; ?>';
+            }, 3000);
         }
         
         // Atualizar timeline
@@ -287,11 +276,17 @@ $activeMenu = 'payment-pix';
         // Buscar quantidade de transações
         document.addEventListener('DOMContentLoaded', async function() {
             try {
-                const response = await fetch(`../../api/payments.php?action=details&id=${paymentId}`);
+                const response = await fetch(`../../controllers/TransactionController.php?action=payment_details&payment_id=${paymentId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: 'payment_id=' + paymentId
+                });
                 const result = await response.json();
                 
                 if (result.status) {
-                    document.getElementById('transactionCount').textContent = result.data.transacoes.length;
+                    document.getElementById('transactionCount').textContent = result.data.totais.total_transacoes;
                 }
             } catch (error) {
                 console.error('Erro ao buscar detalhes:', error);
