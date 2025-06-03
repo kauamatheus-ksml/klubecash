@@ -38,6 +38,8 @@ switch ($method) {
             checkChargeStatus();
         } elseif ($action === 'test') {
             testEndpoint();
+        } elseif ($action === 'test_charge') {
+            testCreateCharge();
         }
         break;
     default:
@@ -259,6 +261,43 @@ function makeOpenPixRequest($method, $endpoint, $data = null) {
         return ['success' => true, 'data' => json_decode($response, true)];
     } else {
         return ['success' => false, 'message' => "Erro HTTP {$httpCode}", 'response' => $response];
+    }
+}
+function testCreateCharge() {
+    try {
+        $db = Database::getConnection();
+        
+        // Buscar qualquer pagamento pendente para teste
+        $stmt = $db->prepare("
+            SELECT p.*, l.nome_fantasia, l.email 
+            FROM pagamentos_comissao p
+            JOIN lojas l ON p.loja_id = l.id 
+            WHERE p.status = 'pendente'
+            LIMIT 1
+        ");
+        $stmt->execute();
+        $payment = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$payment) {
+            echo json_encode(['status' => false, 'message' => 'Nenhum pagamento pendente para teste']);
+            return;
+        }
+        
+        $chargeData = [
+            'value' => 100, // R$ 1,00 para teste
+            'comment' => "Teste - Comissão Klube Cash",
+            'correlationID' => "test_" . time(),
+            'customer' => [
+                'name' => $payment['nome_fantasia'],
+                'email' => $payment['email']
+            ]
+        ];
+        
+        $response = makeOpenPixRequest('POST', '/charge', $chargeData);
+        echo json_encode($response);
+        
+    } catch (Exception $e) {
+        echo json_encode(['status' => false, 'message' => $e->getMessage()]);
     }
 }
 ?>
