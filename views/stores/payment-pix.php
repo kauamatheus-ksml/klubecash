@@ -217,21 +217,28 @@ $activeMenu = 'payment-pix';
         function handlePaymentCompleted() {
             clearInterval(pollingInterval);
             
-            // Atualizar timeline
-            updateTimelineStep(2);
-            setTimeout(() => updateTimelineStep(3), 2000);
-            
-            // Mostrar mensagem de sucesso
-            document.querySelector('.status-badge').textContent = 'Pago';
-            document.querySelector('.status-badge').className = 'value status-badge status-success';
-            
-            // Notificação
-            alert('✅ Pagamento confirmado! O cashback foi liberado automaticamente para os clientes.');
-            
-            // Redirecionar após 3 segundos
-            setTimeout(() => {
-                window.location.href = '<?php echo STORE_PAYMENT_HISTORY_URL; ?>';
-            }, 3000);
+            // Chamar aprovação manual via API
+            fetch(`/controllers/TransactionController.php?action=approve_payment_pix`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ payment_id: paymentId })
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.status) {
+                    updateTimelineStep(2);
+                    setTimeout(() => updateTimelineStep(3), 2000);
+                    
+                    document.querySelector('.status-badge').textContent = 'Pago';
+                    document.querySelector('.status-badge').className = 'value status-badge status-success';
+                    
+                    alert('✅ Pagamento confirmado! O cashback foi liberado para os clientes.');
+                    
+                    setTimeout(() => {
+                        window.location.href = '/store/historico-pagamentos';
+                    }, 3000);
+                }
+            });
         }
         
         // Atualizar timeline

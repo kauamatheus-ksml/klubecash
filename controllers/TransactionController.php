@@ -2430,6 +2430,16 @@ if (basename($_SERVER['PHP_SELF']) === 'TransactionController.php') {
     $action = $_REQUEST['action'] ?? '';
     
     switch ($action) {
+        case 'approve_payment_pix':
+            $input = json_decode(file_get_contents('php://input'), true);
+            $paymentId = $input['payment_id'] ?? 0;
+            
+            $result = TransactionController::approvePaymentAutomatically(
+                $paymentId, 
+                'Pagamento PIX confirmado manualmente'
+            );
+            echo json_encode($result);
+            break;
         case 'transaction_details':
             $transactionId = isset($_POST['transaction_id']) ? intval($_POST['transaction_id']) : 0;
             if ($transactionId <= 0) {
