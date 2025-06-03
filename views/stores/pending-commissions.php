@@ -489,7 +489,8 @@ document.addEventListener('DOMContentLoaded', function() {
         
         try {
             console.log('Fazendo requisição...');
-            const response = await fetch('../../controllers/TransactionController.php?action=register_payment', {
+            const response = await fetch('/controllers/TransactionController.php?action=register_payment', {
+
                 method: 'POST',
                 body: formData
             });
