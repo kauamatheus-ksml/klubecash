@@ -2415,16 +2415,11 @@ if (basename($_SERVER['PHP_SELF']) === 'TransactionController.php') {
      // Verificar se é requisição AJAX
     $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && 
               strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
-
+              
     // Verificar se o usuário está autenticado
     if (!AuthController::isAuthenticated()) {
-        if ($isAjax) {
-            echo json_encode(['status' => false, 'message' => 'Sessão expirada. Faça login novamente.']);
-            exit;
-        } else {
-            header('Location: ' . LOGIN_URL . '?error=' . urlencode('Você precisa fazer login para acessar esta página.'));
-            exit;
-        }
+        header('Location: ' . LOGIN_URL . '?error=' . urlencode('Você precisa fazer login para acessar esta página.'));
+        exit;
     }
     
     $action = $_REQUEST['action'] ?? '';
