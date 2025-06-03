@@ -56,6 +56,8 @@ function testEndpoint() {
 }
 
 function createPixCharge() {
+    // REMOVER as linhas de teste e implementar API real:
+    
     $input = json_decode(file_get_contents('php://input'), true);
     
     if (!$input || !isset($input['payment_id'])) {
@@ -66,8 +68,6 @@ function createPixCharge() {
 
     try {
         $db = Database::getConnection();
-        
-        // Buscar dados do pagamento
         $stmt = $db->prepare("
             SELECT p.*, l.nome_fantasia, l.email 
             FROM pagamentos_comissao p
@@ -82,15 +82,11 @@ function createPixCharge() {
             return;
         }
         
-        // Criar cobrança PIX
+        // Criar cobrança PIX real
         $chargeData = [
-            'value' => (int)($payment['valor_total'] * 100), // valor em centavos
+            'value' => (int)($payment['valor_total'] * 100), // centavos
             'comment' => "Comissão Klube Cash - Pagamento #{$payment['id']}",
-            'correlationID' => "payment_{$payment['id']}_" . time(),
-            'customer' => [
-                'name' => $payment['nome_fantasia'],
-                'email' => $payment['email']
-            ]
+            'correlationID' => "payment_{$payment['id']}_" . time()
         ];
         
         $response = makeOpenPixRequest('POST', '/charge', $chargeData);
@@ -98,14 +94,10 @@ function createPixCharge() {
         if ($response['success']) {
             $charge = $response['data']['charge'];
             
-            // Atualizar pagamento no banco
+            // Salvar no banco
             $updateStmt = $db->prepare("
                 UPDATE pagamentos_comissao 
-                SET pix_charge_id = ?, 
-                    pix_qr_code = ?, 
-                    pix_qr_code_image = ?,
-                    metodo_pagamento = 'pix_automatico',
-                    status = 'pix_aguardando'
+                SET pix_charge_id = ?, pix_qr_code = ?, pix_qr_code_image = ?, metodo_pagamento = 'pix_automatico'
                 WHERE id = ?
             ");
             $updateStmt->execute([
@@ -124,15 +116,11 @@ function createPixCharge() {
                 ]
             ]);
         } else {
-            echo json_encode([
-                'status' => false, 
-                'message' => 'Erro na API OpenPix: ' . ($response['message'] ?? 'Erro desconhecido')
-            ]);
+            echo json_encode(['status' => false, 'message' => $response['message']]);
         }
         
     } catch (Exception $e) {
-        error_log('Erro createPixCharge: ' . $e->getMessage());
-        echo json_encode(['status' => false, 'message' => 'Erro interno do servidor']);
+        echo json_encode(['status' => false, 'message' => 'Erro interno']);
     }
 }
 
