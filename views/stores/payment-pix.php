@@ -86,10 +86,14 @@ $activeMenu = 'payment-pix';
                 <h3>QR Code PIX</h3>
                 <div class="qr-container">
                     <img id="qrCodeImage" src="" alt="QR Code PIX" style="display: none; max-width: 300px;">
+                    
+                    <!-- ADICIONAR ESTES CAMPOS HIDDEN -->
+                    <input type="hidden" id="pixCode" value="">
+                    <input type="hidden" id="chargeId" value="">
+                    
                     <div class="qr-actions">
                         <button class="btn btn-secondary" onclick="copyPixCode()">Copiar Código PIX</button>
                         <button class="btn btn-primary" onclick="checkPaymentStatus()">Verificar Pagamento</button>
-                        <button class="btn btn-success" onclick="handlePaymentCompleted()">Confirmar Pagamento Manualmente</button>
                     </div>
                 </div>
             </div>
@@ -164,19 +168,47 @@ $activeMenu = 'payment-pix';
             btn.disabled = true;
             btn.textContent = 'Gerando PIX...';
             
-            // Mock QR Code para teste
-            setTimeout(() => {
-                const qrImg = document.getElementById('qrCodeImage');
-                qrImg.src = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=PIX_TESTE_' + paymentId;
-                qrImg.style.display = 'block';
+            try {
+                // Fazer chamada real para API OpenPix
+                const response = await fetch('../../api/openpix.php?action=create_charge', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        payment_id: paymentId
+                    })
+                });
                 
-                document.getElementById('pixCode').value = '00020126580014br.gov.bcb.pix0136teste123456';
-                document.getElementById('chargeId').value = 'test_charge_' + paymentId;
-                document.getElementById('pixSection').style.display = 'block';
+                const result = await response.json();
                 
-                updateTimelineStep(1);
-                btn.style.display = 'none';
-            }, 1000);
+                if (result.status) {
+                    // QR Code gerado com sucesso
+                    const qrImg = document.getElementById('qrCodeImage');
+                    qrImg.src = result.data.qr_code_image;
+                    qrImg.style.display = 'block';
+                    
+                    // Salvar dados do PIX
+                    document.getElementById('pixCode').value = result.data.qr_code;
+                    document.getElementById('chargeId').value = result.data.charge_id;
+                    document.getElementById('pixSection').style.display = 'block';
+                    
+                    updateTimelineStep(1);
+                    btn.style.display = 'none';
+                    
+                    // Iniciar verificação automática
+                    startPaymentPolling();
+                    
+                } else {
+                    throw new Error(result.message || 'Erro ao gerar PIX');
+                }
+                
+            } catch (error) {
+                console.error('Erro ao gerar PIX:', error);
+                alert('Erro ao gerar PIX: ' + error.message);
+                btn.disabled = false;
+                btn.textContent = 'Gerar PIX';
+            }
         }
         
         // Copiar código PIX
