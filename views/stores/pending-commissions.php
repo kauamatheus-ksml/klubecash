@@ -481,34 +481,34 @@ document.addEventListener('DOMContentLoaded', function() {
     // Função para criar pagamento PIX
     
     async function createPixPayment() {
-    // Calcular valor total das comissões selecionadas
-    const selectedCheckboxes = document.querySelectorAll('.transaction-checkbox:checked');
-    let totalCommission = 0;
-    
-    selectedCheckboxes.forEach(checkbox => {
-        totalCommission += parseFloat(checkbox.getAttribute('data-value'));
-    });
-    
-    const formData = new FormData(paymentForm);
-    formData.append('metodo_pagamento', 'pix_automatico');
-    formData.append('valor_total', totalCommission.toFixed(2)); // Adicionar valor total
-    
-    try {
-        const response = await fetch('/controllers/TransactionController.php?action=register_payment', {
-            method: 'POST',
-            body: formData
+        // Calcular valor total das comissões selecionadas
+        const selectedCheckboxes = document.querySelectorAll('.transaction-checkbox:checked');
+        let totalCommission = 0;
+        
+        selectedCheckboxes.forEach(checkbox => {
+            totalCommission += parseFloat(checkbox.getAttribute('data-value'));
         });
         
-        const result = await response.json();
-        if (result.status) {
-            window.location.href = `/store/pagamento-pix?payment_id=${result.data.payment_id}`;
-        } else {
-            alert('Erro: ' + result.message);
+        const formData = new FormData(paymentForm);
+        formData.append('metodo_pagamento', 'pix_automatico');
+        formData.append('valor_total', totalCommission.toFixed(2)); // Adicionar valor total
+        
+        try {
+            const response = await fetch('/controllers/TransactionController.php?action=register_payment', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const result = await response.json();
+            if (result.status) {
+                window.location.href = `/store/pagamento-pix?payment_id=${result.data.payment_id}`;
+            } else {
+                alert('Erro: ' + result.message);
+            }
+        } catch (error) {
+            alert('Erro: ' + error.message);
         }
-    } catch (error) {
-        alert('Erro: ' + error.message);
     }
-}
     
     // Inicializar resumo
     updatePaymentSummary();
