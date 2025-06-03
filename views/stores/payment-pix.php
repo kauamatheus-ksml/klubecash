@@ -88,7 +88,9 @@ $activeMenu = 'payment-pix';
                     <img id="qrCodeImage" src="" alt="QR Code PIX" style="max-width: 300px;">
                     <div class="qr-actions">
                         <button class="btn btn-secondary" onclick="copyPixCode()">Copiar Código PIX</button>
-                        <button class="btn btn-primary" onclick="checkPaymentStatus()">Verificar Pagamento</button>
+                        <button class="btn btn-success" onclick="handlePaymentCompleted()">
+    Confirmar Pagamento Manualmente
+</button>
                     </div>
                 </div>
                 <input type="hidden" id="pixCode" value="">
