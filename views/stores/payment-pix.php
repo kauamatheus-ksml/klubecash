@@ -168,7 +168,6 @@ $activeMenu = 'payment-pix';
             btn.disabled = true;
             btn.textContent = 'Gerando PIX...';
             
-            
 
             try {
                 // Fazer chamada real para API OpenPix
