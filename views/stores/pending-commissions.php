@@ -376,7 +376,38 @@ if ($result['status'] && isset($result['data']['totais'])) {
     </div>
     
     <script>
-        
+        // Evento para PIX
+        if (document.getElementById('payPixBtn')) {
+            document.getElementById('payPixBtn').addEventListener('click', function() {
+                const selected = document.querySelectorAll('.transaction-checkbox:checked');
+                if (selected.length > 0) {
+                    // Criar pagamento e redirecionar para PIX
+                    createPixPayment();
+                }
+            });
+        }
+
+        async function createPixPayment() {
+            const form = document.getElementById('paymentForm');
+            const formData = new FormData(form);
+            formData.append('metodo_pagamento', 'pix_automatico');
+            
+            try {
+                const response = await fetch('../../controllers/TransactionController.php?action=register_payment', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                if (result.status) {
+                    window.location.href = `/store/pagamento-pix?payment_id=${result.data.payment_id}`;
+                } else {
+                    alert('Erro: ' + result.message);
+                }
+            } catch (error) {
+                alert('Erro de conexão');
+            }
+        }
         document.addEventListener('DOMContentLoaded', function() {
             const selectAllCheckbox = document.getElementById('selectAll');
             const transactionCheckboxes = document.querySelectorAll('.transaction-checkbox');
@@ -659,38 +690,6 @@ if ($result['status'] && isset($result['data']['totais'])) {
                 localStorage.setItem('pendingCommissionsInfoOpen', 'false');
             }
         }
-        // Evento para PIX
-if (document.getElementById('payPixBtn')) {
-    document.getElementById('payPixBtn').addEventListener('click', function() {
-        const selected = document.querySelectorAll('.transaction-checkbox:checked');
-        if (selected.length > 0) {
-            // Criar pagamento e redirecionar para PIX
-            createPixPayment();
-        }
-    });
-}
-
-async function createPixPayment() {
-    const form = document.getElementById('paymentForm');
-    const formData = new FormData(form);
-    formData.append('metodo_pagamento', 'pix_automatico');
-    
-    try {
-        const response = await fetch('../../controllers/TransactionController.php?action=register_payment', {
-            method: 'POST',
-            body: formData
-        });
-        
-        const result = await response.json();
-        if (result.status) {
-            window.location.href = `/store/pagamento-pix?payment_id=${result.data.payment_id}`;
-        } else {
-            alert('Erro: ' + result.message);
-        }
-    } catch (error) {
-        alert('Erro de conexão');
-    }
-}
     </script>
     
     <style>
