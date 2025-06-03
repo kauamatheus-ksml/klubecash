@@ -180,6 +180,7 @@ $activeMenu = 'payment-pix';
                     })
                 });
                 
+                
                 const result = await response.json();
                 
                 if (result.status) {
