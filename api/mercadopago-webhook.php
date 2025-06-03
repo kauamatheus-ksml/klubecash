@@ -3,23 +3,68 @@
 
 header('Content-Type: application/json');
 
-// Log para debug
+// Log para debug - registra tudo que chega do Mercado Pago
 $input_raw = file_get_contents('php://input');
-error_log("Webhook MP recebido: " . $input_raw);
+error_log("=== WEBHOOK MP RECEBIDO ===");
+error_log("Timestamp: " . date('Y-m-d H:i:s'));
+error_log("Payload: " . $input_raw);
+error_log("Headers: " . print_r(getallheaders(), true));
 
-// SEMPRE retornar 200 para o Mercado Pago
+// SEMPRE retornar 200 para o Mercado Pago (mesmo se houver erro interno)
+// Isso evita que o MP continue tentando reenviar o webhook
 http_response_code(200);
 
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../config/constants.php';
 require_once __DIR__ . '/../controllers/TransactionController.php';
-require_once __DIR__ . '/../utils/MercadoPagoClient.php';
+
+// Verificar se o arquivo MercadoPagoClient existe, senão criar uma versão básica
+if (!file_exists(__DIR__ . '/../utils/MercadoPagoClient.php')) {
+    error_log("WEBHOOK: MercadoPagoClient não encontrado, usando método alternativo");
+    
+    // Função alternativa para buscar status do pagamento
+    function getPaymentStatusAlternative($mpPaymentId) {
+        $url = "https://api.mercadopago.com/v1/payments/{$mpPaymentId}";
+        $headers = [
+            'Authorization: Bearer ' . MP_ACCESS_TOKEN,
+            'Content-Type: application/json'
+        ];
+        
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER => $headers,
+            CURLOPT_TIMEOUT => 10
+        ]);
+        
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        
+        if ($httpCode === 200) {
+            return ['status' => true, 'data' => json_decode($response, true)];
+        } else {
+            return ['status' => false, 'message' => 'Erro ao consultar MP'];
+        }
+    }
+} else {
+    require_once __DIR__ . '/../utils/MercadoPagoClient.php';
+}
 
 $input = json_decode($input_raw, true);
 
-// Se for apenas teste do MP
-if (!$input || !isset($input['data']['id'])) {
-    echo json_encode(['status' => 'ok', 'message' => 'Webhook recebido']);
+// Validação básica do payload
+if (!$input) {
+    error_log("WEBHOOK: Payload JSON inválido");
+    echo json_encode(['status' => 'ok', 'message' => 'Webhook recebido - JSON inválido']);
+    exit;
+}
+
+// Se não tem o ID do pagamento, é apenas um teste do MP
+if (!isset($input['data']['id'])) {
+    error_log("WEBHOOK: Teste do MP ou payload sem ID");
+    echo json_encode(['status' => 'ok', 'message' => 'Webhook recebido - teste']);
     exit;
 }
 
@@ -27,54 +72,134 @@ try {
     $mpPaymentId = $input['data']['id'];
     $action = $input['action'] ?? '';
     
-    // Verificar se é notificação de pagamento
+    error_log("WEBHOOK: Processando Payment ID: {$mpPaymentId}, Action: {$action}");
+    
+    // Verificar se é uma notificação de pagamento que nos interessa
     if ($action === 'payment.updated' || $action === 'payment.created') {
         
         // Buscar status atual no Mercado Pago
-        $mpClient = new MercadoPagoClient();
-        $paymentResponse = $mpClient->getPaymentStatus($mpPaymentId);
+        if (class_exists('MercadoPagoClient')) {
+            $mpClient = new MercadoPagoClient();
+            $paymentResponse = $mpClient->getPaymentStatus($mpPaymentId);
+        } else {
+            $paymentResponse = getPaymentStatusAlternative($mpPaymentId);
+        }
+        
+        error_log("WEBHOOK: Resposta do MP: " . print_r($paymentResponse, true));
         
         if ($paymentResponse['status'] && isset($paymentResponse['data']['status'])) {
             $mpStatus = $paymentResponse['data']['status'];
+            $mpStatusDetail = $paymentResponse['data']['status_detail'] ?? '';
+            
+            error_log("WEBHOOK: Status do pagamento no MP: {$mpStatus} - {$mpStatusDetail}");
             
             if ($mpStatus === 'approved') {
                 $db = Database::getConnection();
                 
-                // Buscar pagamento pelo mp_payment_id
-                $stmt = $db->prepare("SELECT * FROM pagamentos_comissao WHERE mp_payment_id = ?");
+                // Buscar pagamento na nossa base pelo mp_payment_id
+                $stmt = $db->prepare("
+                    SELECT p.*, l.nome_fantasia as loja_nome 
+                    FROM pagamentos_comissao p
+                    LEFT JOIN lojas l ON p.loja_id = l.id
+                    WHERE p.mp_payment_id = ?
+                ");
                 $stmt->execute([$mpPaymentId]);
                 $payment = $stmt->fetch(PDO::FETCH_ASSOC);
                 
-                if ($payment && in_array($payment['status'], ['pendente', 'pix_aguardando'])) {
-                    // Atualizar status para aprovado
-                    $updateStmt = $db->prepare("
-                        UPDATE pagamentos_comissao 
-                        SET status = 'aprovado', data_aprovacao = NOW(), 
-                            observacao_admin = 'Pagamento PIX aprovado automaticamente via Mercado Pago' 
-                        WHERE id = ?
-                    ");
-                    $updateStmt->execute([$payment['id']]);
+                if (!$payment) {
+                    error_log("WEBHOOK: Pagamento não encontrado na base local para MP ID: {$mpPaymentId}");
+                    echo json_encode(['status' => 'ok', 'message' => 'Pagamento não encontrado']);
+                    exit;
+                }
+                
+                error_log("WEBHOOK: Pagamento encontrado - ID: {$payment['id']}, Status atual: {$payment['status']}");
+                
+                // Verificar se o pagamento ainda precisa ser processado
+                if (in_array($payment['status'], ['pendente', 'pix_aguardando'])) {
                     
-                    // Processar aprovação usando o sistema existente
-                    $result = TransactionController::approvePayment(
+                    // Usar o método correto de aprovação automática
+                    $result = TransactionController::approvePaymentAutomatically(
                         $payment['id'], 
-                        'Pagamento PIX aprovado automaticamente via Mercado Pago'
+                        'Pagamento PIX aprovado automaticamente via Mercado Pago - ID MP: ' . $mpPaymentId
                     );
                     
                     if ($result['status']) {
-                        error_log("Pagamento PIX aprovado automaticamente: {$payment['id']}");
+                        error_log("WEBHOOK: ✅ Pagamento aprovado com sucesso - ID: {$payment['id']}");
+                        error_log("WEBHOOK: Cashback liberado: R$ " . ($result['data']['cashback_liberado'] ?? '0.00'));
+                        error_log("WEBHOOK: Transações aprovadas: " . ($result['data']['transacoes_aprovadas'] ?? '0'));
+                        
+                        // Atualizar também o status do MP no nosso banco
+                        $updateMpStmt = $db->prepare("
+                            UPDATE pagamentos_comissao 
+                            SET mp_status = 'approved',
+                                pix_paid_at = NOW()
+                            WHERE id = ?
+                        ");
+                        $updateMpStmt->execute([$payment['id']]);
+                        
                     } else {
-                        error_log("Erro ao aprovar pagamento PIX: {$result['message']}");
+                        error_log("WEBHOOK: ❌ Erro ao aprovar pagamento: " . $result['message']);
                     }
+                    
+                } else {
+                    error_log("WEBHOOK: Pagamento já foi processado - Status: {$payment['status']}");
                 }
+                
+            } elseif ($mpStatus === 'rejected' || $mpStatus === 'cancelled') {
+                
+                // Lidar com pagamentos rejeitados/cancelados
+                error_log("WEBHOOK: Pagamento rejeitado/cancelado no MP: {$mpStatus}");
+                
+                $db = Database::getConnection();
+                $updateStmt = $db->prepare("
+                    UPDATE pagamentos_comissao 
+                    SET mp_status = ?,
+                        observacao_admin = CONCAT(COALESCE(observacao_admin, ''), ' - PIX rejeitado/cancelado no MP: {$mpStatus}')
+                    WHERE mp_payment_id = ?
+                ");
+                $updateStmt->execute([$mpStatus, $mpPaymentId]);
+                
+            } else {
+                error_log("WEBHOOK: Status do pagamento não requer ação: {$mpStatus}");
             }
+            
+        } else {
+            error_log("WEBHOOK: Erro ao consultar status no MP: " . ($paymentResponse['message'] ?? 'Erro desconhecido'));
         }
+        
+    } else {
+        error_log("WEBHOOK: Action não é de pagamento: {$action}");
     }
     
-    echo json_encode(['status' => 'ok', 'message' => 'Webhook processado']);
+    echo json_encode(['status' => 'ok', 'message' => 'Webhook processado com sucesso']);
     
 } catch (Exception $e) {
-    error_log('Erro no webhook MP: ' . $e->getMessage());
-    echo json_encode(['status' => 'ok', 'message' => 'Webhook recebido com erro']);
+    // Log detalhado do erro mas ainda retorna 200 para o MP
+    error_log("WEBHOOK: ❌ ERRO CRÍTICO: " . $e->getMessage());
+    error_log("WEBHOOK: Stack trace: " . $e->getTraceAsString());
+    
+    // Tentar salvar o erro no banco para análise posterior
+    try {
+        $db = Database::getConnection();
+        $errorStmt = $db->prepare("
+            INSERT INTO webhook_errors (mp_payment_id, error_message, payload, created_at) 
+            VALUES (?, ?, ?, NOW())
+            ON DUPLICATE KEY UPDATE 
+            error_message = VALUES(error_message),
+            payload = VALUES(payload),
+            created_at = NOW()
+        ");
+        $errorStmt->execute([
+            $mpPaymentId ?? 'unknown',
+            $e->getMessage(),
+            $input_raw
+        ]);
+    } catch (Exception $dbError) {
+        error_log("WEBHOOK: Erro ao salvar erro no banco: " . $dbError->getMessage());
+    }
+    
+    echo json_encode(['status' => 'ok', 'message' => 'Webhook recebido com erro interno']);
 }
+
+error_log("=== FIM WEBHOOK MP ===");
 ?>

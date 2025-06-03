@@ -1658,12 +1658,53 @@ class TransactionController {
             return false;
         }
     }
-
+    private static function updateAdminBalance($valor, $transacaoId, $paymentId) {
+        try {
+            $db = Database::getConnection();
+            
+            // Verificar/criar registro na tabela admin_saldo
+            $adminSaldoStmt = $db->prepare("SELECT * FROM admin_saldo WHERE id = 1");
+            $adminSaldoStmt->execute();
+            $adminSaldo = $adminSaldoStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$adminSaldo) {
+                $createStmt = $db->prepare("
+                    INSERT INTO admin_saldo (id, valor_total, valor_disponivel, valor_pendente) 
+                    VALUES (1, 0, 0, 0)
+                ");
+                $createStmt->execute();
+            }
+            
+            // Atualizar saldo
+            $updateStmt = $db->prepare("
+                UPDATE admin_saldo 
+                SET valor_total = valor_total + ?, 
+                    valor_disponivel = valor_disponivel + ?,
+                    ultima_atualizacao = NOW()
+                WHERE id = 1
+            ");
+            $updateStmt->execute([$valor, $valor]);
+            
+            // Registrar movimentação
+            $movStmt = $db->prepare("
+                INSERT INTO admin_saldo_movimentacoes (transacao_id, valor, tipo, descricao) 
+                VALUES (?, ?, 'credito', ?)
+            ");
+            $descricao = "Comissão da transação #{$transacaoId} - Pagamento PIX #{$paymentId} aprovado automaticamente";
+            $movStmt->execute([$transacaoId, $valor, $descricao]);
+            
+            return true;
+            
+        } catch (Exception $e) {
+            error_log('Erro ao atualizar saldo admin: ' . $e->getMessage());
+            return false;
+        }
+    }
     public static function approvePaymentAutomatically($paymentId, $observacao = '') {
         try {
             $db = Database::getConnection();
             
-            // Verificar se o pagamento existe e está pendente
+            // Verificar se o pagamento existe e pode ser aprovado
             $paymentStmt = $db->prepare("
                 SELECT p.*, l.nome_fantasia as loja_nome
                 FROM pagamentos_comissao p
@@ -1677,23 +1718,11 @@ class TransactionController {
                 return ['status' => false, 'message' => 'Pagamento não encontrado ou já processado.'];
             }
             
-            // Usar o mesmo processo de aprovação mas sem verificação de admin
-            $db->beginTransaction();
+            error_log("APROVAÇÃO AUTO: Iniciando aprovação do pagamento {$paymentId}");
             
-            // Atualizar pagamento para aprovado
-            $updateStmt = $db->prepare("
-                UPDATE pagamentos_comissao
-                SET status = 'aprovado', 
-                    data_aprovacao = NOW(), 
-                    observacao_admin = ?,
-                    pix_paid_at = NOW()
-                WHERE id = ?
-            ");
-            $updateStmt->execute([$observacao, $paymentId]);
-            
-            // Buscar transações associadas
+            // Buscar transações associadas ANTES de iniciar a transação
             $transStmt = $db->prepare("
-                SELECT t.id, t.usuario_id, t.loja_id, t.valor_cliente
+                SELECT t.id, t.usuario_id, t.loja_id, t.valor_cliente, t.valor_admin
                 FROM pagamentos_transacoes pt
                 JOIN transacoes_cashback t ON pt.transacao_id = t.id
                 WHERE pt.pagamento_id = ?
@@ -1701,8 +1730,28 @@ class TransactionController {
             $transStmt->execute([$paymentId]);
             $transactions = $transStmt->fetchAll(PDO::FETCH_ASSOC);
             
-            // Atualizar status das transações
-            if (!empty($transactions)) {
+            if (empty($transactions)) {
+                return ['status' => false, 'message' => 'Nenhuma transação encontrada para este pagamento.'];
+            }
+            
+            error_log("APROVAÇÃO AUTO: Encontradas " . count($transactions) . " transações");
+            
+            // Iniciar transação principal
+            $db->beginTransaction();
+            
+            try {
+                // 1. Atualizar status do pagamento
+                $updatePaymentStmt = $db->prepare("
+                    UPDATE pagamentos_comissao
+                    SET status = 'aprovado', 
+                        data_aprovacao = NOW(), 
+                        observacao_admin = ?,
+                        pix_paid_at = NOW()
+                    WHERE id = ?
+                ");
+                $updatePaymentStmt->execute([$observacao, $paymentId]);
+                
+                // 2. Atualizar status das transações
                 $transactionIds = array_column($transactions, 'id');
                 $placeholders = implode(',', array_fill(0, count($transactionIds), '?'));
                 
@@ -1713,21 +1762,27 @@ class TransactionController {
                 ");
                 $updateTransStmt->execute($transactionIds);
                 
-                // Atualizar comissões
+                // 3. Atualizar comissões
                 $updateCommissionStmt = $db->prepare("
                     UPDATE transacoes_comissao 
                     SET status = 'aprovado' 
                     WHERE transacao_id IN ($placeholders)
                 ");
                 $updateCommissionStmt->execute($transactionIds);
+                
+                // Commit da transação principal ANTES de creditar saldos
+                $db->commit();
+                error_log("APROVAÇÃO AUTO: Transação principal commitada");
+                
+            } catch (Exception $e) {
+                $db->rollBack();
+                throw $e;
             }
             
-            $db->commit();
-            
-            // Creditar saldos dos clientes (fora da transação)
+            // 4. Creditar saldos dos clientes (fora da transação principal)
             require_once __DIR__ . '/../models/CashbackBalance.php';
-            require_once __DIR__ . '/AdminController.php';
             $balanceModel = new CashbackBalance();
+            $saldosCreditados = 0;
             $totalCashbackReservado = 0;
             
             foreach ($transactions as $transaction) {
@@ -1743,32 +1798,54 @@ class TransactionController {
                     );
                     
                     if ($creditResult) {
+                        $saldosCreditados++;
                         $totalCashbackReservado += $transaction['valor_cliente'];
+                        error_log("APROVAÇÃO AUTO: Saldo creditado para usuário {$transaction['usuario_id']}: R$ {$transaction['valor_cliente']}");
+                    } else {
+                        error_log("APROVAÇÃO AUTO: ERRO ao creditar saldo para usuário {$transaction['usuario_id']}");
                     }
                 }
             }
             
-            // Criar reserva de cashback
+            // 5. Criar reserva de cashback
             if ($totalCashbackReservado > 0) {
-                self::createCashbackReserve(
+                $reservaResult = self::createCashbackReserve(
                     $totalCashbackReservado, 
                     $paymentId, 
                     "Reserva de cashback - Pagamento PIX #{$paymentId} aprovado automaticamente"
                 );
+                
+                if (!$reservaResult) {
+                    error_log("APROVAÇÃO AUTO: ERRO ao criar reserva de cashback");
+                }
             }
             
-            // Criar notificações
+            // 6. Atualizar saldo do administrador
+            $totalComissaoAdmin = 0;
             foreach ($transactions as $transaction) {
-                // Notificar cliente
-                self::createNotification(
-                    $transaction['usuario_id'],
-                    'Cashback disponível!',
-                    'Seu cashback foi liberado automaticamente após confirmação do pagamento PIX.',
-                    'success'
-                );
+                if ($transaction['valor_admin'] > 0) {
+                    $totalComissaoAdmin += $transaction['valor_admin'];
+                    
+                    // Registrar movimentação do admin
+                    self::updateAdminBalance($transaction['valor_admin'], $transaction['id'], $paymentId);
+                }
             }
             
-            // Notificar loja
+            // 7. Criar notificações
+            $clientesNotificados = [];
+            foreach ($transactions as $transaction) {
+                if (!in_array($transaction['usuario_id'], $clientesNotificados)) {
+                    self::createNotification(
+                        $transaction['usuario_id'],
+                        'Cashback disponível!',
+                        'Seu cashback foi liberado automaticamente após confirmação do pagamento PIX.',
+                        'success'
+                    );
+                    $clientesNotificados[] = $transaction['usuario_id'];
+                }
+            }
+            
+            // 8. Notificar loja
             $storeUserStmt = $db->prepare("SELECT usuario_id FROM lojas WHERE id = ?");
             $storeUserStmt->execute([$payment['loja_id']]);
             $storeUser = $storeUserStmt->fetch(PDO::FETCH_ASSOC);
@@ -1782,13 +1859,17 @@ class TransactionController {
                 );
             }
             
+            error_log("APROVAÇÃO AUTO: ✅ Processo concluído com sucesso");
+            
             return [
                 'status' => true,
                 'message' => 'Pagamento PIX aprovado automaticamente',
                 'data' => [
                     'payment_id' => $paymentId,
                     'transacoes_aprovadas' => count($transactions),
-                    'cashback_liberado' => $totalCashbackReservado
+                    'saldos_creditados' => $saldosCreditados,
+                    'cashback_liberado' => $totalCashbackReservado,
+                    'comissao_admin' => $totalComissaoAdmin
                 ]
             ];
             
@@ -1796,8 +1877,8 @@ class TransactionController {
             if (isset($db) && $db->inTransaction()) {
                 $db->rollBack();
             }
-            error_log('Erro na aprovação automática PIX: ' . $e->getMessage());
-            return ['status' => false, 'message' => 'Erro interno do servidor'];
+            error_log('APROVAÇÃO AUTO: ❌ ERRO: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro interno: ' . $e->getMessage()];
         }
     }
 
