@@ -1,8 +1,4 @@
-<?php
-// Adicione temporariamente no início do api/openpix.php
-echo "API Key: " . OPENPIX_API_KEY;
-exit;
-?>
+
 <?php
 // api/openpix.php
 
