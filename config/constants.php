@@ -55,8 +55,8 @@ define('SESSION_LIFETIME', 86400);
 define('TOKEN_EXPIRATION', 7200);
 
 // === MERCADO PAGO CONFIGURAÇÕES ===
-define('MP_PUBLIC_KEY', 'TEST-e07f4dfa-abe6-4d46-8f8c-840cfde27a86'); // Chave pública de teste
-define('MP_ACCESS_TOKEN', 'TEST-8622491157025652-060223-41f1c7f74b1918ac122f00870f6d742f-2320640278'); // Access token de teste
+define('MP_PUBLIC_KEY', 'APP_USR-60bd9502-2ea5-46c8-80b5-765f10277949'); // Chave pública de Producao
+define('MP_ACCESS_TOKEN', 'APP_USR-8622491157025652-060223-01208b007f3c9b708958e846841e0a63-2320640278'); // Access token de producao
 define('MP_WEBHOOK_URL', SITE_URL . '/api/mercadopago-webhook');
 
 // === URLs MERCADO PAGO ===
