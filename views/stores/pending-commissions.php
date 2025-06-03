@@ -500,7 +500,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         try {
             // CORREÇÃO 1: URL correto sem barra inicial
-            const response = await fetch('../../api/store-payment.php', {
+            const response = await fetch('../../controllers/TransactionController.php?action=register_payment', {
                 method: 'POST',
                 // CORREÇÃO 2: Adicionar headers
                 headers: {
