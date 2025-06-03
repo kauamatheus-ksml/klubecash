@@ -1,5 +1,9 @@
 <?php
 // api/openpix.php
+// Adicione temporariamente no início do api/openpix.php
+echo "API Key: " . OPENPIX_API_KEY;
+exit;
+
 header('Content-Type: application/json; charset=UTF-8');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE');
@@ -231,7 +235,7 @@ function makeOpenPixRequest($method, $endpoint, $data = null) {
     
     // DEBUG: Log da API key
     error_log("API Key sendo usada: " . OPENPIX_API_KEY);
-    
+
     $headers = [
         'Authorization: ' . OPENPIX_API_KEY,
         'Content-Type: application/json'
