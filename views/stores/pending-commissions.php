@@ -480,23 +480,32 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Função para criar pagamento PIX
     async function createPixPayment() {
+        console.log('Iniciando pagamento PIX...');
+        
         const formData = new FormData(paymentForm);
         formData.append('metodo_pagamento', 'pix_automatico');
         
+        console.log('FormData criado');
+        
         try {
+            console.log('Fazendo requisição...');
             const response = await fetch('../../controllers/TransactionController.php?action=register_payment', {
                 method: 'POST',
                 body: formData
             });
             
+            console.log('Resposta recebida:', response.status);
             const result = await response.json();
+            console.log('Resultado:', result);
+            
             if (result.status) {
                 window.location.href = `/store/pagamento-pix?payment_id=${result.data.payment_id}`;
             } else {
                 alert('Erro: ' + result.message);
             }
         } catch (error) {
-            alert('Erro de conexão');
+            console.error('Erro detalhado:', error);
+            alert('Erro de conexão: ' + error.message);
         }
     }
     
