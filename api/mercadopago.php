@@ -20,21 +20,47 @@ require_once __DIR__ . '/../utils/MercadoPagoClient.php';
 $method = $_SERVER['REQUEST_METHOD'];
 $action = $_GET['action'] ?? '';
 
-switch ($method) {
-    case 'POST':
-        if ($action === 'create_payment') {
-            createPixPayment();
-        }
-        break;
-    case 'GET':
-        if ($action === 'status') {
-            checkPaymentStatus();
-        }
-        break;
-    default:
-        http_response_code(405);
-        echo json_encode(['status' => false, 'message' => 'Método não permitido']);
-        break;
+// Log para debug
+error_log("MP API Called: $method $action");
+
+try {
+    switch ($method) {
+        case 'POST':
+            if ($action === 'create_payment') {
+                createPixPayment();
+            } else {
+                http_response_code(400);
+                echo json_encode(['status' => false, 'message' => 'Ação inválida']);
+            }
+            break;
+        case 'GET':
+            if ($action === 'status') {
+                checkPaymentStatus();
+            } elseif ($action === 'test') {
+                testConnection();
+            } else {
+                http_response_code(400);
+                echo json_encode(['status' => false, 'message' => 'Ação inválida']);
+            }
+            break;
+        default:
+            http_response_code(405);
+            echo json_encode(['status' => false, 'message' => 'Método não permitido']);
+            break;
+    }
+} catch (Exception $e) {
+    error_log("MP API Error: " . $e->getMessage());
+    http_response_code(500);
+    echo json_encode(['status' => false, 'message' => 'Erro interno do servidor']);
+}
+
+function testConnection() {
+    echo json_encode([
+        'status' => true,
+        'message' => 'API funcionando',
+        'access_token' => substr(MP_ACCESS_TOKEN, 0, 20) . '...',
+        'timestamp' => date('Y-m-d H:i:s')
+    ]);
 }
 
 function createPixPayment() {
@@ -47,6 +73,7 @@ function createPixPayment() {
     }
     
     $input = json_decode(file_get_contents('php://input'), true);
+    error_log("MP Create Payment Input: " . json_encode($input));
     
     if (!$input || !isset($input['payment_id'])) {
         http_response_code(400);
@@ -68,7 +95,13 @@ function createPixPayment() {
         $payment = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if (!$payment) {
-            echo json_encode(['status' => false, 'message' => 'Pagamento não encontrado']);
+            echo json_encode(['status' => false, 'message' => 'Pagamento não encontrado ou já processado']);
+            return;
+        }
+        
+        // Verificar se valor é válido
+        if ($payment['valor_total'] <= 0) {
+            echo json_encode(['status' => false, 'message' => 'Valor do pagamento inválido']);
             return;
         }
         
@@ -77,19 +110,43 @@ function createPixPayment() {
         $paymentData = [
             'amount' => $payment['valor_total'],
             'payer_email' => $payment['email'],
-            'payer_name' => explode(' ', $payment['nome_fantasia'])[0],
-            'payer_lastname' => isset(explode(' ', $payment['nome_fantasia'])[1]) ? 
-                               implode(' ', array_slice(explode(' ', $payment['nome_fantasia']), 1)) : 'Loja',
+            'payer_name' => 'Loja',
+            'payer_lastname' => $payment['nome_fantasia'],
             'description' => "Comissão Klube Cash - Pagamento #{$payment['id']}",
             'external_reference' => "payment_{$payment['id']}",
             'payment_id' => $payment['id'],
             'store_id' => $payment['loja_id']
         ];
         
+        error_log("MP Payment Data: " . json_encode($paymentData));
+        
         $response = $mpClient->createPixPayment($paymentData);
+        
+        error_log("MP Response: " . json_encode($response));
         
         if ($response['status']) {
             $mpPayment = $response['data'];
+            
+            // Verificar se recebemos os dados necessários
+            if (!isset($mpPayment['id'])) {
+                echo json_encode(['status' => false, 'message' => 'Resposta inválida do Mercado Pago: ID não encontrado']);
+                return;
+            }
+            
+            // Extrair dados do PIX
+            $qrCode = '';
+            $qrCodeBase64 = '';
+            
+            if (isset($mpPayment['point_of_interaction']['transaction_data'])) {
+                $transactionData = $mpPayment['point_of_interaction']['transaction_data'];
+                $qrCode = $transactionData['qr_code'] ?? '';
+                $qrCodeBase64 = $transactionData['qr_code_base64'] ?? '';
+            }
+            
+            if (empty($qrCode) && empty($qrCodeBase64)) {
+                echo json_encode(['status' => false, 'message' => 'QR Code não foi gerado pelo Mercado Pago']);
+                return;
+            }
             
             // Salvar dados do PIX no banco
             $updateStmt = $db->prepare("
@@ -99,15 +156,17 @@ function createPixPayment() {
                 WHERE id = ?
             ");
             
-            $qrCode = $mpPayment['point_of_interaction']['transaction_data']['qr_code'] ?? '';
-            $qrCodeBase64 = $mpPayment['point_of_interaction']['transaction_data']['qr_code_base64'] ?? '';
-            
-            $updateStmt->execute([
+            $updateResult = $updateStmt->execute([
                 $mpPayment['id'],
                 $qrCode,
                 $qrCodeBase64,
                 $payment['id']
             ]);
+            
+            if (!$updateResult) {
+                echo json_encode(['status' => false, 'message' => 'Erro ao salvar dados no banco']);
+                return;
+            }
             
             echo json_encode([
                 'status' => true,
@@ -119,12 +178,16 @@ function createPixPayment() {
                 ]
             ]);
         } else {
-            echo json_encode(['status' => false, 'message' => $response['message']]);
+            echo json_encode([
+                'status' => false, 
+                'message' => 'Erro do Mercado Pago: ' . $response['message'],
+                'details' => $response
+            ]);
         }
         
     } catch (Exception $e) {
         error_log('Erro ao criar pagamento PIX: ' . $e->getMessage());
-        echo json_encode(['status' => false, 'message' => 'Erro interno']);
+        echo json_encode(['status' => false, 'message' => 'Erro interno: ' . $e->getMessage()]);
     }
 }
 

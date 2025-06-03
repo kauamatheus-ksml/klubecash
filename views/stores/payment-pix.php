@@ -166,6 +166,8 @@ $activeMenu = 'payment-pix';
             btn.disabled = true;
             btn.textContent = 'Gerando PIX...';
             
+            console.log('Iniciando geração PIX para payment_id:', paymentId);
+            
             try {
                 const response = await fetch('<?php echo MP_CREATE_PAYMENT_URL; ?>', {
                     method: 'POST',
@@ -177,7 +179,24 @@ $activeMenu = 'payment-pix';
                     })
                 });
                 
-                const result = await response.json();
+                console.log('Response status:', response.status);
+                console.log('Response headers:', response.headers);
+                
+                const responseText = await response.text();
+                console.log('Response text:', responseText);
+                
+                let result;
+                try {
+                    result = JSON.parse(responseText);
+                } catch (e) {
+                    console.error('Erro ao fazer parse da resposta:', e);
+                    alert('Erro: Resposta inválida do servidor');
+                    btn.disabled = false;
+                    btn.textContent = 'Gerar PIX via Mercado Pago';
+                    return;
+                }
+                
+                console.log('Parsed result:', result);
                 
                 if (result.status) {
                     // Exibir QR Code
@@ -196,13 +215,14 @@ $activeMenu = 'payment-pix';
                     startPaymentPolling();
                     
                 } else {
-                    alert('Erro ao gerar PIX: ' + result.message);
+                    console.error('Erro na API:', result);
+                    alert('Erro ao gerar PIX: ' + result.message + (result.details ? '\n\nDetalhes: ' + JSON.stringify(result.details) : ''));
                     btn.disabled = false;
                     btn.textContent = 'Gerar PIX via Mercado Pago';
                 }
                 
             } catch (error) {
-                console.error('Erro:', error);
+                console.error('Erro de conexão:', error);
                 alert('Erro de conexão: ' + error.message);
                 btn.disabled = false;
                 btn.textContent = 'Gerar PIX via Mercado Pago';
