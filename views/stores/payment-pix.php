@@ -85,14 +85,13 @@ $activeMenu = 'payment-pix';
             <div class="pix-section" id="pixSection" style="display: none;">
                 <h3>QR Code PIX</h3>
                 <div class="qr-container">
-                    <img id="qrCodeImage" src="" alt="QR Code PIX" style="max-width: 300px;">
+                    <img id="qrCodeImage" src="" alt="QR Code PIX" style="display: none; max-width: 300px;">
                     <div class="qr-actions">
                         <button class="btn btn-secondary" onclick="copyPixCode()">Copiar Código PIX</button>
                         <button class="btn btn-primary" onclick="checkPaymentStatus()">Verificar Pagamento</button>
+                        <button class="btn btn-success" onclick="handlePaymentCompleted()">Confirmar Pagamento Manualmente</button>
                     </div>
                 </div>
-                <input type="hidden" id="pixCode" value="">
-                <input type="hidden" id="chargeId" value="">
             </div>
             
             <div class="action-buttons">
@@ -165,19 +164,44 @@ $activeMenu = 'payment-pix';
             btn.disabled = true;
             btn.textContent = 'Gerando PIX...';
             
-            // MOCK para teste
-            setTimeout(() => {
-                document.getElementById('qrCodeImage').src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
-                document.getElementById('pixCode').value = 'PIX_TESTE_123456';
-                document.getElementById('pixSection').style.display = 'block';
-                updateTimelineStep(1);
-                btn.style.display = 'none';
+            try {
+                const response = await fetch('/api/openpix?action=create_charge', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        payment_id: paymentId
+                    })
+                });
                 
-                // Simular pagamento após 5 segundos
-                setTimeout(() => {
-                    handlePaymentCompleted();
-                }, 5000);
-            }, 1000);
+                const result = await response.json();
+                
+                if (result.status) {
+                    // CORRIGIR: Garantir que a imagem seja exibida
+                    const qrImg = document.getElementById('qrCodeImage');
+                    qrImg.src = result.data.qr_code_image;
+                    qrImg.style.display = 'block';
+                    qrImg.style.maxWidth = '300px';
+                    qrImg.style.height = 'auto';
+                    
+                    document.getElementById('pixCode').value = result.data.qr_code;
+                    document.getElementById('chargeId').value = result.data.charge_id;
+                    document.getElementById('pixSection').style.display = 'block';
+                    
+                    updateTimelineStep(1);
+                    btn.style.display = 'none';
+                } else {
+                    alert('Erro ao gerar PIX: ' + result.message);
+                    btn.disabled = false;
+                    btn.textContent = 'Gerar PIX';
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Erro de conexão');
+                btn.disabled = false;
+                btn.textContent = 'Gerar PIX';
+            }
         }
         
         // Copiar código PIX
