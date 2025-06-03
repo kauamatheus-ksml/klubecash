@@ -229,6 +229,9 @@ function makeOpenPixRequest($method, $endpoint, $data = null) {
     $baseUrl = 'https://api.openpix.com.br/api/v1';
     $url = $baseUrl . $endpoint;
     
+    // DEBUG: Log da API key
+    error_log("API Key sendo usada: " . OPENPIX_API_KEY);
+    
     $headers = [
         'Authorization: ' . OPENPIX_API_KEY,
         'Content-Type: application/json'
