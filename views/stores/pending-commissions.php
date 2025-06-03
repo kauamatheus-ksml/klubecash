@@ -480,22 +480,20 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Função para criar pagamento PIX
     async function createPixPayment() {
-        console.log('Iniciando pagamento PIX...');
-        
         const formData = new FormData(paymentForm);
         formData.append('metodo_pagamento', 'pix_automatico');
         
-        console.log('FormData criado');
+        // Debug - verificar dados
+        for (let [key, value] of formData.entries()) {
+            console.log(key, value);
+        }
         
         try {
-            console.log('Fazendo requisição...');
             const response = await fetch('/controllers/TransactionController.php?action=register_payment', {
-
                 method: 'POST',
                 body: formData
             });
             
-            console.log('Resposta recebida:', response.status);
             const result = await response.json();
             console.log('Resultado:', result);
             
@@ -505,8 +503,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 alert('Erro: ' + result.message);
             }
         } catch (error) {
-            console.error('Erro detalhado:', error);
-            alert('Erro de conexão: ' + error.message);
+            alert('Erro: ' + error.message);
         }
     }
     
