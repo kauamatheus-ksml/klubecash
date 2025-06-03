@@ -104,6 +104,8 @@ RewriteRule ^admin/relatorios/?$ views/admin/reports.php [L]
 # PIX
 RewriteRule ^store/pagamento-pix/?$ views/stores/payment-pix.php [L,QSA]
 
+RewriteRule ^controllers/TransactionController\.php$ controllers/TransactionController.php [L,QSA]
+
 # API OpenPix
 RewriteRule ^api/openpix/?$ api/openpix.php [L,QSA]
 # Lojas
