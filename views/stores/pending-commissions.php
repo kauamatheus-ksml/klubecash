@@ -376,321 +376,179 @@ if ($result['status'] && isset($result['data']['totais'])) {
     </div>
     
     <script>
-        // Evento para PIX
-        if (document.getElementById('payPixBtn')) {
-            document.getElementById('payPixBtn').addEventListener('click', function() {
-                const selected = document.querySelectorAll('.transaction-checkbox:checked');
-                if (selected.length > 0) {
-                    // Criar pagamento e redirecionar para PIX
-                    createPixPayment();
-                }
-            });
+document.addEventListener('DOMContentLoaded', function() {
+    const selectAllCheckbox = document.getElementById('selectAll');
+    const transactionCheckboxes = document.querySelectorAll('.transaction-checkbox');
+    const paySelectedBtn = document.getElementById('paySelectedBtn');
+    const payPixBtn = document.getElementById('payPixBtn');
+    const paymentForm = document.getElementById('paymentForm');
+    const paymentSummary = document.getElementById('paymentSummary');
+    
+    // Função para formatar valores como moeda
+    function formatCurrency(value) {
+        return value.toLocaleString('pt-BR', {
+            style: 'currency',
+            currency: 'BRL',
+            minimumFractionDigits: 2
+        });
+    }
+    
+    // Função para atualizar resumo de pagamento
+    function updatePaymentSummary() {
+        const selectedCheckboxes = document.querySelectorAll('.transaction-checkbox:checked');
+        const selectedCount = selectedCheckboxes.length;
+        let totalCommission = 0;
+        let totalSalesValue = 0;
+        let totalBalanceUsed = 0;
+        
+        selectedCheckboxes.forEach(checkbox => {
+            const commission = parseFloat(checkbox.getAttribute('data-value'));
+            totalCommission += commission;
+            
+            const row = checkbox.closest('tr');
+            const cells = row.querySelectorAll('td');
+            
+            // Valor original da venda (coluna 4)
+            const originalValueText = cells[4].textContent.replace('R$ ', '').replace(/\./g, '').replace(',', '.');
+            const originalValue = parseFloat(originalValueText);
+            
+            // Saldo usado (coluna 5)
+            const balanceUsedElement = cells[5].querySelector('.saldo-usado');
+            const balanceUsed = balanceUsedElement ? 
+                parseFloat(balanceUsedElement.textContent.replace('R$ ', '').replace(/\./g, '').replace(',', '.')) : 0;
+            
+            totalSalesValue += originalValue;
+            totalBalanceUsed += balanceUsed;
+        });
+        
+        document.getElementById('selectedCount').textContent = selectedCount;
+        document.getElementById('totalSalesValue').textContent = formatCurrency(totalSalesValue);
+        document.getElementById('totalBalanceUsed').textContent = formatCurrency(totalBalanceUsed);
+        document.getElementById('totalCommissionValue').textContent = formatCurrency(totalCommission);
+        
+        // Habilitar/desabilitar botões de pagamento
+        if (paySelectedBtn) paySelectedBtn.disabled = selectedCount === 0;
+        if (payPixBtn) payPixBtn.disabled = selectedCount === 0;
+        
+        // Mostrar/esconder resumo de pagamento
+        if (selectedCount > 0) {
+            paymentSummary.style.display = 'block';
+        } else {
+            paymentSummary.style.display = 'none';
         }
-
-        async function createPixPayment() {
-            const form = document.getElementById('paymentForm');
-            const formData = new FormData(form);
-            formData.append('metodo_pagamento', 'pix_automatico');
-            
-            try {
-                const response = await fetch('../../controllers/TransactionController.php?action=register_payment', {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                const result = await response.json();
-                if (result.status) {
-                    window.location.href = `/store/pagamento-pix?payment_id=${result.data.payment_id}`;
-                } else {
-                    alert('Erro: ' + result.message);
-                }
-            } catch (error) {
-                alert('Erro de conexão');
-            }
-        }
-        document.addEventListener('DOMContentLoaded', function() {
-            const selectAllCheckbox = document.getElementById('selectAll');
-            const transactionCheckboxes = document.querySelectorAll('.transaction-checkbox');
-            const paySelectedBtn = document.getElementById('paySelectedBtn');
-            const selectedCountElement = document.getElementById('selectedCount');
-            const totalSalesValueElement = document.getElementById('totalSalesValue');
-            const totalBalanceUsedElement = document.getElementById('totalBalanceUsed');
-            const totalCommissionValueElement = document.getElementById('totalCommissionValue');
-            const paymentForm = document.getElementById('paymentForm');
-            const paymentSummary = document.getElementById('paymentSummary');
-            
-            // Função para formatar valores como moeda
-            function formatCurrency(value) {
-                return value.toLocaleString('pt-BR', {
-                    style: 'currency',
-                    currency: 'BRL',
-                    minimumFractionDigits: 2
-                });
-            }
-            
-            // Função para atualizar resumo de pagamento
-            // Função para atualizar resumo de pagamento
-            function updatePaymentSummary() {
-                const selectedCheckboxes = document.querySelectorAll('.transaction-checkbox:checked');
-                const selectedCount = selectedCheckboxes.length;
-                let totalCommission = 0;
-                let totalSalesValue = 0;
-                let totalBalanceUsed = 0;
-                
-                selectedCheckboxes.forEach(checkbox => {
-                    // CORREÇÃO: Usar data-value do checkbox que agora tem o valor correto
-                    const commission = parseFloat(checkbox.getAttribute('data-value'));
-                    totalCommission += commission;
-                    
-                    const row = checkbox.closest('tr');
-                    const cells = row.querySelectorAll('td');
-                    
-                    // Valor original da venda (coluna 4)
-                    const originalValueText = cells[4].textContent.replace('R$ ', '').replace(/\./g, '').replace(',', '.');
-                    const originalValue = parseFloat(originalValueText);
-                    
-                    // Saldo usado (coluna 5)
-                    const balanceUsedElement = cells[5].querySelector('.saldo-usado');
-                    const balanceUsed = balanceUsedElement ? 
-                        parseFloat(balanceUsedElement.textContent.replace('R$ ', '').replace(/\./g, '').replace(',', '.')) : 0;
-                    
-                    totalSalesValue += originalValue;
-                    totalBalanceUsed += balanceUsed;
-                });
-                
-                document.getElementById('selectedCount').textContent = selectedCount;
-                document.getElementById('totalSalesValue').textContent = formatCurrency(totalSalesValue);
-                document.getElementById('totalBalanceUsed').textContent = formatCurrency(totalBalanceUsed);
-                document.getElementById('totalCommissionValue').textContent = formatCurrency(totalCommission);
-                
-                // Habilitar/desabilitar botão de pagamento
-                const paySelectedBtn = document.getElementById('paySelectedBtn');
-                paySelectedBtn.disabled = selectedCount === 0;
-                
-                // Mostrar/esconder resumo de pagamento
-                const paymentSummary = document.getElementById('paymentSummary');
-                if (selectedCount > 0) {
-                    paymentSummary.style.display = 'block';
-                } else {
-                    paymentSummary.style.display = 'none';
-                }
-            }
-
-            // Função para formatar moeda
-            function formatCurrency(value) {
-                return value.toLocaleString('pt-BR', {
-                    style: 'currency',
-                    currency: 'BRL',
-                    minimumFractionDigits: 2
-                });
-            }
-            
-            // Evento para selecionar/deselecionar todos
-            if (selectAllCheckbox) {
-                selectAllCheckbox.addEventListener('change', function() {
-                    transactionCheckboxes.forEach(checkbox => {
-                        checkbox.checked = selectAllCheckbox.checked;
-                    });
-                    updatePaymentSummary();
-                });
-            }
-            
-            // Eventos para checkboxes individuais
+    }
+    
+    // Evento para selecionar/deselecionar todos
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', function() {
             transactionCheckboxes.forEach(checkbox => {
-                checkbox.addEventListener('change', function() {
-                    // Verificar se todos estão selecionados
-                    const allChecked = Array.from(transactionCheckboxes).every(cb => cb.checked);
-                    if (selectAllCheckbox) {
-                        selectAllCheckbox.checked = allChecked;
-                    }
-                    
-                    updatePaymentSummary();
-                });
+                checkbox.checked = selectAllCheckbox.checked;
             });
-            
-            // Evento para botão de pagamento
-            if (paySelectedBtn) {
-                paySelectedBtn.addEventListener('click', function() {
-                    if (document.querySelectorAll('.transaction-checkbox:checked').length > 0) {
-                        paymentForm.submit();
-                    }
-                });
-            }
-            
-            // Inicializar resumo
             updatePaymentSummary();
         });
-        document.addEventListener('DOMContentLoaded', function() {
-            const selectAllCheckbox = document.getElementById('selectAll');
-            const transactionCheckboxes = document.querySelectorAll('.transaction-checkbox');
-            const paySelectedBtn = document.getElementById('paySelectedBtn');
-            const selectedCountElement = document.getElementById('selectedCount');
-            const totalSalesValueElement = document.getElementById('totalSalesValue');
-            const totalBalanceUsedElement = document.getElementById('totalBalanceUsed');
-            const totalCommissionValueElement = document.getElementById('totalCommissionValue');
-            const paymentForm = document.getElementById('paymentForm');
-            const paymentSummary = document.getElementById('paymentSummary');
-            
-            // Função para formatar valores como moeda
-            function formatCurrency(value) {
-                return value.toLocaleString('pt-BR', {
-                    style: 'currency',
-                    currency: 'BRL',
-                    minimumFractionDigits: 2
-                });
-            }
-            
-            // Função para atualizar resumo de pagamento
-            function updatePaymentSummary() {
-                const selectedCheckboxes = document.querySelectorAll('.transaction-checkbox:checked');
-                const selectedCount = selectedCheckboxes.length;
-                let totalCommission = 0;
-                let totalSalesValue = 0;
-                let totalBalanceUsed = 0;
-                
-                selectedCheckboxes.forEach(checkbox => {
-                    // CORREÇÃO: Usar data-value do checkbox que agora tem o valor correto
-                    const commission = parseFloat(checkbox.getAttribute('data-value'));
-                    totalCommission += commission;
-                    
-                    const row = checkbox.closest('tr');
-                    const cells = row.querySelectorAll('td');
-                    
-                    // Valor original da venda (coluna 4)
-                    const originalValueText = cells[4].textContent.replace('R$ ', '').replace(/\./g, '').replace(',', '.');
-                    const originalValue = parseFloat(originalValueText);
-                    
-                    // Saldo usado (coluna 5)
-                    const balanceUsedElement = cells[5].querySelector('.saldo-usado');
-                    const balanceUsed = balanceUsedElement ? 
-                        parseFloat(balanceUsedElement.textContent.replace('R$ ', '').replace(/\./g, '').replace(',', '.')) : 0;
-                    
-                    totalSalesValue += originalValue;
-                    totalBalanceUsed += balanceUsed;
-                });
-                
-                document.getElementById('selectedCount').textContent = selectedCount;
-                document.getElementById('totalSalesValue').textContent = formatCurrency(totalSalesValue);
-                document.getElementById('totalBalanceUsed').textContent = formatCurrency(totalBalanceUsed);
-                document.getElementById('totalCommissionValue').textContent = formatCurrency(totalCommission);
-                
-                // Habilitar/desabilitar botão de pagamento
-                const paySelectedBtn = document.getElementById('paySelectedBtn');
-                paySelectedBtn.disabled = selectedCount === 0;
-                
-                // Mostrar/esconder resumo de pagamento
-                const paymentSummary = document.getElementById('paymentSummary');
-                if (selectedCount > 0) {
-                    paymentSummary.style.display = 'block';
-                } else {
-                    paymentSummary.style.display = 'none';
-                }
-            }
-            
-            // Evento para selecionar/deselecionar todos
+    }
+    
+    // Eventos para checkboxes individuais
+    transactionCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            const allChecked = Array.from(transactionCheckboxes).every(cb => cb.checked);
             if (selectAllCheckbox) {
-                selectAllCheckbox.addEventListener('change', function() {
-                    transactionCheckboxes.forEach(checkbox => {
-                        checkbox.checked = selectAllCheckbox.checked;
-                    });
-                    updatePaymentSummary();
-                });
+                selectAllCheckbox.checked = allChecked;
             }
-            
-            // Eventos para checkboxes individuais
-            transactionCheckboxes.forEach(checkbox => {
-                checkbox.addEventListener('change', function() {
-                    // Verificar se todos estão selecionados
-                    const allChecked = Array.from(transactionCheckboxes).every(cb => cb.checked);
-                    if (selectAllCheckbox) {
-                        selectAllCheckbox.checked = allChecked;
-                    }
-                    
-                    updatePaymentSummary();
-                });
-            });
-            
-            // Evento para botão de pagamento
-            if (paySelectedBtn) {
-                paySelectedBtn.addEventListener('click', function() {
-                    if (document.querySelectorAll('.transaction-checkbox:checked').length > 0) {
-                        paymentForm.submit();
-                    }
-                });
-            }
-            
-            // Inicializar resumo
             updatePaymentSummary();
-            
-            // Restaurar estado do dropdown ao carregar a página
-            const savedState = localStorage.getItem('pendingCommissionsInfoOpen');
-            const content = document.getElementById('infoSectionContent');
-            const icon = document.getElementById('infoDropdownIcon');
-            const card = content ? content.closest('.collapsible-card') : null;
-            
-            if (savedState === 'true' && content && icon && card) {
-                content.style.display = 'block';
-                icon.classList.add('open');
-                card.classList.add('expanded');
-            }
-            
-            // Adicionar indicador visual ao passar o mouse
-            const header = document.querySelector('.collapsible-header');
-            if (header && card) {
-                header.addEventListener('mouseenter', function() {
-                    if (!card.classList.contains('expanded')) {
-                        this.style.backgroundColor = '#f8f9fa';
-                    }
-                });
-                
-                header.addEventListener('mouseleave', function() {
-                    if (!card.classList.contains('expanded')) {
-                        this.style.backgroundColor = '';
-                    }
-                });
+        });
+    });
+    
+    // Evento para botão de pagamento normal
+    if (paySelectedBtn) {
+        paySelectedBtn.addEventListener('click', function() {
+            if (document.querySelectorAll('.transaction-checkbox:checked').length > 0) {
+                paymentForm.submit();
             }
         });
-
-        // Função para controlar o dropdown de informações
-        function toggleInfoSection() {
-            const content = document.getElementById('infoSectionContent');
-            const icon = document.getElementById('infoDropdownIcon');
-            const card = content.closest('.collapsible-card');
+    }
+    
+    // Evento para botão PIX
+    if (payPixBtn) {
+        payPixBtn.addEventListener('click', function() {
+            const selected = document.querySelectorAll('.transaction-checkbox:checked');
+            if (selected.length > 0) {
+                createPixPayment();
+            }
+        });
+    }
+    
+    // Função para criar pagamento PIX
+    async function createPixPayment() {
+        const formData = new FormData(paymentForm);
+        formData.append('metodo_pagamento', 'pix_automatico');
+        
+        try {
+            const response = await fetch('../../controllers/TransactionController.php?action=register_payment', {
+                method: 'POST',
+                body: formData
+            });
             
-            if (content.style.display === 'none' || content.style.display === '') {
-                // Abrir
-                content.style.display = 'block';
-                content.classList.add('opening');
-                content.classList.remove('closing');
-                icon.classList.add('open');
-                card.classList.add('expanded');
-                
-                // Remover classe de animação após completar
-                setTimeout(() => {
-                    content.classList.remove('opening');
-                }, 400);
-                
-                // Salvar estado no localStorage (usando chave única para esta página)
-                localStorage.setItem('pendingCommissionsInfoOpen', 'true');
-                
+            const result = await response.json();
+            if (result.status) {
+                window.location.href = `/store/pagamento-pix?payment_id=${result.data.payment_id}`;
             } else {
-                // Fechar
-                content.classList.add('closing');
-                content.classList.remove('opening');
-                icon.classList.remove('open');
-                card.classList.remove('expanded');
-                
-                // Ocultar após animação
-                setTimeout(() => {
-                    content.style.display = 'none';
-                    content.classList.remove('closing');
-                }, 400);
-                
-                // Salvar estado no localStorage
-                localStorage.setItem('pendingCommissionsInfoOpen', 'false');
+                alert('Erro: ' + result.message);
             }
+        } catch (error) {
+            alert('Erro de conexão');
         }
-    </script>
+    }
+    
+    // Inicializar resumo
+    updatePaymentSummary();
+    
+    // Restaurar estado do dropdown
+    const savedState = localStorage.getItem('pendingCommissionsInfoOpen');
+    const content = document.getElementById('infoSectionContent');
+    const icon = document.getElementById('infoDropdownIcon');
+    const card = content ? content.closest('.collapsible-card') : null;
+    
+    if (savedState === 'true' && content && icon && card) {
+        content.style.display = 'block';
+        icon.classList.add('open');
+        card.classList.add('expanded');
+    }
+});
+
+// Função para controlar o dropdown de informações
+function toggleInfoSection() {
+    const content = document.getElementById('infoSectionContent');
+    const icon = document.getElementById('infoDropdownIcon');
+    const card = content.closest('.collapsible-card');
+    
+    if (content.style.display === 'none' || content.style.display === '') {
+        content.style.display = 'block';
+        content.classList.add('opening');
+        content.classList.remove('closing');
+        icon.classList.add('open');
+        card.classList.add('expanded');
+        
+        setTimeout(() => {
+            content.classList.remove('opening');
+        }, 400);
+        
+        localStorage.setItem('pendingCommissionsInfoOpen', 'true');
+    } else {
+        content.classList.add('closing');
+        content.classList.remove('opening');
+        icon.classList.remove('open');
+        card.classList.remove('expanded');
+        
+        setTimeout(() => {
+            content.style.display = 'none';
+            content.classList.remove('closing');
+        }, 400);
+        
+        localStorage.setItem('pendingCommissionsInfoOpen', 'false');
+    }
+}
+</script>
     
     <style>
         /* Estilos adicionais para saldo usado */
