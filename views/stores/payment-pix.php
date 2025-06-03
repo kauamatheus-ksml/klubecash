@@ -168,6 +168,8 @@ $activeMenu = 'payment-pix';
             btn.disabled = true;
             btn.textContent = 'Gerando PIX...';
             
+            
+
             try {
                 // Fazer chamada real para API OpenPix
                 const response = await fetch('../../api/openpix.php?action=create_charge', {
@@ -180,7 +182,7 @@ $activeMenu = 'payment-pix';
                     })
                 });
                 
-                
+
                 const result = await response.json();
                 
                 if (result.status) {
