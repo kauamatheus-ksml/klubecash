@@ -169,7 +169,10 @@ if ($result['status'] && isset($result['data']['totais'])) {
                 <div class="card-header">
                     <div class="card-title">Transações Pendentes de Pagamento</div>
                     <?php if ($totalTransacoes > 0): ?>
-                    <button id="paySelectedBtn" class="btn btn-primary" disabled>Pagar Selecionadas</button>
+                    <div style="display: flex; gap: 1rem;">
+                        <button id="paySelectedBtn" class="btn btn-primary" disabled>Pagar Selecionadas</button>
+                        <button id="payPixBtn" class="btn btn-success" disabled>Pagar via PIX</button>
+                    </div>
                     <?php endif; ?>
                 </div>
                 
@@ -373,6 +376,38 @@ if ($result['status'] && isset($result['data']['totais'])) {
     </div>
     
     <script>
+        // Evento para PIX
+        if (document.getElementById('payPixBtn')) {
+            document.getElementById('payPixBtn').addEventListener('click', function() {
+                const selected = document.querySelectorAll('.transaction-checkbox:checked');
+                if (selected.length > 0) {
+                    // Criar pagamento e redirecionar para PIX
+                    createPixPayment();
+                }
+            });
+        }
+
+        async function createPixPayment() {
+            const form = document.getElementById('paymentForm');
+            const formData = new FormData(form);
+            formData.append('metodo_pagamento', 'pix_automatico');
+            
+            try {
+                const response = await fetch('../../controllers/TransactionController.php?action=register_payment', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                if (result.status) {
+                    window.location.href = `/store/pagamento-pix?payment_id=${result.data.payment_id}`;
+                } else {
+                    alert('Erro: ' + result.message);
+                }
+            } catch (error) {
+                alert('Erro de conexão');
+            }
+        }
         document.addEventListener('DOMContentLoaded', function() {
             const selectAllCheckbox = document.getElementById('selectAll');
             const transactionCheckboxes = document.querySelectorAll('.transaction-checkbox');
