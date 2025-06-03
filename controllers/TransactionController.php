@@ -1204,9 +1204,9 @@ class TransactionController {
             }
             
             // Verificar se o usuário está autenticado e é loja ou admin
-            //if (!AuthController::isAuthenticated()) {
-            //    return ['status' => false, 'message' => 'Usuário não autenticado.'];
-            //}
+            if (!AuthController::isAuthenticated()) {
+                return ['status' => false, 'message' => 'Usuário não autenticado.'];
+            }
             
             if (!AuthController::isStore() && !AuthController::isAdmin()) {
                 return ['status' => false, 'message' => 'Apenas lojas e administradores podem registrar pagamentos.'];
@@ -2465,6 +2465,11 @@ if (basename($_SERVER['PHP_SELF']) === 'TransactionController.php') {
             break;
             
         case 'register_payment':
+            // Debug da sessão
+            error_log("Session data: " . print_r($_SESSION, true));
+            error_log("Auth check: " . (AuthController::isAuthenticated() ? 'true' : 'false'));
+            error_log("Store check: " . (AuthController::isStore() ? 'true' : 'false'));
+            
             $data = $_POST;
             $result = TransactionController::registerPayment($data);
             echo json_encode($result);
