@@ -56,15 +56,8 @@ function testEndpoint() {
 }
 
 function createPixCharge() {
-    // Verificar se AuthController existe
-    if (!class_exists('AuthController')) {
-        http_response_code(500);
-        echo json_encode(['status' => false, 'message' => 'Sistema em manutenção']);
-        return;
-    }
-
+    // REMOVER as linhas de teste e implementar API real:
     
-
     $input = json_decode(file_get_contents('php://input'), true);
     
     if (!$input || !isset($input['payment_id'])) {
@@ -75,8 +68,6 @@ function createPixCharge() {
 
     try {
         $db = Database::getConnection();
-        
-        // Buscar dados do pagamento
         $stmt = $db->prepare("
             SELECT p.*, l.nome_fantasia, l.email 
             FROM pagamentos_comissao p
@@ -87,29 +78,15 @@ function createPixCharge() {
         $payment = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if (!$payment) {
-            http_response_code(404);
             echo json_encode(['status' => false, 'message' => 'Pagamento não encontrado']);
             return;
         }
-        // TESTE: Retornar dados mockados primeiro
-        echo json_encode([
-            'status' => true,
-            'data' => [
-                'charge_id' => 'test_charge_' . time(),
-                'qr_code' => 'PIX_MOCK_CODE_' . $payment['id'],
-                'qr_code_image' => 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
-            ]
-        ]);
         
-        // Criar cobrança PIX usando cURL diretamente
+        // Criar cobrança PIX real
         $chargeData = [
-            'value' => (int)($payment['valor_total'] * 100),
+            'value' => (int)($payment['valor_total'] * 100), // centavos
             'comment' => "Comissão Klube Cash - Pagamento #{$payment['id']}",
-            'correlationID' => "payment_{$payment['id']}_" . time(),
-            'customer' => [
-                'name' => $payment['nome_fantasia'],
-                'email' => $payment['email']
-            ]
+            'correlationID' => "payment_{$payment['id']}_" . time()
         ];
         
         $response = makeOpenPixRequest('POST', '/charge', $chargeData);
@@ -117,7 +94,7 @@ function createPixCharge() {
         if ($response['success']) {
             $charge = $response['data']['charge'];
             
-            // Salvar dados da cobrança PIX
+            // Salvar no banco
             $updateStmt = $db->prepare("
                 UPDATE pagamentos_comissao 
                 SET pix_charge_id = ?, pix_qr_code = ?, pix_qr_code_image = ?, metodo_pagamento = 'pix_automatico'
@@ -143,8 +120,7 @@ function createPixCharge() {
         }
         
     } catch (Exception $e) {
-        error_log('Erro ao criar cobrança PIX: ' . $e->getMessage());
-        echo json_encode(['status' => false, 'message' => 'Erro interno do servidor']);
+        echo json_encode(['status' => false, 'message' => 'Erro interno']);
     }
 }
 
