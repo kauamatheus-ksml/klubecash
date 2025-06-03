@@ -164,44 +164,19 @@ $activeMenu = 'payment-pix';
             btn.disabled = true;
             btn.textContent = 'Gerando PIX...';
             
-            try {
-                const response = await fetch('/api/openpix?action=create_charge', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        payment_id: paymentId
-                    })
-                });
+            // Mock QR Code para teste
+            setTimeout(() => {
+                const qrImg = document.getElementById('qrCodeImage');
+                qrImg.src = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=PIX_TESTE_' + paymentId;
+                qrImg.style.display = 'block';
                 
-                const result = await response.json();
+                document.getElementById('pixCode').value = '00020126580014br.gov.bcb.pix0136teste123456';
+                document.getElementById('chargeId').value = 'test_charge_' + paymentId;
+                document.getElementById('pixSection').style.display = 'block';
                 
-                if (result.status) {
-                    // CORRIGIR: Garantir que a imagem seja exibida
-                    const qrImg = document.getElementById('qrCodeImage');
-                    qrImg.src = result.data.qr_code_image;
-                    qrImg.style.display = 'block';
-                    qrImg.style.maxWidth = '300px';
-                    qrImg.style.height = 'auto';
-                    
-                    document.getElementById('pixCode').value = result.data.qr_code;
-                    document.getElementById('chargeId').value = result.data.charge_id;
-                    document.getElementById('pixSection').style.display = 'block';
-                    
-                    updateTimelineStep(1);
-                    btn.style.display = 'none';
-                } else {
-                    alert('Erro ao gerar PIX: ' + result.message);
-                    btn.disabled = false;
-                    btn.textContent = 'Gerar PIX';
-                }
-            } catch (error) {
-                console.error('Erro:', error);
-                alert('Erro de conexão');
-                btn.disabled = false;
-                btn.textContent = 'Gerar PIX';
-            }
+                updateTimelineStep(1);
+                btn.style.display = 'none';
+            }, 1000);
         }
         
         // Copiar código PIX
