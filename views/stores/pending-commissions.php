@@ -479,7 +479,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Função para criar pagamento PIX
-    async function createPixPayment() {
+    
     async function createPixPayment() {
     // Calcular valor total das comissões selecionadas
     const selectedCheckboxes = document.querySelectorAll('.transaction-checkbox:checked');
