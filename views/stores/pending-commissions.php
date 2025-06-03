@@ -479,10 +479,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Função para criar pagamento PIX
-    if (!document.body.dataset.userType || document.body.dataset.userType !== 'loja') {
-        alert('Você precisa estar logado como loja');
-        return;
-    }
+    const testResponse = await fetch('/controllers/TransactionController.php?action=test');
+    console.log('Teste:', await testResponse.text());
+    
     async function createPixPayment() {
         // Calcular valor total das comissões selecionadas
         const selectedCheckboxes = document.querySelectorAll('.transaction-checkbox:checked');
