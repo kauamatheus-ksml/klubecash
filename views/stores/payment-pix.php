@@ -156,50 +156,25 @@ $activeMenu = 'payment-pix';
         let pollingInterval = null;
         
         // Gerar PIX
+        // Substituir a função generatePix() por:
         async function generatePix() {
             const btn = document.getElementById('generatePixBtn');
             btn.disabled = true;
             btn.textContent = 'Gerando PIX...';
             
-            try {
-                const response = await fetch('<?php echo OPENPIX_CREATE_CHARGE_URL; ?>', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        payment_id: paymentId,
-                        transaction_ids: [] // Será preenchido pelo backend
-                    })
-                });
+            // MOCK para teste
+            setTimeout(() => {
+                document.getElementById('qrCodeImage').src = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+                document.getElementById('pixCode').value = 'PIX_TESTE_123456';
+                document.getElementById('pixSection').style.display = 'block';
+                updateTimelineStep(1);
+                btn.style.display = 'none';
                 
-                const result = await response.json();
-                
-                if (result.status) {
-                    // Mostrar QR Code
-                    document.getElementById('qrCodeImage').src = result.data.qr_code_image;
-                    document.getElementById('pixCode').value = result.data.qr_code;
-                    document.getElementById('chargeId').value = result.data.charge_id;
-                    document.getElementById('pixSection').style.display = 'block';
-                    
-                    // Iniciar polling para verificar pagamento
-                    startPaymentPolling();
-                    
-                    // Atualizar status
-                    updateTimelineStep(1);
-                    
-                    btn.style.display = 'none';
-                } else {
-                    alert('Erro ao gerar PIX: ' + result.message);
-                    btn.disabled = false;
-                    btn.textContent = 'Gerar PIX';
-                }
-            } catch (error) {
-                console.error('Erro:', error);
-                alert('Erro de conexão');
-                btn.disabled = false;
-                btn.textContent = 'Gerar PIX';
-            }
+                // Simular pagamento após 5 segundos
+                setTimeout(() => {
+                    handlePaymentCompleted();
+                }, 5000);
+            }, 1000);
         }
         
         // Copiar código PIX
