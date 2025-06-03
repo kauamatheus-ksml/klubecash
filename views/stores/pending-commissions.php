@@ -488,25 +488,48 @@ document.addEventListener('DOMContentLoaded', function() {
         selectedCheckboxes.forEach(checkbox => {
             totalCommission += parseFloat(checkbox.getAttribute('data-value'));
         });
-        
+
+        if (totalCommission <= 0) {
+            alert('Selecione pelo menos uma transação');
+            return;
+        }
+
         const formData = new FormData(paymentForm);
         formData.append('metodo_pagamento', 'pix_automatico');
-        formData.append('valor_total', totalCommission.toFixed(2)); // Adicionar valor total
-        
+        formData.append('valor_total', totalCommission.toFixed(2));
+
         try {
-            const response = await fetch('/controllers/TransactionController.php?action=register_payment', {
+            // CORREÇÃO 1: URL correto sem barra inicial
+            const response = await fetch('../../api/store-payment.php', {
                 method: 'POST',
-                body: formData
+                // CORREÇÃO 2: Adicionar headers
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: formData,
+                // CORREÇÃO 3: Incluir cookies para manter sessão
+                credentials: 'same-origin'
             });
-            
+
+            // CORREÇÃO 4: Verificar se resposta é JSON antes de fazer parse
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                const text = await response.text();
+                console.error('Resposta não é JSON:', text);
+                alert('Erro no servidor. Verifique se você está logado.');
+                return;
+            }
+
             const result = await response.json();
+            
             if (result.status) {
-                window.location.href = `/store/pagamento-pix?payment_id=${result.data.payment_id}`;
+                window.location.href = `../../store/pagamento-pix?payment_id=${result.data.payment_id}`;
             } else {
                 alert('Erro: ' + result.message);
             }
         } catch (error) {
-            alert('Erro: ' + error.message);
+            console.error('Erro na requisição:', error);
+            alert('Erro de conexão: ' + error.message);
         }
     }
     
