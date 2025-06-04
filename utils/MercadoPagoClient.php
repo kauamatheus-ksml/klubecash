@@ -96,6 +96,21 @@ class MercadoPagoClient {
                 return ['status' => false, 'message' => $validation['message']];
             }
             
+            // GARANTIR QUE SEMPRE TEMOS NOMES VÁLIDOS
+            $payerFirstName = $this->extractFirstName($data['payer_name'] ?? 'Cliente Klube Cash');
+            $payerLastName = $this->extractLastName($data['payer_lastname'] ?? $data['payer_name'] ?? 'Sistema Klube Cash');
+            
+            // Log para debug
+            error_log("MP: Nome extraído - First: '{$payerFirstName}', Last: '{$payerLastName}'");
+            
+            // Validação final dos nomes
+            if (empty($payerFirstName) || strlen($payerFirstName) < 2) {
+                $payerFirstName = 'Cliente';
+            }
+            if (empty($payerLastName) || strlen($payerLastName) < 2) {
+                $payerLastName = 'KlubeCash';
+            }
+            
             // Montar o payload COMPLETO para enviar ao Mercado Pago
             $payload = [
                 // Valor do pagamento (deve ser um número decimal)
@@ -104,22 +119,22 @@ class MercadoPagoClient {
                 // Especifica que queremos um pagamento PIX
                 'payment_method_id' => 'pix',
                 
-                // DADOS COMPLETOS DO PAGADOR (OBRIGATÓRIO PARA BOA APROVAÇÃO)
+                // DADOS COMPLETOS DO PAGADOR (NOMES OBRIGATÓRIOS E VÁLIDOS)
                 'payer' => [
                     'email' => trim($data['payer_email']),
-                    'first_name' => $this->extractFirstName($data['payer_name'] ?? 'Cliente'),
-                    'last_name' => $this->extractLastName($data['payer_lastname'] ?? $data['payer_name'] ?? 'Klube Cash'),
+                    'first_name' => $payerFirstName, // NUNCA VAZIO
+                    'last_name' => $payerLastName,   // NUNCA VAZIO
                     'type' => 'customer'
                 ],
                 
-                // ITENS DETALHADOS (OBRIGATÓRIO PARA BOA APROVAÇÃO)
+                // ITENS DETALHADOS (TODOS OS CAMPOS OBRIGATÓRIOS)
                 'additional_info' => [
                     'items' => [
                         [
-                            'id' => $data['item_id'] ?? 'COMISSAO_' . ($data['payment_id'] ?? uniqid()),
+                            'id' => $data['item_id'] ?? 'COMISSAO_KC_' . ($data['payment_id'] ?? uniqid()),
                             'title' => $data['item_title'] ?? 'Comissão Klube Cash',
-                            'description' => $data['description'] ?? 'Pagamento de comissão para liberação de cashback',
-                            'category_id' => 'services', // Categoria obrigatória
+                            'description' => $data['item_description'] ?? 'Pagamento de comissão para liberação de cashback aos clientes',
+                            'category_id' => $data['item_category'] ?? 'services', // OBRIGATÓRIO
                             'quantity' => 1,
                             'unit_price' => (float) $data['amount'],
                             'picture_url' => 'https://klubecash.com/assets/images/logo.png',
@@ -129,8 +144,8 @@ class MercadoPagoClient {
                 ],
                 
                 // Configurações adicionais para PIX
-                'date_of_expiration' => gmdate('Y-m-d\TH:i:s.000\Z', strtotime('+30 minutes')), // PIX expira em 30 minutos
-                'statement_descriptor' => 'KLUBECASH', // Aparece no extrato do cliente
+                'date_of_expiration' => gmdate('Y-m-d\TH:i:s.000\Z', strtotime('+30 minutes')),
+                'statement_descriptor' => 'KLUBECASH',
                 'notification_url' => defined('MP_WEBHOOK_URL') && !empty(MP_WEBHOOK_URL) ? MP_WEBHOOK_URL : null
             ];
             
@@ -138,6 +153,7 @@ class MercadoPagoClient {
             if (!empty($data['payer_phone'])) {
                 $phoneData = $this->parsePhoneNumber($data['payer_phone']);
                 $payload['payer']['phone'] = $phoneData;
+                error_log("MP: Telefone adicionado: " . json_encode($phoneData));
             }
             
             // ADICIONAR CPF/CNPJ SE DISPONÍVEL (MELHORA MUITO A APROVAÇÃO)
@@ -146,20 +162,20 @@ class MercadoPagoClient {
                     'type' => strlen(preg_replace('/\D/', '', $data['payer_cpf'])) <= 11 ? 'CPF' : 'CNPJ',
                     'number' => preg_replace('/\D/', '', $data['payer_cpf'])
                 ];
+                error_log("MP: Identificação adicionada: " . json_encode($payload['payer']['identification']));
             }
             
             // ADICIONAR ENDEREÇO SE DISPONÍVEL (MELHORA APROVAÇÃO)
             if (!empty($data['payer_address'])) {
                 $payload['payer']['address'] = $this->parseAddress($data['payer_address']);
+                error_log("MP: Endereço adicionado: " . json_encode($payload['payer']['address']));
             }
             
-            // Removido: O parâmetro 'device_id' não é aceito pela API do Mercado Pago para pagamentos PIX (Erro 400).
-            
-            // ADICIONAR INFORMAÇÕES EXTRAS DO PAGADOR
-            if (!empty($data['payer_registration_date'])) {
-                $payload['additional_info']['payer'] = [
-                    'registration_date' => $data['payer_registration_date']
-                ];
+            // ADICIONAR DEVICE ID (OBRIGATÓRIO PARA QUALIDADE)
+            if (!empty($data['device_id'])) {
+                // Device ID vai no nível raiz para PIX
+                $payload['device_id'] = $data['device_id'];
+                error_log("MP: Device ID adicionado: " . $data['device_id']);
             }
             
             // Adicionar campos opcionais se foram fornecidos
@@ -172,21 +188,23 @@ class MercadoPagoClient {
             }
             
             // Metadados para armazenar informações extras
-            if (!empty($data['payment_id']) || !empty($data['store_id'])) {
-                $payload['metadata'] = [];
-                if (!empty($data['payment_id'])) {
-                    $payload['metadata']['payment_id'] = (string) $data['payment_id'];
-                }
-                if (!empty($data['store_id'])) {
-                    $payload['metadata']['store_id'] = (string) $data['store_id'];
-                }
-                $payload['metadata']['created_at'] = date('Y-m-d H:i:s');
-                $payload['metadata']['source'] = 'Klube Cash v2.0';
+            $payload['metadata'] = [
+                'integration' => 'KlubeCash_v2.1',
+                'payment_type' => 'commission',
+                'created_at' => date('Y-m-d H:i:s'),
+                'source' => 'store_payment'
+            ];
+            
+            if (!empty($data['payment_id'])) {
+                $payload['metadata']['payment_id'] = (string) $data['payment_id'];
+            }
+            if (!empty($data['store_id'])) {
+                $payload['metadata']['store_id'] = (string) $data['store_id'];
             }
             
-            // Log para debug (mascarando dados sensíveis)
+            // Log final para debug (mascarando dados sensíveis)
             $logPayload = $this->maskSensitiveData($payload);
-            error_log("MP createPixPayment - Payload COMPLETO: " . json_encode($logPayload, JSON_PRETTY_PRINT));
+            error_log("MP createPixPayment - Payload FINAL: " . json_encode($logPayload, JSON_PRETTY_PRINT));
             
             // Fazer a requisição para o Mercado Pago
             $response = $this->makeRequest('POST', self::ENDPOINTS['payments'], $payload);
@@ -212,19 +230,49 @@ class MercadoPagoClient {
      * Extrair primeiro nome de um nome completo
      */
     private function extractFirstName($fullName) {
-        $names = explode(' ', trim($fullName));
-        return !empty($names[0]) ? $names[0] : 'Cliente';
+        if (empty($fullName) || trim($fullName) === '') {
+            return 'Cliente'; // Fallback obrigatório
+        }
+        
+        $names = array_filter(explode(' ', trim($fullName)));
+        $firstName = !empty($names[0]) ? trim($names[0]) : 'Cliente';
+        
+        // Validar se tem pelo menos 2 caracteres
+        if (strlen($firstName) < 2) {
+            return 'Cliente';
+        }
+        
+        // Remover caracteres especiais, manter apenas letras
+        $firstName = preg_replace('/[^a-zA-ZÀ-ÿ\s]/', '', $firstName);
+        
+        return !empty($firstName) ? $firstName : 'Cliente';
     }
     
     /**
      * Extrair sobrenome de um nome completo
      */
     private function extractLastName($fullName) {
-        $names = array_filter(explode(' ', trim($fullName)));
-        if (count($names) <= 1) {
-            return 'Klube Cash';
+        if (empty($fullName) || trim($fullName) === '') {
+            return 'KlubeCash'; // Fallback obrigatório
         }
-        return implode(' ', array_slice($names, 1));
+        
+        $names = array_filter(explode(' ', trim($fullName)));
+        
+        if (count($names) <= 1) {
+            return 'KlubeCash';
+        }
+        
+        $lastName = implode(' ', array_slice($names, 1));
+        
+        // Validar se tem pelo menos 2 caracteres
+        if (strlen($lastName) < 2) {
+            return 'KlubeCash';
+        }
+        
+        // Remover caracteres especiais, manter apenas letras
+        $lastName = preg_replace('/[^a-zA-ZÀ-ÿ\s]/', '', $lastName);
+        
+        return !empty($lastName) ? $lastName : 'KlubeCash';
     }
     
     /**

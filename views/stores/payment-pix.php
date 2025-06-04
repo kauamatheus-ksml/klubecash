@@ -55,7 +55,8 @@ $activeMenu = 'payment-pix';
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
     <link rel="stylesheet" href="../../assets/css/views/stores/payment-pix.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <script src="../../assets/js/mercadopago-device.js?v=2.1.0"></script>
+    
+    <script src="../../assets/js/mercadopago-sdk.js?v=2.1.0"></script>
 </head>
 <body>
     <?php include_once '../components/sidebar-store.php'; ?>

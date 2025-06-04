@@ -202,6 +202,43 @@ define('LOG_MP_RESPONSES', true); // Log de todas as respostas MP
 define('LOG_WEBHOOK_EVENTS', true); // Log de eventos de webhook
 define('LOG_QUALITY_METRICS', true); // Log de métricas de qualidade
 
+
+
+// === MERCADO PAGO SDK CONFIGURATION ===
+define('MP_SDK_VERSION', 'v2');
+define('MP_SDK_URL', 'https://sdk.mercadopago.com/js/v2');
+define('MP_FRONTEND_SDK_ENABLED', true);
+define('MP_BACKEND_SDK_ENABLED', true);
+define('MP_PCI_COMPLIANCE_MODE', true);
+
+// === CERTIFICADOS E SEGURANÇA ===
+define('SSL_ENABLED', true);
+define('TLS_VERSION', '1.2+');
+define('PCI_DSS_COMPLIANT', true);
+define('HTTPS_ONLY', true);
+
+// === DEVICE ID CONFIGURATION ===
+define('DEVICE_ID_PREFIX', 'klube_web_');
+define('DEVICE_ID_ALGORITHM', 'enhanced');
+define('DEVICE_ID_STORAGE', 'multi'); // localStorage + sessionStorage + cookie
+
+// Funções helper para certificados
+function is_ssl_enabled() {
+    return isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
+}
+
+function get_tls_version() {
+    return $_SERVER['SSL_PROTOCOL'] ?? 'unknown';
+}
+
+function validate_pci_compliance() {
+    return is_ssl_enabled() && 
+           (strpos(get_tls_version(), '1.2') !== false || 
+            strpos(get_tls_version(), '1.3') !== false);
+}
+
+
+
 // === FUNÇÕES HELPER OTIMIZADAS ===
 function asset($path, $versioned = true) {
     $url = SITE_URL . '/assets/' . ltrim($path, '/');
