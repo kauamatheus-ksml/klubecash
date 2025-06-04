@@ -3,7 +3,7 @@
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../config/constants.php';
 require_once __DIR__ . '/../config/email.php';
-require_once __DIR__ . '/../utils/Validator.php';
+require_once __DIR__ . '/../utils/Validator.php'; // ADICIONAR ESTA LINHA
 require_once __DIR__ . '/AuthController.php';
 
 /**
@@ -578,82 +578,135 @@ class ClientController {
      */
     public static function getProfileData($userId) {
         try {
-            // Verificar se é um cliente válido
-            if (!self::validateClient($userId)) {
-                return ['status' => false, 'message' => 'Cliente não encontrado ou inativo.'];
-            }
+            error_log('Iniciando getProfileData para usuário ID: ' . $userId);
             
             $db = Database::getConnection();
             
-            // Obter dados do perfil
-            $stmt = $db->prepare("
+            // NOVO: Verificar se a coluna CPF existe antes de tentar consultar
+            try {
+                $checkColumnStmt = $db->prepare("SHOW COLUMNS FROM usuarios LIKE 'cpf'");
+                $checkColumnStmt->execute();
+                $cpfColumnExists = $checkColumnStmt->rowCount() > 0;
+                error_log('Coluna CPF existe na consulta getProfileData: ' . ($cpfColumnExists ? 'SIM' : 'NÃO'));
+                
+                if (!$cpfColumnExists) {
+                    error_log('Criando coluna CPF durante getProfileData...');
+                    $db->exec("ALTER TABLE usuarios ADD COLUMN cpf VARCHAR(14) NULL AFTER telefone");
+                    error_log('Coluna CPF criada com sucesso durante getProfileData');
+                }
+            } catch (Exception $e) {
+                error_log('Erro ao verificar/criar coluna CPF durante getProfileData: ' . $e->getMessage());
+            }
+            
+            // Buscar dados principais (ATUALIZADO para incluir CPF)
+            $sql = "
                 SELECT u.nome, u.email, u.cpf, u.telefone, u.status, u.data_criacao, u.ultimo_login
                 FROM usuarios u 
                 WHERE u.id = :id
-            ");
-            $stmt->bindParam(':user_id', $userId);
-            $tipo = USER_TYPE_CLIENT;
-            $stmt->bindParam(':tipo', $tipo);
-            $stmt->execute();
-            $profileData = $stmt->fetch(PDO::FETCH_ASSOC);
+            ";
             
-            if (!$profileData) {
-                return ['status' => false, 'message' => 'Perfil não encontrado.'];
+            error_log('SQL para buscar dados do usuário: ' . $sql);
+            
+            $stmt = $db->prepare($sql);
+            $stmt->bindParam(':id', $userId);
+            $executeResult = $stmt->execute();
+            
+            error_log('Resultado da execução da consulta principal: ' . ($executeResult ? 'SUCESSO' : 'FALHA'));
+            
+            if (!$executeResult) {
+                $errorInfo = $stmt->errorInfo();
+                error_log('Erro na consulta principal: ' . print_r($errorInfo, true));
+                return ['status' => false, 'message' => 'Erro na consulta principal: ' . $errorInfo[2]];
             }
             
-            // Obter estatísticas do cliente
-            $statsStmt = $db->prepare("
-                SELECT 
-                    SUM(valor_cashback) as total_cashback,
-                    COUNT(*) as total_transacoes,
-                    SUM(valor_total) as total_compras,
-                    COUNT(DISTINCT loja_id) as total_lojas_utilizadas
-                FROM transacoes_cashback
-                WHERE usuario_id = :user_id AND status = :status
-            ");
-            $statsStmt->bindParam(':user_id', $userId);
-            $status = TRANSACTION_APPROVED;
-            $statsStmt->bindParam(':status', $status);
-            $statsStmt->execute();
-            $statistics = $statsStmt->fetch(PDO::FETCH_ASSOC);
+            if ($stmt->rowCount() === 0) {
+                error_log('Usuário não encontrado com ID: ' . $userId);
+                return ['status' => false, 'message' => 'Usuário não encontrado'];
+            }
             
-            // Obter informações adicionais do cliente
-            $addressStmt = $db->prepare("
-                SELECT *
-                FROM usuarios_endereco
-                WHERE usuario_id = :user_id
-                ORDER BY principal DESC
-                LIMIT 1
-            ");
-            $addressStmt->bindParam(':user_id', $userId);
-            $addressStmt->execute();
-            $address = $addressStmt->fetch(PDO::FETCH_ASSOC);
+            $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
+            error_log('Dados do usuário encontrados: ' . print_r($usuario, true));
             
-            // Verificar se existe tabela de informações adicionais
-            $contactStmt = $db->prepare("
-                SELECT *
-                FROM usuarios_contato
-                WHERE usuario_id = :user_id
-                LIMIT 1
-            ");
-            $contactStmt->bindParam(':user_id', $userId);
-            $contactStmt->execute();
-            $contact = $contactStmt->fetch(PDO::FETCH_ASSOC);
+            // Buscar dados de contato
+            try {
+                $contatoStmt = $db->prepare("
+                    SELECT telefone, celular, email_alternativo 
+                    FROM usuarios_contato 
+                    WHERE usuario_id = :id
+                ");
+                $contatoStmt->bindParam(':id', $userId);
+                $contatoStmt->execute();
+                $contato = $contatoStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+                error_log('Dados de contato: ' . print_r($contato, true));
+            } catch (Exception $e) {
+                error_log('Erro ao buscar contato: ' . $e->getMessage());
+                $contato = [];
+            }
             
-            // Consolidar dados
-            return [
+            // Buscar endereço
+            try {
+                $enderecoStmt = $db->prepare("
+                    SELECT cep, logradouro, numero, complemento, bairro, cidade, estado 
+                    FROM usuarios_endereco 
+                    WHERE usuario_id = :id AND principal = 1
+                ");
+                $enderecoStmt->bindParam(':id', $userId);
+                $enderecoStmt->execute();
+                $endereco = $enderecoStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+                error_log('Dados de endereço: ' . print_r($endereco, true));
+            } catch (Exception $e) {
+                error_log('Erro ao buscar endereço: ' . $e->getMessage());
+                $endereco = [];
+            }
+            
+            // Buscar estatísticas
+            try {
+                $statsStmt = $db->prepare("
+                    SELECT 
+                        COALESCE(SUM(valor_cashback), 0) as total_cashback,
+                        COUNT(*) as total_transacoes,
+                        COALESCE(SUM(valor_total), 0) as total_compras,
+                        COUNT(DISTINCT loja_id) as total_lojas_utilizadas
+                    FROM transacoes_cashback 
+                    WHERE usuario_id = :id AND status = 'aprovado'
+                ");
+                $statsStmt->bindParam(':id', $userId);
+                $statsStmt->execute();
+                $estatisticas = $statsStmt->fetch(PDO::FETCH_ASSOC) ?: [
+                    'total_cashback' => 0,
+                    'total_transacoes' => 0,
+                    'total_compras' => 0,
+                    'total_lojas_utilizadas' => 0
+                ];
+                error_log('Estatísticas: ' . print_r($estatisticas, true));
+            } catch (Exception $e) {
+                error_log('Erro ao buscar estatísticas: ' . $e->getMessage());
+                $estatisticas = [
+                    'total_cashback' => 0,
+                    'total_transacoes' => 0,
+                    'total_compras' => 0,
+                    'total_lojas_utilizadas' => 0
+                ];
+            }
+            
+            $resultado = [
                 'status' => true,
                 'data' => [
-                    'perfil' => $profileData,
-                    'estatisticas' => $statistics,
-                    'endereco' => $address ?: null,
-                    'contato' => $contact ?: null
+                    'perfil' => $usuario,
+                    'contato' => $contato,
+                    'endereco' => $endereco,
+                    'estatisticas' => $estatisticas
                 ]
             ];
             
-        } catch (PDOException $e) {
-            error_log('Erro ao obter dados do perfil: ' . $e->getMessage());
-            return ['status' => false, 'message' => 'Erro ao carregar dados do perfil. Tente novamente.'];
+            error_log('Dados completos do perfil: ' . print_r($resultado, true));
+            
+            return $resultado;
+            
+        } catch (Exception $e) {
+            error_log('ERRO DETALHADO em getProfileData: ' . $e->getMessage());
+            error_log('Stack trace: ' . $e->getTraceAsString());
+            return ['status' => false, 'message' => 'Erro ao carregar dados do perfil: ' . $e->getMessage()];
         }
     }
     
