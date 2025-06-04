@@ -58,6 +58,8 @@ define('TOKEN_EXPIRATION', 7200);
 define('MP_PUBLIC_KEY', 'APP_USR-60bd9502-2ea5-46c8-80b5-765f10277949'); // Chave pública de Producao
 define('MP_ACCESS_TOKEN', 'APP_USR-8622491157025652-060223-01208b007f3c9b708958e846841e0a63-2320640278'); // Access token de producao
 define('MP_WEBHOOK_URL', SITE_URL . '/api/mercadopago-webhook');
+// NOVA LINHA PARA ADICIONAR:
+define('MP_WEBHOOK_SECRET', '21c03ffb0010adca8e57a0b9fcf30855191d44008baa16b757d9104ed5bfce5b'); // Obter no painel do MP
 
 // === URLs MERCADO PAGO ===
 define('MP_CREATE_PAYMENT_URL', SITE_URL . '/api/mercadopago?action=create_payment');

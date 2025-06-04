@@ -1,11 +1,11 @@
 <?php
 // api/refunds.php
 header('Content-Type: application/json; charset=UTF-8');
+header('Content-Type: application/json');
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../config/constants.php';
 require_once __DIR__ . '/../controllers/AuthController.php';
 require_once __DIR__ . '/../utils/MercadoPagoClient.php';
-
 session_start();
 
 $method = $_SERVER['REQUEST_METHOD'];
@@ -157,31 +157,26 @@ function approveRefund() {
         $db = Database::getConnection();
         
         // Buscar dados da devolução
-        $stmt = $db->prepare("
-            SELECT * FROM pagamentos_devolucoes 
-            WHERE id = ? AND status = 'solicitado'
-        ");
+        $stmt = $db->prepare("SELECT * FROM pagamentos_devolucoes WHERE id = ? AND status = 'solicitado'");
         $stmt->execute([$refundId]);
         $refund = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if (!$refund) {
-            echo json_encode(['status' => false, 'message' => 'Devolução não encontrada ou não está pendente']);
+            echo json_encode(['status' => false, 'message' => 'Devolução não encontrada']);
             return;
         }
         
-        // Atualizar status para processando
-        $updateStmt = $db->prepare("
-            UPDATE pagamentos_devolucoes 
-            SET status = 'processando', aprovado_por = ?, observacao_admin = ?
-            WHERE id = ?
-        ");
-        $updateStmt->execute([AuthController::getCurrentUserId(), $observation, $refundId]);
-        
-        // Fazer solicitação para Mercado Pago
+        // AQUI É ONDE VAI O CÓDIGO 1 - CRIAR DEVOLUÇÃO
+        require_once __DIR__ . '/../utils/MercadoPagoClient.php';
         $mpClient = new MercadoPagoClient();
+        
+        // Determinar se é devolução total ou parcial
+        $amount = ($refund['tipo'] === 'parcial') ? $refund['valor_devolucao'] : null;
+        
+        // Criar devolução no Mercado Pago
         $mpResponse = $mpClient->createRefund(
-            $refund['mp_payment_id'],
-            $refund['valor_devolucao'],
+            $refund['mp_payment_id'], 
+            $amount, 
             $refund['motivo']
         );
         
@@ -206,20 +201,9 @@ function approveRefund() {
                 'data' => $mpRefundData
             ]);
         } else {
-            // Erro no MP - voltar status para solicitado
-            $errorStmt = $db->prepare("
-                UPDATE pagamentos_devolucoes 
-                SET status = 'erro', observacao_admin = ?
-                WHERE id = ?
-            ");
-            $errorStmt->execute([
-                'Erro no Mercado Pago: ' . $mpResponse['message'],
-                $refundId
-            ]);
-            
             echo json_encode([
                 'status' => false,
-                'message' => 'Erro ao processar devolução no Mercado Pago: ' . $mpResponse['message']
+                'message' => 'Erro no Mercado Pago: ' . $mpResponse['message']
             ]);
         }
         
@@ -288,13 +272,28 @@ function checkRefundStatus() {
             return;
         }
         
-        // Se tem MP refund ID, verificar status no MP
-        if ($refund['mp_refund_id']) {
+        // AQUI É ONDE VAI O CÓDIGO 2 - CONSULTAR STATUS
+        if ($refund['mp_refund_id'] && $refund['mp_payment_id']) {
+            require_once __DIR__ . '/../utils/MercadoPagoClient.php';
             $mpClient = new MercadoPagoClient();
+            
+            // Consultar status específico da devolução
             $mpStatus = $mpClient->getRefundStatus($refund['mp_payment_id'], $refund['mp_refund_id']);
             
             if ($mpStatus['status']) {
                 $refund['mp_status'] = $mpStatus['data'];
+                
+                // Atualizar status local se necessário
+                $currentMpStatus = $mpStatus['data']['status'];
+                if ($currentMpStatus !== $refund['status']) {
+                    $newStatus = ($currentMpStatus === 'approved') ? 'aprovado' : 
+                                ($currentMpStatus === 'rejected') ? 'rejeitado' : 'processando';
+                    
+                    $updateStmt = $db->prepare("UPDATE pagamentos_devolucoes SET status = ? WHERE id = ?");
+                    $updateStmt->execute([$newStatus, $refundId]);
+                    
+                    $refund['status'] = $newStatus;
+                }
             }
         }
         
