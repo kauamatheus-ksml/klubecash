@@ -15,7 +15,6 @@ session_start();
 
 // Verificar se o usuário está logado e é uma loja
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION['user_type'] !== 'loja') {
-    // Redirecionar para a página de login com mensagem de erro
     header("Location: " . LOGIN_URL . "?error=acesso_restrito");
     exit;
 }
@@ -79,7 +78,7 @@ if ($result['status'] && isset($result['data']['pagamentos'])) {
         
         if ($payment['status'] === 'aprovado') {
             $totalAprovados++;
-        } elseif ($payment['status'] === 'pendente') {
+        } elseif (in_array($payment['status'], ['pendente', 'pix_aguardando'])) {
             $totalPendentes++;
         } elseif ($payment['status'] === 'rejeitado') {
             $totalRejeitados++;
@@ -118,14 +117,6 @@ $metodosPagamento = [
             <div class="dashboard-header">
                 <h1>Histórico de Pagamentos</h1>
                 <p class="subtitle">Acompanhe todos os pagamentos de comissões realizados para <?php echo htmlspecialchars($storeName); ?></p>
-            </div>
-            
-            <!-- Notificação de Auto-verificação -->
-            <div id="autoCheckNotification" class="alert alert-info" style="display: none;">
-                <div class="alert-content">
-                    <span class="alert-icon">🔄</span>
-                    <span>Verificando status dos pagamentos PIX automaticamente...</span>
-                </div>
             </div>
             
             <!-- Cards de estatísticas -->
@@ -216,10 +207,6 @@ $metodosPagamento = [
                 <div class="card-header">
                     <div class="card-title">Histórico de Pagamentos</div>
                     <div style="display: flex; gap: 1rem;">
-                        <button id="checkAllPixPayments" class="btn btn-info">
-                            <span style="margin-right: 5px;">🔄</span>
-                            Verificar Status PIX
-                        </button>
                         <button id="refreshPayments" class="btn btn-secondary">
                             <span style="margin-right: 5px;">↻</span>
                             Atualizar Lista
@@ -245,7 +232,7 @@ $metodosPagamento = [
                             </thead>
                             <tbody>
                                 <?php foreach ($result['data']['pagamentos'] as $payment): ?>
-                                    <tr id="payment-row-<?php echo $payment['id']; ?>">
+                                    <tr>
                                         <td><?php echo $payment['id']; ?></td>
                                         <td><?php echo date('d/m/Y H:i', strtotime($payment['data_registro'])); ?></td>
                                         <td>
@@ -273,7 +260,7 @@ $metodosPagamento = [
                                         </td>
                                         <td><?php echo isset($metodosPagamento[$payment['metodo_pagamento']]) ? $metodosPagamento[$payment['metodo_pagamento']] : $payment['metodo_pagamento']; ?></td>
                                         <td>
-                                            <span class="status-badge status-<?php echo $payment['status']; ?>" id="status-badge-<?php echo $payment['id']; ?>">
+                                            <span class="status-badge status-<?php echo $payment['status']; ?>">
                                                 <?php 
                                                     switch($payment['status']) {
                                                         case 'aprovado':
@@ -303,7 +290,7 @@ $metodosPagamento = [
                                             </div>
                                         </td>
                                         <td>
-                                            <div class="action-buttons" id="action-buttons-<?php echo $payment['id']; ?>">
+                                            <div class="action-buttons">
                                                 <button class="btn btn-action" onclick="viewPaymentDetails(<?php echo $payment['id']; ?>)">Detalhes</button>
                                                 
                                                 <?php if (!empty($payment['comprovante'])): ?>
@@ -311,17 +298,14 @@ $metodosPagamento = [
                                                 <?php endif; ?>
                                                 
                                                 <?php if (in_array($payment['status'], ['pix_aguardando', 'pendente']) && $payment['metodo_pagamento'] === 'pix_mercadopago' && !empty($payment['mp_payment_id'])): ?>
-                                                    <!-- Verificar status antes de mostrar continuar pagamento -->
-                                                    <button class="btn btn-action btn-info check-pix-status" 
-                                                            data-payment-id="<?php echo $payment['id']; ?>" 
-                                                            data-mp-payment-id="<?php echo $payment['mp_payment_id']; ?>">
+                                                    <button class="btn btn-action btn-info" 
+                                                            onclick="checkPixStatus('<?php echo $payment['mp_payment_id']; ?>', <?php echo $payment['id']; ?>)">
                                                         <span style="margin-right: 5px;">🔍</span>
                                                         Verificar Status
                                                     </button>
                                                     
                                                     <a href="<?php echo STORE_PAYMENT_PIX_URL; ?>?payment_id=<?php echo $payment['id']; ?>" 
-                                                       class="btn btn-action btn-success continue-pix-payment"
-                                                       id="continue-pix-<?php echo $payment['id']; ?>">
+                                                       class="btn btn-action btn-success">
                                                         <span style="margin-right: 5px;">🔄</span>
                                                         Continuar Pagamento PIX
                                                     </a>
@@ -379,7 +363,7 @@ $metodosPagamento = [
             <div class="card info-card collapsible-card">
                 <div class="card-header collapsible-header" onclick="toggleInfoSection()">
                     <div class="card-title">
-                        <span>📋 Informações sobre Pagamentos e Saldo</span>
+                        <span>📋 Informações sobre Pagamentos PIX</span>
                         <span class="dropdown-icon" id="infoDropdownIcon">▼</span>
                     </div>
                 </div>
@@ -393,7 +377,7 @@ $metodosPagamento = [
                             </div>
                             <div class="status-item">
                                 <span class="status-badge status-pix_aguardando">PIX Aguardando</span>
-                                <p>O PIX foi gerado e está aguardando o pagamento. Use "Verificar Status" para atualizar.</p>
+                                <p>O PIX foi gerado e está aguardando o pagamento. O sistema atualiza automaticamente via webhook.</p>
                             </div>
                             <div class="status-item">
                                 <span class="status-badge status-aprovado">Aprovado</span>
@@ -401,8 +385,19 @@ $metodosPagamento = [
                             </div>
                             <div class="status-item">
                                 <span class="status-badge status-rejeitado">Rejeitado</span>
-                                <p>O pagamento foi rejeitado pelo administrador. Verifique o motivo nos detalhes e faça um novo pagamento.</p>
+                                <p>O pagamento foi rejeitado. Verifique o motivo nos detalhes e faça um novo pagamento.</p>
                             </div>
+                        </div>
+                        
+                        <div class="info-section">
+                            <h4>🔄 Como Funciona o Webhook (Automático):</h4>
+                            <ul>
+                                <li><strong>Instantâneo:</strong> Quando você paga o PIX, o Mercado Pago notifica nosso sistema automaticamente</li>
+                                <li><strong>Sem Espera:</strong> Não precisa ficar atualizando a página - o sistema processa sozinho</li>
+                                <li><strong>Aprovação Automática:</strong> PIX aprovado = cashback liberado imediatamente</li>
+                                <li><strong>Verificação Manual:</strong> Use o botão "Verificar Status" apenas se suspeitar de problema</li>
+                                <li><strong>Atualizar Lista:</strong> Use o botão "Atualizar Lista" para ver as últimas mudanças</li>
+                            </ul>
                         </div>
                         
                         <div class="info-section">
@@ -416,44 +411,34 @@ $metodosPagamento = [
                         </div>
                         
                         <div class="info-section">
-                            <h4>🔄 Verificação de Status PIX:</h4>
-                            <ul>
-                                <li><strong>Automática:</strong> O sistema verifica automaticamente os pagamentos PIX pendentes a cada 30 segundos</li>
-                                <li><strong>Manual:</strong> Use o botão "Verificar Status" para forçar uma verificação imediata</li>
-                                <li><strong>Aprovação:</strong> Pagamentos PIX são aprovados automaticamente após confirmação</li>
-                                <li><strong>Atualização:</strong> A página se atualiza automaticamente quando um pagamento é confirmado</li>
-                            </ul>
-                        </div>
-                        
-                        <div class="info-section">
                             <h4>🔄 Processo de Pagamento:</h4>
                             <ol>
-                                <li>Você seleciona transações pendentes e realiza o pagamento</li>
-                                <li>A comissão é calculada sobre o valor efetivamente cobrado (descontando saldo usado)</li>
-                                <li>O administrador analisa e aprova/rejeita o pagamento</li>
-                                <li>Após aprovação, o cashback é liberado para os clientes</li>
+                                <li>Você seleciona transações pendentes e gera o PIX</li>
+                                <li>Paga o PIX no seu aplicativo bancário</li>
+                                <li>Mercado Pago confirma o pagamento automaticamente</li>
+                                <li>Sistema libera o cashback para os clientes imediatamente</li>
+                                <li>Status muda para "Aprovado" automaticamente</li>
                             </ol>
                         </div>
                         
                         <div class="info-section">
                             <h4>↩️ Solicitação de Devolução:</h4>
                             <ul>
-                                <li>Você pode solicitar devolução de pagamentos aprovados via PIX Mercado Pago</li>
-                                <li>As devoluções podem ser totais ou parciais</li>
-                                <li>O administrador precisa aprovar a solicitação de devolução</li>
-                                <li>O cashback dos clientes será revertido após devolução aprovada</li>
+                                <li>Disponível apenas para pagamentos aprovados via PIX</li>
+                                <li>Devoluções podem ser totais ou parciais</li>
+                                <li>Administrador precisa aprovar a solicitação</li>
+                                <li>Cashback dos clientes será revertido após devolução aprovada</li>
                             </ul>
                         </div>
                         
                         <div class="info-section">
                             <h4>ℹ️ Dicas Importantes:</h4>
                             <ul>
-                                <li>Mantenha seus comprovantes de pagamento organizados</li>
-                                <li>Realize pagamentos regularmente para liberar o cashback dos clientes</li>
-                                <li>Em caso de rejeição, verifique o motivo e faça um novo pagamento</li>
-                                <li>O valor da comissão é sempre calculado sobre o valor efetivamente pago pelo cliente</li>
-                                <li>Solicite devoluções apenas quando necessário, pois afeta o cashback dos clientes</li>
-                                <li><strong>PIX:</strong> Se o status não atualizar automaticamente, use "Verificar Status" manualmente</li>
+                                <li><strong>Webhook Eficiente:</strong> Sistema atualiza automaticamente - não precisa verificar constantemente</li>
+                                <li><strong>PIX Rápido:</strong> Pagamentos PIX são processados em segundos</li>
+                                <li><strong>Monitoramento:</strong> Acompanhe o status sem gastar recursos do sistema</li>
+                                <li><strong>Verificação Manual:</strong> Use apenas quando necessário</li>
+                                <li><strong>Transparência:</strong> Todos os status são atualizados automaticamente</li>
                             </ul>
                         </div>
                     </div>
@@ -556,108 +541,31 @@ $metodosPagamento = [
     
     <script>
         let currentRefundData = null;
-        let autoCheckInterval = null;
         
-        // Inicializar verificação automática quando a página carrega
+        // Configurar event listeners quando página carrega
         document.addEventListener('DOMContentLoaded', function() {
-            setupAutoPixStatusCheck();
             setupEventListeners();
         });
         
-        // Configurar verificação automática de status PIX
-        function setupAutoPixStatusCheck() {
-            // Verificar se há pagamentos PIX pendentes
-            const pixPayments = document.querySelectorAll('.check-pix-status');
-            
-            if (pixPayments.length > 0) {
-                showAutoCheckNotification(true);
-                
-                // Verificar imediatamente
-                checkAllPixPayments();
-                
-                // Configurar verificação automática a cada 30 segundos
-                autoCheckInterval = setInterval(() => {
-                    checkAllPixPayments();
-                }, 30000);
-                
-                // Parar após 10 minutos para não sobrecarregar
-                setTimeout(() => {
-                    if (autoCheckInterval) {
-                        clearInterval(autoCheckInterval);
-                        showAutoCheckNotification(false);
-                        console.log('Auto-verificação PIX parada após 10 minutos');
-                    }
-                }, 600000);
-            }
-        }
-        
-        // Mostrar/esconder notificação de auto-verificação
-        function showAutoCheckNotification(show) {
-            const notification = document.getElementById('autoCheckNotification');
-            if (show) {
-                notification.style.display = 'block';
-            } else {
-                notification.style.display = 'none';
-            }
-        }
-        
         // Configurar event listeners
         function setupEventListeners() {
-            // Botão de verificar todos os PIX
-            document.getElementById('checkAllPixPayments').addEventListener('click', function() {
-                checkAllPixPayments();
-            });
-            
             // Botão de atualizar lista
             document.getElementById('refreshPayments').addEventListener('click', function() {
-                window.location.reload();
-            });
-            
-            // Botões individuais de verificar status
-            document.querySelectorAll('.check-pix-status').forEach(button => {
-                button.addEventListener('click', function() {
-                    const paymentId = this.dataset.paymentId;
-                    const mpPaymentId = this.dataset.mpPaymentId;
-                    checkSinglePixStatus(paymentId, mpPaymentId);
-                });
+                showNotification('Atualizando lista de pagamentos...', 'info');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 500);
             });
         }
         
-        // Verificar status de todos os pagamentos PIX pendentes
-        async function checkAllPixPayments() {
-            const pixButtons = document.querySelectorAll('.check-pix-status');
-            
-            if (pixButtons.length === 0) {
-                showNotification('Nenhum pagamento PIX pendente encontrado', 'info');
-                return;
-            }
-            
-            showNotification(`Verificando status de ${pixButtons.length} pagamento(s) PIX...`, 'info');
-            
-            for (const button of pixButtons) {
-                const paymentId = button.dataset.paymentId;
-                const mpPaymentId = button.dataset.mpPaymentId;
-                await checkSinglePixStatus(paymentId, mpPaymentId, false); // false = não mostrar notificação individual
-                
-                // Pequeno delay entre verificações
-                await new Promise(resolve => setTimeout(resolve, 500));
-            }
-        }
-        
-        // Verificar status de um pagamento PIX específico
-        async function checkSinglePixStatus(paymentId, mpPaymentId, showIndividualNotification = true) {
+        // Verificar status PIX específico (apenas quando solicitado manualmente)
+        async function checkPixStatus(mpPaymentId, paymentId) {
             if (!mpPaymentId) {
-                if (showIndividualNotification) {
-                    showNotification('ID do pagamento MP não encontrado', 'error');
-                }
+                showNotification('ID do pagamento MP não encontrado', 'error');
                 return;
             }
             
-            const button = document.querySelector(`[data-payment-id="${paymentId}"]`);
-            if (button) {
-                button.disabled = true;
-                button.innerHTML = '<span style="margin-right: 5px;">⏳</span>Verificando...';
-            }
+            showNotification('Verificando status do pagamento PIX...', 'info');
             
             try {
                 const response = await fetch(`../../api/mercadopago.php?action=status&mp_payment_id=${mpPaymentId}`);
@@ -668,81 +576,27 @@ $metodosPagamento = [
                     console.log(`Pagamento ${paymentId} - Status MP: ${mpStatus}`);
                     
                     if (mpStatus === 'approved') {
-                        // Pagamento aprovado - atualizar interface e notificar
-                        updatePaymentStatusInInterface(paymentId, 'aprovado');
-                        
-                        if (showIndividualNotification) {
-                            showNotification(`✅ Pagamento #${paymentId} foi aprovado! O cashback foi liberado.`, 'success');
-                        }
-                        
-                        // Recarregar página após 3 segundos para atualizar tudo
+                        showNotification(`✅ Pagamento #${paymentId} foi aprovado! Atualizando página...`, 'success');
                         setTimeout(() => {
                             window.location.reload();
-                        }, 3000);
+                        }, 2000);
                         
                     } else if (mpStatus === 'rejected' || mpStatus === 'cancelled') {
-                        updatePaymentStatusInInterface(paymentId, 'rejeitado');
-                        
-                        if (showIndividualNotification) {
-                            showNotification(`❌ Pagamento #${paymentId} foi rejeitado/cancelado`, 'error');
-                        }
+                        showNotification(`❌ Pagamento #${paymentId} foi rejeitado/cancelado`, 'error');
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 2000);
                         
                     } else {
-                        // Status ainda pendente
-                        if (showIndividualNotification) {
-                            showNotification(`⏳ Pagamento #${paymentId} ainda está pendente (${mpStatus})`, 'info');
-                        }
+                        showNotification(`⏳ Pagamento #${paymentId} ainda está pendente (${mpStatus})`, 'info');
                     }
                 } else {
-                    if (showIndividualNotification) {
-                        showNotification(`Erro ao verificar pagamento #${paymentId}: ${result.message || 'Erro desconhecido'}`, 'error');
-                    }
+                    showNotification(`Erro ao verificar pagamento: ${result.message || 'Erro desconhecido'}`, 'error');
                 }
                 
             } catch (error) {
                 console.error('Erro ao verificar status PIX:', error);
-                if (showIndividualNotification) {
-                    showNotification(`Erro de conexão ao verificar pagamento #${paymentId}`, 'error');
-                }
-            } finally {
-                // Restaurar botão
-                if (button) {
-                    button.disabled = false;
-                    button.innerHTML = '<span style="margin-right: 5px;">🔍</span>Verificar Status';
-                }
-            }
-        }
-        
-        // Atualizar status do pagamento na interface
-        function updatePaymentStatusInInterface(paymentId, newStatus) {
-            // Atualizar badge de status
-            const statusBadge = document.getElementById(`status-badge-${paymentId}`);
-            if (statusBadge) {
-                statusBadge.className = `status-badge status-${newStatus}`;
-                statusBadge.textContent = newStatus === 'aprovado' ? 'Aprovado' : 
-                                         newStatus === 'rejeitado' ? 'Rejeitado' : 
-                                         newStatus.charAt(0).toUpperCase() + newStatus.slice(1);
-            }
-            
-            // Atualizar botões de ação
-            const actionButtons = document.getElementById(`action-buttons-${paymentId}`);
-            if (actionButtons && newStatus === 'aprovado') {
-                // Remover botão de continuar pagamento e verificar status
-                const continuePix = document.getElementById(`continue-pix-${paymentId}`);
-                const checkButton = actionButtons.querySelector('.check-pix-status');
-                
-                if (continuePix) continuePix.remove();
-                if (checkButton) checkButton.remove();
-                
-                // Adicionar botão de devolução se não existir
-                const existingRefundBtn = actionButtons.querySelector('.btn-warning');
-                if (!existingRefundBtn) {
-                    const refundBtn = document.createElement('button');
-                    refundBtn.className = 'btn btn-action btn-warning';
-                    refundBtn.onclick = () => requestRefund(paymentId, '0', 'mp_payment_id_here');
-                    refundBtn.innerHTML = 'Solicitar Devolução';
-                    actionButtons.appendChild(refundBtn);
-                }
+                showNotification('Erro de conexão ao verificar pagamento', 'error');
             }
         }
         
@@ -752,35 +606,29 @@ $metodosPagamento = [
             const card = content.closest('.collapsible-card');
             
             if (content.style.display === 'none' || content.style.display === '') {
-                // Abrir
                 content.style.display = 'block';
                 content.classList.add('opening');
                 content.classList.remove('closing');
                 icon.classList.add('open');
                 card.classList.add('expanded');
                 
-                // Remover classe de animação após completar
                 setTimeout(() => {
                     content.classList.remove('opening');
                 }, 400);
                 
-                // Salvar estado no localStorage
                 localStorage.setItem('infoSectionOpen', 'true');
                 
             } else {
-                // Fechar
                 content.classList.add('closing');
                 content.classList.remove('opening');
                 icon.classList.remove('open');
                 card.classList.remove('expanded');
                 
-                // Ocultar após animação
                 setTimeout(() => {
                     content.style.display = 'none';
                     content.classList.remove('closing');
                 }, 400);
                 
-                // Salvar estado no localStorage
                 localStorage.setItem('infoSectionOpen', 'false');
             }
         }
@@ -834,7 +682,6 @@ $metodosPagamento = [
                 reason: reason.trim()
             };
             
-            // Se for devolução parcial, incluir o valor
             if (refundType === 'parcial' && refundAmount) {
                 const amount = parseFloat(refundAmount);
                 const maxAmount = parseFloat(currentRefundData.amount);
@@ -859,7 +706,6 @@ $metodosPagamento = [
                 if (result.status) {
                     showNotification('Solicitação de devolução enviada com sucesso! Aguarde a análise do administrador.', 'success');
                     closeRefundModal();
-                    // Opcional: recarregar a página para atualizar status
                     setTimeout(() => {
                         window.location.reload();
                     }, 2000);
@@ -901,10 +747,8 @@ $metodosPagamento = [
         }
         
         function showNotification(message, type) {
-            // Sistema simples de notificação - você pode melhorar isso
             const alertClass = type === 'success' ? 'success' : type === 'error' ? 'danger' : 'info';
             
-            // Criar elemento de notificação
             const notification = document.createElement('div');
             notification.className = `alert alert-${alertClass} notification-toast`;
             notification.innerHTML = `
@@ -914,10 +758,8 @@ $metodosPagamento = [
                 </div>
             `;
             
-            // Adicionar ao body
             document.body.appendChild(notification);
             
-            // Remover após 5 segundos
             setTimeout(() => {
                 if (notification.parentElement) {
                     notification.remove();
@@ -925,15 +767,14 @@ $metodosPagamento = [
             }, 5000);
         }
 
+// Manter toda a lógica dos modais igual à versão anterior
 document.addEventListener('DOMContentLoaded', function() {
-    // Elementos dos modais - obtendo referências dos elementos DOM
     const paymentDetailsModal = document.getElementById('paymentDetailsModal');
     const receiptModal = document.getElementById('receiptModal');
     const refundModal = document.getElementById('refundModal');
     const paymentDetailsContent = document.getElementById('paymentDetailsContent');
     const receiptImage = document.getElementById('receiptImage');
     
-    // Configuração dos botões de fechar modais
     const closeButtons = document.getElementsByClassName('close');
     for (let i = 0; i < closeButtons.length; i++) {
         closeButtons[i].addEventListener('click', function() {
@@ -943,7 +784,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Fechar modal quando clicar fora dela (no backdrop)
     window.addEventListener('click', function(event) {
         if (event.target === paymentDetailsModal) {
             paymentDetailsModal.style.display = 'none';
@@ -956,19 +796,15 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // Função principal para visualizar detalhes do pagamento
     window.viewPaymentDetails = function(paymentId) {
-        // Validação básica do ID do pagamento
         if (!paymentId || paymentId <= 0) {
             alert('ID do pagamento inválido');
             return;
         }
         
-        // Abrir modal e mostrar loading
         paymentDetailsModal.style.display = 'block';
         paymentDetailsContent.innerHTML = '<div class="loading-state"><div class="spinner"></div><p>Carregando detalhes...</p></div>';
         
-        // Usar TransactionController para buscar detalhes com informações de saldo
         fetch('../../controllers/TransactionController.php', {
             method: 'POST',
             headers: {
@@ -1003,7 +839,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     };
     
-    // Função para visualizar comprovante de pagamento
     window.viewReceipt = function(receiptUrl) {
         if (!receiptUrl) {
             alert('Comprovante não disponível');
@@ -1026,7 +861,6 @@ document.addEventListener('DOMContentLoaded', function() {
         };
     };
     
-    // Função para renderizar os detalhes do pagamento com informações de saldo
     function renderPaymentDetailsWithBalance(data) {
         if (!data || !data.pagamento) {
             paymentDetailsContent.innerHTML = '<div class="error-state"><p class="error">Dados do pagamento não encontrados.</p></div>';
@@ -1036,10 +870,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const payment = data.pagamento;
         const transactions = data.transacoes || [];
         
-        // Construção do HTML com informações de saldo
         let html = `
             <div class="payment-details-container">
-                <!-- Resumo do Pagamento -->
                 <div class="payment-summary">
                     <h3>💳 Resumo do Pagamento</h3>
                     <div class="summary-grid">
@@ -1070,7 +902,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                 </div>
 
-                <!-- Valores Financeiros -->
                 <div class="financial-summary">
                     <h3>💰 Resumo Financeiro</h3>
                     <div class="financial-grid">
@@ -1094,7 +925,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
         `;
         
-        // Seção de informações de aprovação/rejeição
         if (payment.status && payment.status !== 'pendente') {
             html += `
                 <div class="approval-info">
@@ -1117,7 +947,6 @@ document.addEventListener('DOMContentLoaded', function() {
             `;
         }
         
-        // Lista de transações incluídas no pagamento com informações de saldo
         html += `
             <div class="transactions-section">
                 <h3>📋 Transações Incluídas (${transactions.length})</h3>
@@ -1167,7 +996,6 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
         `;
         
-        // Observações da loja sobre o pagamento
         if (payment.observacao) {
             html += `
                 <div class="payment-notes">
@@ -1179,7 +1007,6 @@ document.addEventListener('DOMContentLoaded', function() {
             `;
         }
         
-        // Ações disponíveis para pagamentos rejeitados
         if (payment.status === 'rejeitado') {
             html += `
                 <div class="payment-actions">
@@ -1194,12 +1021,11 @@ document.addEventListener('DOMContentLoaded', function() {
             `;
         }
         
-        html += '</div>'; // Fechar payment-details-container
+        html += '</div>';
         
         paymentDetailsContent.innerHTML = html;
     }
     
-    // Funções auxiliares para formatação e segurança
     function formatDate(dateString) {
         if (!dateString) return 'N/A';
         
@@ -1263,51 +1089,8 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <style>
-/* Estilos existentes mantidos... */
+/* Mantendo todos os estilos da versão anterior, mas removendo estilos relacionados ao auto-check */
 
-/* Estilos adicionais para auto-verificação */
-.alert {
-    padding: 1rem;
-    margin-bottom: 1rem;
-    border: 1px solid transparent;
-    border-radius: 0.375rem;
-}
-
-.alert-info {
-    color: #0c5460;
-    background-color: #d1ecf1;
-    border-color: #bee5eb;
-}
-
-.alert-content {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-.alert-icon {
-    font-size: 1.2rem;
-}
-
-/* Estilos para botões de ação adiciais */
-.btn-info {
-    background-color: #17a2b8;
-    border-color: #17a2b8;
-    color: white;
-}
-
-.btn-info:hover {
-    background-color: #138496;
-    border-color: #117a8b;
-}
-
-/* Status badge para PIX aguardando */
-.status-pix_aguardando {
-    background-color: #ffc107;
-    color: #212529;
-}
-
-/* Estilos adicionais para informações de saldo */
 .stat-card-subtitle {
     font-size: 0.8rem;
     color: #6c757d;
@@ -1470,7 +1253,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 }
 
-/* Estilos especiais para quando está expandido */
 .collapsible-card.expanded {
     border-left: 4px solid var(--primary-color);
 }
@@ -1558,6 +1340,22 @@ document.addEventListener('DOMContentLoaded', function() {
 .btn-warning:hover {
     background-color: #e0a800;
     border-color: #d39e00;
+}
+
+.btn-info {
+    background-color: #17a2b8;
+    border-color: #17a2b8;
+    color: white;
+}
+
+.btn-info:hover {
+    background-color: #138496;
+    border-color: #117a8b;
+}
+
+.status-pix_aguardando {
+    background-color: #ffc107;
+    color: #212529;
 }
 
 /* Sistema de notificações */
