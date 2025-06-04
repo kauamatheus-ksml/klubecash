@@ -171,11 +171,17 @@ class MercadoPagoClient {
                 error_log("MP: Endereço adicionado: " . json_encode($payload['payer']['address']));
             }
             
-            // ADICIONAR DEVICE ID (OBRIGATÓRIO PARA QUALIDADE)
+            // ADICIONAR DATA DE REGISTRO SE DISPONÍVEL
+            if (!empty($data['payer_registration_date'])) {
+                if (!isset($payload['additional_info']['payer'])) {
+                    $payload['additional_info']['payer'] = [];
+                }
+                $payload['additional_info']['payer']['registration_date'] = $data['payer_registration_date'];
+            }
+            
+            // DEVICE ID PARA PIX VAI NOS METADADOS (NÃO NO PAYLOAD PRINCIPAL)
             if (!empty($data['device_id'])) {
-                // Device ID vai no nível raiz para PIX
-                $payload['device_id'] = $data['device_id'];
-                error_log("MP: Device ID adicionado: " . $data['device_id']);
+                error_log("MP: Device ID será adicionado aos metadados: " . $data['device_id']);
             }
             
             // Adicionar campos opcionais se foram fornecidos
@@ -187,13 +193,19 @@ class MercadoPagoClient {
                 $payload['external_reference'] = trim($data['external_reference']);
             }
             
-            // Metadados para armazenar informações extras
+            // Metadados para armazenar informações extras (INCLUINDO DEVICE_ID)
             $payload['metadata'] = [
                 'integration' => 'KlubeCash_v2.1',
                 'payment_type' => 'commission',
                 'created_at' => date('Y-m-d H:i:s'),
                 'source' => 'store_payment'
             ];
+            
+            // DEVICE ID VAI NOS METADADOS PARA PIX
+            if (!empty($data['device_id'])) {
+                $payload['metadata']['device_id'] = $data['device_id'];
+                $payload['metadata']['device_source'] = 'javascript_sdk';
+            }
             
             if (!empty($data['payment_id'])) {
                 $payload['metadata']['payment_id'] = (string) $data['payment_id'];
@@ -204,7 +216,7 @@ class MercadoPagoClient {
             
             // Log final para debug (mascarando dados sensíveis)
             $logPayload = $this->maskSensitiveData($payload);
-            error_log("MP createPixPayment - Payload FINAL: " . json_encode($logPayload, JSON_PRETTY_PRINT));
+            error_log("MP createPixPayment - Payload CORRIGIDO: " . json_encode($logPayload, JSON_PRETTY_PRINT));
             
             // Fazer a requisição para o Mercado Pago
             $response = $this->makeRequest('POST', self::ENDPOINTS['payments'], $payload);
@@ -769,16 +781,20 @@ class MercadoPagoClient {
             'Authorization: Bearer ' . $this->accessToken,
             'Content-Type: application/json',
             'Accept: application/json',
-            'User-Agent: KlubeCash/2.0 (PHP/' . PHP_VERSION . '; MP-Integration-Quality-Optimized)',
+            'User-Agent: KlubeCash/2.1 (PHP/' . PHP_VERSION . '; MP-Integration-Quality-Optimized)',
             'X-Idempotency-Key: ' . uniqid('klube_' . time() . '_', true),
-            'X-meli-session-id: ' . uniqid('session_', true), // Para tracking
-            'X-Product-Id: KLUBE_CASH_CASHBACK_SYSTEM' // Identificação do produto
+            'X-meli-session-id: ' . uniqid('session_', true),
+            'X-Product-Id: KLUBE_CASH_CASHBACK_SYSTEM'
         ];
         
-        // ADICIONAR TRACKING DE ORIGEM
+        // ADICIONAR TRACKING DE ORIGEM MELHORADO
         if (isset($_SERVER['HTTP_USER_AGENT'])) {
             $headers[] = 'X-Tracking-Id: ' . md5($_SERVER['HTTP_USER_AGENT'] . date('Y-m-d'));
         }
+        
+        // Headers específicos para melhorar aprovação
+        $headers[] = 'X-Integrator-Id: klube_cash_v2';
+        $headers[] = 'X-Platform-Id: custom_integration';
         
         error_log("MP Request: {$method} {$url}");
         
@@ -793,13 +809,13 @@ class MercadoPagoClient {
             CURLOPT_CUSTOMREQUEST => $method,
             CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_SSL_VERIFYHOST => 2,
-            CURLOPT_SSLVERSION => CURL_SSLVERSION_TLSv1_2, // FORÇAR TLS 1.2+
+            CURLOPT_SSLVERSION => CURL_SSLVERSION_TLSv1_2,
             CURLOPT_FOLLOWLOCATION => false,
             CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-            CURLOPT_USERAGENT => 'KlubeCash/2.0 MP-Quality-Optimized',
+            CURLOPT_USERAGENT => 'KlubeCash/2.1 MP-Quality-Optimized',
             CURLOPT_VERBOSE => false,
-            CURLOPT_FRESH_CONNECT => true, // Forçar nova conexão
-            CURLOPT_FORBID_REUSE => true,  // Não reutilizar conexão
+            CURLOPT_FRESH_CONNECT => true,
+            CURLOPT_FORBID_REUSE => true,
         ]);
         
         // Adicionar dados se necessário
@@ -816,7 +832,6 @@ class MercadoPagoClient {
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $curlError = curl_error($ch);
-        $curlInfo = curl_getinfo($ch);
         curl_close($ch);
         
         $responseTime = microtime(true) - $startTime;
