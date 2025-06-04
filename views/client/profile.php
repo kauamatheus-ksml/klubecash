@@ -891,29 +891,7 @@ $cpfPendente = empty($profileData['perfil']['cpf']);
                     </p>
                 <?php endif; ?>
                 
-                <div class="user-stats">
-                    <div class="stat-item">
-                        <span class="stat-value">R$ <?php echo number_format($profileData['estatisticas']['total_cashback'] ?? 0, 2, ',', '.'); ?></span>
-                        <span class="stat-label">Cashback Total</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-value"><?php echo $profileData['estatisticas']['total_transacoes'] ?? 0; ?></span>
-                        <span class="stat-label">Transações</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-value"><?php echo $profileData['estatisticas']['total_lojas_utilizadas'] ?? 0; ?></span>
-                        <span class="stat-label">Lojas Parceiras</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-value">
-                            <?php 
-                            $status = $profileData['perfil']['status'] ?? 'Ativo';
-                            echo $status === 'ativo' ? '✅ Ativo' : ucfirst($status);
-                            ?>
-                        </span>
-                        <span class="stat-label">Status da Conta</span>
-                    </div>
-                </div>
+                
             </div>
 
             <!-- Seção de formulários -->
