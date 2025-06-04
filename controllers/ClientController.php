@@ -408,9 +408,9 @@ class ClientController {
             
             // Calcular estatísticas
             $statisticsQuery = "
-                SELECT 
+                SELECT
                     SUM(valor_total) as total_compras,
-                    SUM(valor_cashback) as total_cashback,
+                    SUM(CASE WHEN status = :status_approved THEN valor_cashback ELSE 0 END) as total_cashback, /* MODIFIED LINE */
                     COUNT(*) as total_transacoes
                 FROM transacoes_cashback
                 WHERE usuario_id = :user_id
@@ -421,15 +421,17 @@ class ClientController {
                 if (isset($filters['data_inicio']) && !empty($filters['data_inicio'])) {
                     $statisticsQuery .= " AND data_transacao >= :data_inicio";
                 }
-                
+
                 if (isset($filters['data_fim']) && !empty($filters['data_fim'])) {
                     $statisticsQuery .= " AND data_transacao <= :data_fim";
                 }
-                
+
                 if (isset($filters['loja_id']) && !empty($filters['loja_id'])) {
                     $statisticsQuery .= " AND loja_id = :loja_id";
                 }
-                
+
+                // If status filter is 'aprovado', it will be applied here too
+                // If status filter is 'todos' or not present, only 'aprovado' cashback will be summed for total_cashback
                 if (isset($filters['status']) && !empty($filters['status'])) {
                     $statisticsQuery .= " AND status = :status";
                 }
@@ -439,6 +441,11 @@ class ClientController {
             foreach ($params as $param => $value) {
                 $statsStmt->bindValue($param, $value);
             }
+            // Bind the new parameter for approved status
+            $approvedStatus = TRANSACTION_APPROVED;
+            $statsStmt->bindValue(':status_approved', $approvedStatus); // NEW LINE
+
+
             $statsStmt->execute();
             $statistics = $statsStmt->fetch(PDO::FETCH_ASSOC);
             
