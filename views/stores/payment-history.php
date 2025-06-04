@@ -90,6 +90,7 @@ if ($result['status'] && isset($result['data']['pagamentos'])) {
 // Método de pagamento para exibição
 $metodosPagamento = [
     'pix' => 'PIX',
+    'pix_mercadopago' => 'PIX Mercado Pago',
     'transferencia' => 'Transferência Bancária',
     'boleto' => 'Boleto',
     'cartao' => 'Cartão de Crédito',
@@ -281,10 +282,17 @@ $metodosPagamento = [
                                             </div>
                                         </td>
                                         <td>
-                                            <button class="btn btn-action" onclick="viewPaymentDetails(<?php echo $payment['id']; ?>)">Detalhes</button>
-                                            <?php if (!empty($payment['comprovante'])): ?>
-                                                <button class="btn btn-action" onclick="viewReceipt('<?php echo htmlspecialchars($payment['comprovante']); ?>')">Comprovante</button>
-                                            <?php endif; ?>
+                                            <div class="action-buttons">
+                                                <button class="btn btn-action" onclick="viewPaymentDetails(<?php echo $payment['id']; ?>)">Detalhes</button>
+                                                <?php if (!empty($payment['comprovante'])): ?>
+                                                    <button class="btn btn-action" onclick="viewReceipt('<?php echo htmlspecialchars($payment['comprovante']); ?>')">Comprovante</button>
+                                                <?php endif; ?>
+                                                <?php if ($payment['status'] === 'aprovado' && !empty($payment['mp_payment_id'])): ?>
+                                                    <button class="btn btn-action btn-warning" onclick="requestRefund(<?php echo $payment['id']; ?>, '<?php echo $payment['valor_total']; ?>', '<?php echo $payment['mp_payment_id']; ?>')">
+                                                        Solicitar Devolução
+                                                    </button>
+                                                <?php endif; ?>
+                                            </div>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
@@ -374,12 +382,23 @@ $metodosPagamento = [
                         </div>
                         
                         <div class="info-section">
+                            <h4>↩️ Solicitação de Devolução:</h4>
+                            <ul>
+                                <li>Você pode solicitar devolução de pagamentos aprovados via PIX Mercado Pago</li>
+                                <li>As devoluções podem ser totais ou parciais</li>
+                                <li>O administrador precisa aprovar a solicitação de devolução</li>
+                                <li>O cashback dos clientes será revertido após devolução aprovada</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="info-section">
                             <h4>ℹ️ Dicas Importantes:</h4>
                             <ul>
                                 <li>Mantenha seus comprovantes de pagamento organizados</li>
                                 <li>Realize pagamentos regularmente para liberar o cashback dos clientes</li>
                                 <li>Em caso de rejeição, verifique o motivo e faça um novo pagamento</li>
                                 <li>O valor da comissão é sempre calculado sobre o valor efetivamente pago pelo cliente</li>
+                                <li>Solicite devoluções apenas quando necessário, pois afeta o cashback dos clientes</li>
                             </ul>
                         </div>
                     </div>
@@ -416,7 +435,73 @@ $metodosPagamento = [
         </div>
     </div>
     
+    <!-- Modal de Solicitação de Devolução -->
+    <div id="refundModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Solicitar Devolução PIX</h2>
+                <span class="close" onclick="closeRefundModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="refund-info">
+                    <div class="info-alert">
+                        <strong>⚠️ Importante:</strong> Ao solicitar uma devolução, o cashback dos clientes relacionado a este pagamento será revertido após aprovação.
+                    </div>
+                </div>
+                
+                <form id="refundForm">
+                    <input type="hidden" id="refundPaymentId" value="">
+                    <input type="hidden" id="refundMpPaymentId" value="">
+                    
+                    <div class="form-group">
+                        <label>Valor do Pagamento:</label>
+                        <div class="payment-info">
+                            <span id="refundPaymentAmount" class="payment-value"></span>
+                            <small>Valor da comissão paga</small>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="refundType">Tipo de Devolução:</label>
+                        <select id="refundType" onchange="toggleRefundAmount()">
+                            <option value="total">Devolução Total</option>
+                            <option value="parcial">Devolução Parcial</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group" id="amountGroup" style="display: none;">
+                        <label for="refundAmount">Valor a Devolver:</label>
+                        <input type="number" id="refundAmount" step="0.01" min="0.01" placeholder="0,00">
+                        <small class="form-help">Informe o valor em reais (ex: 150.50)</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="refundReason">Motivo da Devolução: *</label>
+                        <textarea id="refundReason" rows="4" placeholder="Descreva detalhadamente o motivo da solicitação de devolução..." required></textarea>
+                        <small class="form-help">Este motivo será analisado pelo administrador</small>
+                    </div>
+                    
+                    <div class="refund-consequences">
+                        <h4>Consequências da Devolução:</h4>
+                        <ul>
+                            <li>O cashback dos clientes relacionado será removido</li>
+                            <li>As transações voltarão ao status original</li>
+                            <li>O valor será estornado via PIX após aprovação</li>
+                            <li>O processo pode levar até 3 dias úteis</li>
+                        </ul>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-danger" onclick="submitRefundRequest()">Solicitar Devolução</button>
+                <button class="btn btn-secondary" onclick="closeRefundModal()">Cancelar</button>
+            </div>
+        </div>
+    </div>
+    
     <script>
+        let currentRefundData = null;
+        
         function toggleInfoSection() {
             const content = document.getElementById('infoSectionContent');
             const icon = document.getElementById('infoDropdownIcon');
@@ -483,10 +568,138 @@ $metodosPagamento = [
                 });
             }
         });
+        
+        // Função para solicitar devolução
+        function requestRefund(paymentId, amount, mpPaymentId) {
+            currentRefundData = {
+                id: paymentId,
+                amount: amount,
+                mp_payment_id: mpPaymentId
+            };
+            
+            document.getElementById('refundPaymentId').value = paymentId;
+            document.getElementById('refundMpPaymentId').value = mpPaymentId;
+            document.getElementById('refundPaymentAmount').textContent = `R$ ${formatMoney(amount)}`;
+            document.getElementById('refundModal').style.display = 'block';
+        }
+        
+        async function submitRefundRequest() {
+            const paymentId = document.getElementById('refundPaymentId').value;
+            const refundType = document.getElementById('refundType').value;
+            const refundAmount = document.getElementById('refundAmount').value;
+            const reason = document.getElementById('refundReason').value;
+            
+            if (!reason.trim()) {
+                showNotification('Motivo da devolução é obrigatório', 'error');
+                return;
+            }
+            
+            if (refundType === 'parcial' && (!refundAmount || parseFloat(refundAmount) <= 0)) {
+                showNotification('Para devolução parcial, informe um valor válido', 'error');
+                return;
+            }
+            
+            const payload = {
+                payment_id: parseInt(paymentId),
+                reason: reason.trim()
+            };
+            
+            // Se for devolução parcial, incluir o valor
+            if (refundType === 'parcial' && refundAmount) {
+                const amount = parseFloat(refundAmount);
+                const maxAmount = parseFloat(currentRefundData.amount);
+                
+                if (amount > maxAmount) {
+                    showNotification(`Valor da devolução não pode ser maior que R$ ${formatMoney(maxAmount)}`, 'error');
+                    return;
+                }
+                
+                payload.amount = amount;
+            }
+            
+            try {
+                const response = await fetch('../../api/refunds.php?action=request', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                const result = await response.json();
+                
+                if (result.status) {
+                    showNotification('Solicitação de devolução enviada com sucesso! Aguarde a análise do administrador.', 'success');
+                    closeRefundModal();
+                    // Opcional: recarregar a página para atualizar status
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 2000);
+                } else {
+                    showNotification('Erro ao solicitar devolução: ' + result.message, 'error');
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                showNotification('Erro de conexão. Tente novamente.', 'error');
+            }
+        }
+        
+        function toggleRefundAmount() {
+            const type = document.getElementById('refundType').value;
+            const amountGroup = document.getElementById('amountGroup');
+            
+            if (type === 'parcial') {
+                amountGroup.style.display = 'block';
+                document.getElementById('refundAmount').max = currentRefundData.amount;
+                document.getElementById('refundAmount').placeholder = `Máximo: R$ ${formatMoney(currentRefundData.amount)}`;
+            } else {
+                amountGroup.style.display = 'none';
+                document.getElementById('refundAmount').value = '';
+            }
+        }
+        
+        function closeRefundModal() {
+            document.getElementById('refundModal').style.display = 'none';
+            document.getElementById('refundForm').reset();
+            document.getElementById('amountGroup').style.display = 'none';
+            currentRefundData = null;
+        }
+        
+        function formatMoney(value) {
+            return parseFloat(value).toLocaleString('pt-BR', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+        
+        function showNotification(message, type) {
+            // Sistema simples de notificação - você pode melhorar isso
+            const alertClass = type === 'success' ? 'success' : type === 'error' ? 'danger' : 'info';
+            
+            // Criar elemento de notificação
+            const notification = document.createElement('div');
+            notification.className = `alert alert-${alertClass} notification-toast`;
+            notification.innerHTML = `
+                <div class="notification-content">
+                    <span>${message}</span>
+                    <button class="notification-close" onclick="this.parentElement.parentElement.remove()">&times;</button>
+                </div>
+            `;
+            
+            // Adicionar ao body
+            document.body.appendChild(notification);
+            
+            // Remover após 5 segundos
+            setTimeout(() => {
+                if (notification.parentElement) {
+                    notification.remove();
+                }
+            }, 5000);
+        }
+
 document.addEventListener('DOMContentLoaded', function() {
     // Elementos dos modais - obtendo referências dos elementos DOM
     const paymentDetailsModal = document.getElementById('paymentDetailsModal');
     const receiptModal = document.getElementById('receiptModal');
+    const refundModal = document.getElementById('refundModal');
     const paymentDetailsContent = document.getElementById('paymentDetailsContent');
     const receiptImage = document.getElementById('receiptImage');
     
@@ -496,6 +709,7 @@ document.addEventListener('DOMContentLoaded', function() {
         closeButtons[i].addEventListener('click', function() {
             paymentDetailsModal.style.display = 'none';
             receiptModal.style.display = 'none';
+            refundModal.style.display = 'none';
         });
     }
     
@@ -506,6 +720,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         if (event.target === receiptModal) {
             receiptModal.style.display = 'none';
+        }
+        if (event.target === refundModal) {
+            refundModal.style.display = 'none';
         }
     });
     
@@ -779,6 +996,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function getPaymentMethodName(method) {
         const methods = {
             'pix': 'PIX',
+            'pix_mercadopago': 'PIX Mercado Pago',
             'transferencia': 'Transferência Bancária',
             'ted': 'TED',
             'boleto': 'Boleto',
@@ -814,6 +1032,8 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <style>
+/* Estilos existentes mantidos... */
+
 /* Estilos adicionais para informações de saldo */
 .stat-card-subtitle {
     font-size: 0.8rem;
@@ -896,6 +1116,7 @@ document.addEventListener('DOMContentLoaded', function() {
     position: absolute;
     left: 0;
 }
+
 /* Estilos para seção colapsável */
 .collapsible-card {
     transition: all 0.3s ease;
@@ -976,8 +1197,177 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 }
 
+/* Estilos especiais para quando está expandido */
+.collapsible-card.expanded {
+    border-left: 4px solid var(--primary-color);
+}
+
+.collapsible-card.expanded .collapsible-header {
+    background-color: var(--primary-light);
+}
+
+/* Estilos para o modal de devolução */
+.refund-info {
+    margin-bottom: 20px;
+}
+
+.info-alert {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 6px;
+    padding: 15px;
+    margin-bottom: 20px;
+    color: #856404;
+}
+
+.payment-info {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 15px;
+    margin-top: 5px;
+}
+
+.payment-value {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #28a745;
+    display: block;
+}
+
+.payment-info small {
+    color: #6c757d;
+    font-size: 0.8rem;
+}
+
+.form-help {
+    font-size: 0.8rem;
+    color: #6c757d;
+    margin-top: 5px;
+    display: block;
+}
+
+.refund-consequences {
+    background: #f8d7da;
+    border: 1px solid #f5c6cb;
+    border-radius: 6px;
+    padding: 15px;
+    margin-top: 20px;
+}
+
+.refund-consequences h4 {
+    color: #721c24;
+    margin-bottom: 10px;
+}
+
+.refund-consequences ul {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.refund-consequences li {
+    margin-bottom: 5px;
+    color: #721c24;
+}
+
+.action-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.btn-warning {
+    background-color: #ffc107;
+    border-color: #ffc107;
+    color: #212529;
+}
+
+.btn-warning:hover {
+    background-color: #e0a800;
+    border-color: #d39e00;
+}
+
+/* Sistema de notificações */
+.notification-toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+    min-width: 300px;
+    max-width: 500px;
+    padding: 15px;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    animation: slideInRight 0.3s ease-out;
+}
+
+.notification-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.notification-close {
+    background: none;
+    border: none;
+    color: inherit;
+    font-size: 1.2rem;
+    cursor: pointer;
+    margin-left: 10px;
+    opacity: 0.7;
+}
+
+.notification-close:hover {
+    opacity: 1;
+}
+
+.alert-success {
+    color: #155724;
+    background-color: #d4edda;
+    border-color: #c3e6cb;
+}
+
+.alert-danger {
+    color: #721c24;
+    background-color: #f8d7da;
+    border-color: #f5c6cb;
+}
+
+.alert-info {
+    color: #0c5460;
+    background-color: #d1ecf1;
+    border-color: #bee5eb;
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
 /* Ajustes para mobile */
 @media (max-width: 768px) {
+    .action-buttons {
+        flex-direction: column;
+        gap: 5px;
+    }
+    
+    .btn-action {
+        width: 100%;
+        margin-bottom: 5px;
+    }
+    
+    .notification-toast {
+        left: 10px;
+        right: 10px;
+        min-width: auto;
+    }
+    
     .collapsible-header .card-title {
         font-size: 16px;
     }
@@ -989,15 +1379,6 @@ document.addEventListener('DOMContentLoaded', function() {
     .info-section h4 {
         font-size: 1rem;
     }
-}
-
-/* Estilo especial para quando está expandido */
-.collapsible-card.expanded {
-    border-left: 4px solid var(--primary-color);
-}
-
-.collapsible-card.expanded .collapsible-header {
-    background-color: var(--primary-light);
 }
 </style>
 </body>

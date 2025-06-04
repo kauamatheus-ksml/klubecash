@@ -89,7 +89,9 @@ RewriteRule ^cliente/lojas-parceiras/?$ views/client/partner-stores.php [L]
 RewriteRule ^cliente/perfil/?$ views/client/profile.php [L]
 RewriteRule ^cliente/saldo/?$ views/client/balance.php [L]
 RewriteRule ^cliente/actions/?$ controllers/client_actions.php [L,QSA]
-
+RewriteRule ^cliente/devolucoes/?$ views/client/refund-status.php [L]
+# API de Devoluções (já adicionado antes)
+RewriteRule ^api/refunds/?$ api/refunds.php [L,QSA]
 # Admin
 RewriteRule ^admin/dashboard/?$ views/admin/dashboard.php [L]
 RewriteRule ^admin/usuarios/?$ views/admin/users.php [L]
@@ -121,6 +123,7 @@ RewriteRule ^store/upload-lote/?$ views/stores/batch-upload.php [L,QSA]
 RewriteRule ^store/pagamento/?$ views/stores/payment.php [L,QSA]
 RewriteRule ^store/historico-pagamentos/?$ views/stores/payment-history.php [L,QSA]
 RewriteRule ^store/perfil/?$ views/stores/profile.php [L,QSA]
+
 
 # Email Marketing
 RewriteRule ^admin/email-marketing/?$ views/admin/email-marketing.php [L]

@@ -2,20 +2,51 @@
 // utils/MercadoPagoClient.php
 
 /**
- * Cliente para integração com a API do Mercado Pago
- * Esta classe é responsável por criar pagamentos PIX e consultar seu status
+ * Cliente para integração completa com a API do Mercado Pago
  * 
- * O Mercado Pago funciona assim:
+ * Esta classe é responsável por:
+ * - Criar pagamentos PIX e consultar seu status
+ * - Processar devoluções (refunds)
+ * - Validar webhooks
+ * - Gerenciar comunicação segura com a API do MP
+ * 
+ * Fluxo do Mercado Pago:
  * 1. Enviamos dados do pagamento para eles
  * 2. Eles retornam um QR Code e dados do PIX
  * 3. Cliente paga o PIX
  * 4. MP nos notifica via webhook quando o pagamento é aprovado
+ * 5. Podemos solicitar devoluções se necessário
  */
 class MercadoPagoClient {
+    // Configurações da API
     private $accessToken;
     private $baseUrl = 'https://api.mercadopago.com';
-    private $timeout = 30; // Timeout padrão para requisições
+    private $timeout = 30;
     
+    // Endpoints da API organizados por funcionalidade
+    const ENDPOINTS = [
+        'payments' => '/v1/payments',
+        'payment_methods' => '/v1/payment_methods',
+        'refunds' => '/v1/payments/{payment_id}/refunds',
+        'refund_detail' => '/v1/payments/{payment_id}/refunds/{refund_id}'
+    ];
+    
+    // Status possíveis dos pagamentos no MP
+    const PAYMENT_STATUS = [
+        'pending' => 'Pendente',
+        'approved' => 'Aprovado',
+        'authorized' => 'Autorizado',
+        'in_process' => 'Em processamento',
+        'in_mediation' => 'Em mediação',
+        'rejected' => 'Rejeitado',
+        'cancelled' => 'Cancelado',
+        'refunded' => 'Estornado',
+        'charged_back' => 'Chargeback'
+    ];
+    
+    /**
+     * Construtor - Inicializa o cliente com validações de segurança
+     */
     public function __construct() {
         // Verificar se as constantes estão definidas antes de usar
         if (!defined('MP_ACCESS_TOKEN')) {
@@ -29,7 +60,12 @@ class MercadoPagoClient {
             throw new Exception('MP_ACCESS_TOKEN está vazio. Configure suas credenciais do Mercado Pago.');
         }
         
-        // Log de inicialização para debug
+        // Validar formato básico do token (deve começar com APP_USR)
+        if (!str_starts_with($this->accessToken, 'APP_USR-')) {
+            throw new Exception('MP_ACCESS_TOKEN parece inválido. Verifique se está usando o token correto.');
+        }
+        
+        // Log de inicialização para debug (mascarando dados sensíveis)
         error_log("MercadoPagoClient inicializado com token: " . substr($this->accessToken, 0, 20) . "...");
     }
     
@@ -52,140 +88,100 @@ class MercadoPagoClient {
      * @return array Resultado da operação com status e dados do pagamento
      */
     public function createPixPayment($data) {
-        $endpoint = '/v1/payments';
-        
-        // Primeiro, validamos os dados obrigatórios
-        // Sem estes dados, o Mercado Pago rejeitará a requisição
-        if (empty($data['amount']) || !is_numeric($data['amount']) || $data['amount'] <= 0) {
-            return ['status' => false, 'message' => 'Valor do pagamento é obrigatório e deve ser maior que zero'];
-        }
-        
-        if (empty($data['payer_email']) || !filter_var($data['payer_email'], FILTER_VALIDATE_EMAIL)) {
-            return ['status' => false, 'message' => 'Email do pagador é obrigatório e deve ser válido'];
-        }
-        
-        // Montar o payload para enviar ao Mercado Pago
-        // Este é o formato que a API do MP espera receber
-        $payload = [
-            // Valor do pagamento (deve ser um número decimal)
-            'transaction_amount' => (float) $data['amount'],
-            
-            // Especifica que queremos um pagamento PIX
-            'payment_method_id' => 'pix',
-            
-            // Dados do pagador (pessoa que vai pagar)
-            'payer' => [
-                'email' => trim($data['payer_email']),
-                'first_name' => $data['payer_name'] ?? 'Lojista',
-                'last_name' => $data['payer_lastname'] ?? 'Klube Cash'
-            ]
-        ];
-        
-        // Adicionar campos opcionais se foram fornecidos
-        // Estes campos ajudam no controle e rastreamento do pagamento
-        
-        if (!empty($data['description'])) {
-            // Descrição que aparece no extrato do cliente
-            $payload['description'] = substr(trim($data['description']), 0, 255); // MP limita a 255 caracteres
-        }
-        
-        if (!empty($data['external_reference'])) {
-            // Nossa referência interna para identificar o pagamento
-            $payload['external_reference'] = trim($data['external_reference']);
-        }
-        
-        // Metadados para armazenar informações extras
-        // Úteis para identificar o pagamento nos nossos sistemas
-        if (!empty($data['payment_id']) || !empty($data['store_id'])) {
-            $payload['metadata'] = [];
-            if (!empty($data['payment_id'])) {
-                $payload['metadata']['payment_id'] = (string) $data['payment_id'];
-            }
-            if (!empty($data['store_id'])) {
-                $payload['metadata']['store_id'] = (string) $data['store_id'];
-            }
-        }
-        
-        // Configurar URL de notificação se estiver definida
-        // Esta é a URL que o MP chamará quando o pagamento for processado
-        if (defined('MP_WEBHOOK_URL') && !empty(MP_WEBHOOK_URL)) {
-            $payload['notification_url'] = MP_WEBHOOK_URL;
-        }
-        
-        // Log detalhado para debug - importante para resolver problemas
-        error_log("MP createPixPayment - Payload preparado: " . json_encode($payload, JSON_PRETTY_PRINT));
-        
-        // Fazer a requisição para o Mercado Pago
-        $response = $this->makeRequest('POST', $endpoint, $payload);
-        
-        // Se a requisição foi bem-sucedida, extrair os dados do PIX
-        if ($response['status'] && isset($response['data'])) {
-            $mpData = $response['data'];
-            
-            // Verificar se recebemos os dados necessários do PIX
-            $qrCode = '';
-            $qrCodeBase64 = '';
-            
-            // O MP retorna os dados do PIX dentro de point_of_interaction
-            if (isset($mpData['point_of_interaction']['transaction_data'])) {
-                $transactionData = $mpData['point_of_interaction']['transaction_data'];
-                $qrCode = $transactionData['qr_code'] ?? '';
-                $qrCodeBase64 = $transactionData['qr_code_base64'] ?? '';
+        try {
+            // Primeiro, validamos os dados obrigatórios
+            $validation = $this->validatePaymentData($data);
+            if (!$validation['valid']) {
+                return ['status' => false, 'message' => $validation['message']];
             }
             
-            // Validar se recebemos os dados essenciais
-            if (empty($qrCode) || empty($qrCodeBase64)) {
-                error_log("MP createPixPayment - ERRO: QR Code não foi gerado. Resposta: " . json_encode($mpData));
-                return [
-                    'status' => false, 
-                    'message' => 'Mercado Pago não gerou o QR Code PIX. Tente novamente.',
-                    'mp_response' => $mpData
-                ];
+            // Montar o payload para enviar ao Mercado Pago
+            $payload = [
+                // Valor do pagamento (deve ser um número decimal)
+                'transaction_amount' => (float) $data['amount'],
+                
+                // Especifica que queremos um pagamento PIX
+                'payment_method_id' => 'pix',
+                
+                // Dados do pagador (pessoa que vai pagar)
+                'payer' => [
+                    'email' => trim($data['payer_email']),
+                    'first_name' => $data['payer_name'] ?? 'Lojista',
+                    'last_name' => $data['payer_lastname'] ?? 'Klube Cash'
+                ],
+                
+                // Configurações adicionais para PIX
+                'date_of_expiration' => date('c', strtotime('+30 minutes')), // PIX expira em 30 minutos
+                'statement_descriptor' => 'KLUBECASH' // Aparece no extrato do cliente
+            ];
+            
+            // Adicionar campos opcionais se foram fornecidos
+            if (!empty($data['description'])) {
+                $payload['description'] = substr(trim($data['description']), 0, 255);
             }
             
-            // Retornar os dados organizados para nosso sistema usar
+            if (!empty($data['external_reference'])) {
+                $payload['external_reference'] = trim($data['external_reference']);
+            }
+            
+            // Metadados para armazenar informações extras
+            if (!empty($data['payment_id']) || !empty($data['store_id'])) {
+                $payload['metadata'] = [];
+                if (!empty($data['payment_id'])) {
+                    $payload['metadata']['payment_id'] = (string) $data['payment_id'];
+                }
+                if (!empty($data['store_id'])) {
+                    $payload['metadata']['store_id'] = (string) $data['store_id'];
+                }
+                $payload['metadata']['created_at'] = date('Y-m-d H:i:s');
+            }
+            
+            // Configurar URL de notificação
+            if (defined('MP_WEBHOOK_URL') && !empty(MP_WEBHOOK_URL)) {
+                $payload['notification_url'] = MP_WEBHOOK_URL;
+            }
+            
+            // Log para debug (mascarando dados sensíveis)
+            $logPayload = $this->maskSensitiveData($payload);
+            error_log("MP createPixPayment - Payload: " . json_encode($logPayload, JSON_PRETTY_PRINT));
+            
+            // Fazer a requisição para o Mercado Pago
+            $response = $this->makeRequest('POST', self::ENDPOINTS['payments'], $payload);
+            
+            // Se a requisição foi bem-sucedida, extrair os dados do PIX
+            if ($response['status'] && isset($response['data'])) {
+                return $this->processPixPaymentResponse($response['data']);
+            }
+            
+            return $response;
+            
+        } catch (Exception $e) {
+            error_log("MP createPixPayment Exception: " . $e->getMessage());
             return [
-                'status' => true,
-                'data' => [
-                    'mp_payment_id' => $mpData['id'],
-                    'qr_code' => $qrCode,
-                    'qr_code_base64' => $qrCodeBase64,
-                    'status' => $mpData['status'],
-                    'status_detail' => $mpData['status_detail'] ?? '',
-                    'amount' => $mpData['transaction_amount'],
-                    'currency_id' => $mpData['currency_id'] ?? 'BRL',
-                    'date_created' => $mpData['date_created'] ?? '',
-                    'external_reference' => $mpData['external_reference'] ?? ''
-                ]
+                'status' => false,
+                'message' => 'Erro interno ao criar pagamento PIX: ' . $e->getMessage(),
+                'error_type' => 'internal_error'
             ];
         }
-        
-        // Se chegou aqui, houve algum erro na requisição
-        return $response;
     }
     
     /**
      * Consultar o status de um pagamento no Mercado Pago
      * 
-     * Este método é usado pelo webhook e pela verificação manual
-     * para saber se um pagamento foi aprovado, rejeitado, etc.
-     * 
      * @param string $paymentId ID do pagamento no Mercado Pago
      * @return array Resultado com status e dados do pagamento
      */
     public function getPaymentStatus($paymentId) {
-        // Validar o ID do pagamento
         if (empty($paymentId)) {
             return ['status' => false, 'message' => 'ID do pagamento é obrigatório'];
         }
         
-        $endpoint = "/v1/payments/{$paymentId}";
+        $endpoint = str_replace('{payment_id}', $paymentId, self::ENDPOINTS['payments'] . '/{payment_id}');
         
         error_log("MP getPaymentStatus - Consultando pagamento: {$paymentId}");
         
         $response = $this->makeRequest('GET', $endpoint);
         
-        // Se a consulta foi bem-sucedida, organizar os dados importantes
         if ($response['status'] && isset($response['data'])) {
             $mpData = $response['data'];
             
@@ -195,11 +191,15 @@ class MercadoPagoClient {
                     'id' => $mpData['id'],
                     'status' => $mpData['status'],
                     'status_detail' => $mpData['status_detail'] ?? '',
+                    'status_description' => self::PAYMENT_STATUS[$mpData['status']] ?? $mpData['status'],
                     'amount' => $mpData['transaction_amount'],
                     'date_created' => $mpData['date_created'] ?? '',
                     'date_approved' => $mpData['date_approved'] ?? '',
+                    'date_last_updated' => $mpData['date_last_updated'] ?? '',
                     'external_reference' => $mpData['external_reference'] ?? '',
-                    'metadata' => $mpData['metadata'] ?? []
+                    'metadata' => $mpData['metadata'] ?? [],
+                    'payment_method_id' => $mpData['payment_method_id'] ?? '',
+                    'payment_type_id' => $mpData['payment_type_id'] ?? ''
                 ]
             ];
         }
@@ -208,21 +208,165 @@ class MercadoPagoClient {
     }
     
     /**
+     * Criar uma devolução (refund) para um pagamento
+     * 
+     * @param string $paymentId ID do pagamento no MP
+     * @param float|null $amount Valor a devolver (null = devolução total)
+     * @param string|null $reason Motivo da devolução
+     * @return array Resultado da operação
+     */
+    public function createRefund($paymentId, $amount = null, $reason = null) {
+        if (empty($paymentId)) {
+            return ['status' => false, 'message' => 'ID do pagamento é obrigatório'];
+        }
+        
+        $endpoint = str_replace('{payment_id}', $paymentId, self::ENDPOINTS['refunds']);
+        
+        $payload = [];
+        
+        // Se amount for especificado, é devolução parcial
+        if ($amount !== null) {
+            if (!is_numeric($amount) || $amount <= 0) {
+                return ['status' => false, 'message' => 'Valor da devolução deve ser maior que zero'];
+            }
+            $payload['amount'] = (float) $amount;
+        }
+        
+        // Adicionar metadata com motivo
+        if ($reason !== null) {
+            $payload['metadata'] = [
+                'reason' => substr(trim($reason), 0, 255),
+                'refund_date' => date('Y-m-d H:i:s')
+            ];
+        }
+        
+        error_log("MP createRefund - Payment: {$paymentId}, Amount: " . ($amount ?? 'total'));
+        
+        $response = $this->makeRequest('POST', $endpoint, $payload);
+        
+        if ($response['status'] && isset($response['data'])) {
+            $refundData = $response['data'];
+            
+            return [
+                'status' => true,
+                'data' => [
+                    'id' => $refundData['id'],
+                    'payment_id' => $refundData['payment_id'],
+                    'amount' => $refundData['amount'],
+                    'status' => $refundData['status'],
+                    'date_created' => $refundData['date_created'] ?? '',
+                    'metadata' => $refundData['metadata'] ?? []
+                ]
+            ];
+        }
+        
+        return $response;
+    }
+    
+    /**
+     * Consultar status de uma devolução específica
+     * 
+     * @param string $paymentId ID do pagamento
+     * @param string|null $refundId ID da devolução (se null, lista todas)
+     * @return array Resultado da consulta
+     */
+    public function getRefundStatus($paymentId, $refundId = null) {
+        if (empty($paymentId)) {
+            return ['status' => false, 'message' => 'ID do pagamento é obrigatório'];
+        }
+        
+        if ($refundId) {
+            // Consultar devolução específica
+            $endpoint = str_replace(
+                ['{payment_id}', '{refund_id}'], 
+                [$paymentId, $refundId], 
+                self::ENDPOINTS['refund_detail']
+            );
+        } else {
+            // Listar todas as devoluções do pagamento
+            $endpoint = str_replace('{payment_id}', $paymentId, self::ENDPOINTS['refunds']);
+        }
+        
+        error_log("MP getRefundStatus - Payment: {$paymentId}, Refund: " . ($refundId ?? 'all'));
+        
+        return $this->makeRequest('GET', $endpoint);
+    }
+    
+    /**
+     * Validar assinatura do webhook do Mercado Pago
+     * 
+     * @param array $headers Headers da requisição
+     * @param string $body Corpo da requisição
+     * @return bool True se a assinatura for válida
+     */
+    public function validateWebhookSignature($headers, $body) {
+        // MP envia a assinatura nos headers
+        $signature = $headers['x-signature'] ?? $headers['X-Signature'] ?? '';
+        $requestId = $headers['x-request-id'] ?? $headers['X-Request-Id'] ?? '';
+        
+        if (empty($signature) || empty($requestId)) {
+            error_log("MP Webhook - Headers de assinatura ausentes");
+            return false;
+        }
+        
+        // Separar timestamp e hash da assinatura
+        $parts = explode(',', $signature);
+        $timestamp = '';
+        $hash = '';
+        
+        foreach ($parts as $part) {
+            $keyValue = explode('=', $part, 2);
+            if (count($keyValue) === 2) {
+                if (trim($keyValue[0]) === 'ts') {
+                    $timestamp = trim($keyValue[1]);
+                } elseif (trim($keyValue[0]) === 'v1') {
+                    $hash = trim($keyValue[1]);
+                }
+            }
+        }
+        
+        if (empty($timestamp) || empty($hash)) {
+            error_log("MP Webhook - Formato de assinatura inválido");
+            return false;
+        }
+        
+        // Verificar se o timestamp não é muito antigo (máximo 15 minutos)
+        $currentTime = time();
+        if (abs($currentTime - (int)$timestamp) > 900) {
+            error_log("MP Webhook - Timestamp muito antigo");
+            return false;
+        }
+        
+        // Construir string para validação
+        $dataToSign = $requestId . $timestamp . $body;
+        
+        // Calcular hash esperado usando a chave secreta
+        // Nota: você precisará definir MP_WEBHOOK_SECRET nas constantes
+        if (defined('MP_WEBHOOK_SECRET')) {
+            $expectedHash = hash_hmac('sha256', $dataToSign, MP_WEBHOOK_SECRET);
+            
+            return hash_equals($expectedHash, $hash);
+        }
+        
+        error_log("MP Webhook - MP_WEBHOOK_SECRET não definido, pulando validação");
+        return true; // Se não tem secret configurado, aceita (não recomendado para produção)
+    }
+    
+    /**
      * Método para testar a conectividade com o Mercado Pago
-     * Útil para verificar se as credenciais estão funcionando
      * 
      * @return array Resultado do teste
      */
     public function testConnection() {
         try {
-            // Fazer uma requisição simples para verificar se tudo está configurado
-            $response = $this->makeRequest('GET', '/v1/payment_methods');
+            $response = $this->makeRequest('GET', self::ENDPOINTS['payment_methods']);
             
             if ($response['status']) {
                 return [
                     'status' => true, 
                     'message' => 'Conexão com Mercado Pago funcionando corretamente',
-                    'token_valid' => true
+                    'token_valid' => true,
+                    'response_time' => $response['response_time'] ?? 'unknown'
                 ];
             } else {
                 return [
@@ -241,10 +385,115 @@ class MercadoPagoClient {
     }
     
     /**
-     * Método central para fazer requisições HTTP para o Mercado Pago
+     * Validar dados obrigatórios para criação de pagamento
      * 
-     * Este método cuida de toda a comunicação com a API do MP,
-     * incluindo autenticação, headers, tratamento de erros, etc.
+     * @param array $data Dados a validar
+     * @return array Resultado da validação
+     */
+    private function validatePaymentData($data) {
+        // Verificar valor
+        if (empty($data['amount']) || !is_numeric($data['amount']) || $data['amount'] <= 0) {
+            return ['valid' => false, 'message' => 'Valor do pagamento é obrigatório e deve ser maior que zero'];
+        }
+        
+        // Verificar limites do valor
+        if ($data['amount'] < 0.01) {
+            return ['valid' => false, 'message' => 'Valor mínimo é R$ 0,01'];
+        }
+        
+        if ($data['amount'] > 1000000) {
+            return ['valid' => false, 'message' => 'Valor máximo é R$ 1.000.000,00'];
+        }
+        
+        // Verificar email
+        if (empty($data['payer_email']) || !filter_var($data['payer_email'], FILTER_VALIDATE_EMAIL)) {
+            return ['valid' => false, 'message' => 'Email do pagador é obrigatório e deve ser válido'];
+        }
+        
+        // Verificar tamanho da descrição
+        if (!empty($data['description']) && strlen($data['description']) > 255) {
+            return ['valid' => false, 'message' => 'Descrição não pode ter mais que 255 caracteres'];
+        }
+        
+        return ['valid' => true];
+    }
+    
+    /**
+     * Processar resposta de criação de pagamento PIX
+     * 
+     * @param array $mpData Dados retornados pelo MP
+     * @return array Resultado processado
+     */
+    private function processPixPaymentResponse($mpData) {
+        // Verificar se recebemos os dados necessários do PIX
+        $qrCode = '';
+        $qrCodeBase64 = '';
+        
+        // O MP retorna os dados do PIX dentro de point_of_interaction
+        if (isset($mpData['point_of_interaction']['transaction_data'])) {
+            $transactionData = $mpData['point_of_interaction']['transaction_data'];
+            $qrCode = $transactionData['qr_code'] ?? '';
+            $qrCodeBase64 = $transactionData['qr_code_base64'] ?? '';
+        }
+        
+        // Validar se recebemos os dados essenciais
+        if (empty($qrCode) || empty($qrCodeBase64)) {
+            error_log("MP createPixPayment - ERRO: QR Code não foi gerado. Resposta: " . json_encode($mpData));
+            return [
+                'status' => false, 
+                'message' => 'Mercado Pago não gerou o QR Code PIX. Tente novamente.',
+                'error_type' => 'qr_code_error',
+                'mp_payment_id' => $mpData['id'] ?? null
+            ];
+        }
+        
+        // Retornar os dados organizados
+        return [
+            'status' => true,
+            'data' => [
+                'mp_payment_id' => $mpData['id'],
+                'qr_code' => $qrCode,
+                'qr_code_base64' => $qrCodeBase64,
+                'status' => $mpData['status'],
+                'status_detail' => $mpData['status_detail'] ?? '',
+                'amount' => $mpData['transaction_amount'],
+                'currency_id' => $mpData['currency_id'] ?? 'BRL',
+                'date_created' => $mpData['date_created'] ?? '',
+                'date_of_expiration' => $mpData['date_of_expiration'] ?? '',
+                'external_reference' => $mpData['external_reference'] ?? '',
+                'description' => $mpData['description'] ?? ''
+            ]
+        ];
+    }
+    
+    /**
+     * Mascarar dados sensíveis para logs
+     * 
+     * @param array $data Dados a mascarar
+     * @return array Dados mascarados
+     */
+    private function maskSensitiveData($data) {
+        $masked = $data;
+        
+        // Mascarar email
+        if (isset($masked['payer']['email'])) {
+            $email = $masked['payer']['email'];
+            $atPos = strpos($email, '@');
+            if ($atPos !== false) {
+                $masked['payer']['email'] = substr($email, 0, 3) . '***' . substr($email, $atPos);
+            }
+        }
+        
+        // Mascarar outros dados sensíveis se necessário
+        if (isset($masked['payer']['first_name'])) {
+            $masked['payer']['first_name'] = substr($masked['payer']['first_name'], 0, 3) . '***';
+        }
+        
+        return $masked;
+    }
+    
+    /**
+     * Método central para fazer requisições HTTP para o Mercado Pago
      * 
      * @param string $method Método HTTP (GET, POST, PUT, DELETE)
      * @param string $endpoint Endpoint da API (ex: /v1/payments)
@@ -252,101 +501,87 @@ class MercadoPagoClient {
      * @return array Resultado da requisição
      */
     private function makeRequest($method, $endpoint, $data = null) {
+        $startTime = microtime(true);
         $url = $this->baseUrl . $endpoint;
         
-        // Configurar headers necessários para a API do Mercado Pago
+        // Configurar headers necessários
         $headers = [
-            // Autenticação usando Bearer Token
             'Authorization: Bearer ' . $this->accessToken,
-            
-            // Indicar que enviamos e esperamos JSON
             'Content-Type: application/json',
             'Accept: application/json',
-            
-            // Header para identificar nossa aplicação
-            'User-Agent: KlubeCash/1.0 (PHP/' . PHP_VERSION . ')',
-            
-            // Chave de idempotência - evita duplicação de pagamentos
+            'User-Agent: KlubeCash/2.0 (PHP/' . PHP_VERSION . ')',
             'X-Idempotency-Key: ' . uniqid('klube_' . time() . '_', true)
         ];
         
-        // Log detalhado para debug (útil para resolver problemas)
         error_log("MP Request: {$method} {$url}");
         
-        // Inicializar cURL para fazer a requisição HTTP
+        // Inicializar cURL
         $ch = curl_init();
         
-        // Configurações do cURL para comunicação segura com o MP
         curl_setopt_array($ch, [
             CURLOPT_URL => $url,
-            CURLOPT_RETURNTRANSFER => true, // Retornar resposta como string
+            CURLOPT_RETURNTRANSFER => true,
             CURLOPT_HTTPHEADER => $headers,
             CURLOPT_TIMEOUT => $this->timeout,
             CURLOPT_CUSTOMREQUEST => $method,
-            
-            // Configurações de segurança
-            CURLOPT_SSL_VERIFYPEER => true, // Verificar certificado SSL
-            CURLOPT_SSL_VERIFYHOST => 2,    // Verificar hostname
-            CURLOPT_FOLLOWLOCATION => false, // Não seguir redirects
-            
-            // Configurações de protocolo
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSL_VERIFYHOST => 2,
+            CURLOPT_FOLLOWLOCATION => false,
             CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-            CURLOPT_USERAGENT => 'KlubeCash/1.0',
-            
-            // Configurações para debug
+            CURLOPT_USERAGENT => 'KlubeCash/2.0',
             CURLOPT_VERBOSE => false
         ]);
         
-        // Se temos dados para enviar (POST/PUT), adicionar ao body da requisição
+        // Adicionar dados se necessário
         if ($data && in_array($method, ['POST', 'PUT', 'PATCH'])) {
-            $jsonData = json_encode($data);
+            $jsonData = json_encode($data, JSON_UNESCAPED_UNICODE);
             curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonData);
             
-            // Log dos dados enviados (sem dados sensíveis)
-            $logData = $data;
-            if (isset($logData['payer']['email'])) {
-                $logData['payer']['email'] = substr($logData['payer']['email'], 0, 3) . '***';
-            }
+            // Log dos dados (mascarados)
+            $logData = $this->maskSensitiveData($data);
             error_log("MP Request Data: " . json_encode($logData));
         }
         
-        // Executar a requisição
+        // Executar requisição
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $curlError = curl_error($ch);
         $curlInfo = curl_getinfo($ch);
         curl_close($ch);
         
-        // Log da resposta para debug
-        error_log("MP Response Code: {$httpCode}");
-        error_log("MP Response Time: " . ($curlInfo['total_time'] ?? 'unknown') . "s");
+        $responseTime = microtime(true) - $startTime;
         
-        // Verificar se houve erro de conexão (problemas de rede, SSL, etc.)
+        // Log da resposta
+        error_log("MP Response: HTTP {$httpCode} em {$responseTime}s");
+        
+        // Verificar erros de conexão
         if ($curlError) {
             error_log("MP cURL Error: {$curlError}");
             return [
                 'status' => false, 
                 'message' => 'Erro de conexão com Mercado Pago: ' . $curlError,
-                'error_type' => 'connection_error'
+                'error_type' => 'connection_error',
+                'response_time' => $responseTime
             ];
         }
         
-        // Verificar se a resposta está vazia
+        // Verificar resposta vazia
         if (empty($response)) {
             error_log("MP Empty Response - HTTP Code: {$httpCode}");
             return [
                 'status' => false,
                 'message' => 'Mercado Pago retornou resposta vazia',
                 'error_type' => 'empty_response',
-                'http_code' => $httpCode
+                'http_code' => $httpCode,
+                'response_time' => $responseTime
             ];
         }
         
-        // Log da resposta (truncado para não logar dados sensíveis)
+        // Log da resposta (truncado)
         $logResponse = strlen($response) > 1000 ? substr($response, 0, 1000) . '...' : $response;
         error_log("MP Response Body: {$logResponse}");
         
-        // Tentar decodificar a resposta JSON
+        // Decodificar JSON
         $decodedResponse = json_decode($response, true);
         if (json_last_error() !== JSON_ERROR_NONE) {
             error_log("MP JSON Decode Error: " . json_last_error_msg());
@@ -354,42 +589,81 @@ class MercadoPagoClient {
                 'status' => false,
                 'message' => 'Resposta inválida do Mercado Pago: ' . json_last_error_msg(),
                 'error_type' => 'json_error',
-                'raw_response' => $response
+                'raw_response' => substr($response, 0, 500),
+                'response_time' => $responseTime
             ];
         }
         
-        // Verificar se o código HTTP indica sucesso (200-299)
+        // Verificar sucesso HTTP
         if ($httpCode >= 200 && $httpCode < 300) {
-            return ['status' => true, 'data' => $decodedResponse];
+            return [
+                'status' => true, 
+                'data' => $decodedResponse,
+                'response_time' => $responseTime
+            ];
         }
         
-        // Se chegou aqui, houve algum erro da API do Mercado Pago
-        $errorMessage = 'Erro HTTP ' . $httpCode;
+        // Processar erro da API
+        $errorMessage = $this->extractErrorMessage($decodedResponse, $httpCode);
         
-        // Tentar extrair mensagem de erro mais específica
-        if (is_array($decodedResponse)) {
-            if (isset($decodedResponse['message'])) {
-                $errorMessage .= ': ' . $decodedResponse['message'];
-            } elseif (isset($decodedResponse['error'])) {
-                $errorMessage .= ': ' . $decodedResponse['error'];
-            } elseif (isset($decodedResponse['cause'])) {
-                // MP às vezes retorna erros em formato diferente
-                $causes = is_array($decodedResponse['cause']) ? $decodedResponse['cause'] : [$decodedResponse['cause']];
-                $errorMessage .= ': ' . implode(', ', array_map(function($cause) {
-                    return $cause['description'] ?? $cause['code'] ?? 'Erro desconhecido';
-                }, $causes));
-            }
-        }
-        
-        error_log("MP Error Response: {$errorMessage}");
+        error_log("MP API Error: {$errorMessage}");
         
         return [
             'status' => false,
             'message' => $errorMessage,
             'error_type' => 'api_error',
             'http_code' => $httpCode,
-            'response_data' => $decodedResponse
+            'response_data' => $decodedResponse,
+            'response_time' => $responseTime
         ];
+    }
+    
+    /**
+     * Extrair mensagem de erro mais legível da resposta do MP
+     * 
+     * @param array $response Resposta decodificada
+     * @param int $httpCode Código HTTP
+     * @return string Mensagem de erro
+     */
+    private function extractErrorMessage($response, $httpCode) {
+        $errorMessage = 'Erro HTTP ' . $httpCode;
+        
+        if (!is_array($response)) {
+            return $errorMessage;
+        }
+        
+        // Diferentes formatos de erro do MP
+        if (isset($response['message'])) {
+            $errorMessage .= ': ' . $response['message'];
+        } elseif (isset($response['error'])) {
+            $errorMessage .= ': ' . $response['error'];
+        } elseif (isset($response['cause'])) {
+            $causes = is_array($response['cause']) ? $response['cause'] : [$response['cause']];
+            $causeMessages = [];
+            
+            foreach ($causes as $cause) {
+                if (is_array($cause)) {
+                    $causeMessages[] = $cause['description'] ?? $cause['code'] ?? 'Erro desconhecido';
+                } else {
+                    $causeMessages[] = $cause;
+                }
+            }
+            
+            $errorMessage .= ': ' . implode(', ', $causeMessages);
+        } elseif (isset($response['errors'])) {
+            // Formato alternativo de erros
+            $errorMessages = [];
+            foreach ($response['errors'] as $error) {
+                if (is_array($error)) {
+                    $errorMessages[] = $error['message'] ?? $error['description'] ?? 'Erro desconhecido';
+                }
+            }
+            if (!empty($errorMessages)) {
+                $errorMessage .= ': ' . implode(', ', $errorMessages);
+            }
+        }
+        
+        return $errorMessage;
     }
 }
 ?>
