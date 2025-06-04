@@ -316,14 +316,19 @@ function formatDate($date) {
                     <?php if (!empty($storesData['lojas'])): ?>
                     <div class="quick-stats">
                         <div class="quick-stat">
-                            <span class="stat-number"><?php echo number_format($storesData['estatisticas']['media_cashback'] ?? 0, 1); ?>%</span>
+                            <span class="stat-number">
+                                <?php echo number_format(($storesData['estatisticas']['media_cashback'] ?? 0) - 5, 1); ?>%
+                            </span>
                             <span class="stat-desc">Cashback médio</span>
                         </div>
                         <div class="quick-stat">
-                            <span class="stat-number"><?php echo number_format($storesData['estatisticas']['maior_cashback'] ?? 0, 1); ?>%</span>
+                            <span class="stat-number">
+                                <?php echo number_format(($storesData['estatisticas']['maior_cashback'] ?? 0) - 5, 1); ?>%
+                            </span>
                             <span class="stat-desc">Maior cashback</span>
                         </div>
                     </div>
+
                     <?php endif; ?>
                 </div>
                 
