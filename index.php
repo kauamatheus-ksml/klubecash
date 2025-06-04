@@ -1,12 +1,9 @@
 <?php
-// index.php - Versão 2.0 Completamente Redesenhada
+// index.php - Versão Otimizada para Carregamento Rápido
 require_once './config/constants.php';
 require_once './config/database.php';
 
-/**
- * Como um artista digital, esta função decide se vai mostrar uma foto real da loja
- * ou criar um ícone colorido personalizado - é como ter um designer automático!
- */
+// Funcionalidades do logo mantidas
 function renderStoreLogo($store) {
     static $logoCache = [];
     
@@ -16,38 +13,30 @@ function renderStoreLogo($store) {
     if (!empty($store['logo'])) {
         $logoFilename = $store['logo'];
         
-        // Verificação de segurança - como um porteiro que confere se o arquivo é confiável
         if (!isset($logoCache[$logoFilename])) {
             if (preg_match('/^[a-zA-Z0-9_.-]+\.(jpg|jpeg|png|gif)$/i', $logoFilename)) {
                 $fullPath = __DIR__ . '/uploads/store_logos/' . $logoFilename;
                 $logoCache[$logoFilename] = file_exists($fullPath);
             } else {
                 $logoCache[$logoFilename] = false;
-                error_log("Arquivo suspeito detectado: " . $logoFilename);
             }
         }
         
         if ($logoCache[$logoFilename]) {
             $logoPath = '/uploads/store_logos/' . htmlspecialchars($logoFilename);
-            return '<img src="' . $logoPath . '" alt="Logo ' . $nomeFantasia . '" class="store-logo-image" loading="lazy">';
+            return '<img src="' . $logoPath . '" alt="Logo ' . $nomeFantasia . '" class="store-logo-image">';
         }
     }
     
-    // Se não tem logo, criamos um ícone personalizado com cor única
     $corDeFundo = generateColorFromName($nomeFantasia);
     return '<div class="store-logo-fallback" style="background: linear-gradient(135deg, ' . $corDeFundo . ', ' . adjustBrightness($corDeFundo, -20) . ')" title="' . $nomeFantasia . '">' . $primeiraLetra . '</div>';
 }
 
-/**
- * Gera uma cor única para cada loja - como uma impressão digital colorida
- * Cada loja sempre terá a mesma cor, criando uma identidade visual consistente
- */
 function generateColorFromName($name) {
     $colors = [
         '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FECA57',
         '#FF9FF3', '#54A0FF', '#5F27CD', '#FF3838', '#00D2D3',
-        '#FF6348', '#7bed9f', '#70a1ff', '#dda0dd', '#ffb142',
-        '#ff7675', '#74b9ff', '#0984e3', '#00b894', '#fdcb6e'
+        '#FF6348', '#7bed9f', '#70a1ff', '#dda0dd', '#ffb142'
     ];
     
     $hash = crc32($name);
@@ -55,9 +44,6 @@ function generateColorFromName($name) {
     return $colors[$index];
 }
 
-/**
- * Ajusta o brilho de uma cor para criar gradientes automáticos
- */
 function adjustBrightness($hex, $percent) {
     $hex = ltrim($hex, '#');
     $r = hexdec(substr($hex, 0, 2));
@@ -71,17 +57,15 @@ function adjustBrightness($hex, $percent) {
     return sprintf("#%02x%02x%02x", $r, $g, $b);
 }
 
-// Inicialização da sessão - como abrir a porta de casa
+// Backend funcionando perfeitamente (mantido igual)
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Verificação do usuário logado - como verificar se alguém já está em casa
 $isLoggedIn = isset($_SESSION['user_id']);
 $userType = $isLoggedIn ? ($_SESSION['user_type'] ?? '') : '';
 $userName = $isLoggedIn ? ($_SESSION['user_name'] ?? '') : '';
 
-// Determinação da URL do dashboard - como decidir para qual sala da casa ir
 $dashboardURL = '';
 if ($isLoggedIn) {
     switch ($userType) {
@@ -97,27 +81,12 @@ if ($isLoggedIn) {
     }
 }
 
-// Busca das lojas parceiras - como procurar os melhores amigos para apresentar
+// Buscar lojas parceiras
 $partnerStores = [];
 try {
     $db = Database::getConnection();
-    
-    $stmt = $db->query("
-        SELECT 
-            nome_fantasia, 
-            logo, 
-            categoria,
-            descricao,
-            porcentagem_cashback
-        FROM lojas 
-        WHERE status = 'aprovado' 
-        ORDER BY RAND() 
-        LIMIT 8
-    ");
+    $stmt = $db->query("SELECT nome_fantasia, logo, categoria, descricao, porcentagem_cashback FROM lojas WHERE status = 'aprovado' ORDER BY RAND() LIMIT 8");
     $partnerStores = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    error_log("Lojas parceiras carregadas: " . count($partnerStores));
-    
 } catch (PDOException $e) {
     error_log("Erro ao buscar lojas parceiras: " . $e->getMessage());
     $partnerStores = [];
@@ -131,878 +100,993 @@ try {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo $isLoggedIn ? "Bem-vindo ao Klube Cash, " . htmlspecialchars($userName) : "Klube Cash - Transforme suas Compras em Dinheiro de Volta"; ?></title>
     
-    <!-- Meta tags otimizadas para SEO e compartilhamento -->
-    <meta name="description" content="Klube Cash - O programa de cashback mais inteligente do Brasil. Receba dinheiro de volta em todas as suas compras. Cadastre-se grátis e comece a economizar hoje mesmo!">
-    <meta name="keywords" content="cashback, dinheiro de volta, economia, programa de fidelidade, compras online, desconto, lojas parceiras">
-    <meta name="author" content="Klube Cash">
-    <meta name="robots" content="index, follow">
+    <meta name="description" content="Klube Cash - O programa de cashback mais inteligente do Brasil. Receba dinheiro de volta em todas as suas compras. Cadastre-se grátis!">
+    <meta name="keywords" content="cashback, dinheiro de volta, economia, programa de fidelidade">
     
-    <!-- Open Graph para redes sociais -->
-    <meta property="og:title" content="Klube Cash - Seu Dinheiro de Volta Garantido">
-    <meta property="og:description" content="Receba cashback real em suas compras. Simples, rápido e confiável.">
-    <meta property="og:image" content="<?php echo SITE_URL; ?>/assets/images/og-image.jpg">
-    <meta property="og:url" content="<?php echo SITE_URL; ?>">
-    <meta property="og:type" content="website">
-    
-    <!-- Favicons modernos -->
     <link rel="icon" type="image/x-icon" href="assets/images/icons/KlubeCashLOGO.ico">
-    <link rel="apple-touch-icon" sizes="180x180" href="assets/images/icons/apple-touch-icon.png">
-    
-    <!-- Preload de recursos críticos -->
-    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" as="style">
-    <link rel="preload" href="assets/css/index-v2.css" as="style">
-    
-    <!-- Styles -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="assets/css/index-v2.css">
     
-    <!-- Bibliotecas de animação -->
-    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
-    
-    <!-- Schema.org para rich snippets -->
-    <script type="application/ld+json">
-    {
-        "@context": "https://schema.org",
-        "@type": "WebApplication",
-        "name": "Klube Cash",
-        "description": "Programa de cashback inteligente",
-        "url": "<?php echo SITE_URL; ?>",
-        "applicationCategory": "FinanceApplication",
-        "operatingSystem": "Web"
-    }
-    </script>
+    <style>
+        /* CSS INLINE OTIMIZADO - Carregamento Instantâneo */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        :root {
+            --primary-color: #FF7A00;
+            --primary-dark: #E06600;
+            --primary-light: #FFB366;
+            --secondary-color: #1A1A1A;
+            --white: #FFFFFF;
+            --gray-50: #F9FAFB;
+            --gray-100: #F3F4F6;
+            --gray-600: #4B5563;
+            --gray-800: #1F2937;
+            --gray-900: #111827;
+            --success: #10B981;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            line-height: 1.6;
+            color: var(--gray-800);
+            background: var(--white);
+        }
+        
+        /* HEADER */
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 80px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+        }
+        
+        .header-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+        }
+        
+        .logo img {
+            height: 40px;
+            width: auto;
+        }
+        
+        .nav-menu {
+            display: flex;
+            list-style: none;
+            gap: 2rem;
+            align-items: center;
+        }
+        
+        .nav-link {
+            text-decoration: none;
+            color: var(--gray-600);
+            font-weight: 500;
+            transition: color 0.3s ease;
+        }
+        
+        .nav-link:hover {
+            color: var(--primary-color);
+        }
+        
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        /* BOTÕES */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            text-decoration: none;
+            border: 2px solid transparent;
+            border-radius: 0.75rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-height: 44px;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
+            color: var(--white);
+            box-shadow: 0 10px 20px rgba(255, 122, 0, 0.2);
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 30px rgba(255, 122, 0, 0.3);
+        }
+        
+        .btn-ghost {
+            background: transparent;
+            color: var(--gray-600);
+            border-color: var(--gray-600);
+        }
+        
+        .btn-ghost:hover {
+            background: var(--gray-50);
+            color: var(--gray-800);
+        }
+        
+        /* USER MENU */
+        .user-menu {
+            position: relative;
+        }
+        
+        .user-button {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 0.75rem;
+            transition: background-color 0.3s ease;
+        }
+        
+        .user-button:hover {
+            background-color: var(--gray-100);
+        }
+        
+        .user-avatar {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
+            color: var(--white);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+        
+        .user-name {
+            font-weight: 500;
+            color: var(--gray-600);
+            max-width: 120px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .user-dropdown {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            width: 200px;
+            background: var(--white);
+            border: 1px solid var(--gray-100);
+            border-radius: 0.75rem;
+            box-shadow: var(--shadow);
+            padding: 0.5rem;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: all 0.3s ease;
+            z-index: 1100;
+        }
+        
+        .user-dropdown.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+        
+        .dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem;
+            color: var(--gray-600);
+            text-decoration: none;
+            border-radius: 0.5rem;
+            transition: background-color 0.3s ease;
+        }
+        
+        .dropdown-item:hover {
+            background-color: var(--gray-50);
+            color: var(--primary-color);
+        }
+        
+        /* MOBILE MENU */
+        .mobile-toggle {
+            display: none;
+            flex-direction: column;
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0.5rem;
+        }
+        
+        .hamburger-line {
+            width: 24px;
+            height: 2px;
+            background: var(--gray-600);
+            margin: 3px 0;
+            transition: 0.3s;
+        }
+        
+        /* MAIN CONTENT */
+        .main-content {
+            padding-top: 80px;
+        }
+        
+        /* HERO SECTION */
+        .hero {
+            background: linear-gradient(135deg, #FF7A00 0%, #FF9A40 50%, #FFB366 100%);
+            color: var(--white);
+            padding: 6rem 0;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .hero-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+        
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 2rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-bottom: 2rem;
+            backdrop-filter: blur(10px);
+        }
+        
+        .hero-title {
+            font-size: 3rem;
+            font-weight: 800;
+            line-height: 1.1;
+            margin-bottom: 1.5rem;
+        }
+        
+        .hero-subtitle {
+            font-size: 1.25rem;
+            line-height: 1.6;
+            margin-bottom: 2rem;
+            opacity: 0.95;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        
+        .hero-actions {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-bottom: 3rem;
+        }
+        
+        .btn-large {
+            padding: 1rem 2rem;
+            font-size: 1.125rem;
+            min-height: 56px;
+        }
+        
+        /* STATS */
+        .hero-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 2rem;
+            max-width: 600px;
+            margin: 0 auto;
+            padding-top: 2rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .stat-item {
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 2rem;
+            font-weight: 800;
+            color: #FFD700;
+            margin-bottom: 0.25rem;
+            display: block;
+        }
+        
+        .stat-label {
+            font-size: 0.875rem;
+            opacity: 0.8;
+        }
+        
+        /* SECTIONS */
+        .section {
+            padding: 6rem 0;
+        }
+        
+        .section:nth-child(even) {
+            background: var(--gray-50);
+        }
+        
+        .section-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+        
+        .section-header {
+            text-align: center;
+            margin-bottom: 4rem;
+        }
+        
+        .section-badge {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            background: rgba(255, 122, 0, 0.1);
+            color: var(--primary-color);
+            border: 1px solid rgba(255, 122, 0, 0.2);
+            border-radius: 2rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 1rem;
+        }
+        
+        .section-title {
+            font-size: 2.25rem;
+            font-weight: 800;
+            color: var(--gray-900);
+            margin-bottom: 1rem;
+        }
+        
+        .section-description {
+            font-size: 1.125rem;
+            color: var(--gray-600);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        /* GRID LAYOUTS */
+        .grid {
+            display: grid;
+            gap: 2rem;
+        }
+        
+        .grid-3 {
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        }
+        
+        .grid-4 {
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        }
+        
+        /* CARDS */
+        .card {
+            background: var(--white);
+            border: 1px solid var(--gray-100);
+            border-radius: 1rem;
+            padding: 2rem;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-8px);
+            box-shadow: var(--shadow);
+            border-color: var(--primary-color);
+        }
+        
+        .card-icon {
+            width: 80px;
+            height: 80px;
+            background: rgba(255, 122, 0, 0.1);
+            color: var(--primary-color);
+            border-radius: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1.5rem;
+            font-size: 2rem;
+        }
+        
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--gray-900);
+            margin-bottom: 1rem;
+        }
+        
+        .card-description {
+            color: var(--gray-600);
+            line-height: 1.6;
+        }
+        
+        /* STORE LOGOS */
+        .store-logo-image {
+            max-width: 70px;
+            max-height: 70px;
+            border-radius: 0.75rem;
+            object-fit: contain;
+        }
+        
+        .store-logo-fallback {
+            width: 70px;
+            height: 70px;
+            border-radius: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--white);
+            margin: 0 auto 1rem;
+        }
+        
+        /* FOOTER */
+        .footer {
+            background: var(--gray-900);
+            color: var(--white);
+            padding: 3rem 0 1rem;
+        }
+        
+        .footer-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+        
+        .footer-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+        
+        .footer-brand {
+            grid-column: span 2;
+        }
+        
+        .footer-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+        }
+        
+        .footer-links {
+            list-style: none;
+        }
+        
+        .footer-links li {
+            margin-bottom: 0.75rem;
+        }
+        
+        .footer-links a {
+            color: rgba(255, 255, 255, 0.8);
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+        
+        .footer-links a:hover {
+            color: var(--primary-color);
+        }
+        
+        .footer-bottom {
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            padding-top: 1rem;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.6);
+        }
+        
+        /* RESPONSIVIDADE */
+        @media (max-width: 768px) {
+            .nav-menu {
+                display: none;
+            }
+            
+            .mobile-toggle {
+                display: flex;
+            }
+            
+            .hero-title {
+                font-size: 2.25rem;
+            }
+            
+            .hero-actions {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .hero-stats {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+            
+            .section-title {
+                font-size: 1.875rem;
+            }
+            
+            .footer-brand {
+                grid-column: span 1;
+            }
+            
+            .user-name {
+                display: none;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .header-container,
+            .hero-container,
+            .section-container,
+            .footer-container {
+                padding: 0 1rem;
+            }
+            
+            .grid {
+                gap: 1rem;
+            }
+            
+            .card {
+                padding: 1.5rem;
+            }
+        }
+    </style>
 </head>
 
 <body>
-    <!-- Loading Screen -->
-    <div id="loading-screen" class="loading-screen">
-        <div class="loading-content">
-            <div class="loading-logo">
-                <img src="assets/images/logolaranja.png" alt="Klube Cash">
-            </div>
-            <div class="loading-spinner"></div>
-            <p>Carregando sua experiência...</p>
-        </div>
-    </div>
-
-    <!-- Header Moderno e Responsivo -->
-    <header class="modern-header" id="mainHeader">
+    <!-- HEADER -->
+    <header class="header">
         <div class="header-container">
-            <nav class="main-navigation">
-                <!-- Logo Responsivo -->
-                <a href="<?php echo SITE_URL; ?>" class="brand-logo" aria-label="Klube Cash - Página Inicial">
-                    <img src="assets/images/logolaranja.png" alt="Klube Cash" class="logo-image">
-                    <span class="logo-text"></span>
-                </a>
-                
-                <!-- Menu Desktop -->
-                <ul class="desktop-menu" role="menubar">
-                    <li><a href="#como-funciona" class="nav-link smooth-scroll" role="menuitem">Como Funciona</a></li>
-                    <li><a href="#vantagens" class="nav-link smooth-scroll" role="menuitem">Vantagens</a></li>
-                    <li><a href="#parceiros" class="nav-link smooth-scroll" role="menuitem">Parceiros</a></li>
-                    <li><a href="#testimonials" class="nav-link smooth-scroll" role="menuitem">Depoimentos</a></li>
-                    <li><a href="#faq" class="nav-link smooth-scroll" role="menuitem">FAQ</a></li>
+            <a href="<?php echo SITE_URL; ?>" class="logo">
+                <img src="assets/images/logolaranja.png" alt="Klube Cash">
+            </a>
+            
+            <nav>
+                <ul class="nav-menu">
+                    <li><a href="#como-funciona" class="nav-link">Como Funciona</a></li>
+                    <li><a href="#vantagens" class="nav-link">Vantagens</a></li>
+                    <li><a href="#parceiros" class="nav-link">Parceiros</a></li>
+                    <li><a href="#faq" class="nav-link">FAQ</a></li>
                 </ul>
-                
-                <!-- Botões de Ação -->
-                <div class="header-actions">
-                    <?php if ($isLoggedIn): ?>
-                        <div class="user-menu">
-                            <button class="user-button" id="userMenuBtn">
-                                <div class="user-avatar">
-                                    <?php echo strtoupper(substr($userName, 0, 1)); ?>
-                                </div>
-                                <span class="user-name"><?php echo htmlspecialchars($userName); ?></span>
-                                <svg class="dropdown-icon" viewBox="0 0 24 24" width="16" height="16">
-                                    <path d="M7 10l5 5 5-5z" fill="currentColor"/>
-                                </svg>
-                            </button>
-                            
-                            <div class="user-dropdown" id="userDropdown">
-                                <a href="<?php echo htmlspecialchars($dashboardURL); ?>" class="dropdown-item">
-                                    <svg viewBox="0 0 24 24" width="20" height="20">
-                                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="none" stroke="currentColor" stroke-width="2"/>
-                                    </svg>
-                                    Meu Painel
-                                </a>
-                                <div class="dropdown-divider"></div>
-                                <a href="<?php echo SITE_URL; ?>/controllers/AuthController.php?action=logout" class="dropdown-item logout">
-                                    <svg viewBox="0 0 24 24" width="20" height="20">
-                                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" fill="none" stroke="currentColor" stroke-width="2"/>
-                                    </svg>
-                                    Sair
-                                </a>
-                            </div>
-                        </div>
-                    <?php else: ?>
-                        <a href="<?php echo LOGIN_URL; ?>" class="btn btn-ghost">Entrar</a>
+            </nav>
+            
+            <div class="header-actions">
+                <?php if ($isLoggedIn): ?>
+                    <div class="user-menu">
+                        <button class="user-button" onclick="toggleUserMenu()">
+                            <div class="user-avatar"><?php echo strtoupper(substr($userName, 0, 1)); ?></div>
+                            <span class="user-name"><?php echo htmlspecialchars($userName); ?></span>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M7 10l5 5 5-5z"/>
+                            </svg>
+                        </button>
                         
-                    <?php endif; ?>
-                </div>
+                        <div class="user-dropdown" id="userDropdown">
+                            <a href="<?php echo htmlspecialchars($dashboardURL); ?>" class="dropdown-item">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                                </svg>
+                                Meu Painel
+                            </a>
+                            <a href="<?php echo SITE_URL; ?>/controllers/AuthController.php?action=logout" class="dropdown-item">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>
+                                </svg>
+                                Sair
+                            </a>
+                        </div>
+                    </div>
+                <?php else: ?>
+                    <a href="<?php echo LOGIN_URL; ?>" class="btn btn-ghost">Entrar</a>
+                    <a href="<?php echo REGISTER_URL; ?>" class="btn btn-primary">Cadastrar Grátis</a>
+                <?php endif; ?>
                 
-                <!-- Botão Mobile Menu -->
-                <button class="mobile-menu-toggle" id="mobileMenuBtn" aria-label="Abrir menu">
+                <button class="mobile-toggle" onclick="toggleMobileMenu()">
                     <span class="hamburger-line"></span>
                     <span class="hamburger-line"></span>
                     <span class="hamburger-line"></span>
                 </button>
-            </nav>
-        </div>
-        
-        <!-- Menu Mobile -->
-        <div class="mobile-menu" id="mobileMenu">
-            <div class="mobile-menu-content">
-                <ul class="mobile-nav-list">
-                    <li><a href="#como-funciona" class="mobile-nav-link">Como Funciona</a></li>
-                    <li><a href="#vantagens" class="mobile-nav-link">Vantagens</a></li>
-                    <li><a href="#parceiros" class="mobile-nav-link">Parceiros</a></li>
-                    <li><a href="#testimonials" class="mobile-nav-link">Depoimentos</a></li>
-                    <li><a href="#faq" class="mobile-nav-link">FAQ</a></li>
-                </ul>
-                
-                <div class="mobile-menu-actions">
-                    <?php if ($isLoggedIn): ?>
-                        <a href="<?php echo htmlspecialchars($dashboardURL); ?>" class="btn btn-primary btn-full">Meu Painel</a>
-                        <a href="<?php echo SITE_URL; ?>/controllers/AuthController.php?action=logout" class="btn btn-ghost btn-full">Sair</a>
-                    <?php else: ?>
-                        <a href="<?php echo LOGIN_URL; ?>" class="btn btn-ghost btn-full">Entrar</a>
-                        <a href="<?php echo REGISTER_URL; ?>" class="btn btn-primary btn-full">Cadastrar Grátis</a>
-                    <?php endif; ?>
-                </div>
             </div>
         </div>
     </header>
-
+    
+    <!-- MAIN CONTENT -->
     <main class="main-content">
-        <!-- Hero Section Revolucionária -->
-        <section class="hero-modern" id="hero">
-            <div class="hero-background">
-                <div class="hero-shapes">
-                    <div class="shape shape-1"></div>
-                    <div class="shape shape-2"></div>
-                    <div class="shape shape-3"></div>
-                </div>
-                <div class="hero-gradient"></div>
-            </div>
-            
+        <!-- HERO SECTION -->
+        <section class="hero">
             <div class="hero-container">
-                <div class="hero-content" data-aos="fade-up" data-aos-duration="800">
-                    <?php if ($isLoggedIn): ?>
-                        <div class="welcome-badge">
-                            <span class="badge-icon">👋</span>
-                            <span>Bem-vindo de volta!</span>
-                        </div>
-                        <h1 class="hero-title">
-                            Olá, <span class="highlight-name"><?php echo htmlspecialchars($userName); ?></span>!
-                            <br>Continue economizando com <span class="highlight-brand">inteligência</span>
-                        </h1>
-                        <p class="hero-subtitle">
-                            Você já faz parte da revolução do cashback. Explore suas oportunidades de economia e descubra quanto dinheiro pode ganhar de volta com suas próximas compras.
-                        </p>
-                        <div class="hero-actions">
-                            <a href="<?php echo htmlspecialchars($dashboardURL); ?>" class="btn btn-primary btn-large">
-                                <span>Acessar Minha Conta</span>
-                                <svg viewBox="0 0 24 24" width="20" height="20">
-                                    <path d="M5 12h14M12 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2"/>
-                                </svg>
-                            </a>
-                            <a href="#parceiros" class="btn btn-ghost btn-large smooth-scroll">Ver Lojas Parceiras</a>
-                        </div>
-                    <?php else: ?>
-                        <div class="hero-badge">
-                            <span class="badge-icon">💰</span>
-                            <span>Dinheiro de volta garantido</span>
-                        </div>
-                        <h1 class="hero-title">
-                            Transforme suas <span class="highlight-primary">compras</span> em
-                            <span class="highlight-secondary">dinheiro de volta</span>
-                        </h1>
-                        <p class="hero-subtitle">
-                            O Klube Cash é o programa de cashback mais inteligente do Brasil. Cadastre-se gratuitamente e comece a receber dinheiro de volta em todas as suas compras. Simples, rápido e sem pegadinhas.
-                        </p>
-                        <div class="hero-actions">
-                            <a href="<?php echo REGISTER_URL; ?>" class="btn btn-primary btn-large pulse-animation">
-                                <span>Começar Agora - É Grátis</span>
-                                <svg viewBox="0 0 24 24" width="20" height="20">
-                                    <path d="M5 12h14M12 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2"/>
-                                </svg>
-                            </a>
-                            <a href="#como-funciona" class="btn btn-ghost btn-large smooth-scroll">Como Funciona?</a>
-                        </div>
-                    <?php endif; ?>
-                    
-                    <!-- Estatísticas Impressionantes -->
-                    <div class="hero-stats" data-aos="fade-up" data-aos-delay="400">
-                        <div class="stat-item">
-                            <div class="stat-number" data-count="50000">0</div>
-                            <div class="stat-label">Usuários Ativos</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-number" data-count="500">0</div>
-                            <div class="stat-label">Lojas Parceiras</div>
-                        </div>
-                        <div class="stat-item">
-                            <div class="stat-number">R$ <span data-count="2500000">0</span></div>
-                            <div class="stat-label">Em Cashback Pago</div>
-                        </div>
+                <?php if ($isLoggedIn): ?>
+                    <div class="hero-badge">
+                        <span>👋</span>
+                        <span>Bem-vindo de volta!</span>
                     </div>
-                </div>
+                    <h1 class="hero-title">
+                        Olá, <?php echo htmlspecialchars($userName); ?>!<br>
+                        Continue economizando com <em>inteligência</em>
+                    </h1>
+                    <p class="hero-subtitle">
+                        Você já faz parte da revolução do cashback. Explore suas oportunidades de economia.
+                    </p>
+                    <div class="hero-actions">
+                        <a href="<?php echo htmlspecialchars($dashboardURL); ?>" class="btn btn-primary btn-large">
+                            Acessar Minha Conta
+                        </a>
+                        <a href="#parceiros" class="btn btn-ghost btn-large">Ver Lojas Parceiras</a>
+                    </div>
+                <?php else: ?>
+                    <div class="hero-badge">
+                        <span>💰</span>
+                        <span>Dinheiro de volta garantido</span>
+                    </div>
+                    <h1 class="hero-title">
+                        Transforme suas <em>compras</em> em<br>
+                        <em>dinheiro de volta</em>
+                    </h1>
+                    <p class="hero-subtitle">
+                        O Klube Cash é o programa de cashback mais inteligente do Brasil. 
+                        Cadastre-se gratuitamente e comece a receber dinheiro de volta em todas as suas compras.
+                    </p>
+                    <div class="hero-actions">
+                        <a href="<?php echo REGISTER_URL; ?>" class="btn btn-primary btn-large">
+                            Começar Agora - É Grátis
+                        </a>
+                        <a href="#como-funciona" class="btn btn-ghost btn-large">Como Funciona?</a>
+                    </div>
+                <?php endif; ?>
                 
-                <!-- Ilustração Moderna -->
-                <div class="hero-visual" data-aos="fade-left" data-aos-delay="200">
-                    <div class="visual-container">
-                        <div class="cashback-card floating">
-                            <div class="card-header">
-                                <div class="card-logo">💳</div>
-                                <span>Klube Cash</span>
-                            </div>
-                            <div class="card-content">
-                                <div class="balance-label">Seu Cashback</div>
-                                <div class="balance-amount">R$ 247,85</div>
-                            </div>
-                            <div class="card-footer">
-                                <div class="progress-bar">
-                                    <div class="progress-fill"></div>
-                                </div>
-                                <span class="progress-text">+15% este mês</span>
-                            </div>
-                        </div>
-                        
-                        <div class="floating-icons">
-                            <div class="icon-item icon-1">💰</div>
-                            <div class="icon-item icon-2">🎯</div>
-                            <div class="icon-item icon-3">⚡</div>
-                            <div class="icon-item icon-4">🚀</div>
-                        </div>
+                <div class="hero-stats">
+                    <div class="stat-item">
+                        <span class="stat-number">50K+</span>
+                        <span class="stat-label">Usuários Ativos</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number">500+</span>
+                        <span class="stat-label">Lojas Parceiras</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number">R$ 2.5M</span>
+                        <span class="stat-label">Em Cashback Pago</span>
                     </div>
                 </div>
-            </div>
-            
-            <!-- Indicador de Scroll -->
-            <div class="scroll-indicator">
-                <div class="scroll-text">Role para descobrir mais</div>
-                <div class="scroll-arrow"></div>
             </div>
         </section>
-
-        <!-- Como Funciona - Redesenhado -->
-        <section class="how-it-works modern-section" id="como-funciona">
+        
+        <!-- COMO FUNCIONA -->
+        <section class="section" id="como-funciona">
             <div class="section-container">
-                <div class="section-header" data-aos="fade-up">
+                <div class="section-header">
                     <span class="section-badge">Processo Simples</span>
                     <h2 class="section-title">Como o Klube Cash Funciona?</h2>
                     <p class="section-description">
-                        Três passos simples para começar a receber dinheiro de volta em todas as suas compras. 
-                        Não há truques, taxas ocultas ou complicações.
+                        Três passos simples para começar a receber dinheiro de volta em todas as suas compras.
                     </p>
                 </div>
                 
-                <div class="steps-grid">
-                    <div class="step-card" data-aos="zoom-in" data-aos-delay="100">
-                        <div class="step-visual">
-                            <div class="step-number">1</div>
-                            <div class="step-icon">
-                                <svg viewBox="0 0 24 24" width="32" height="32">
-                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z" fill="none" stroke="currentColor" stroke-width="2"/>
-                                </svg>
-                            </div>
-                        </div>
-                        <h3 class="step-title">Cadastre-se Gratuitamente</h3>
-                        <p class="step-description">
-                            Crie sua conta em menos de 2 minutos. É 100% gratuito e você não paga nada para participar do programa.
+                <div class="grid grid-3">
+                    <div class="card">
+                        <div class="card-icon">1️⃣</div>
+                        <h3 class="card-title">Cadastre-se Gratuitamente</h3>
+                        <p class="card-description">
+                            Crie sua conta em menos de 2 minutos. É 100% gratuito e você não paga nada para participar.
                         </p>
-                        <div class="step-features">
-                            <span class="feature">✓ Sem taxas</span>
-                            <span class="feature">✓ Sem anuidade</span>
-                            <span class="feature">✓ Cadastro rápido</span>
-                        </div>
                     </div>
                     
-                    <div class="step-card" data-aos="zoom-in" data-aos-delay="200">
-                        <div class="step-visual">
-                            <div class="step-number">2</div>
-                            <div class="step-icon">
-                                <svg viewBox="0 0 24 24" width="32" height="32">
-                                    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2M15 2H9a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1z" fill="none" stroke="currentColor" stroke-width="2"/>
-                                </svg>
-                            </div>
-                        </div>
-                        <h3 class="step-title">Compre e Se Identifique</h3>
-                        <p class="step-description">
-                            Faça suas compras normalmente nas lojas parceiras e se identifique como membro Klube Cash no momento da compra.
+                    <div class="card">
+                        <div class="card-icon">2️⃣</div>
+                        <h3 class="card-title">Compre e Se Identifique</h3>
+                        <p class="card-description">
+                            Faça suas compras normalmente nas lojas parceiras e se identifique como membro Klube Cash.
                         </p>
-                        <div class="step-features">
-                            <span class="feature">✓ Online ou física</span>
-                            <span class="feature">✓ Processo simples</span>
-                            <span class="feature">✓ Sem mudanças</span>
-                        </div>
                     </div>
                     
-                    <div class="step-card" data-aos="zoom-in" data-aos-delay="300">
-                        <div class="step-visual">
-                            <div class="step-number">3</div>
-                            <div class="step-icon">
-                                <svg viewBox="0 0 24 24" width="32" height="32">
-                                    <path d="M12 1v6m0 6v6m8-10l-6 6-2-2-4 4" fill="none" stroke="currentColor" stroke-width="2"/>
-                                </svg>
-                            </div>
-                        </div>
-                        <h3 class="step-title">Receba Seu Cashback</h3>
-                        <p class="step-description">
-                            Uma porcentagem do valor das suas compras volta para sua conta Klube Cash. É dinheiro real que você pode usar!
+                    <div class="card">
+                        <div class="card-icon">3️⃣</div>
+                        <h3 class="card-title">Receba Seu Cashback</h3>
+                        <p class="card-description">
+                            Uma porcentagem do valor volta para sua conta. É dinheiro real que você pode usar!
                         </p>
-                        <div class="step-features">
-                            <span class="feature">✓ Dinheiro real</span>
-                            <span class="feature">✓ Automático</span>
-                            <span class="feature">✓ Sem prazo para usar</span>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Timeline Visual -->
-                <div class="process-timeline" data-aos="fade-up" data-aos-delay="400">
-                    <div class="timeline-line"></div>
-                    <div class="timeline-points">
-                        <div class="timeline-point active">
-                            <span class="point-number">1</span>
-                        </div>
-                        <div class="timeline-point">
-                            <span class="point-number">2</span>
-                        </div>
-                        <div class="timeline-point">
-                            <span class="point-number">3</span>
-                        </div>
                     </div>
                 </div>
             </div>
         </section>
-
-        <!-- Vantagens - Seção Completamente Nova -->
-        <section class="advantages-section modern-section" id="vantagens">
+        
+        <!-- VANTAGENS -->
+        <section class="section" id="vantagens">
             <div class="section-container">
-                <div class="section-header" data-aos="fade-up">
+                <div class="section-header">
                     <span class="section-badge">Por Que Escolher?</span>
                     <h2 class="section-title">Vantagens Exclusivas do Klube Cash</h2>
                     <p class="section-description">
-                        Descobri porque somos a escolha número 1 de quem quer economizar de verdade
+                        Descubra por que somos a escolha número 1 de quem quer economizar de verdade
                     </p>
                 </div>
                 
-                <div class="advantages-grid">
-                    <div class="advantage-card featured" data-aos="fade-up" data-aos-delay="100">
-                        <div class="advantage-icon">
-                            <svg viewBox="0 0 24 24" width="40" height="40">
-                                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" fill="none" stroke="currentColor" stroke-width="2"/>
-                            </svg>
-                        </div>
-                        <h3 class="advantage-title">Cashback Real</h3>
-                        <p class="advantage-description">
-                            Dinheiro de verdade na sua conta, não pontos que expiram ou vales que complicam sua vida.
-                        </p>
-                        <div class="advantage-highlight">
-                            <span class="highlight-text">Até 10% de volta</span>
-                        </div>
-                    </div>
-                    
-                    <div class="advantage-card" data-aos="fade-up" data-aos-delay="200">
-                        <div class="advantage-icon">
-                            <svg viewBox="0 0 24 24" width="40" height="40">
-                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" fill="none" stroke="currentColor" stroke-width="2"/>
-                            </svg>
-                        </div>
-                        <h3 class="advantage-title">100% Seguro</h3>
-                        <p class="advantage-description">
-                            Plataforma criptografada e dados protegidos. Sua segurança é nossa prioridade máxima.
+                <div class="grid grid-3">
+                    <div class="card">
+                        <div class="card-icon">💰</div>
+                        <h3 class="card-title">Cashback Real</h3>
+                        <p class="card-description">
+                            Dinheiro de verdade na sua conta, não pontos que expiram ou vales complicados.
                         </p>
                     </div>
                     
-                    <div class="advantage-card" data-aos="fade-up" data-aos-delay="300">
-                        <div class="advantage-icon">
-                            <svg viewBox="0 0 24 24" width="40" height="40">
-                                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="none" stroke="currentColor" stroke-width="2"/>
-                            </svg>
-                        </div>
-                        <h3 class="advantage-title">Instantâneo</h3>
-                        <p class="advantage-description">
-                            Cashback processado rapidamente. Você vê o retorno do seu dinheiro em tempo real.
+                    <div class="card">
+                        <div class="card-icon">🔒</div>
+                        <h3 class="card-title">100% Seguro</h3>
+                        <p class="card-description">
+                            Plataforma criptografada e dados protegidos. Sua segurança é nossa prioridade.
                         </p>
                     </div>
                     
-                    <div class="advantage-card" data-aos="fade-up" data-aos-delay="400">
-                        <div class="advantage-icon">
-                            <svg viewBox="0 0 24 24" width="40" height="40">
-                                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" fill="none" stroke="currentColor" stroke-width="2"/>
-                            </svg>
-                        </div>
-                        <h3 class="advantage-title">Suporte 24/7</h3>
-                        <p class="advantage-description">
-                            Equipe especializada sempre pronta para ajudar você com qualquer dúvida ou problema.
+                    <div class="card">
+                        <div class="card-icon">⚡</div>
+                        <h3 class="card-title">Instantâneo</h3>
+                        <p class="card-description">
+                            Cashback processado rapidamente. Você vê o retorno em tempo real.
                         </p>
                     </div>
                     
-                    <div class="advantage-card" data-aos="fade-up" data-aos-delay="500">
-                        <div class="advantage-icon">
-                            <svg viewBox="0 0 24 24" width="40" height="40">
-                                <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.29 1.51 4.04 3 5.5l7 7z" fill="none" stroke="currentColor" stroke-width="2"/>
-                            </svg>
-                        </div>
-                        <h3 class="advantage-title">Sem Fidelidade</h3>
-                        <p class="advantage-description">
-                            Use quando quiser, como quiser. Sem contratos longos ou obrigações chatas.
-                        </p>
-                    </div>
-                    
-                    <div class="advantage-card" data-aos="fade-up" data-aos-delay="600">
-                        <div class="advantage-icon">
-                            <svg viewBox="0 0 24 24" width="40" height="40">
-                                <path d="M3 3h18l-1 13H4L3 3zM3 3L2 1M7 13v6a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-6" fill="none" stroke="currentColor" stroke-width="2"/>
-                            </svg>
-                        </div>
-                        <h3 class="advantage-title">Milhares de Lojas</h3>
-                        <p class="advantage-description">
+                    <div class="card">
+                        <div class="card-icon">🏪</div>
+                        <h3 class="card-title">Milhares de Lojas</h3>
+                        <p class="card-description">
                             Rede gigante de parceiros em todas as categorias que você imaginar.
                         </p>
                     </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- CTA Revolucionário -->
-        <section class="cta-modern">
-            <div class="cta-background">
-                <div class="cta-shapes">
-                    <div class="cta-shape cta-shape-1"></div>
-                    <div class="cta-shape cta-shape-2"></div>
-                </div>
-            </div>
-            
-            <div class="cta-container" data-aos="zoom-in">
-                <div class="cta-content">
-                    <h2 class="cta-title">Pronto para Começar a Ganhar Dinheiro?</h2>
-                    <p class="cta-description">
-                        Junte-se a milhares de brasileiros que já descobriram o segredo de transformar gastos em ganhos. 
-                        Seu primeiro cashback está a apenas um clique de distância.
-                    </p>
                     
-                    <div class="cta-stats">
-                        <div class="cta-stat">
-                            <div class="stat-icon">⏱️</div>
-                            <div class="stat-info">
-                                <div class="stat-number">2 min</div>
-                                <div class="stat-text">para cadastrar</div>
-                            </div>
-                        </div>
-                        <div class="cta-stat">
-                            <div class="stat-icon">💰</div>
-                            <div class="stat-info">
-                                <div class="stat-number">R$ 0</div>
-                                <div class="stat-text">de taxa</div>
-                            </div>
-                        </div>
-                        <div class="cta-stat">
-                            <div class="stat-icon">🚀</div>
-                            <div class="stat-info">
-                                <div class="stat-number">Hoje</div>
-                                <div class="stat-text">comece a economizar</div>
-                            </div>
-                        </div>
+                    <div class="card">
+                        <div class="card-icon">💝</div>
+                        <h3 class="card-title">Sem Fidelidade</h3>
+                        <p class="card-description">
+                            Use quando quiser, como quiser. Sem contratos longos ou obrigações.
+                        </p>
                     </div>
                     
-                    <div class="cta-actions">
-                        <a href="<?php echo REGISTER_URL; ?>" class="btn btn-cta btn-large">
-                            <span>Quero Meu Cashback Agora!</span>
-                            <svg viewBox="0 0 24 24" width="24" height="24">
-                                <path d="M5 12h14M12 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2"/>
-                            </svg>
-                        </a>
-                        
-                        <div class="cta-guarantee">
-                            <svg viewBox="0 0 24 24" width="20" height="20">
-                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" fill="none" stroke="currentColor" stroke-width="2"/>
-                            </svg>
-                            <span>100% Gratuito • Sem Pegadinhas</span>
-                        </div>
+                    <div class="card">
+                        <div class="card-icon">🔧</div>
+                        <h3 class="card-title">Suporte 24/7</h3>
+                        <p class="card-description">
+                            Equipe especializada sempre pronta para ajudar com qualquer dúvida.
+                        </p>
                     </div>
                 </div>
             </div>
         </section>
-
-        <!-- Lojas Parceiras - Redesenhado -->
-        <section class="partners-modern modern-section" id="parceiros">
+        
+        <!-- PARCEIROS -->
+        <section class="section" id="parceiros">
             <div class="section-container">
-                <div class="section-header" data-aos="fade-up">
+                <div class="section-header">
                     <span class="section-badge">Nossos Parceiros</span>
                     <h2 class="section-title">Onde Você Pode Usar o Klube Cash</h2>
                     <p class="section-description">
-                        Descubra algumas das incríveis lojas parceiras onde você pode ganhar cashback em suas compras
+                        Algumas das incríveis lojas parceiras onde você pode ganhar cashback
                     </p>
                 </div>
                 
                 <?php if (!empty($partnerStores)): ?>
-                    <div class="partners-showcase" data-aos="fade-up" data-aos-delay="200">
-                        <?php foreach ($partnerStores as $index => $store): ?>
-                            <div class="partner-item" data-aos="zoom-in" data-aos-delay="<?php echo 100 + ($index * 50); ?>">
-                                <div class="partner-logo">
-                                    <?php echo renderStoreLogo($store); ?>
+                    <div class="grid grid-4">
+                        <?php foreach ($partnerStores as $store): ?>
+                            <div class="card">
+                                <?php echo renderStoreLogo($store); ?>
+                                <h4 class="card-title"><?php echo htmlspecialchars($store['nome_fantasia']); ?></h4>
+                                <?php if (!empty($store['categoria'])): ?>
+                                    <p style="font-size: 0.875rem; color: var(--gray-600); margin-bottom: 1rem;">
+                                        <?php echo htmlspecialchars($store['categoria']); ?>
+                                    </p>
+                                <?php endif; ?>
+                                <div style="font-weight: 600; color: var(--primary-color);">
+                                    Cashback: <?php echo number_format($store['porcentagem_cashback'] ?? 5, 1); ?>%
                                 </div>
-                                <div class="partner-info">
-                                    <h4 class="partner-name"><?php echo htmlspecialchars($store['nome_fantasia']); ?></h4>
-                                    <?php if (!empty($store['categoria'])): ?>
-                                        <span class="partner-category"><?php echo htmlspecialchars($store['categoria']); ?></span>
-                                    <?php endif; ?>
-                                    <div class="partner-cashback">
-                                        <span class="cashback-label">Cashback:</span>
-                                        <span class="cashback-value"><?php echo number_format($store['porcentagem_cashback'] ?? 5, 1); ?>%</span>
-                                    </div>
-                                </div>
-                                <div class="partner-hover-effect"></div>
                             </div>
                         <?php endforeach; ?>
                     </div>
-                    
-                    <div class="partners-footer" data-aos="fade-up" data-aos-delay="400">
-                        <div class="partners-count">
-                            <span class="count-number">+500</span>
-                            <span class="count-text">lojas parceiras em todo Brasil</span>
-                        </div>
-                        <a href="<?php echo STORE_REGISTER_URL; ?>" class="btn btn-outline">
-                            <span>Quero Ser Parceiro</span>
-                            <svg viewBox="0 0 24 24" width="20" height="20">
-                                <path d="M5 12h14M12 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2"/>
-                            </svg>
-                        </a>
-                    </div>
                 <?php else: ?>
-                    <div class="partners-empty" data-aos="fade-up">
-                        <div class="empty-icon">🏪</div>
+                    <div style="text-align: center; padding: 4rem 0; background: rgba(255, 122, 0, 0.05); border-radius: 1rem;">
+                        <div style="font-size: 3rem; margin-bottom: 1rem;">🏪</div>
                         <h3>Em Breve: Lojas Incríveis!</h3>
-                        <p>Estamos fechando parcerias com as melhores lojas para você. Em breve você terá acesso a centenas de opções para ganhar cashback!</p>
-                        <a href="<?php echo STORE_REGISTER_URL; ?>" class="btn btn-primary">Seja o Primeiro Parceiro</a>
+                        <p>Estamos fechando parcerias com as melhores lojas para você.</p>
+                        <a href="<?php echo STORE_REGISTER_URL; ?>" class="btn btn-primary" style="margin-top: 1rem;">Seja o Primeiro Parceiro</a>
                     </div>
                 <?php endif; ?>
             </div>
         </section>
-
-        <!-- Depoimentos - Seção Nova -->
-        <section class="testimonials-section modern-section" id="testimonials">
+        
+        <!-- FAQ -->
+        <section class="section" id="faq">
             <div class="section-container">
-                <div class="section-header" data-aos="fade-up">
-                    <span class="section-badge">Depoimentos</span>
-                    <h2 class="section-title">O Que Nossos Usuários Dizem</h2>
-                    <p class="section-description">
-                        Veja como o Klube Cash está transformando a vida financeira de milhares de brasileiros
-                    </p>
-                </div>
-                
-                <div class="testimonials-grid">
-                    <div class="testimonial-card" data-aos="fade-up" data-aos-delay="100">
-                        <div class="testimonial-content">
-                            <div class="testimonial-rating">
-                                <span class="star">⭐</span>
-                                <span class="star">⭐</span>
-                                <span class="star">⭐</span>
-                                <span class="star">⭐</span>
-                                <span class="star">⭐</span>
-                            </div>
-                            <blockquote class="testimonial-text">
-                                "Em 6 meses já recebi mais de R$ 500 em cashback! É dinheiro real que eu uso para outras compras. Simplesmente incrível!"
-                            </blockquote>
-                            <div class="testimonial-author">
-                                <div class="author-avatar">M</div>
-                                <div class="author-info">
-                                    <div class="author-name">Maria Silva</div>
-                                    <div class="author-location">São Paulo, SP</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="testimonial-card featured" data-aos="fade-up" data-aos-delay="200">
-                        <div class="testimonial-content">
-                            <div class="testimonial-rating">
-                                <span class="star">⭐</span>
-                                <span class="star">⭐</span>
-                                <span class="star">⭐</span>
-                                <span class="star">⭐</span>
-                                <span class="star">⭐</span>
-                            </div>
-                            <blockquote class="testimonial-text">
-                                "O processo é super simples e transparente. Não tem pegadinha, o dinheiro realmente volta para minha conta. Recomendo para todos!"
-                            </blockquote>
-                            <div class="testimonial-author">
-                                <div class="author-avatar">J</div>
-                                <div class="author-info">
-                                    <div class="author-name">João Santos</div>
-                                    <div class="author-location">Rio de Janeiro, RJ</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="testimonial-card" data-aos="fade-up" data-aos-delay="300">
-                        <div class="testimonial-content">
-                            <div class="testimonial-rating">
-                                <span class="star">⭐</span>
-                                <span class="star">⭐</span>
-                                <span class="star">⭐</span>
-                                <span class="star">⭐</span>
-                                <span class="star">⭐</span>
-                            </div>
-                            <blockquote class="testimonial-text">
-                                "Como empresária, preciso de soluções práticas. O Klube Cash me ajuda a economizar nas compras para minha empresa."
-                            </blockquote>
-                            <div class="testimonial-author">
-                                <div class="author-avatar">A</div>
-                                <div class="author-info">
-                                    <div class="author-name">Ana Costa</div>
-                                    <div class="author-location">Belo Horizonte, MG</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- FAQ Modernizado -->
-        <section class="faq-modern modern-section" id="faq">
-            <div class="section-container">
-                <div class="section-header" data-aos="fade-up">
+                <div class="section-header">
                     <span class="section-badge">Tire Suas Dúvidas</span>
                     <h2 class="section-title">Perguntas Frequentes</h2>
-                    <p class="section-description">
-                        Encontre respostas para as principais dúvidas sobre o Klube Cash
-                    </p>
                 </div>
                 
-                <div class="faq-container" data-aos="fade-up" data-aos-delay="200">
-                    <div class="faq-item">
-                        <button class="faq-question" aria-expanded="false">
-                            <span class="question-text">O cadastro no Klube Cash é realmente gratuito?</span>
-                            <span class="question-icon">
-                                <svg viewBox="0 0 24 24" width="20" height="20">
-                                    <path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2"/>
-                                </svg>
-                            </span>
-                        </button>
-                        <div class="faq-answer">
-                            <div class="answer-content">
-                                <p>Sim! O cadastro no Klube Cash é 100% gratuito e sempre será. Não cobramos nenhuma taxa de adesão, mensalidade ou anuidade. Você só ganha dinheiro, nunca paga nada para participar do programa.</p>
+                <div style="max-width: 800px; margin: 0 auto;">
+                    <div class="faq-item" onclick="toggleFAQ(this)">
+                        <div style="background: var(--white); border: 1px solid var(--gray-100); border-radius: 1rem; margin-bottom: 1rem; overflow: hidden;">
+                            <button style="width: 100%; padding: 1.5rem; text-align: left; background: none; border: none; font-size: 1.125rem; font-weight: 600; cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
+                                <span>O cadastro no Klube Cash é realmente gratuito?</span>
+                                <span class="faq-icon">▼</span>
+                            </button>
+                            <div class="faq-answer" style="max-height: 0; overflow: hidden; transition: max-height 0.3s ease;">
+                                <div style="padding: 0 1.5rem 1.5rem; color: var(--gray-600);">
+                                    Sim! O cadastro no Klube Cash é 100% gratuito e sempre será. Não cobramos nenhuma taxa de adesão, mensalidade ou anuidade.
+                                </div>
                             </div>
                         </div>
                     </div>
                     
-                    <div class="faq-item">
-                        <button class="faq-question" aria-expanded="false">
-                            <span class="question-text">Como funciona o cashback? É dinheiro real?</span>
-                            <span class="question-icon">
-                                <svg viewBox="0 0 24 24" width="20" height="20">
-                                    <path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2"/>
-                                </svg>
-                            </span>
-                        </button>
-                        <div class="faq-answer">
-                            <div class="answer-content">
-                                <p>Sim, é dinheiro real! Quando você compra em lojas parceiras, uma porcentagem do valor volta como cashback para sua conta Klube Cash. Esse dinheiro pode ser usado em novas compras ou transferido para sua conta bancária.</p>
+                    <div class="faq-item" onclick="toggleFAQ(this)">
+                        <div style="background: var(--white); border: 1px solid var(--gray-100); border-radius: 1rem; margin-bottom: 1rem; overflow: hidden;">
+                            <button style="width: 100%; padding: 1.5rem; text-align: left; background: none; border: none; font-size: 1.125rem; font-weight: 600; cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
+                                <span>Como funciona o cashback? É dinheiro real?</span>
+                                <span class="faq-icon">▼</span>
+                            </button>
+                            <div class="faq-answer" style="max-height: 0; overflow: hidden; transition: max-height 0.3s ease;">
+                                <div style="padding: 0 1.5rem 1.5rem; color: var(--gray-600);">
+                                    Sim, é dinheiro real! Quando você compra em lojas parceiras, uma porcentagem do valor volta como cashback para usar em novas compras na mesma loja.
+                                </div>
                             </div>
                         </div>
                     </div>
                     
-                    <div class="faq-item">
-                        <button class="faq-question" aria-expanded="false">
-                            <span class="question-text">Quanto tempo demora para receber o cashback?</span>
-                            <span class="question-icon">
-                                <svg viewBox="0 0 24 24" width="20" height="20">
-                                    <path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2"/>
-                                </svg>
-                            </span>
-                        </button>
-                        <div class="faq-answer">
-                            <div class="answer-content">
-                                <p>O cashback aparece em sua conta imediatamente após a confirmação da compra pela loja parceira. Geralmente isso acontece em até 48 horas, mas pode variar conforme cada loja.</p>
+                    <div class="faq-item" onclick="toggleFAQ(this)">
+                        <div style="background: var(--white); border: 1px solid var(--gray-100); border-radius: 1rem; margin-bottom: 1rem; overflow: hidden;">
+                            <button style="width: 100%; padding: 1.5rem; text-align: left; background: none; border: none; font-size: 1.125rem; font-weight: 600; cursor: pointer; display: flex; justify-content: space-between; align-items: center;">
+                                <span>O Klube Cash é seguro para usar?</span>
+                                <span class="faq-icon">▼</span>
+                            </button>
+                            <div class="faq-answer" style="max-height: 0; overflow: hidden; transition: max-height 0.3s ease;">
+                                <div style="padding: 0 1.5rem 1.5rem; color: var(--gray-600);">
+                                    Absolutamente! Utilizamos tecnologias avançadas de criptografia para proteger seus dados e seguimos todas as normas de segurança.
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    
-                    <div class="faq-item">
-                        <button class="faq-question" aria-expanded="false">
-                            <span class="question-text">Posso usar o cashback em qualquer loja?</span>
-                            <span class="question-icon">
-                                <svg viewBox="0 0 24 24" width="20" height="20">
-                                    <path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2"/>
-                                </svg>
-                            </span>
-                        </button>
-                        <div class="faq-answer">
-                            <div class="answer-content">
-                                <p>O cashback gerado em uma loja só pode ser usado na mesma loja onde foi gerado. Isso garante um relacionamento mais forte entre você e as lojas parceiras que realmente oferecem vantagens.</p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="faq-item">
-                        <button class="faq-question" aria-expanded="false">
-                            <span class="question-text">Como minha loja pode participar do programa?</span>
-                            <span class="question-icon">
-                                <svg viewBox="0 0 24 24" width="20" height="20">
-                                    <path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2"/>
-                                </svg>
-                            </span>
-                        </button>
-                        <div class="faq-answer">
-                            <div class="answer-content">
-                                <p>É muito simples! Clique em "Quero Ser Parceiro", preencha o formulário de cadastro da sua loja e nossa equipe entrará em contato para explicar todo o processo e benefícios.</p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="faq-item">
-                        <button class="faq-question" aria-expanded="false">
-                            <span class="question-text">O Klube Cash é seguro para usar?</span>
-                            <span class="question-icon">
-                                <svg viewBox="0 0 24 24" width="20" height="20">
-                                    <path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2"/>
-                                </svg>
-                            </span>
-                        </button>
-                        <div class="faq-answer">
-                            <div class="answer-content">
-                                <p>Absolutamente! Utilizamos as mais avançadas tecnologias de criptografia para proteger seus dados. Além disso, não armazenamos informações de cartão de crédito e seguimos todas as normas de segurança do mercado financeiro.</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="faq-footer" data-aos="fade-up" data-aos-delay="400">
-                    <div class="faq-contact">
-                        <h3>Ainda tem dúvidas?</h3>
-                        <p>Nossa equipe está sempre pronta para ajudar você!</p>
-                        <a href="mailto:contato@klubecash.com" class="btn btn-outline">
-                            <svg viewBox="0 0 24 24" width="20" height="20">
-                                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" fill="none" stroke="currentColor" stroke-width="2"/>
-                                <polyline points="22,6 12,13 2,6" fill="none" stroke="currentColor" stroke-width="2"/>
-                            </svg>
-                            Falar com Suporte
-                        </a>
                     </div>
                 </div>
             </div>
         </section>
     </main>
-
-    <!-- Footer Moderno -->
-    <footer class="modern-footer">
-        <div class="footer-background">
-            <div class="footer-pattern"></div>
-        </div>
-        
+    
+    <!-- FOOTER -->
+    <footer class="footer">
         <div class="footer-container">
             <div class="footer-grid">
                 <div class="footer-brand">
-                    <div class="brand-logo-footer">
-                        <img src="assets/images/logolaranja.png" alt="Klube Cash">
-                        <span class="brand-name"></span>
+                    <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.5rem;">
+                        <img src="assets/images/logobranco.png" alt="Klube Cash" style="height: 40px;">
                     </div>
-                    <p class="brand-description">
+                    <p style="margin-bottom: 1.5rem; color: rgba(255, 255, 255, 0.8);">
                         Transformando suas compras em oportunidades de economia. 
                         O programa de cashback mais inteligente e confiável do Brasil.
                     </p>
-                    <div class="social-links">
-                        <a href="https://www.instagram.com/klubecash/" class="social-link" target="_blank" rel="noopener">
-                            <svg viewBox="0 0 24 24" width="20" height="20">
-                                <rect x="2" y="2" width="20" height="20" rx="5" ry="5" fill="none" stroke="currentColor" stroke-width="2"/>
-                                <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" fill="none" stroke="currentColor" stroke-width="2"/>
-                                <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" stroke="currentColor" stroke-width="2"/>
-                            </svg>
-                        </a>
-                        <a href="#" class="social-link">
-                            <svg viewBox="0 0 24 24" width="20" height="20">
-                                <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" fill="none" stroke="currentColor" stroke-width="2"/>
-                            </svg>
-                        </a>
-                        <a href="#" class="social-link">
-                            <svg viewBox="0 0 24 24" width="20" height="20">
-                                <path d="M23 3a10.9 10.9 0 0 1-3.14 1.53 4.48 4.48 0 0 0-7.86 3v1A10.66 10.66 0 0 1 3 4s-4 9 5 13a11.64 11.64 0 0 1-7 2c9 5 20 0 20-11.5a4.5 4.5 0 0 0-.08-.83A7.72 7.72 0 0 0 23 3z" fill="none" stroke="currentColor" stroke-width="2"/>
-                            </svg>
-                        </a>
-                    </div>
                 </div>
                 
-                <div class="footer-links">
+                <div>
                     <h4 class="footer-title">Links Rápidos</h4>
-                    <ul class="link-list">
-                        <li><a href="#como-funciona" class="smooth-scroll">Como Funciona</a></li>
-                        <li><a href="#vantagens" class="smooth-scroll">Vantagens</a></li>
-                        <li><a href="#parceiros" class="smooth-scroll">Lojas Parceiras</a></li>
-                        <li><a href="#faq" class="smooth-scroll">FAQ</a></li>
+                    <ul class="footer-links">
+                        <li><a href="#como-funciona">Como Funciona</a></li>
+                        <li><a href="#vantagens">Vantagens</a></li>
+                        <li><a href="#parceiros">Lojas Parceiras</a></li>
                         <li><a href="<?php echo STORE_REGISTER_URL; ?>">Seja Parceiro</a></li>
                     </ul>
                 </div>
                 
-                <div class="footer-legal">
-                    <h4 class="footer-title">Legal</h4>
-                    <ul class="link-list">
-                        <li><a href="#">Termos de Uso</a></li>
-                        <li><a href="#">Política de Privacidade</a></li>
-                        <li><a href="#">Política de Cookies</a></li>
-                        <li><a href="#">Código de Conduta</a></li>
-                        <li><a href="#">Regulamentação</a></li>
-                    </ul>
-                </div>
-                
-                <div class="footer-contact">
+                <div>
                     <h4 class="footer-title">Contato</h4>
-                    <div class="contact-list">
-                        <div class="contact-item">
-                            <svg viewBox="0 0 24 24" width="18" height="18">
-                                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" fill="none" stroke="currentColor" stroke-width="2"/>
-                                <polyline points="22,6 12,13 2,6" fill="none" stroke="currentColor" stroke-width="2"/>
-                            </svg>
-                            <a href="mailto:contato@klubecash.com">contato@klubecash.com</a>
-                        </div>
-                        <div class="contact-item">
-                            <svg viewBox="0 0 24 24" width="18" height="18">
-                                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" fill="none" stroke="currentColor" stroke-width="2"/>
-                            </svg>
-                            <span>(34) 9999-9999</span>
-                        </div>
-                        <div class="contact-item">
-                            <svg viewBox="0 0 24 24" width="18" height="18">
-                                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" fill="none" stroke="currentColor" stroke-width="2"/>
-                                <circle cx="12" cy="10" r="3" fill="none" stroke="currentColor" stroke-width="2"/>
-                            </svg>
-                            <span>Patos de Minas, MG</span>
-                        </div>
-                    </div>
+                    <ul class="footer-links">
+                        <li><a href="mailto:contato@klubecash.com">contato@klubecash.com</a></li>
+                        <li><span style="color: rgba(255, 255, 255, 0.8);">(34) 9999-9999</span></li>
+                        <li><span style="color: rgba(255, 255, 255, 0.8);">Patos de Minas, MG</span></li>
+                    </ul>
                 </div>
             </div>
             
             <div class="footer-bottom">
-                <div class="footer-copyright">
-                    <p>&copy; <?php echo date('Y'); ?> Klube Cash. Todos os direitos reservados.</p>
-                </div>
-                <div class="footer-badges">
-                    <div class="security-badge">
-                        <svg viewBox="0 0 24 24" width="16" height="16">
-                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" fill="none" stroke="currentColor" stroke-width="2"/>
-                        </svg>
-                        <span>Site Seguro</span>
-                    </div>
-                    <div class="ssl-badge">
-                        <svg viewBox="0 0 24 24" width="16" height="16">
-                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" fill="none" stroke="currentColor" stroke-width="2"/>
-                            <circle cx="12" cy="16" r="1" fill="currentColor"/>
-                            <path d="M7 11V7a5 5 0 0 1 10 0v4" fill="none" stroke="currentColor" stroke-width="2"/>
-                        </svg>
-                        <span>SSL Certificado</span>
-                    </div>
-                </div>
+                <p>&copy; <?php echo date('Y'); ?> Klube Cash. Todos os direitos reservados.</p>
             </div>
         </div>
     </footer>
-
-    <!-- Scripts -->
-    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
-    <script src="assets/js/index-v2.js"></script>
+    
+    <script>
+        // JavaScript Essencial e Funcional
+        
+        // Toggle User Menu
+        function toggleUserMenu() {
+            const dropdown = document.getElementById('userDropdown');
+            dropdown.classList.toggle('show');
+        }
+        
+        // Toggle FAQ
+        function toggleFAQ(element) {
+            const answer = element.querySelector('.faq-answer');
+            const icon = element.querySelector('.faq-icon');
+            const isOpen = answer.style.maxHeight && answer.style.maxHeight !== '0px';
+            
+            // Fechar todos os outros FAQs
+            document.querySelectorAll('.faq-item').forEach(item => {
+                if (item !== element) {
+                    const otherAnswer = item.querySelector('.faq-answer');
+                    const otherIcon = item.querySelector('.faq-icon');
+                    otherAnswer.style.maxHeight = '0';
+                    otherIcon.textContent = '▼';
+                }
+            });
+            
+            // Toggle atual
+            if (isOpen) {
+                answer.style.maxHeight = '0';
+                icon.textContent = '▼';
+            } else {
+                answer.style.maxHeight = answer.scrollHeight + 'px';
+                icon.textContent = '▲';
+            }
+        }
+        
+        // Smooth Scroll
+        document.querySelectorAll('a[href^="#"]').forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+        
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.user-menu')) {
+                document.getElementById('userDropdown')?.classList.remove('show');
+            }
+        });
+        
+        // Header scroll effect
+        window.addEventListener('scroll', function() {
+            const header = document.querySelector('.header');
+            if (window.scrollY > 100) {
+                header.style.background = 'rgba(255, 255, 255, 0.98)';
+                header.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+            } else {
+                header.style.background = 'rgba(255, 255, 255, 0.95)';
+                header.style.boxShadow = 'none';
+            }
+        });
+        
+        console.log('✅ Klube Cash carregado com sucesso!');
+    </script>
 </body>
 </html>
