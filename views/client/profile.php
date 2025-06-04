@@ -23,12 +23,12 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION[
 $userId = $_SESSION['user_id'];
 
 // Inicializar variáveis para mensagens de feedback
-$personalInfoMessage = '';
-$personalInfoSuccess = false;
-$addressMessage = '';
-$addressSuccess = false;
-$passwordMessage = '';
-$passwordSuccess = false;
+$personalInfoMessage = $_SESSION['personal_info_message'] ?? '';
+$personalInfoSuccess = $_SESSION['personal_info_success'] ?? false;
+$addressMessage = $_SESSION['address_message'] ?? '';
+$addressSuccess = $_SESSION['address_success'] ?? false;
+$passwordMessage = $_SESSION['password_message'] ?? '';
+$passwordSuccess = $_SESSION['password_success'] ?? false;
 
 // Função para registrar erros em log e exibir mensagem amigável
 function logError($message, $error) {
@@ -44,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $updateData = [
                 'nome' => $_POST['nome'] ?? '',
-                'cpf' => $_POST['cpf'] ?? '', // Novo campo CPF
+                'cpf' => $_POST['cpf'] ?? '',
                 'contato' => [
                     'telefone' => $_POST['telefone'] ?? '',
                     'celular' => $_POST['celular'] ?? '',
@@ -53,17 +53,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ];
             
             $result = ClientController::updateProfile($userId, $updateData);
-            $personalInfoSuccess = $result['status'];
-            $personalInfoMessage = $result['message'];
+            
+            // Armazenar mensagem na sessão
+            $_SESSION['personal_info_success'] = $result['status'];
+            $_SESSION['personal_info_message'] = $result['message'];
             
         } catch (Exception $e) {
-            $personalInfoSuccess = false;
-            $personalInfoMessage = logError('Erro ao atualizar informações pessoais', $e->getMessage());
+            $_SESSION['personal_info_success'] = false;
+            $_SESSION['personal_info_message'] = logError('Erro ao atualizar informações pessoais', $e->getMessage());
         }
+        
+        // Redirecionar para evitar reenvio
+        header("Location: " . $_SERVER['REQUEST_URI'] . "#personal-info");
+        exit;
     }
     
     // Formulário de endereço (mantém o mesmo)
-    if (isset($_POST['form_type']) && $_POST['form_type'] === 'address') {
+     if (isset($_POST['form_type']) && $_POST['form_type'] === 'address') {
         try {
             $updateData = [
                 'endereco' => [
@@ -79,13 +85,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ];
             
             $result = ClientController::updateProfile($userId, $updateData);
-            $addressSuccess = $result['status'];
-            $addressMessage = $result['message'];
+            
+            // Armazenar mensagem na sessão
+            $_SESSION['address_success'] = $result['status'];
+            $_SESSION['address_message'] = $result['message'];
             
         } catch (Exception $e) {
-            $addressSuccess = false;
-            $addressMessage = logError('Erro ao atualizar endereço', $e->getMessage());
+            $_SESSION['address_success'] = false;
+            $_SESSION['address_message'] = logError('Erro ao atualizar endereço', $e->getMessage());
         }
+        
+        // Redirecionar para evitar reenvio
+        header("Location: " . $_SERVER['REQUEST_URI'] . "#address");
+        exit;
     }
     
     // Formulário de alteração de senha (mantém o mesmo)
@@ -116,10 +128,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $passwordMessage = $result['message'];
             }
             
+            // Armazenar mensagem na sessão
+            $_SESSION['password_success'] = $passwordSuccess;
+            $_SESSION['password_message'] = $passwordMessage;
+            
         } catch (Exception $e) {
-            $passwordSuccess = false;
-            $passwordMessage = logError('Erro ao atualizar senha', $e->getMessage());
+            $_SESSION['password_success'] = false;
+            $_SESSION['password_message'] = logError('Erro ao atualizar senha', $e->getMessage());
         }
+        
+        // Redirecionar para evitar reenvio
+        header("Location: " . $_SERVER['REQUEST_URI'] . "#password");
+        exit;
     }
 }
 
@@ -821,6 +841,20 @@ $cpfPendente = empty($profileData['perfil']['cpf']);
             background: linear-gradient(to bottom, var(--success-color), transparent);
             border-radius: 2px;
         }
+        /* Smooth scroll para ancoragem */
+        html {
+            scroll-behavior: smooth;
+        }
+
+        /* Destacar seção ativa temporariamente */
+        .form-card:target {
+            animation: highlight 2s ease-in-out;
+        }
+
+        @keyframes highlight {
+            0% { background-color: var(--primary-light); }
+            100% { background-color: var(--white); }
+        }
     </style>
 </head>
 <body>
@@ -897,7 +931,7 @@ $cpfPendente = empty($profileData['perfil']['cpf']);
             <!-- Seção de formulários -->
             <div class="form-section">
                 <!-- Formulário de informações pessoais (ATUALIZADO) -->
-                <div class="form-card">
+                <div class="form-card" id="personal-info"><div class="form-card" id="personal-info">
                     <div class="form-card-header">
                         <h3 class="form-card-title">
                             <i class="fas fa-user"></i>
@@ -1002,7 +1036,7 @@ $cpfPendente = empty($profileData['perfil']['cpf']);
                 </div>
 
                 <!-- Formulário de endereço (mantém o mesmo) -->
-                <div class="form-card">
+                <div class="form-card" id="address">
                     <div class="form-card-header">
                         <h3 class="form-card-title">
                             <i class="fas fa-map-marker-alt"></i>
@@ -1086,7 +1120,7 @@ $cpfPendente = empty($profileData['perfil']['cpf']);
                 </div>
 
                 <!-- Formulário de alteração de senha (mantém o mesmo) -->
-                <div class="form-card">
+                <div class="form-card" id="password">
                     <div class="form-card-header">
                         <h3 class="form-card-title">
                             <i class="fas fa-shield-alt"></i>
@@ -1141,6 +1175,21 @@ $cpfPendente = empty($profileData['perfil']['cpf']);
     </div>
     
     <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const hash = window.location.hash;
+            if (hash) {
+                const element = document.querySelector(hash);
+                if (element) {
+                    // Pequeno delay para garantir que a página carregou
+                    setTimeout(() => {
+                        element.scrollIntoView({ 
+                            behavior: 'smooth', 
+                            block: 'center' 
+                        });
+                    }, 100);
+                }
+            }
+        });
         // Script aprimorado para preenchimento automático de endereço via CEP
         document.getElementById('cep').addEventListener('blur', function() {
             const cep = this.value.replace(/\D/g, '');
@@ -1329,8 +1378,11 @@ $cpfPendente = empty($profileData['perfil']['cpf']);
         document.querySelectorAll('form').forEach(form => {
             form.addEventListener('submit', function(e) {
                 const submitBtn = this.querySelector('button[type="submit"]');
-                submitBtn.classList.add('loading');
-                submitBtn.disabled = true;
+                if (submitBtn) {
+                    submitBtn.classList.add('loading');
+                    submitBtn.disabled = true;
+                    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
+                }
             });
         });
 
