@@ -155,7 +155,9 @@ class MercadoPagoClient {
             
             // ADICIONAR DEVICE ID SE DISPONÍVEL (OBRIGATÓRIO PARA APROVAÇÃO)
             if (!empty($data['device_id'])) {
-                $payload['device_id'] = $data['device_id'];
+                $payload['device'] = [ // Alterado para 'device' (objeto)
+                    'id' => $data['device_id'] // Campo correto dentro do objeto
+                ];
             }
             
             // ADICIONAR INFORMAÇÕES EXTRAS DO PAGADOR
