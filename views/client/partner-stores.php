@@ -1,5 +1,7 @@
 <?php
 // views/client/partner-stores.php
+// VERSÃO CORRIGIDA - SEM DUPLICAÇÃO
+
 // Definir o menu ativo
 $activeMenu = 'lojas';
 
@@ -39,10 +41,6 @@ if (isset($_GET['filtrar'])) {
         $filters['cashback_min'] = $_GET['cashback_min'];
     }
     
-    if (!empty($_GET['tem_saldo']) && $_GET['tem_saldo'] != 'todas') {
-        $filters['tem_saldo'] = $_GET['tem_saldo'];
-    }
-    
     if (!empty($_GET['ordenar']) && $_GET['ordenar'] != 'nome') {
         $filters['ordenar'] = $_GET['ordenar'];
     }
@@ -51,7 +49,7 @@ if (isset($_GET['filtrar'])) {
 try {
     $db = Database::getConnection();
     
-    // Obter dados das lojas parceiras com informações de saldo
+    // Obter dados das lojas parceiras (AGORA SEM DUPLICAÇÃO)
     $result = ClientController::getPartnerStores($userId, $filters, $page);
     
     // Verificar se houve erro
@@ -61,73 +59,23 @@ try {
     // Dados para exibição
     $storesData = $hasError ? [] : $result['data'];
     
-    // Se não há erro, enriquecer dados com informações de saldo
-    if (!$hasError && !empty($storesData['lojas'])) {
-        foreach ($storesData['lojas'] as &$loja) {
-            // Buscar saldo disponível do cliente nesta loja
-            $saldoQuery = "
-                SELECT 
-                    saldo_disponivel,
-                    total_creditado,
-                    total_usado
-                FROM cashback_saldos 
-                WHERE usuario_id = ? AND loja_id = ?
-            ";
-            
-            $saldoStmt = $db->prepare($saldoQuery);
-            $saldoStmt->execute([$userId, $loja['id']]);
-            $saldoInfo = $saldoStmt->fetch(PDO::FETCH_ASSOC);
-            
-            if ($saldoInfo) {
-                $loja['saldo_disponivel'] = $saldoInfo['saldo_disponivel'];
-                $loja['total_creditado'] = $saldoInfo['total_creditado'];
-                $loja['total_usado'] = $saldoInfo['total_usado'];
-            } else {
-                $loja['saldo_disponivel'] = 0;
-                $loja['total_creditado'] = 0;
-                $loja['total_usado'] = 0;
-            }
-            
-            // Buscar contagem de usos
-            $usosQuery = "SELECT COUNT(*) as total_usos FROM cashback_movimentacoes WHERE usuario_id = ? AND loja_id = ? AND tipo_operacao = 'uso'";
-            $usosStmt = $db->prepare($usosQuery);
-            $usosStmt->execute([$userId, $loja['id']]);
-            $usosInfo = $usosStmt->fetch(PDO::FETCH_ASSOC);
-            $loja['total_usos'] = $usosInfo['total_usos'] ?? 0;
-            
-            // Buscar último uso
-            $ultimoUsoQuery = "SELECT data_operacao FROM cashback_movimentacoes WHERE usuario_id = ? AND loja_id = ? ORDER BY data_operacao DESC LIMIT 1";
-            $ultimoUsoStmt = $db->prepare($ultimoUsoQuery);
-            $ultimoUsoStmt->execute([$userId, $loja['id']]);
-            $ultimoUsoInfo = $ultimoUsoStmt->fetch(PDO::FETCH_ASSOC);
-            $loja['ultimo_uso'] = $ultimoUsoInfo['data_operacao'] ?? null;
-            
-            // Buscar cashback pendente
-            $pendingQuery = "SELECT SUM(valor_cliente) as cashback_pendente FROM transacoes_cashback WHERE usuario_id = ? AND loja_id = ? AND status = 'pendente'";
-            $pendingStmt = $db->prepare($pendingQuery);
-            $pendingStmt->execute([$userId, $loja['id']]);
-            $pendingInfo = $pendingStmt->fetch(PDO::FETCH_ASSOC);
-            $loja['cashback_pendente'] = $pendingInfo['cashback_pendente'] ?? 0;
-        }
-    }
-    
-    // Obter estatísticas gerais do cliente
-    try {
+    // Obter estatísticas gerais do saldo do cliente (CORRIGIDA)
+    if (!$hasError) {
         $estatisticasQuery = "
             SELECT 
-                COUNT(DISTINCT loja_id) as lojas_com_saldo,
-                SUM(saldo_disponivel) as total_saldo_disponivel,
-                SUM(total_usado) as total_usado_geral,
-                COUNT(DISTINCT CASE WHEN saldo_disponivel > 0 THEN loja_id END) as lojas_saldo_disponivel
-            FROM cashback_saldos
-            WHERE usuario_id = ?
+                COUNT(DISTINCT cs.loja_id) as lojas_com_saldo,
+                COALESCE(SUM(cs.saldo_disponivel), 0) as total_saldo_disponivel,
+                COALESCE(SUM(cs.total_usado), 0) as total_usado_geral,
+                COUNT(DISTINCT CASE WHEN cs.saldo_disponivel > 0 THEN cs.loja_id END) as lojas_saldo_disponivel
+            FROM cashback_saldos cs
+            WHERE cs.usuario_id = ?
         ";
         $estatisticasStmt = $db->prepare($estatisticasQuery);
         $estatisticasStmt->execute([$userId]);
         $estatisticasGerais = $estatisticasStmt->fetch(PDO::FETCH_ASSOC);
         
         // Se não houver dados, definir valores padrão
-        if (!$estatisticasGerais) {
+        if (!$estatisticasGerais || $estatisticasGerais['lojas_com_saldo'] === null) {
             $estatisticasGerais = [
                 'lojas_com_saldo' => 0,
                 'total_saldo_disponivel' => 0,
@@ -135,8 +83,58 @@ try {
                 'lojas_saldo_disponivel' => 0
             ];
         }
-    } catch (Exception $e) {
-        // Em caso de erro, usar valores padrão
+        
+        // ENRIQUECER DADOS DAS LOJAS COM SALDO DO CLIENTE (CORRIGIDO)
+        if (!empty($storesData['lojas'])) {
+            foreach ($storesData['lojas'] as &$loja) {
+                // Buscar saldo específico desta loja para o cliente
+                $saldoQuery = "
+                    SELECT 
+                        saldo_disponivel,
+                        total_creditado,
+                        total_usado
+                    FROM cashback_saldos 
+                    WHERE usuario_id = ? AND loja_id = ?
+                ";
+                
+                $saldoStmt = $db->prepare($saldoQuery);
+                $saldoStmt->execute([$userId, $loja['id']]);
+                $saldoInfo = $saldoStmt->fetch(PDO::FETCH_ASSOC);
+                
+                if ($saldoInfo) {
+                    $loja['saldo_disponivel'] = $saldoInfo['saldo_disponivel'];
+                    $loja['total_creditado'] = $saldoInfo['total_creditado'];
+                    $loja['total_usado'] = $saldoInfo['total_usado'];
+                } else {
+                    $loja['saldo_disponivel'] = 0;
+                    $loja['total_creditado'] = 0;
+                    $loja['total_usado'] = 0;
+                }
+                
+                // Buscar último uso (CORRIGIDO)
+                $ultimoUsoQuery = "
+                    SELECT MAX(data_operacao) as ultima_data 
+                    FROM cashback_movimentacoes 
+                    WHERE usuario_id = ? AND loja_id = ? AND tipo_operacao = 'uso'
+                ";
+                $ultimoUsoStmt = $db->prepare($ultimoUsoQuery);
+                $ultimoUsoStmt->execute([$userId, $loja['id']]);
+                $ultimoUsoInfo = $ultimoUsoStmt->fetch(PDO::FETCH_ASSOC);
+                $loja['ultimo_uso'] = $ultimoUsoInfo['ultima_data'] ?? null;
+                
+                // Buscar total de usos
+                $totalUsosQuery = "
+                    SELECT COUNT(*) as total_usos 
+                    FROM cashback_movimentacoes 
+                    WHERE usuario_id = ? AND loja_id = ? AND tipo_operacao = 'uso'
+                ";
+                $totalUsosStmt = $db->prepare($totalUsosQuery);
+                $totalUsosStmt->execute([$userId, $loja['id']]);
+                $totalUsosInfo = $totalUsosStmt->fetch(PDO::FETCH_ASSOC);
+                $loja['total_usos'] = $totalUsosInfo['total_usos'] ?? 0;
+            }
+        }
+    } else {
         $estatisticasGerais = [
             'lojas_com_saldo' => 0,
             'total_saldo_disponivel' => 0,
@@ -283,20 +281,11 @@ function formatDate($date) {
                             </div>
                             
                             <div class="filter-group">
-                                <label>Situação</label>
-                                <select name="tem_saldo" class="filter-select">
-                                    <option value="todas">Todas</option>
-                                    <option value="com_saldo" <?php echo (isset($filters['tem_saldo']) && $filters['tem_saldo'] == 'com_saldo') ? 'selected' : ''; ?>>Com saldo</option>
-                                    <option value="ja_usei" <?php echo (isset($filters['tem_saldo']) && $filters['tem_saldo'] == 'ja_usei') ? 'selected' : ''; ?>>Já usei saldo</option>
-                                </select>
-                            </div>
-                            
-                            <div class="filter-group">
                                 <label>Ordenar</label>
                                 <select name="ordenar" class="filter-select">
                                     <option value="nome">Nome</option>
                                     <option value="cashback" <?php echo (isset($filters['ordenar']) && $filters['ordenar'] == 'cashback') ? 'selected' : ''; ?>>% Cashback</option>
-                                    <option value="saldo" <?php echo (isset($filters['ordenar']) && $filters['ordenar'] == 'saldo') ? 'selected' : ''; ?>>Saldo</option>
+                                    <option value="categoria" <?php echo (isset($filters['ordenar']) && $filters['ordenar'] == 'categoria') ? 'selected' : ''; ?>>Categoria</option>
                                 </select>
                             </div>
                             
@@ -457,7 +446,7 @@ function formatDate($date) {
                 </div>
             </div>
             
-            <!-- Paginação -->
+            <!-- Paginação (mantém igual) -->
             <?php if (!empty($storesData['paginacao']) && $storesData['paginacao']['total_paginas'] > 1): ?>
                 <div class="pagination-wrapper">
                     <nav class="pagination">
@@ -512,6 +501,7 @@ function formatDate($date) {
         </div>
     </div>
     
+    <!-- Modais permanecem iguais -->
     <!-- Modal de Detalhes da Loja -->
     <div id="storeModal" class="modal">
         <div class="modal-overlay" onclick="closeModal()"></div>
@@ -581,6 +571,7 @@ function formatDate($date) {
     </div>
     
     <script>
+        // JavaScript permanece igual
         // Toggle dos filtros
         document.getElementById('toggleFilters').addEventListener('click', function() {
             const content = document.getElementById('filtersContent');

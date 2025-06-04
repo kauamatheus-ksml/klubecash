@@ -482,27 +482,16 @@ class ClientController {
             
             $db = Database::getConnection();
             
-            // Preparar consulta base
+            // CONSULTA PRINCIPAL CORRIGIDA - SEM SUBCONSULTAS PROBLEMÁTICAS
             $query = "
-                SELECT l.*, 
-                       IFNULL(
-                           (SELECT SUM(t.valor_cashback) 
-                            FROM transacoes_cashback t 
-                            WHERE t.loja_id = l.id AND t.usuario_id = :user_id AND t.status = 'aprovado'), 
-                           0
-                       ) as cashback_recebido,
-                       (SELECT COUNT(*) 
-                        FROM transacoes_cashback t 
-                        WHERE t.loja_id = l.id AND t.usuario_id = :user_id_count) as compras_realizadas
+                SELECT DISTINCT l.id, l.nome_fantasia, l.razao_social, l.cnpj, l.email, 
+                    l.telefone, l.categoria, l.porcentagem_cashback, l.descricao, 
+                    l.website, l.logo, l.status, l.data_cadastro
                 FROM lojas l
                 WHERE l.status = :status
             ";
             
-            $params = [
-                ':user_id' => $userId,
-                ':user_id_count' => $userId,
-                ':status' => STORE_APPROVED
-            ];
+            $params = [':status' => STORE_APPROVED];
             
             // Aplicar filtros
             if (!empty($filters)) {
@@ -525,13 +514,31 @@ class ClientController {
                 }
             }
             
-            // Adicionar ordenação (padrão: porcentagem de cashback decrescente)
-            $orderBy = isset($filters['order_by']) ? $filters['order_by'] : 'porcentagem_cashback';
-            $orderDir = isset($filters['order_dir']) && strtolower($filters['order_dir']) == 'asc' ? 'ASC' : 'DESC';
-            $query .= " ORDER BY l.$orderBy $orderDir";
+            // Adicionar ordenação (padrão: nome)
+            $orderBy = isset($filters['ordenar']) ? $filters['ordenar'] : 'nome_fantasia';
+            $orderDir = isset($filters['order_dir']) && strtolower($filters['order_dir']) == 'desc' ? 'DESC' : 'ASC';
+            
+            // Mapear opções de ordenação
+            $orderMapping = [
+                'nome' => 'l.nome_fantasia',
+                'cashback' => 'l.porcentagem_cashback',
+                'categoria' => 'l.categoria'
+            ];
+            
+            $orderColumn = isset($orderMapping[$orderBy]) ? $orderMapping[$orderBy] : 'l.nome_fantasia';
+            $query .= " ORDER BY $orderColumn $orderDir";
             
             // Calcular total de registros para paginação
-            $countStmt = $db->prepare(str_replace('l.*, IFNULL', 'COUNT(*) as total, IFNULL', $query));
+            $countQuery = str_replace(
+                'SELECT DISTINCT l.id, l.nome_fantasia, l.razao_social, l.cnpj, l.email, l.telefone, l.categoria, l.porcentagem_cashback, l.descricao, l.website, l.logo, l.status, l.data_cadastro',
+                'SELECT COUNT(DISTINCT l.id) as total',
+                $query
+            );
+            
+            // Remover ORDER BY da query de contagem
+            $countQuery = preg_replace('/ORDER BY.*$/', '', $countQuery);
+            
+            $countStmt = $db->prepare($countQuery);
             foreach ($params as $param => $value) {
                 $countStmt->bindValue($param, $value);
             }
@@ -543,13 +550,50 @@ class ClientController {
             $offset = ($page - 1) * $perPage;
             $query .= " LIMIT $offset, $perPage";
             
-            // Executar consulta
+            // Executar consulta principal
             $stmt = $db->prepare($query);
             foreach ($params as $param => $value) {
                 $stmt->bindValue($param, $value);
             }
             $stmt->execute();
             $stores = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            // AGORA ENRIQUECER OS DADOS SEM DUPLICAÇÃO
+            if (!empty($stores)) {
+                foreach ($stores as &$store) {
+                    // Obter dados específicos do cliente para esta loja
+                    $userStoreDataQuery = "
+                        SELECT 
+                            -- Cashback recebido (aprovado)
+                            COALESCE(SUM(CASE WHEN t.status = 'aprovado' THEN t.valor_cliente ELSE 0 END), 0) as cashback_recebido,
+                            -- Compras realizadas
+                            COUNT(DISTINCT CASE WHEN t.status = 'aprovado' THEN t.id END) as compras_realizadas,
+                            -- Cashback pendente
+                            COALESCE(SUM(CASE WHEN t.status = 'pendente' THEN t.valor_cliente ELSE 0 END), 0) as cashback_pendente
+                        FROM transacoes_cashback t 
+                        WHERE t.loja_id = :loja_id AND t.usuario_id = :user_id
+                    ";
+                    
+                    $userStoreStmt = $db->prepare($userStoreDataQuery);
+                    $userStoreStmt->bindValue(':loja_id', $store['id']);
+                    $userStoreStmt->bindValue(':user_id', $userId);
+                    $userStoreStmt->execute();
+                    $userStoreData = $userStoreStmt->fetch(PDO::FETCH_ASSOC);
+                    
+                    // Adicionar os dados ao array da loja
+                    $store['cashback_recebido'] = $userStoreData['cashback_recebido'] ?? 0;
+                    $store['compras_realizadas'] = $userStoreData['compras_realizadas'] ?? 0;
+                    $store['cashback_pendente'] = $userStoreData['cashback_pendente'] ?? 0;
+                    
+                    // Verificar se é favorita
+                    $favoriteQuery = "SELECT 1 FROM lojas_favoritas WHERE usuario_id = :user_id AND loja_id = :loja_id LIMIT 1";
+                    $favoriteStmt = $db->prepare($favoriteQuery);
+                    $favoriteStmt->bindValue(':user_id', $userId);
+                    $favoriteStmt->bindValue(':loja_id', $store['id']);
+                    $favoriteStmt->execute();
+                    $store['is_favorite'] = $favoriteStmt->rowCount() > 0 ? 1 : 0;
+                }
+            }
             
             // Obter categorias disponíveis para filtro
             $categoriesStmt = $db->prepare("SELECT DISTINCT categoria FROM lojas WHERE status = :status ORDER BY categoria");
@@ -560,11 +604,11 @@ class ClientController {
             // Obter estatísticas
             $statsStmt = $db->prepare("
                 SELECT 
-                    COUNT(*) as total_lojas,
-                    AVG(porcentagem_cashback) as media_cashback,
-                    MAX(porcentagem_cashback) as maior_cashback
-                FROM lojas
-                WHERE status = :status
+                    COUNT(DISTINCT l.id) as total_lojas,
+                    AVG(l.porcentagem_cashback) as media_cashback,
+                    MAX(l.porcentagem_cashback) as maior_cashback
+                FROM lojas l
+                WHERE l.status = :status
             ");
             $statsStmt->bindValue(':status', STORE_APPROVED);
             $statsStmt->execute();
@@ -795,51 +839,7 @@ class ClientController {
         
         // NOVO: Processar CPF com logs detalhados
         if (isset($data['cpf'])) {
-            error_log('CPF recebido no data: ' . var_export($data['cpf'], true));
-            
-            // Verificar se CPF pode ser editado
-            if (!self::canEditCPF($userId)) {
-                error_log('Tentativa de alterar CPF já validado - operação negada');
-                $db->rollBack();
-                return ['status' => false, 'message' => 'CPF já foi validado e não pode ser alterado. Entre em contato com o suporte se necessário.'];
-            }
-            
-            $cpf = preg_replace('/\D/', '', $data['cpf']); // Remove caracteres não numéricos
-            error_log('CPF após limpeza: ' . var_export($cpf, true));
-            
-            if (!empty($cpf)) {
-                error_log('Processando CPF não vazio: ' . $cpf);
-                
-                // Validar CPF usando a classe Validator
-                $cpfValido = Validator::validaCPF($cpf);
-                error_log('CPF é válido: ' . ($cpfValido ? 'SIM' : 'NÃO'));
-                
-                if (!$cpfValido) {
-                    $db->rollBack();
-                    return ['status' => false, 'message' => 'CPF informado é inválido.'];
-                }
-                
-                // Verificar se o CPF já existe para outro usuário
-                $checkCpfStmt = $db->prepare("SELECT id, nome FROM usuarios WHERE cpf = :cpf AND id != :user_id");
-                $checkCpfStmt->bindParam(':cpf', $cpf);
-                $checkCpfStmt->bindParam(':user_id', $userId);
-                $checkCpfStmt->execute();
-                
-                if ($checkCpfStmt->rowCount() > 0) {
-                    $existingUser = $checkCpfStmt->fetch(PDO::FETCH_ASSOC);
-                    error_log('CPF já existe para outro usuário: ID ' . $existingUser['id'] . ' - ' . $existingUser['nome']);
-                    $db->rollBack();
-                    return ['status' => false, 'message' => 'Este CPF já está cadastrado para outro usuário.'];
-                }
-                
-                $basicFields[] = 'cpf = :cpf';
-                $basicParams[':cpf'] = $cpf;
-                $updateBasicData = true;
-                error_log('CPF validado e será atualizado: ' . $cpf);
-            }
-        } else {
-            error_log('CPF não foi enviado nos dados');
-        }
+    getPartnerStores
         
         // Executar atualização dos dados básicos se houver campos para atualizar
         if ($updateBasicData && !empty($basicFields)) {
