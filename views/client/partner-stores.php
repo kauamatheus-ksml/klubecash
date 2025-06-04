@@ -634,7 +634,7 @@ function formatDate($date) {
         }
         
         // Auto-hide para toasts
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function() {$loja['saldo_disponivel']
             const toasts = document.querySelectorAll('.toast');
             toasts.forEach(toast => {
                 setTimeout(() => {

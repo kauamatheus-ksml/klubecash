@@ -482,26 +482,34 @@ class ClientController {
             
             $db = Database::getConnection();
             
-            // Preparar consulta base
+            // Preparar consulta base (CORRIGIDA para evitar duplicatas)
             $query = "
-                SELECT l.*, 
-                       IFNULL(
-                           (SELECT SUM(t.valor_cashback) 
-                            FROM transacoes_cashback t 
-                            WHERE t.loja_id = l.id AND t.usuario_id = :user_id AND t.status = 'aprovado'), 
-                           0
-                       ) as cashback_recebido,
-                       (SELECT COUNT(*) 
+                SELECT DISTINCT l.*, 
+                    COALESCE(cs.saldo_disponivel, 0) as saldo_disponivel,
+                    COALESCE(cs.total_creditado, 0) as cashback_recebido,
+                    COALESCE(cs.total_usado, 0) as total_usado,
+                    (SELECT COUNT(*) 
                         FROM transacoes_cashback t 
-                        WHERE t.loja_id = l.id AND t.usuario_id = :user_id_count) as compras_realizadas
+                        WHERE t.loja_id = l.id AND t.usuario_id = :user_id_count AND t.status = 'aprovado') as compras_realizadas,
+                    COALESCE(
+                        (SELECT SUM(t.valor_cliente) 
+                            FROM transacoes_cashback t 
+                            WHERE t.loja_id = l.id AND t.usuario_id = :user_id_pending AND t.status = 'pendente'), 
+                        0
+                    ) as cashback_pendente,
+                    COALESCE(f.id, 0) as is_favorite
                 FROM lojas l
+                LEFT JOIN cashback_saldos cs ON l.id = cs.loja_id AND cs.usuario_id = :user_id
+                LEFT JOIN lojas_favoritas f ON l.id = f.loja_id AND f.usuario_id = :user_id_fav
                 WHERE l.status = :status
             ";
             
             $params = [
                 ':user_id' => $userId,
                 ':user_id_count' => $userId,
-                ':status' => STORE_APPROVED
+                ':user_id_pending' => $userId,
+                ':user_id_fav' => $userId,
+                ':status' => defined('STORE_APPROVED') ? STORE_APPROVED : 'aprovado'
             ];
             
             // Aplicar filtros
@@ -525,21 +533,51 @@ class ClientController {
                 }
             }
             
-            // Adicionar ordenação (padrão: porcentagem de cashback decrescente)
-            $orderBy = isset($filters['order_by']) ? $filters['order_by'] : 'porcentagem_cashback';
-            $orderDir = isset($filters['order_dir']) && strtolower($filters['order_dir']) == 'asc' ? 'ASC' : 'DESC';
-            $query .= " ORDER BY l.$orderBy $orderDir";
+            // Adicionar ordenação
+            $orderBy = isset($filters['ordenar']) ? $filters['ordenar'] : 'nome';
+            $orderDir = isset($filters['order_dir']) && strtolower($filters['order_dir']) == 'desc' ? 'DESC' : 'ASC';
             
-            // Calcular total de registros para paginação
-            $countStmt = $db->prepare(str_replace('l.*, IFNULL', 'COUNT(*) as total, IFNULL', $query));
+            // Mapear opções de ordenação
+            $orderMapping = [
+                'nome' => 'l.nome_fantasia',
+                'cashback' => 'l.porcentagem_cashback',
+                'categoria' => 'l.categoria'
+            ];
+            
+            $orderColumn = isset($orderMapping[$orderBy]) ? $orderMapping[$orderBy] : 'l.nome_fantasia';
+            $query .= " ORDER BY $orderColumn $orderDir";
+            
+            // Calcular total de registros para paginação (SIMPLIFICADO)
+            $countQuery = "
+                SELECT COUNT(DISTINCT l.id) as total
+                FROM lojas l
+                WHERE l.status = :status
+            ";
+            
+            // Aplicar os mesmos filtros na contagem
+            if (!empty($filters)) {
+                if (isset($filters['categoria']) && !empty($filters['categoria'])) {
+                    $countQuery .= " AND l.categoria = :categoria";
+                }
+                if (isset($filters['nome']) && !empty($filters['nome'])) {
+                    $countQuery .= " AND (l.nome_fantasia LIKE :nome OR l.razao_social LIKE :nome)";
+                }
+                if (isset($filters['cashback_min']) && !empty($filters['cashback_min'])) {
+                    $countQuery .= " AND l.porcentagem_cashback >= :cashback_min";
+                }
+            }
+            
+            $countStmt = $db->prepare($countQuery);
             foreach ($params as $param => $value) {
-                $countStmt->bindValue($param, $value);
+                if ($param !== ':user_id' && $param !== ':user_id_count' && $param !== ':user_id_pending' && $param !== ':user_id_fav') {
+                    $countStmt->bindValue($param, $value);
+                }
             }
             $countStmt->execute();
             $totalCount = $countStmt->fetch(PDO::FETCH_ASSOC)['total'];
             
             // Adicionar paginação
-            $perPage = ITEMS_PER_PAGE;
+            $perPage = defined('ITEMS_PER_PAGE') ? ITEMS_PER_PAGE : 10;
             $offset = ($page - 1) * $perPage;
             $query .= " LIMIT $offset, $perPage";
             
@@ -551,9 +589,40 @@ class ClientController {
             $stmt->execute();
             $stores = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
+            // Enriquecer dados com informações adicionais
+            foreach ($stores as &$store) {
+                // Buscar último uso se houver saldo usado
+                if ($store['total_usado'] > 0) {
+                    $ultimoUsoStmt = $db->prepare("
+                        SELECT MAX(data_operacao) as ultima_data 
+                        FROM cashback_movimentacoes 
+                        WHERE usuario_id = ? AND loja_id = ? AND tipo_operacao = 'uso'
+                    ");
+                    $ultimoUsoStmt->execute([$userId, $store['id']]);
+                    $ultimoUso = $ultimoUsoStmt->fetch(PDO::FETCH_ASSOC);
+                    $store['ultimo_uso'] = $ultimoUso['ultima_data'] ?? null;
+                    
+                    // Buscar total de usos
+                    $totalUsosStmt = $db->prepare("
+                        SELECT COUNT(*) as total_usos 
+                        FROM cashback_movimentacoes 
+                        WHERE usuario_id = ? AND loja_id = ? AND tipo_operacao = 'uso'
+                    ");
+                    $totalUsosStmt->execute([$userId, $store['id']]);
+                    $totalUsos = $totalUsosStmt->fetch(PDO::FETCH_ASSOC);
+                    $store['total_usos'] = $totalUsos['total_usos'] ?? 0;
+                } else {
+                    $store['ultimo_uso'] = null;
+                    $store['total_usos'] = 0;
+                }
+                
+                // Converter is_favorite para boolean
+                $store['is_favorite'] = $store['is_favorite'] > 0 ? 1 : 0;
+            }
+            
             // Obter categorias disponíveis para filtro
             $categoriesStmt = $db->prepare("SELECT DISTINCT categoria FROM lojas WHERE status = :status ORDER BY categoria");
-            $categoriesStmt->bindValue(':status', STORE_APPROVED);
+            $categoriesStmt->bindValue(':status', defined('STORE_APPROVED') ? STORE_APPROVED : 'aprovado');
             $categoriesStmt->execute();
             $categories = $categoriesStmt->fetchAll(PDO::FETCH_COLUMN);
             
@@ -561,12 +630,12 @@ class ClientController {
             $statsStmt = $db->prepare("
                 SELECT 
                     COUNT(*) as total_lojas,
-                    AVG(porcentagem_cashback) as media_cashback,
-                    MAX(porcentagem_cashback) as maior_cashback
+                    COALESCE(AVG(porcentagem_cashback), 0) as media_cashback,
+                    COALESCE(MAX(porcentagem_cashback), 0) as maior_cashback
                 FROM lojas
                 WHERE status = :status
             ");
-            $statsStmt->bindValue(':status', STORE_APPROVED);
+            $statsStmt->bindValue(':status', defined('STORE_APPROVED') ? STORE_APPROVED : 'aprovado');
             $statsStmt->execute();
             $statistics = $statsStmt->fetch(PDO::FETCH_ASSOC);
             
