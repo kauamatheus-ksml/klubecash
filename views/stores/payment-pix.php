@@ -1,9 +1,8 @@
-<\?php
+<?php
 // views/stores/payment-pix.php
 require_once '../../config/database.php';
 require_once '../../config/constants.php';
 require_once '../../controllers/AuthController.php';
-require_once '../../utils/MercadoPagoClient.php'; // Incluir o cliente MP
 
 session_start();
 
@@ -16,7 +15,7 @@ $userId = AuthController::getCurrentUserId();
 $db = Database::getConnection();
 
 // Obter dados da loja
-$storeQuery = $db->prepare("SELECT id, nome_fantasia, email FROM lojas WHERE usuario_id = ?"); // Adicionado email
+$storeQuery = $db->prepare("SELECT id, nome_fantasia FROM lojas WHERE usuario_id = ?");
 $storeQuery->execute([$userId]);
 $store = $storeQuery->fetch(PDO::FETCH_ASSOC);
 
@@ -41,104 +40,7 @@ if (!$payment) {
     exit;
 }
 
-// --- LÓGICA DE RENOVAÇÃO AUTOMÁTICA DO PIX --- 
-$pixRenewed = false;
-$pixRenewalError = null;
-
-if ($payment['status'] === 'pix_aguardando' && !empty($payment['mp_payment_id'])) {
-    error_log("[Payment {$paymentId}] Verificando status do PIX existente: {$payment['mp_payment_id']}");
-    try {
-        $mpClient = new MercadoPagoClient();
-        $statusResponse = $mpClient->getPaymentStatus($payment['mp_payment_id']);
-        
-        if ($statusResponse['status'] && isset($statusResponse['data']['status'])) {
-            $currentMpStatus = $statusResponse['data']['status'];
-            error_log("[Payment {$paymentId}] Status atual no MP: {$currentMpStatus}");
-            
-            // Status que indicam que o PIX não é mais pagável
-            $invalidStatus = ['rejected', 'cancelled', 'expired']; // 'expired' pode não ser um status real, mas 'cancelled' geralmente cobre isso.
-            
-            if (in_array($currentMpStatus, $invalidStatus)) {
-                error_log("[Payment {$paymentId}] PIX {$payment['mp_payment_id']} está {$currentMpStatus}. Tentando renovar...");
-                
-                // Preparar dados para novo PIX
-                $pixData = [
-                    'amount' => $payment['valor_total'],
-                    'payer_email' => $store['email'], // Usar email da loja como pagador
-                    'payer_name' => $store['nome_fantasia'],
-                    'description' => 'Renovação Pagamento Comissão Klube Cash ID: ' . $paymentId,
-                    'external_reference' => 'KC_COMISSAO_' . $paymentId . '_' . time(), // Referência única
-                    'payment_id' => $paymentId,
-                    'store_id' => $storeId
-                    // Adicionar outros dados do pagador se disponíveis (CPF/CNPJ, Telefone, Endereço) para melhorar aprovação
-                ];
-                
-                $newPixResponse = $mpClient->createPixPayment($pixData);
-                
-                if ($newPixResponse['status'] && isset($newPixResponse['data'])) {
-                    $newPix = $newPixResponse['data'];
-                    error_log("[Payment {$paymentId}] Novo PIX gerado com sucesso: {$newPix['mp_payment_id']}");
-                    
-                    // Atualizar o pagamento no banco de dados
-                    $updateStmt = $db->prepare("
-                        UPDATE pagamentos_comissao
-                        SET mp_payment_id = :mp_payment_id,
-                            mp_qr_code = :mp_qr_code,
-                            mp_qr_code_base64 = :mp_qr_code_base64,
-                            mp_date_of_expiration = :mp_date_of_expiration, 
-                            mp_status = :mp_status,
-                            status = 'pix_aguardando', 
-                            pix_paid_at = NULL,
-                            updated_at = NOW()
-                        WHERE id = :id
-                    ");
-                    
-                    $updateSuccess = $updateStmt->execute([
-                        ':mp_payment_id' => $newPix['mp_payment_id'],
-                        ':mp_qr_code' => $newPix['qr_code'],
-                        ':mp_qr_code_base64' => $newPix['qr_code_base64'],
-                        ':mp_date_of_expiration' => $newPix['date_of_expiration'], // Certifique-se que esta coluna existe!
-                        ':mp_status' => $newPix['status'], // Geralmente 'pending'
-                        ':id' => $paymentId
-                    ]);
-                    
-                    if ($updateSuccess) {
-                        error_log("[Payment {$paymentId}] Banco de dados atualizado com o novo PIX.");
-                        // Recarregar os dados do pagamento para refletir a atualização
-                        $paymentStmt->execute([$paymentId, $storeId]);
-                        $payment = $paymentStmt->fetch(PDO::FETCH_ASSOC);
-                        $pixRenewed = true;
-                    } else {
-                        $pixRenewalError = "Erro ao atualizar o banco de dados com o novo PIX.";
-                        error_log("[Payment {$paymentId}] ERRO: {$pixRenewalError}");
-                    }
-                    
-                } else {
-                    $pixRenewalError = "Erro ao gerar novo PIX no Mercado Pago: " . ($newPixResponse['message'] ?? 'Erro desconhecido');
-                    error_log("[Payment {$paymentId}] ERRO: {$pixRenewalError}");
-                }
-            } else {
-                 error_log("[Payment {$paymentId}] PIX {$payment['mp_payment_id']} ainda válido ({$currentMpStatus}). Nenhuma ação necessária.");
-                 // Atualizar o status MP no nosso banco se estiver diferente
-                 if ($payment['mp_status'] !== $currentMpStatus) {
-                     $updateMpStatusStmt = $db->prepare("UPDATE pagamentos_comissao SET mp_status = ? WHERE id = ?");
-                     $updateMpStatusStmt->execute([$currentMpStatus, $paymentId]);
-                     $payment['mp_status'] = $currentMpStatus; // Atualiza localmente também
-                 }
-            }
-        } else {
-            $pixRenewalError = "Erro ao consultar status do PIX no Mercado Pago: " . ($statusResponse['message'] ?? 'Erro desconhecido');
-            error_log("[Payment {$paymentId}] ERRO: {$pixRenewalError}");
-        }
-        
-    } catch (Exception $e) {
-        $pixRenewalError = "Exceção ao verificar/renovar PIX: " . $e->getMessage();
-        error_log("[Payment {$paymentId}] EXCEÇÃO: {$pixRenewalError}");
-    }
-}
-// --- FIM DA LÓGICA DE RENOVAÇÃO --- 
-
-// Verificar novamente se existe PIX (pode ter sido renovado)
+// Verificar se já existe PIX gerado (para recuperar estado)
 $hasExistingPix = !empty($payment['mp_payment_id']) && !empty($payment['mp_qr_code']) && !empty($payment['mp_qr_code_base64']);
 
 $activeMenu = 'payment-pix';
@@ -153,8 +55,7 @@ $activeMenu = 'payment-pix';
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
     <link rel="stylesheet" href="../../assets/css/views/stores/payment-pix.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Remover script mercadopago-device.js se não for usado para coletar device_id -->
-    <!-- <script src="../../assets/js/mercadopago-device.js?v=2.1.0"></script> -->
+    <script src="../../assets/js/mercadopago-device.js?v=2.1.0"></script>
 </head>
 <body>
     <?php include_once '../components/sidebar-store.php'; ?>
@@ -162,8 +63,7 @@ $activeMenu = 'payment-pix';
     <div class="main-content" id="mainContent">
         <!-- Header Moderno -->
         <div class="pix-header">
-            <!-- ... (código do header sem alterações) ... -->
-             <div class="header-content">
+            <div class="header-content">
                 <div class="header-icon">
                     <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/>
@@ -181,19 +81,11 @@ $activeMenu = 'payment-pix';
             </div>
         </div>
 
-        <!-- Mensagem de Status da Renovação -->
-        <?php if ($pixRenewed): ?>
-            <div class="status-message success">PIX anterior expirado. Um novo código PIX foi gerado automaticamente.</div>
-        <?php elseif ($pixRenewalError): ?>
-            <div class="status-message error">Erro ao tentar renovar o PIX: <?php echo htmlspecialchars($pixRenewalError); ?>. Tente gerar manualmente.</div>
-        <?php endif; ?>
-
         <!-- Container Principal -->
         <div class="pix-container">
             <!-- Painel de Etapas -->
             <div class="steps-panel">
-                 <!-- ... (código das etapas sem alterações) ... -->
-                 <div class="step" id="step1" data-step="1">
+                <div class="step" id="step1" data-step="1">
                     <div class="step-number">1</div>
                     <div class="step-content">
                         <h3>Gerar PIX</h3>
@@ -220,10 +112,9 @@ $activeMenu = 'payment-pix';
 
             <!-- Painel Principal de Conteúdo -->
             <div class="content-panel">
-                <!-- Estado Inicial (se não houver PIX existente ou erro na renovação) -->
-                <div class="payment-state" id="initialState" <?php echo ($hasExistingPix && !$pixRenewalError) ? 'style="display: none;"' : ''; ?>>
-                    <!-- ... (código do estado inicial sem alterações) ... -->
-                     <div class="state-icon">
+                <!-- Estado Inicial -->
+                <div class="payment-state" id="initialState">
+                    <div class="state-icon">
                         <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                             <path d="M12 2v4"/>
                             <path d="m16.2 7.8 2.9-2.9"/>
@@ -264,10 +155,9 @@ $activeMenu = 'payment-pix';
                     </button>
                 </div>
 
-                <!-- Estado do QR Code (se houver PIX existente e sem erro na renovação) -->
-                <div class="payment-state" id="qrCodeState" <?php echo ($hasExistingPix && !$pixRenewalError) ? '' : 'style="display: none;"'; ?>>
-                    <!-- ... (código do estado QR Code, adaptado para usar dados do $payment) ... -->
-                     <div class="qr-section">
+                <!-- Estado do QR Code -->
+                <div class="payment-state" id="qrCodeState" style="display: none;">
+                    <div class="qr-section">
                         <h2>Escaneie o QR Code</h2>
                         <p class="qr-instruction">
                             Abra o app do seu banco e escaneie o código abaixo, 
@@ -276,9 +166,8 @@ $activeMenu = 'payment-pix';
                         
                         <div class="qr-display">
                             <div class="qr-image-container">
-                                <!-- Usar dados do $payment que pode ter sido renovado -->
-                                <img id="qrCodeImage" src="data:image/png;base64,<?php echo $payment['mp_qr_code_base64'] ?? ''; ?>" alt="QR Code PIX" style="<?php echo ($hasExistingPix && !$pixRenewalError) ? '' : 'display: none;'; ?>">
-                                <div class="qr-loading" id="qrLoading" style="display: none;"> <!-- Esconder loading inicial -->
+                                <img id="qrCodeImage" src="" alt="QR Code PIX" style="display: none;">
+                                <div class="qr-loading" id="qrLoading">
                                     <div class="spinner"></div>
                                     <span>Gerando QR Code...</span>
                                 </div>
@@ -293,9 +182,8 @@ $activeMenu = 'payment-pix';
                                     Código PIX
                                 </label>
                                 <div class="code-input-container">
-                                     <!-- Usar dados do $payment que pode ter sido renovado -->
-                                    <textarea id="pixCode" readonly><?php echo $payment['mp_qr_code'] ?? ''; ?></textarea>
-                                    <button class="copy-btn" onclick="copyPixCode()" id="copyBtn" <?php echo ($hasExistingPix && !$pixRenewalError) ? '' : 'disabled'; ?>>
+                                    <textarea id="pixCode" readonly placeholder="Código PIX será exibido aqui..."></textarea>
+                                    <button class="copy-btn" onclick="copyPixCode()" id="copyBtn" disabled>
                                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                             <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
                                             <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
@@ -320,17 +208,15 @@ $activeMenu = 'payment-pix';
 
                         <div class="payment-timer">
                             <div class="timer-icon">⏱️</div>
-                            <!-- Exibir data de expiração se disponível -->
-                            <span id="expirationInfo">Aguardando pagamento... <?php echo (!empty($payment['mp_date_of_expiration'])) ? 'Expira em: ' . date('d/m/Y H:i', strtotime($payment['mp_date_of_expiration'])) : ''; ?></span>
+                            <span>Aguardando pagamento...</span>
                             <div class="pulse-indicator"></div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Estado de Sucesso (sem alterações) -->
+                <!-- Estado de Sucesso -->
                 <div class="payment-state success-state" id="successState" style="display: none;">
-                    <!-- ... (código do estado de sucesso sem alterações) ... -->
-                     <div class="success-animation">
+                    <div class="success-animation">
                         <div class="success-icon">
                             <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
@@ -354,10 +240,9 @@ $activeMenu = 'payment-pix';
                 </div>
             </div>
 
-            <!-- Painel de Informações (sem alterações) -->
+            <!-- Painel de Informações -->
             <div class="info-panel">
-                 <!-- ... (código do painel de info sem alterações) ... -->
-                 <div class="info-section">
+                <div class="info-section">
                     <h3>
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <circle cx="12" cy="12" r="10"/>
@@ -404,10 +289,9 @@ $activeMenu = 'payment-pix';
             </div>
         </div>
 
-        <!-- Botão de Voltar Fixo (sem alterações) -->
+        <!-- Botão de Voltar Fixo -->
         <div class="fixed-back-btn">
-             <!-- ... (código do botão voltar sem alterações) ... -->
-             <a href="<?php echo STORE_PENDING_TRANSACTIONS_URL; ?>" class="back-btn">
+            <a href="<?php echo STORE_PENDING_TRANSACTIONS_URL; ?>" class="back-btn">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="15 18 9 12 15 6"/>
                 </svg>
@@ -417,14 +301,12 @@ $activeMenu = 'payment-pix';
     </div>
     
     <!-- Dados ocultos para JavaScript -->
+    <input type="hidden" id="mpPaymentId" value="">
     <input type="hidden" id="paymentId" value="<?php echo $paymentId; ?>">
-    <!-- Passar dados do PIX atual (pode ser o renovado) para o JS -->
-    <input type="hidden" id="currentMpPaymentId" value="<?php echo $payment['mp_payment_id'] ?? ''; ?>">
     
     <script>
-        // Variáveis globais
+        // Variáveis globais - mantendo a lógica original
         const paymentId = document.getElementById('paymentId').value;
-        const currentMpPaymentId = document.getElementById('currentMpPaymentId').value;
         let pollingInterval = null;
         
         // Elementos do DOM
@@ -436,192 +318,351 @@ $activeMenu = 'payment-pix';
         const qrLoading = document.getElementById('qrLoading');
         const pixCodeTextarea = document.getElementById('pixCode');
         const copyBtn = document.getElementById('copyBtn');
-        const expirationInfoSpan = document.getElementById('expirationInfo');
+        const mpPaymentIdInput = document.getElementById('mpPaymentId');
         
-        // Função para atualizar etapas visuais (sem alterações)
+        // Função para atualizar etapas visuais
         function updateStep(stepNumber) {
+            // Remove active de todas as etapas
             document.querySelectorAll('.step').forEach(step => {
                 step.classList.remove('active', 'completed');
             });
+            
+            // Marca etapas anteriores como completadas
             for (let i = 1; i < stepNumber; i++) {
                 const step = document.getElementById(`step${i}`);
                 if (step) step.classList.add('completed');
             }
+            
+            // Marca etapa atual como ativa
             const currentStep = document.getElementById(`step${stepNumber}`);
             if (currentStep) currentStep.classList.add('active');
         }
-
-        // Função para copiar código PIX (sem alterações)
-        function copyPixCode() {
-            pixCodeTextarea.select();
-            document.execCommand('copy');
-            copyBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Copiado!';
-            setTimeout(() => {
-                copyBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copiar';
-            }, 2000);
-        }
-
-        // Função para gerar PIX (chamada pelo botão 'Gerar PIX Agora')
-        async function generatePix() {
-            console.log('Gerando PIX para pagamento ID:', paymentId);
-            generatePixBtn.disabled = true;
-            generatePixBtn.innerHTML = '<div class="spinner small"></div> Gerando...';
-            updateStep(1);
-            
-            // Mostrar loading no QR Code State
+        
+        // Função para mostrar estado específico
+        function showState(stateName) {
+            // Esconder todos os estados
             initialState.style.display = 'none';
-            qrCodeState.style.display = 'block';
-            qrCodeImage.style.display = 'none';
-            qrLoading.style.display = 'flex';
-            pixCodeTextarea.value = '';
-            copyBtn.disabled = true;
-
+            qrCodeState.style.display = 'none';
+            successState.style.display = 'none';
+            
+            // Mostrar estado solicitado
+            switch(stateName) {
+                case 'initial':
+                    initialState.style.display = 'block';
+                    updateStep(1);
+                    break;
+                case 'qrcode':
+                    qrCodeState.style.display = 'block';
+                    updateStep(2);
+                    break;
+                case 'success':
+                    successState.style.display = 'block';
+                    updateStep(3);
+                    break;
+            }
+        }
+        
+        // Gerar PIX - mantendo lógica original com melhorias visuais
+        async function generatePix() {
+            generatePixBtn.disabled = true;
+            generatePixBtn.innerHTML = `
+                <div class="btn-spinner"></div>
+                Gerando PIX...
+            `;
+            
+            console.log('Iniciando geração PIX para payment_id:', paymentId);
+            
+            // OBTER DEVICE ID PARA MELHOR APROVAÇÃO
+            const deviceId = getPaymentDeviceId();
+            console.log('Device ID gerado:', deviceId);
+            
             try {
-                const response = await fetch('../../api/generate-pix.php', {
+                const response = await fetch('<?php echo MP_CREATE_PAYMENT_URL; ?>', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ payment_id: paymentId })
+                    body: JSON.stringify({
+                        payment_id: paymentId,
+                        device_id: deviceId // ADICIONAR DEVICE ID
+                    })
                 });
-
-                const result = await response.json();
-                console.log('Resposta da API generate-pix:', result);
-
-                if (result.status === 'success' && result.data) {
-                    const pixData = result.data;
-                    // Atualizar UI com os dados recebidos
-                    qrCodeImage.src = 'data:image/png;base64,' + pixData.qr_code_base64;
-                    pixCodeTextarea.value = pixData.qr_code;
-                    document.getElementById('currentMpPaymentId').value = pixData.mp_payment_id; // Atualiza ID oculto
+                
+                console.log('Response status:', response.status);
+                
+                const responseText = await response.text();
+                console.log('Response text:', responseText);
+                
+                let result;
+                try {
+                    result = JSON.parse(responseText);
+                } catch (e) {
+                    console.error('Erro ao fazer parse da resposta:', e);
+                    showError('Erro: Resposta inválida do servidor');
+                    return;
+                }
+                
+                console.log('Parsed result:', result);
+                
+                if (result.status) {
+                    // Mostrar estado do QR Code
+                    showState('qrcode');
                     
-                    // Atualizar info de expiração se disponível
-                    if (pixData.date_of_expiration) {
-                        const expirationDate = new Date(pixData.date_of_expiration);
-                        expirationInfoSpan.textContent = `Aguardando pagamento... Expira em: ${expirationDate.toLocaleDateString('pt-BR')} ${expirationDate.toLocaleTimeString('pt-BR')}`;
-                    } else {
-                        expirationInfoSpan.textContent = 'Aguardando pagamento...';
-                    }
-
-                    qrLoading.style.display = 'none';
-                    qrCodeImage.style.display = 'block';
-                    copyBtn.disabled = false;
-                    updateStep(2);
-                    startPolling(); // Iniciar verificação de status
+                    // Simular carregamento do QR
+                    setTimeout(() => {
+                        // Exibir QR Code
+                        qrCodeImage.src = 'data:image/png;base64,' + result.data.qr_code_base64;
+                        qrCodeImage.style.display = 'block';
+                        qrLoading.style.display = 'none';
+                        
+                        // Preencher código PIX
+                        pixCodeTextarea.value = result.data.qr_code;
+                        copyBtn.disabled = false;
+                        
+                        // Salvar ID do pagamento MP
+                        mpPaymentIdInput.value = result.data.mp_payment_id;
+                        
+                        // Iniciar polling automático
+                        startPaymentPolling();
+                        
+                        // Mostrar notificação de sucesso
+                        showNotification('QR Code gerado com sucesso!', 'success');
+                    }, 1500);
+                    
                 } else {
-                    console.error('Erro ao gerar PIX:', result.message);
-                    alert('Erro ao gerar PIX: ' + result.message);
-                    // Voltar ao estado inicial em caso de erro
-                    qrCodeState.style.display = 'none';
-                    initialState.style.display = 'block';
-                    generatePixBtn.disabled = false;
-                    generatePixBtn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg> Gerar PIX Agora';
+                    console.error('Erro na API:', result);
+                    showError('Erro ao gerar PIX: ' + result.message);
                 }
+                
             } catch (error) {
-                console.error('Erro na requisição generatePix:', error);
-                alert('Erro de comunicação ao gerar PIX. Verifique sua conexão.');
-                qrCodeState.style.display = 'none';
-                initialState.style.display = 'block';
-                generatePixBtn.disabled = false;
-                generatePixBtn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg> Gerar PIX Agora';
+                console.error('Erro de conexão:', error);
+                showError('Erro de conexão: ' + error.message);
             }
         }
-
-        // Função para verificar status do pagamento (chamada pelo botão 'Verificar Pagamento' e pelo polling)
-        async function checkPaymentStatus(showLoading = true) {
-            const mpIdToCheck = document.getElementById('currentMpPaymentId').value;
-            if (!mpIdToCheck) {
-                console.log('Nenhum MP Payment ID para verificar.');
-                return; 
+        
+        // Copiar código PIX - mantendo lógica original
+        function copyPixCode() {
+            const pixCode = pixCodeTextarea.value;
+            navigator.clipboard.writeText(pixCode).then(() => {
+                // Feedback visual no botão
+                const originalText = copyBtn.innerHTML;
+                copyBtn.innerHTML = `
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                    Copiado!
+                `;
+                copyBtn.classList.add('copied');
+                
+                setTimeout(() => {
+                    copyBtn.innerHTML = originalText;
+                    copyBtn.classList.remove('copied');
+                }, 2000);
+                
+                showNotification('Código PIX copiado!', 'success');
+            }).catch(() => {
+                showNotification('Erro ao copiar código', 'error');
+            });
+        }
+        
+        // Verificar status do pagamento - mantendo lógica original
+        async function checkPaymentStatus() {
+            const mpPaymentId = mpPaymentIdInput.value;
+            
+            if (!mpPaymentId) {
+                showNotification('PIX não foi gerado ainda', 'warning');
+                return;
             }
             
-            console.log('Verificando status do pagamento MP ID:', mpIdToCheck);
-            if (showLoading) {
-                // Adicionar feedback visual de carregamento se necessário
-            }
-
             try {
-                const response = await fetch(`../../api/check-payment-status.php?mp_payment_id=${mpIdToCheck}`);
+                const response = await fetch(`<?php echo MP_CHECK_STATUS_URL; ?>&mp_payment_id=${mpPaymentId}`);
                 const result = await response.json();
-                console.log('Resposta da API check-payment-status:', result);
-
-                if (result.status === 'success' && result.data) {
-                    const paymentStatus = result.data.status;
-                    if (paymentStatus === 'approved') {
-                        console.log('Pagamento APROVADO!');
-                        stopPolling();
-                        qrCodeState.style.display = 'none';
-                        successState.style.display = 'block';
-                        updateStep(3);
-                    } else if (['rejected', 'cancelled', 'expired'].includes(paymentStatus)) {
-                         console.log(`Pagamento ${paymentStatus}. Recarregando para tentar renovar...`);
-                         stopPolling();
-                         // Forçar recarregamento da página para ativar a lógica de renovação no PHP
-                         window.location.reload(); 
-                    } else {
-                        console.log('Pagamento ainda pendente:', paymentStatus);
-                        // Manter estado QR Code e polling ativo
-                    }
+                
+                if (result.status && result.data.status === 'approved') {
+                    handlePaymentCompleted();
+                } else if (result.data.status === 'rejected') {
+                    clearInterval(pollingInterval);
+                    showError('❌ Pagamento foi rejeitado. Tente novamente.');
+                    setTimeout(() => window.location.reload(), 3000);
                 } else {
-                    console.error('Erro ao verificar status:', result.message);
-                    // Não parar polling por erro de verificação, tentar novamente depois
+                    showNotification('Pagamento ainda pendente', 'info');
                 }
             } catch (error) {
-                console.error('Erro na requisição checkPaymentStatus:', error);
-                // Não parar polling por erro de comunicação
+                console.error('Erro ao verificar status:', error);
+                showNotification('Erro ao verificar status', 'error');
             }
         }
-
-        // Função para iniciar polling (verificação periódica)
-        function startPolling() {
-            if (pollingInterval) clearInterval(pollingInterval);
-            console.log('Iniciando polling para verificar status do pagamento...');
-            // Verificar imediatamente e depois a cada 15 segundos
-            checkPaymentStatus(false);
-            pollingInterval = setInterval(() => checkPaymentStatus(false), 15000); 
+        
+        // Iniciar polling automático - mantendo lógica original
+        function startPaymentPolling() {
+            pollingInterval = setInterval(() => {
+                checkPaymentStatus();
+            }, 10000); // Verificar a cada 10 segundos
         }
-
-        // Função para parar polling
-        function stopPolling() {
-            if (pollingInterval) {
-                clearInterval(pollingInterval);
-                pollingInterval = null;
-                console.log('Polling interrompido.');
-            }
+        
+        // Quando pagamento for confirmado - mantendo lógica original
+        function handlePaymentCompleted() {
+            clearInterval(pollingInterval);
+            
+            // Mostrar estado de sucesso
+            showState('success');
+            
+            // Animação de sucesso
+            setTimeout(() => {
+                document.querySelector('.success-animation').classList.add('animate');
+            }, 500);
+            
+            showNotification('✅ Pagamento PIX confirmado! O cashback foi liberado para os clientes.', 'success');
+            
+            // Redirecionar após alguns segundos
+            setTimeout(() => {
+                window.location.href = '<?php echo STORE_PAYMENT_HISTORY_URL; ?>';
+            }, 5000);
         }
-
-        // Inicialização da página
-        document.addEventListener('DOMContentLoaded', () => {
-            // Se já existe um PIX (válido ou renovado), mostrar o estado QR Code e iniciar polling
-            if (currentMpPaymentId && qrCodeState.style.display !== 'none') {
-                console.log('PIX existente encontrado ou renovado. Exibindo QR Code e iniciando polling.');
-                updateStep(2);
-                startPolling();
-            } else if (initialState.style.display !== 'none'){
-                 console.log('Nenhum PIX válido. Exibindo estado inicial.');
-                 updateStep(1);
+        
+        // Sistema de notificações
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.innerHTML = `
+                <div class="notification-content">
+                    <span class="notification-icon">
+                        ${type === 'success' ? '✅' : type === 'error' ? '❌' : type === 'warning' ? '⚠️' : 'ℹ️'}
+                    </span>
+                    <span class="notification-message">${message}</span>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Animar entrada
+            setTimeout(() => notification.classList.add('show'), 100);
+            
+            // Remover após 4 segundos
+            setTimeout(() => {
+                notification.classList.remove('show');
+                setTimeout(() => document.body.removeChild(notification), 300);
+            }, 4000);
+        }
+        
+        // Mostrar erro e voltar ao estado inicial
+        function showError(message) {
+            showNotification(message, 'error');
+            
+            // Restaurar botão
+            generatePixBtn.disabled = false;
+            generatePixBtn.innerHTML = `
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/>
+                    <line x1="1" y1="10" x2="23" y2="10"/>
+                </svg>
+                Gerar PIX Agora
+            `;
+        }
+        
+        // Buscar quantidade de transações e verificar estado existente
+        document.addEventListener('DOMContentLoaded', async function() {
+            try {
+                const response = await fetch(`../../controllers/TransactionController.php?action=payment_details&payment_id=${paymentId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: 'payment_id=' + paymentId
+                });
+                const result = await response.json();
+                
+                if (result.status) {
+                    document.getElementById('transactionCount').textContent = result.data.totais.total_transacoes;
+                }
+            } catch (error) {
+                console.error('Erro ao buscar detalhes:', error);
+                document.getElementById('transactionCount').textContent = 'N/A';
             }
             
-            // Carregar contagem de transações (exemplo, adaptar à sua API)
-            fetch(`../../api/get-payment-details.php?payment_id=${paymentId}`)
-                .then(response => response.json())
-                .then(data => {
-                    if(data.status === 'success' && data.details) {
-                        document.getElementById('transactionCount').textContent = data.details.transaction_count || 'N/A';
-                    } else {
-                         document.getElementById('transactionCount').textContent = 'Erro';
-                    }
-                })
-                .catch(error => {
-                    console.error('Erro ao buscar detalhes do pagamento:', error);
-                    document.getElementById('transactionCount').textContent = 'Erro';
-                });
+            // Verificar se já existe PIX gerado
+            <?php if ($hasExistingPix): ?>
+                // Restaurar estado do QR Code existente
+                console.log('PIX já foi gerado anteriormente, restaurando estado...');
+                restoreExistingPix();
+            <?php else: ?>
+                // Inicializar no estado inicial
+                showState('initial');
+            <?php endif; ?>
         });
 
-        // Limpar polling ao sair da página
-        window.addEventListener('beforeunload', stopPolling);
-
+        // Função para restaurar PIX existente
+        function restoreExistingPix() {
+            // Dados do PIX existente do PHP
+            const existingPixData = {
+                mp_payment_id: '<?php echo $payment['mp_payment_id'] ?? ''; ?>',
+                qr_code: '<?php echo addslashes($payment['mp_qr_code'] ?? ''); ?>',
+                qr_code_base64: '<?php echo $payment['mp_qr_code_base64'] ?? ''; ?>'
+            };
+            
+            if (existingPixData.mp_payment_id && existingPixData.qr_code && existingPixData.qr_code_base64) {
+                // Mostrar estado do QR Code
+                showState('qrcode');
+                
+                // Preencher dados
+                setTimeout(() => {
+                    qrCodeImage.src = 'data:image/png;base64,' + existingPixData.qr_code_base64;
+                    qrCodeImage.style.display = 'block';
+                    qrLoading.style.display = 'none';
+                    
+                    pixCodeTextarea.value = existingPixData.qr_code;
+                    copyBtn.disabled = false;
+                    
+                    mpPaymentIdInput.value = existingPixData.mp_payment_id;
+                    
+                    // Iniciar polling automático
+                    startPaymentPolling();
+                    
+                    showNotification('PIX restaurado! Você pode continuar o pagamento.', 'info');
+                }, 500);
+            } else {
+                console.log('Dados do PIX incompletos, iniciando novo PIX');
+                showState('initial');
+            }
+        }
     </script>
+    <style>
+/* Botão de continuar pagamento PIX */
+.btn-success {
+    background-color: #28a745;
+    border-color: #28a745;
+    color: white;
+}
+
+.btn-success:hover {
+    background-color: #218838;
+    border-color: #1e7e34;
+}
+
+.action-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 150px;
+}
+
+.action-buttons .btn {
+    width: 100%;
+    font-size: 0.875rem;
+    padding: 0.4rem 0.6rem;
+}
+
+/* Responsivo para mobile */
+@media (max-width: 768px) {
+    .action-buttons {
+        min-width: 120px;
+    }
+    
+    .action-buttons .btn {
+        font-size: 0.8rem;
+        padding: 0.3rem 0.5rem;
+    }
+}
+</style>
 </body>
 </html>
-
