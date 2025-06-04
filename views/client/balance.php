@@ -245,7 +245,7 @@ function formatMonth($yearMonth) {
                 <div class="card-value">
                     <span class="currency">R$</span>
                     <span class="amount" data-value="<?php echo $saldoTotal['total_disponivel']; ?>">
-                        <?php echo number_format($saldoTotal['total_disponivel'], 2, ',', '.'); ?>
+                        <?php echo number_format($saldoTotal['total_disponivel'], 3, ',', '.'); ?>
                     </span>
                 </div>
                 <div class="card-stats">
