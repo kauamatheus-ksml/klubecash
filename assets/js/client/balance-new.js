@@ -19,24 +19,27 @@ document.addEventListener('DOMContentLoaded', function() {
  */
 function initializeAnimations() {
     // Animar números dos valores principais
-    const amountElements = document.querySelectorAll('.amount[data-value]');
+    const amountElements = document.querySelectorAll('.amount[data-value]'); //
     
     amountElements.forEach(element => {
-        const finalValue = parseFloat(element.getAttribute('data-value') || element.textContent.replace(/[^\d,]/g, '').replace(',', '.'));
+        const finalValue = parseFloat(element.getAttribute('data-value') || element.textContent.replace(/[^\d,]/g, '').replace(',', '.')); //
         if (isNaN(finalValue)) return;
         
-        animateNumber(element, 0, finalValue, 1500);
+        // ---- CORRECTION ----
+        // Pass true for the isCurrency parameter for .amount elements
+        animateNumber(element, 0, finalValue, 1500, true); // 
+        // ---- END CORRECTION ----
     });
     
     // Animar cards de estatísticas
-    const statNumbers = document.querySelectorAll('.stat-number');
+    const statNumbers = document.querySelectorAll('.stat-number'); //
     
     statNumbers.forEach(element => {
         const text = element.textContent.trim();
         const number = parseFloat(text.replace(/[^\d,]/g, '').replace(',', '.'));
         
         if (!isNaN(number)) {
-            animateNumber(element, 0, number, 1000, text.includes('R$'));
+            animateNumber(element, 0, number, 1000, text.includes('R$')); //
         }
     });
 }
@@ -44,7 +47,7 @@ function initializeAnimations() {
 /**
  * Anima um número de um valor inicial até um valor final
  */
-function animateNumber(element, startValue, endValue, duration, isCurrency = false) {
+function animateNumber(element, startValue, endValue, duration, isCurrency = false) { //
     const startTime = performance.now();
     const difference = endValue - startValue;
     
@@ -53,13 +56,13 @@ function animateNumber(element, startValue, endValue, duration, isCurrency = fal
         const progress = Math.min(elapsed / duration, 1);
         
         // Usar easing para animação mais suave
-        const easedProgress = easeOutQuart(progress);
+        const easedProgress = easeOutQuart(progress); //
         const currentValue = startValue + (difference * easedProgress);
         
-        if (isCurrency) {
-            element.textContent = formatCurrency(currentValue);
+        if (isCurrency) { //
+            element.textContent = formatCurrency(currentValue); //
         } else {
-            element.textContent = Math.round(currentValue).toString();
+            element.textContent = Math.round(currentValue).toString(); //
         }
         
         if (progress < 1) {
@@ -73,17 +76,17 @@ function animateNumber(element, startValue, endValue, duration, isCurrency = fal
 /**
  * Função de easing para animações mais suaves
  */
-function easeOutQuart(t) {
+function easeOutQuart(t) { //
     return 1 - Math.pow(1 - t, 4);
 }
 
 /**
  * Formata valor como moeda brasileira
  */
-function formatCurrency(value) {
-    return value.toLocaleString('pt-BR', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
+function formatCurrency(value) { //
+    return value.toLocaleString('pt-BR', { //
+        minimumFractionDigits: 2, //
+        maximumFractionDigits: 2 //
     });
 }
 
@@ -712,4 +715,28 @@ const additionalStyles = `
 }
 </style>
 `;
+// The showTooltip and hideTooltip functions were missing in the provided code.
+// Adding them here as placeholders if they are needed, or they can be removed if not used.
+function showTooltip(event) {
+    // Placeholder: Implement tooltip display logic
+    const tooltipText = event.target.getAttribute('data-tooltip');
+    if (tooltipText) {
+        // Example: Create and show a simple tooltip
+        const tooltip = document.createElement('div');
+        tooltip.className = 'simple-tooltip';
+        tooltip.textContent = tooltipText;
+        document.body.appendChild(tooltip);
+        const rect = event.target.getBoundingClientRect();
+        tooltip.style.left = `${rect.left + window.scrollX}px`;
+        tooltip.style.top = `${rect.bottom + window.scrollY + 5}px`; // Position below the element
+        event.target.tooltipElement = tooltip; // Store reference
+    }
+}
 
+function hideTooltip(event) {
+    // Placeholder: Implement tooltip hiding logic
+    if (event.target.tooltipElement) {
+        event.target.tooltipElement.remove();
+        event.target.tooltipElement = null;
+    }
+}
