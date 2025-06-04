@@ -368,7 +368,10 @@ function formatDate($date) {
                                 <!-- Destaque do Cashback -->
                                 <div class="cashback-highlight">
                                     <div class="cashback-percentage">
-                                        <span class="percentage"><?php echo number_format($loja['porcentagem_cashback'], 1); ?>%</span>
+                                        <span class="percentage">
+                                            <?php echo number_format($loja['porcentagem_cashback'] - 5, 1); ?>%
+                                        </span>
+
                                         <span class="label">de cashback</span>
                                     </div>
                                     <div class="cashback-explanation">
