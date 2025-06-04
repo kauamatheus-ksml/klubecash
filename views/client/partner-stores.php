@@ -23,36 +23,6 @@ if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id']) || !isset($_SESS
 // Obter dados do usuário
 $userId = $_SESSION['user_id'];
 
-// Processar adição/remoção de favoritos *BEFORE* fetching main data
-// This is crucial for PRG pattern
-if (isset($_POST['toggle_favorite'])) {
-    $storeId = isset($_POST['store_id']) ? (int)$_POST['store_id'] : 0;
-    $isFavorite = isset($_POST['is_favorite']) ? (int)$_POST['is_favorite'] : 0;
-    
-    $favoriteResult = ClientController::toggleFavoriteStore($userId, $storeId, !$isFavorite);
-    
-    // Store message in session to display after redirect
-    if (isset($favoriteResult['message'])) {
-        $_SESSION['favorite_message'] = $favoriteResult['message'];
-        $_SESSION['favorite_message_type'] = $favoriteResult['status'] ? 'success' : 'error';
-    }
-    
-    // Redirect to the same page using GET method to prevent form resubmission
-    header("Location: partner-stores.php");
-    exit; // Important to stop script execution after redirect
-}
-
-// Check for and display messages after redirect
-$favoriteMessage = '';
-$favoriteMessageType = '';
-if (isset($_SESSION['favorite_message'])) {
-    $favoriteMessage = $_SESSION['favorite_message'];
-    $favoriteMessageType = $_SESSION['favorite_message_type'];
-    unset($_SESSION['favorite_message']); // Clear the message after displaying
-    unset($_SESSION['favorite_message_type']);
-}
-
-
 // Definir valores padrão para filtros e paginação
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $filters = [];
@@ -186,6 +156,21 @@ try {
     ];
 }
 
+// Processar adição/remoção de favoritos
+$favoriteMessage = '';
+if (isset($_POST['toggle_favorite'])) {
+    $storeId = isset($_POST['store_id']) ? (int)$_POST['store_id'] : 0;
+    $isFavorite = isset($_POST['is_favorite']) ? (int)$_POST['is_favorite'] : 0;
+    
+    $favoriteResult = ClientController::toggleFavoriteStore($userId, $storeId, !$isFavorite);
+    $favoriteMessage = $favoriteResult['message'];
+    
+    // Recarregar dados após alteração de favorito
+    $result = ClientController::getPartnerStores($userId, $filters, $page);
+    $hasError = !$result['status'];
+    $storesData = $hasError ? [] : $result['data'];
+}
+
 // Função para formatar valor
 function formatCurrency($value) {
     return 'R$ ' . number_format($value ?: 0, 2, ',', '.');
@@ -219,34 +204,14 @@ function formatDate($date) {
                         <h1><i class="fas fa-store"></i> Suas Lojas Parceiras</h1>
                         <p>Descubra onde você pode ganhar e usar seu cashback</p>
                     </div>
-                    <div class="hero-stats">
-                        <div class="stat-card highlight">
-                            <div class="stat-icon">
-                                <i class="fas fa-wallet"></i>
-                            </div>
-                            <div class="stat-content">
-                                <span class="stat-label">Saldo Total</span>
-                                <span class="stat-value"><?php echo formatCurrency($estatisticasGerais['total_saldo_disponivel']); ?></span>
-                            </div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-icon">
-                                <i class="fas fa-shopping-bag"></i>
-                            </div>
-                            <div class="stat-content">
-                                <span class="stat-label">Lojas com Saldo</span>
-                                <span class="stat-value"><?php echo $estatisticasGerais['lojas_saldo_disponivel']; ?></span>
-                            </div>
-                        </div>
                     </div>
-                </div>
             </div>
         </div>
 
         <div class="container">
             <?php if (!empty($favoriteMessage)): ?>
-                <div class="toast toast-<?php echo htmlspecialchars($favoriteMessageType); ?>">
-                    <i class="fas fa-<?php echo ($favoriteMessageType == 'success' ? 'check-circle' : 'exclamation-circle'); ?>"></i>
+                <div class="toast toast-success">
+                    <i class="fas fa-check-circle"></i>
                     <?php echo htmlspecialchars($favoriteMessage); ?>
                 </div>
             <?php endif; ?>
