@@ -116,7 +116,7 @@ class MercadoPagoClient {
                 ],
                 
                 // Configurações adicionais para PIX
-                'date_of_expiration' => date('c', strtotime('+30 minutes')), // PIX expira em 30 minutos
+                'date_of_expiration' => date('Y-m-d\TH:i:s\Z', strtotime('+30 minutes')), // PIX expira em 30 minutos
                 'statement_descriptor' => 'KLUBECASH' // Aparece no extrato do cliente
             ];
             
