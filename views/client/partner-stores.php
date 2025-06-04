@@ -194,11 +194,9 @@ function formatDate($date) {
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
 <body>
-    <!-- Incluir navbar -->
     <?php include_once '../components/navbar.php'; ?>
     
     <div class="page-wrapper" style="margin-top: 80px;">
-        <!-- Hero Section com Resumo de Saldo -->
         <div class="hero-section">
             <div class="container">
                 <div class="hero-content">
@@ -206,27 +204,7 @@ function formatDate($date) {
                         <h1><i class="fas fa-store"></i> Suas Lojas Parceiras</h1>
                         <p>Descubra onde você pode ganhar e usar seu cashback</p>
                     </div>
-                    <div class="hero-stats">
-                        <div class="stat-card highlight">
-                            <div class="stat-icon">
-                                <i class="fas fa-wallet"></i>
-                            </div>
-                            <div class="stat-content">
-                                <span class="stat-label">Saldo Total</span>
-                                <span class="stat-value"><?php echo formatCurrency($estatisticasGerais['total_saldo_disponivel']); ?></span>
-                            </div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-icon">
-                                <i class="fas fa-shopping-bag"></i>
-                            </div>
-                            <div class="stat-content">
-                                <span class="stat-label">Lojas com Saldo</span>
-                                <span class="stat-value"><?php echo $estatisticasGerais['lojas_saldo_disponivel']; ?></span>
-                            </div>
-                        </div>
                     </div>
-                </div>
             </div>
         </div>
 
@@ -245,7 +223,6 @@ function formatDate($date) {
                 </div>
             <?php else: ?>
             
-            <!-- Filtros Compactos -->
             <div class="filters-bar">
                 <div class="filters-toggle">
                     <button id="toggleFilters" class="btn-filter-toggle">
@@ -304,9 +281,7 @@ function formatDate($date) {
                 </div>
             </div>
             
-            <!-- Lista de Lojas Reformulada -->
             <div class="stores-section">
-                <!-- Cabeçalho com contadores -->
                 <div class="section-header">
                     <div class="section-title">
                         <h2>Suas Lojas Disponíveis</h2>
@@ -332,7 +307,6 @@ function formatDate($date) {
                     <?php endif; ?>
                 </div>
                 
-                <!-- Grid de Lojas -->
                 <div class="stores-grid">
                     <?php if (empty($storesData['lojas'])): ?>
                         <div class="empty-state">
@@ -346,7 +320,6 @@ function formatDate($date) {
                     <?php else: ?>
                         <?php foreach ($storesData['lojas'] as $loja): ?>
                             <div class="store-card <?php echo $loja['saldo_disponivel'] > 0 ? 'has-balance' : ''; ?>">
-                                <!-- Header do Card -->
                                 <div class="store-card-header">
                                     <div class="store-avatar">
                                         <span><?php echo strtoupper(substr($loja['nome_fantasia'], 0, 2)); ?></span>
@@ -360,7 +333,6 @@ function formatDate($date) {
                                         </span>
                                     </div>
                                     
-                                    <!-- Botão de Favorito -->
                                     <form method="POST" class="favorite-form">
                                         <input type="hidden" name="store_id" value="<?php echo $loja['id']; ?>">
                                         <input type="hidden" name="is_favorite" value="<?php echo $loja['is_favorite'] ?? 0; ?>">
@@ -370,7 +342,6 @@ function formatDate($date) {
                                     </form>
                                 </div>
                                 
-                                <!-- Destaque do Cashback -->
                                 <div class="cashback-highlight">
                                     <div class="cashback-percentage">
                                         <span class="percentage">
@@ -385,7 +356,6 @@ function formatDate($date) {
                                     </div>
                                 </div>
                                 
-                                <!-- Status do Saldo -->
                                 <?php if ($loja['saldo_disponivel'] > 0): ?>
                                     <div class="balance-status available">
                                         <div class="balance-icon">
@@ -434,7 +404,6 @@ function formatDate($date) {
                                     </div>
                                 <?php endif; ?>
                                 
-                                <!-- Ações do Card -->
                                 <div class="card-actions">
                                     <button class="btn-secondary" onclick="verDetalhes(<?php echo $loja['id']; ?>)">
                                         <i class="fas fa-info-circle"></i>
@@ -454,7 +423,6 @@ function formatDate($date) {
                 </div>
             </div>
             
-            <!-- Paginação (mantém igual) -->
             <?php if (!empty($storesData['paginacao']) && $storesData['paginacao']['total_paginas'] > 1): ?>
                 <div class="pagination-wrapper">
                     <nav class="pagination">
@@ -479,7 +447,6 @@ function formatDate($date) {
                             </a>
                         <?php endif; ?>
                         
-                        <!-- Páginas -->
                         <div class="pagination-numbers">
                             <?php 
                             $start = max(1, $currentPage - 2);
@@ -509,8 +476,6 @@ function formatDate($date) {
         </div>
     </div>
     
-    <!-- Modais permanecem iguais -->
-    <!-- Modal de Detalhes da Loja -->
     <div id="storeModal" class="modal">
         <div class="modal-overlay" onclick="closeModal()"></div>
         <div class="modal-content">
@@ -531,7 +496,6 @@ function formatDate($date) {
         </div>
     </div>
     
-    <!-- Modal de Uso de Saldo -->
     <div id="useBalanceModal" class="modal">
         <div class="modal-overlay" onclick="closeUseBalanceModal()"></div>
         <div class="modal-content">
@@ -642,7 +606,7 @@ function formatDate($date) {
         }
         
         // Auto-hide para toasts
-        document.addEventListener('DOMContentLoaded', function() {$loja['saldo_disponivel']
+        document.addEventListener('DOMContentLoaded', function() {
             const toasts = document.querySelectorAll('.toast');
             toasts.forEach(toast => {
                 setTimeout(() => {
