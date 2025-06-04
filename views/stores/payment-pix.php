@@ -55,6 +55,7 @@ $activeMenu = 'payment-pix';
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
     <link rel="stylesheet" href="../../assets/css/views/stores/payment-pix.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="../../assets/js/mercadopago-device.js?v=2.1.0"></script>
 </head>
 <body>
     <?php include_once '../components/sidebar-store.php'; ?>
@@ -371,6 +372,10 @@ $activeMenu = 'payment-pix';
             
             console.log('Iniciando geração PIX para payment_id:', paymentId);
             
+            // OBTER DEVICE ID PARA MELHOR APROVAÇÃO
+            const deviceId = getPaymentDeviceId();
+            console.log('Device ID gerado:', deviceId);
+            
             try {
                 const response = await fetch('<?php echo MP_CREATE_PAYMENT_URL; ?>', {
                     method: 'POST',
@@ -378,7 +383,8 @@ $activeMenu = 'payment-pix';
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        payment_id: paymentId
+                        payment_id: paymentId,
+                        device_id: deviceId // ADICIONAR DEVICE ID
                     })
                 });
                 

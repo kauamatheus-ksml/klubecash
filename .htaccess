@@ -1,10 +1,10 @@
-# Klube Cash - .htaccess Otimizado v2.0
+# Klube Cash - .htaccess Otimizado para Mercado Pago v2.1
 
 # Habilitar o motor de reescrita
 RewriteEngine On
 RewriteBase /
 
-# === SEGURANÇA AVANÇADA ===
+# === SEGURANÇA AVANÇADA PARA MERCADO PAGO ===
 <IfModule mod_headers.c>
     # Proteção XSS
     Header set X-XSS-Protection "1; mode=block"
@@ -12,11 +12,32 @@ RewriteBase /
     Header set X-Content-Type-Options "nosniff"
     Header set Referrer-Policy "strict-origin-when-cross-origin"
     
-    # CSP otimizado para o novo design
-    Header set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' unpkg.com googleapis.com sdk.mercadopago.com; style-src 'self' 'unsafe-inline' fonts.googleapis.com; font-src 'self' fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' viacep.com.br api.mercadopago.com"
+    # CSP otimizado para o Mercado Pago SDK
+    Header set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' unpkg.com googleapis.com sdk.mercadopago.com secure.mlstatic.com; style-src 'self' 'unsafe-inline' fonts.googleapis.com; font-src 'self' fonts.gstatic.com; img-src 'self' data: blob: *.mlstatic.com; connect-src 'self' viacep.com.br api.mercadopago.com *.mercadopago.com"
     
-    # HSTS para HTTPS
+    # HSTS para HTTPS (OBRIGATÓRIO PARA MP)
     Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" env=HTTPS
+    
+    # Headers adicionais para Mercado Pago
+    Header set X-Permitted-Cross-Domain-Policies "none"
+    Header set X-Download-Options "noopen"
+</IfModule>
+
+# === FORÇA HTTPS OBRIGATÓRIO ===
+# Redirecionar www para non-www
+RewriteCond %{HTTP_HOST} ^www\.(.*)$ [NC]
+RewriteRule ^(.*)$ https://%1/$1 [R=301,L]
+
+# Forçar HTTPS (OBRIGATÓRIO PARA MERCADO PAGO)
+RewriteCond %{HTTPS} off
+RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# === SSL/TLS CONFIGURATION ===
+<IfModule mod_ssl.c>
+    # Força TLS 1.2+ (OBRIGATÓRIO PARA MP)
+    SSLProtocol TLSv1.2 TLSv1.3
+    SSLCipherSuite HIGH:!aNULL:!MD5
+    SSLHonorCipherOrder on
 </IfModule>
 
 # === CACHE E PERFORMANCE ===
@@ -69,14 +90,6 @@ RewriteBase /
 </IfModule>
 
 # === ROTAS EXISTENTES (MANTIDAS) ===
-# Redirecionar www para non-www
-RewriteCond %{HTTP_HOST} ^www\.(.*)$ [NC]
-RewriteRule ^(.*)$ https://%1/$1 [R=301,L]
-
-# Forçar HTTPS
-RewriteCond %{HTTPS} off
-RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
-
 # Autenticação
 RewriteRule ^login/?$ views/auth/login.php [L,NC]
 RewriteRule ^registro/?$ views/auth/register.php [L]
@@ -90,8 +103,10 @@ RewriteRule ^cliente/perfil/?$ views/client/profile.php [L]
 RewriteRule ^cliente/saldo/?$ views/client/balance.php [L]
 RewriteRule ^cliente/actions/?$ controllers/client_actions.php [L,QSA]
 RewriteRule ^cliente/devolucoes/?$ views/client/refund-status.php [L]
-# API de Devoluções (já adicionado antes)
+
+# API de Devoluções
 RewriteRule ^api/refunds/?$ api/refunds.php [L,QSA]
+
 # Admin
 RewriteRule ^admin/dashboard/?$ views/admin/dashboard.php [L]
 RewriteRule ^admin/usuarios/?$ views/admin/users.php [L]
@@ -104,12 +119,10 @@ RewriteRule ^admin/comissoes/?$ views/admin/commissions.php [L]
 RewriteRule ^admin/pagamentos/?$ views/admin/payments.php [L]
 RewriteRule ^admin/relatorios/?$ views/admin/reports.php [L]
 
-# PIX e Mercado Pago
+# PIX e Mercado Pago (OTIMIZADO)
 RewriteRule ^store/pagamento-pix/?$ views/stores/payment-pix.php [L,QSA]
 RewriteRule ^api/mercadopago/?$ api/mercadopago.php [L,QSA]
 RewriteRule ^api/mercadopago-webhook/?$ api/mercadopago-webhook.php [L,QSA]
-
-RewriteRule ^controllers/TransactionController\.php$ controllers/TransactionController.php [L,QSA]
 RewriteRule ^api/store-payment/?$ api/store-payment.php [L,QSA]
 
 # Lojas
@@ -123,7 +136,6 @@ RewriteRule ^store/upload-lote/?$ views/stores/batch-upload.php [L,QSA]
 RewriteRule ^store/pagamento/?$ views/stores/payment.php [L,QSA]
 RewriteRule ^store/historico-pagamentos/?$ views/stores/payment-history.php [L,QSA]
 RewriteRule ^store/perfil/?$ views/stores/profile.php [L,QSA]
-
 
 # Email Marketing
 RewriteRule ^admin/email-marketing/?$ views/admin/email-marketing.php [L]
@@ -146,13 +158,16 @@ RewriteRule ^auth/google/auth/?$ auth/google/auth.php [L]
 RewriteRule ^auth/google/register/?$ auth/google/register.php [L]
 RewriteRule ^auth/google/callback/?$ auth/google/callback.php [L]
 
-# === OTIMIZAÇÕES ESPECIAIS ===
-# Preload de recursos críticos
+# === OTIMIZAÇÕES ESPECIAIS PARA MERCADO PAGO ===
 <IfModule mod_headers.c>
-    # Preload da fonte principal
+    # Preload de recursos críticos
     Header add Link "</assets/css/index-v2.css>; rel=preload; as=style"
     Header add Link "<https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap>; rel=preload; as=style; crossorigin"
     Header add Link "</assets/js/index-v2.js>; rel=preload; as=script"
+    
+    # Permitir conexões do SDK do Mercado Pago
+    Header add Access-Control-Allow-Origin "https://sdk.mercadopago.com"
+    Header add Access-Control-Allow-Credentials "true"
 </IfModule>
 
 # === BLOQUEIO DE ARQUIVOS SENSÍVEIS ===
@@ -168,9 +183,10 @@ RewriteRule ^auth/google/callback/?$ auth/google/callback.php [L]
     AddType font/woff2 .woff2
     AddType application/font-woff .woff
     AddType application/font-woff2 .woff2
+    AddType application/json .json
 </IfModule>
 
-# === CONFIGURAÇÕES PHP ===
+# === CONFIGURAÇÕES PHP OTIMIZADAS ===
 <IfModule mod_php7.c>
     php_value upload_max_filesize 10M
     php_value post_max_size 10M
@@ -179,6 +195,10 @@ RewriteRule ^auth/google/callback/?$ auth/google/callback.php [L]
     php_flag display_errors off
     php_value error_reporting "E_ALL & ~E_NOTICE & ~E_DEPRECATED"
     php_value memory_limit 256M
+    
+    # Configurações específicas para Mercado Pago
+    php_value user_agent "KlubeCash/2.0 (PHP/7.4; MercadoPago-Optimized)"
+    php_value default_socket_timeout 30
 </IfModule>
 
 # === PÁGINAS DE ERRO ===

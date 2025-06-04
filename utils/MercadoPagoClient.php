@@ -2,19 +2,14 @@
 // utils/MercadoPagoClient.php
 
 /**
- * Cliente completo para integração com a API do Mercado Pago
- * 
- * Esta classe é responsável por:
- * - Criar pagamentos PIX e consultar seu status
- * - Processar devoluções (refunds) totais e parciais
- * - Validar webhooks de forma segura
- * - Gerenciar comunicação segura com a API do MP
+ * Cliente otimizado para integração com a API do Mercado Pago
+ * Implementa todas as boas práticas para máxima taxa de aprovação
  * 
  * Fluxo do Mercado Pago:
- * 1. Enviamos dados do pagamento para eles
- * 2. Eles retornam um QR Code e dados do PIX
+ * 1. Enviamos dados completos do pagamento (payer, items, device_id)
+ * 2. MP retorna QR Code PIX com alta qualidade de aprovação
  * 3. Cliente paga o PIX
- * 4. MP nos notifica via webhook quando o pagamento é aprovado
+ * 4. MP nos notifica via webhook seguro
  * 5. Podemos solicitar devoluções se necessário
  */
 class MercadoPagoClient {
@@ -75,20 +70,21 @@ class MercadoPagoClient {
     }
     
     /**
-     * Criar um pagamento PIX no Mercado Pago
-     * 
-     * Este método pega os dados da nossa loja e cria um pagamento PIX.
-     * O MP retorna um QR Code que o cliente pode escanear para pagar.
+     * Criar um pagamento PIX no Mercado Pago com TODOS os campos para máxima aprovação
      * 
      * @param array $data Dados do pagamento contendo:
      *                   - amount: valor em reais (obrigatório)
      *                   - payer_email: email do pagador (obrigatório)  
      *                   - payer_name: nome do pagador (opcional)
      *                   - payer_lastname: sobrenome do pagador (opcional)
+     *                   - payer_phone: telefone do pagador (opcional)
+     *                   - payer_cpf: CPF do pagador (opcional)
+     *                   - payer_address: endereço do pagador (opcional)
      *                   - description: descrição do pagamento (opcional)
      *                   - external_reference: referência externa (opcional)
      *                   - payment_id: ID do nosso pagamento interno (opcional)
      *                   - store_id: ID da loja (opcional)
+     *                   - device_id: ID do dispositivo (recomendado)
      * 
      * @return array Resultado da operação com status e dados do pagamento
      */
@@ -100,7 +96,7 @@ class MercadoPagoClient {
                 return ['status' => false, 'message' => $validation['message']];
             }
             
-            // Montar o payload para enviar ao Mercado Pago
+            // Montar o payload COMPLETO para enviar ao Mercado Pago
             $payload = [
                 // Valor do pagamento (deve ser um número decimal)
                 'transaction_amount' => (float) $data['amount'],
@@ -108,18 +104,66 @@ class MercadoPagoClient {
                 // Especifica que queremos um pagamento PIX
                 'payment_method_id' => 'pix',
                 
-                // Dados do pagador (pessoa que vai pagar)
+                // DADOS COMPLETOS DO PAGADOR (OBRIGATÓRIO PARA BOA APROVAÇÃO)
                 'payer' => [
                     'email' => trim($data['payer_email']),
-                    'first_name' => $data['payer_name'] ?? 'Lojista',
-                    'last_name' => $data['payer_lastname'] ?? 'Klube Cash'
+                    'first_name' => $this->extractFirstName($data['payer_name'] ?? 'Cliente'),
+                    'last_name' => $this->extractLastName($data['payer_lastname'] ?? $data['payer_name'] ?? 'Klube Cash'),
+                    'type' => 'customer'
+                ],
+                
+                // ITENS DETALHADOS (OBRIGATÓRIO PARA BOA APROVAÇÃO)
+                'additional_info' => [
+                    'items' => [
+                        [
+                            'id' => $data['item_id'] ?? 'COMISSAO_' . ($data['payment_id'] ?? uniqid()),
+                            'title' => $data['item_title'] ?? 'Comissão Klube Cash',
+                            'description' => $data['description'] ?? 'Pagamento de comissão para liberação de cashback',
+                            'category_id' => 'services', // Categoria obrigatória
+                            'quantity' => 1,
+                            'unit_price' => (float) $data['amount'],
+                            'picture_url' => 'https://klubecash.com/assets/images/logo.png',
+                            'warranty' => false
+                        ]
+                    ]
                 ],
                 
                 // Configurações adicionais para PIX
                 'date_of_expiration' => gmdate('Y-m-d\TH:i:s.000\Z', strtotime('+30 minutes')), // PIX expira em 30 minutos
-
-                'statement_descriptor' => 'KLUBECASH' // Aparece no extrato do cliente
+                'statement_descriptor' => 'KLUBECASH', // Aparece no extrato do cliente
+                'notification_url' => defined('MP_WEBHOOK_URL') && !empty(MP_WEBHOOK_URL) ? MP_WEBHOOK_URL : null
             ];
+            
+            // ADICIONAR TELEFONE SE DISPONÍVEL (MELHORA APROVAÇÃO)
+            if (!empty($data['payer_phone'])) {
+                $phoneData = $this->parsePhoneNumber($data['payer_phone']);
+                $payload['payer']['phone'] = $phoneData;
+            }
+            
+            // ADICIONAR CPF/CNPJ SE DISPONÍVEL (MELHORA MUITO A APROVAÇÃO)
+            if (!empty($data['payer_cpf'])) {
+                $payload['payer']['identification'] = [
+                    'type' => strlen(preg_replace('/\D/', '', $data['payer_cpf'])) <= 11 ? 'CPF' : 'CNPJ',
+                    'number' => preg_replace('/\D/', '', $data['payer_cpf'])
+                ];
+            }
+            
+            // ADICIONAR ENDEREÇO SE DISPONÍVEL (MELHORA APROVAÇÃO)
+            if (!empty($data['payer_address'])) {
+                $payload['payer']['address'] = $this->parseAddress($data['payer_address']);
+            }
+            
+            // ADICIONAR DEVICE ID SE DISPONÍVEL (OBRIGATÓRIO PARA APROVAÇÃO)
+            if (!empty($data['device_id'])) {
+                $payload['device_id'] = $data['device_id'];
+            }
+            
+            // ADICIONAR INFORMAÇÕES EXTRAS DO PAGADOR
+            if (!empty($data['payer_registration_date'])) {
+                $payload['additional_info']['payer'] = [
+                    'registration_date' => $data['payer_registration_date']
+                ];
+            }
             
             // Adicionar campos opcionais se foram fornecidos
             if (!empty($data['description'])) {
@@ -140,16 +184,12 @@ class MercadoPagoClient {
                     $payload['metadata']['store_id'] = (string) $data['store_id'];
                 }
                 $payload['metadata']['created_at'] = date('Y-m-d H:i:s');
-            }
-            
-            // Configurar URL de notificação
-            if (defined('MP_WEBHOOK_URL') && !empty(MP_WEBHOOK_URL)) {
-                $payload['notification_url'] = MP_WEBHOOK_URL;
+                $payload['metadata']['source'] = 'Klube Cash v2.0';
             }
             
             // Log para debug (mascarando dados sensíveis)
             $logPayload = $this->maskSensitiveData($payload);
-            error_log("MP createPixPayment - Payload: " . json_encode($logPayload, JSON_PRETTY_PRINT));
+            error_log("MP createPixPayment - Payload COMPLETO: " . json_encode($logPayload, JSON_PRETTY_PRINT));
             
             // Fazer a requisição para o Mercado Pago
             $response = $this->makeRequest('POST', self::ENDPOINTS['payments'], $payload);
@@ -172,10 +212,83 @@ class MercadoPagoClient {
     }
     
     /**
+     * Extrair primeiro nome de um nome completo
+     */
+    private function extractFirstName($fullName) {
+        $names = explode(' ', trim($fullName));
+        return !empty($names[0]) ? $names[0] : 'Cliente';
+    }
+    
+    /**
+     * Extrair sobrenome de um nome completo
+     */
+    private function extractLastName($fullName) {
+        $names = array_filter(explode(' ', trim($fullName)));
+        if (count($names) <= 1) {
+            return 'Klube Cash';
+        }
+        return implode(' ', array_slice($names, 1));
+    }
+    
+    /**
+     * Parse número de telefone para formato do MP
+     */
+    private function parsePhoneNumber($phone) {
+        // Remove caracteres não numéricos
+        $cleanPhone = preg_replace('/\D/', '', $phone);
+        
+        // Se tem 11 dígitos (celular com DDD)
+        if (strlen($cleanPhone) === 11) {
+            return [
+                'area_code' => substr($cleanPhone, 0, 2),
+                'number' => substr($cleanPhone, 2)
+            ];
+        }
+        
+        // Se tem 10 dígitos (fixo com DDD)
+        if (strlen($cleanPhone) === 10) {
+            return [
+                'area_code' => substr($cleanPhone, 0, 2),
+                'number' => substr($cleanPhone, 2)
+            ];
+        }
+        
+        // Fallback para formato padrão
+        return [
+            'area_code' => '11',
+            'number' => substr($cleanPhone, -8)
+        ];
+    }
+    
+    /**
+     * Parse endereço para formato do MP
+     */
+    private function parseAddress($address) {
+        // Se é um array, usar diretamente
+        if (is_array($address)) {
+            return [
+                'zip_code' => $address['zip_code'] ?? $address['cep'] ?? '',
+                'street_name' => $address['street_name'] ?? $address['logradouro'] ?? '',
+                'street_number' => (int)($address['street_number'] ?? $address['numero'] ?? 0),
+                'neighborhood' => $address['neighborhood'] ?? $address['bairro'] ?? '',
+                'city' => $address['city'] ?? $address['cidade'] ?? '',
+                'federal_unit' => $address['federal_unit'] ?? $address['estado'] ?? ''
+            ];
+        }
+        
+        // Se é string, retornar formato básico
+        return [
+            'zip_code' => '',
+            'street_name' => (string) $address,
+            'street_number' => 0,
+            'neighborhood' => '',
+            'city' => 'Patos de Minas',
+            'federal_unit' => 'MG'
+        ];
+    }
+    
+    /**
      * Consultar o status de um pagamento no Mercado Pago
-     * 
-     * @param string $paymentId ID do pagamento no Mercado Pago
-     * @return array Resultado com status e dados do pagamento
      */
     public function getPaymentStatus($paymentId) {
         if (empty($paymentId)) {
@@ -215,11 +328,6 @@ class MercadoPagoClient {
     
     /**
      * Criar uma devolução (refund) para um pagamento
-     * 
-     * @param string $paymentId ID do pagamento no MP
-     * @param float|null $amount Valor a devolver (null = devolução total)
-     * @param string|null $reason Motivo da devolução
-     * @return array Resultado da operação
      */
     public function createRefund($paymentId, $amount = null, $reason = null) {
         if (empty($paymentId)) {
@@ -264,7 +372,8 @@ class MercadoPagoClient {
             // Adicionar metadata com motivo e informações de controle
             $payload['metadata'] = [
                 'refund_date' => date('Y-m-d H:i:s'),
-                'system' => 'KlubeCash'
+                'system' => 'KlubeCash',
+                'source' => 'admin_request'
             ];
             
             if ($reason !== null) {
@@ -306,11 +415,7 @@ class MercadoPagoClient {
     }
     
     /**
-     * Consultar status de uma devolução específica ou listar todas as devoluções de um pagamento
-     * 
-     * @param string $paymentId ID do pagamento
-     * @param string|null $refundId ID da devolução (se null, lista todas)
-     * @return array Resultado da consulta
+     * Consultar status de uma devolução específica
      */
     public function getRefundStatus($paymentId, $refundId = null) {
         if (empty($paymentId)) {
@@ -396,10 +501,6 @@ class MercadoPagoClient {
     
     /**
      * Validar assinatura do webhook do Mercado Pago
-     * 
-     * @param array $headers Headers da requisição
-     * @param string $body Corpo da requisição
-     * @return bool True se a assinatura for válida
      */
     public function validateWebhookSignature($headers, $body) {
         try {
@@ -472,8 +573,6 @@ class MercadoPagoClient {
     
     /**
      * Método para testar a conectividade com o Mercado Pago
-     * 
-     * @return array Resultado do teste
      */
     public function testConnection() {
         try {
@@ -504,9 +603,6 @@ class MercadoPagoClient {
     
     /**
      * Validar dados obrigatórios para criação de pagamento
-     * 
-     * @param array $data Dados a validar
-     * @return array Resultado da validação
      */
     private function validatePaymentData($data) {
         // Verificar valor
@@ -538,9 +634,6 @@ class MercadoPagoClient {
     
     /**
      * Processar resposta de criação de pagamento PIX
-     * 
-     * @param array $mpData Dados retornados pelo MP
-     * @return array Resultado processado
      */
     private function processPixPaymentResponse($mpData) {
         // Verificar se recebemos os dados necessários do PIX
@@ -586,9 +679,6 @@ class MercadoPagoClient {
     
     /**
      * Mascarar dados sensíveis para logs
-     * 
-     * @param array $data Dados a mascarar
-     * @return array Dados mascarados
      */
     private function maskSensitiveData($data) {
         $masked = $data;
@@ -607,33 +697,47 @@ class MercadoPagoClient {
             $masked['payer']['first_name'] = substr($masked['payer']['first_name'], 0, 3) . '***';
         }
         
+        // Mascarar phone
+        if (isset($masked['payer']['phone']['number'])) {
+            $phone = $masked['payer']['phone']['number'];
+            $masked['payer']['phone']['number'] = substr($phone, 0, 3) . '***' . substr($phone, -2);
+        }
+        
+        // Mascarar CPF
+        if (isset($masked['payer']['identification']['number'])) {
+            $doc = $masked['payer']['identification']['number'];
+            $masked['payer']['identification']['number'] = substr($doc, 0, 3) . '***' . substr($doc, -2);
+        }
+        
         return $masked;
     }
     
     /**
      * Método central para fazer requisições HTTP para o Mercado Pago
-     * 
-     * @param string $method Método HTTP (GET, POST, PUT, DELETE)
-     * @param string $endpoint Endpoint da API (ex: /v1/payments)
-     * @param array|null $data Dados para enviar na requisição (para POST/PUT)
-     * @return array Resultado da requisição
      */
     private function makeRequest($method, $endpoint, $data = null) {
         $startTime = microtime(true);
         $url = $this->baseUrl . $endpoint;
         
-        // Configurar headers necessários
+        // Configurar headers necessários COM TODAS AS OTIMIZAÇÕES
         $headers = [
             'Authorization: Bearer ' . $this->accessToken,
             'Content-Type: application/json',
             'Accept: application/json',
-            'User-Agent: KlubeCash/2.0 (PHP/' . PHP_VERSION . ')',
-            'X-Idempotency-Key: ' . uniqid('klube_' . time() . '_', true)
+            'User-Agent: KlubeCash/2.0 (PHP/' . PHP_VERSION . '; MP-Integration-Quality-Optimized)',
+            'X-Idempotency-Key: ' . uniqid('klube_' . time() . '_', true),
+            'X-meli-session-id: ' . uniqid('session_', true), // Para tracking
+            'X-Product-Id: KLUBE_CASH_CASHBACK_SYSTEM' // Identificação do produto
         ];
+        
+        // ADICIONAR TRACKING DE ORIGEM
+        if (isset($_SERVER['HTTP_USER_AGENT'])) {
+            $headers[] = 'X-Tracking-Id: ' . md5($_SERVER['HTTP_USER_AGENT'] . date('Y-m-d'));
+        }
         
         error_log("MP Request: {$method} {$url}");
         
-        // Inicializar cURL
+        // Inicializar cURL com configurações otimizadas
         $ch = curl_init();
         
         curl_setopt_array($ch, [
@@ -644,15 +748,18 @@ class MercadoPagoClient {
             CURLOPT_CUSTOMREQUEST => $method,
             CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_SSL_VERIFYHOST => 2,
+            CURLOPT_SSLVERSION => CURL_SSLVERSION_TLSv1_2, // FORÇAR TLS 1.2+
             CURLOPT_FOLLOWLOCATION => false,
             CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-            CURLOPT_USERAGENT => 'KlubeCash/2.0',
-            CURLOPT_VERBOSE => false
+            CURLOPT_USERAGENT => 'KlubeCash/2.0 MP-Quality-Optimized',
+            CURLOPT_VERBOSE => false,
+            CURLOPT_FRESH_CONNECT => true, // Forçar nova conexão
+            CURLOPT_FORBID_REUSE => true,  // Não reutilizar conexão
         ]);
         
         // Adicionar dados se necessário
         if ($data && in_array($method, ['POST', 'PUT', 'PATCH'])) {
-            $jsonData = json_encode($data, JSON_UNESCAPED_UNICODE);
+            $jsonData = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonData);
             
             // Log dos dados (mascarados)
@@ -738,10 +845,6 @@ class MercadoPagoClient {
     
     /**
      * Extrair mensagem de erro mais legível da resposta do MP
-     * 
-     * @param array $response Resposta decodificada
-     * @param int $httpCode Código HTTP
-     * @return string Mensagem de erro
      */
     private function extractErrorMessage($response, $httpCode) {
         $errorMessage = 'Erro HTTP ' . $httpCode;
