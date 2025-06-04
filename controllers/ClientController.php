@@ -140,6 +140,30 @@ class ClientController {
             return ['status' => false, 'message' => 'Erro ao carregar detalhes da loja.'];
         }
     }
+    /**
+     * Verifica se o CPF pode ser editado (não foi validado/salvo anteriormente)
+     * 
+     * @param int $userId ID do usuário
+     * @return bool true se pode editar, false se está fixo
+     */
+    private static function canEditCPF($userId) {
+        try {
+            $db = Database::getConnection();
+            
+            // Verificar se já existe CPF válido salvo
+            $stmt = $db->prepare("SELECT cpf FROM usuarios WHERE id = :user_id");
+            $stmt->bindParam(':user_id', $userId);
+            $stmt->execute();
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            // Se CPF existe e não está vazio, não pode mais ser editado
+            return empty($user['cpf']);
+            
+        } catch (Exception $e) {
+            error_log('Erro ao verificar edição de CPF: ' . $e->getMessage());
+            return true; // Em caso de erro, permitir edição por segurança
+        }
+    }
 
     /**
     * Simula o uso de saldo de uma loja específica
@@ -627,6 +651,11 @@ class ClientController {
             $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
             error_log('Dados do usuário encontrados: ' . print_r($usuario, true));
             
+            // NOVO: Verificar se CPF pode ser editado
+            $cpfEditavel = self::canEditCPF($userId);
+            $usuario['cpf_editavel'] = $cpfEditavel;
+            error_log('CPF editável: ' . ($cpfEditavel ? 'SIM' : 'NÃO'));
+            
             // Buscar dados de contato
             try {
                 $contatoStmt = $db->prepare("
@@ -767,6 +796,14 @@ class ClientController {
         // NOVO: Processar CPF com logs detalhados
         if (isset($data['cpf'])) {
             error_log('CPF recebido no data: ' . var_export($data['cpf'], true));
+            
+            // Verificar se CPF pode ser editado
+            if (!self::canEditCPF($userId)) {
+                error_log('Tentativa de alterar CPF já validado - operação negada');
+                $db->rollBack();
+                return ['status' => false, 'message' => 'CPF já foi validado e não pode ser alterado. Entre em contato com o suporte se necessário.'];
+            }
+            
             $cpf = preg_replace('/\D/', '', $data['cpf']); // Remove caracteres não numéricos
             error_log('CPF após limpeza: ' . var_export($cpf, true));
             
@@ -799,11 +836,6 @@ class ClientController {
                 $basicParams[':cpf'] = $cpf;
                 $updateBasicData = true;
                 error_log('CPF validado e será atualizado: ' . $cpf);
-            } else {
-                // Se CPF for enviado vazio, limpar campo
-                $basicFields[] = 'cpf = NULL';
-                $updateBasicData = true;
-                error_log('CPF será limpo (valor vazio enviado)');
             }
         } else {
             error_log('CPF não foi enviado nos dados');

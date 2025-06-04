@@ -161,11 +161,19 @@ try {
 
 // Calcular progresso do perfil (ATUALIZADO para incluir CPF)
 $profileCompletion = 0;
-$totalSteps = 6; // Aumentado de 5 para 6
+$totalSteps = 6; // Mantém 6 passos
 $completedSteps = 0;
 
 if (!empty($profileData['perfil']['nome'])) $completedSteps++;
-if (!empty($profileData['perfil']['cpf'])) $completedSteps++; // Novo: CPF
+
+// MODIFICADO: CPF conta como completo se existe (editável ou não)
+if (!empty($profileData['perfil']['cpf'])) {
+    $completedSteps++;
+    $cpfPendente = false; // Se já tem CPF, não está mais pendente
+} else {
+    $cpfPendente = $profileData['perfil']['cpf_editavel']; // Só pendente se ainda pode editar
+}
+
 if (!empty($profileData['contato']['telefone']) || !empty($profileData['contato']['celular'])) $completedSteps++;
 if (!empty($profileData['contato']['email_alternativo'])) $completedSteps++;
 if (!empty($profileData['endereco']['cep']) && !empty($profileData['endereco']['logradouro'])) $completedSteps++;
@@ -769,6 +777,50 @@ $cpfPendente = empty($profileData['perfil']['cpf']);
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+        /* Estilos para CPF verificado/fixo */
+        .cpf-verified {
+            color: var(--success-color);
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin-left: 8px;
+        }
+
+        .cpf-verified i {
+            margin-right: 4px;
+        }
+
+        .form-control:disabled {
+            background-color: #f8f9fa !important;
+            color: var(--medium-gray) !important;
+            cursor: not-allowed;
+            border-color: #e9ecef;
+            opacity: 0.8;
+        }
+
+        .form-help.cpf-fixed {
+            color: var(--success-color);
+            font-weight: 500;
+        }
+
+        .form-help.cpf-fixed i {
+            color: var(--success-color);
+        }
+
+        /* Destaque visual para campo CPF fixo */
+        .form-group:has(.form-control:disabled) {
+            position: relative;
+        }
+
+        .form-group:has(.form-control:disabled)::before {
+            content: '';
+            position: absolute;
+            left: -5px;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background: linear-gradient(to bottom, var(--success-color), transparent);
+            border-radius: 2px;
+        }
     </style>
 </head>
 <body>
@@ -894,20 +946,35 @@ $cpfPendente = empty($profileData['perfil']['cpf']);
                                        required placeholder="Digite seu nome completo">
                             </div>
                             
-                            <!-- NOVO: Campo CPF -->
-                            <div class="form-group <?php echo $cpfPendente ? 'cpf-required' : ''; ?>">
+                            <!-- MODIFICADO: Campo CPF com verificação de edição -->
+                            <div class="form-group <?php echo ($cpfPendente && $profileData['perfil']['cpf_editavel']) ? 'cpf-required' : ''; ?>">
                                 <label class="form-label" for="cpf">
-                                    CPF <?php echo $cpfPendente ? '<span class="required">*</span>' : ''; ?>
+                                    CPF 
+                                    <?php if ($cpfPendente && $profileData['perfil']['cpf_editavel']): ?>
+                                        <span class="required">*</span>
+                                    <?php endif; ?>
+                                    <?php if (!$profileData['perfil']['cpf_editavel']): ?>
+                                        <span class="cpf-verified"><i class="fas fa-check-circle"></i> Verificado</span>
+                                    <?php endif; ?>
                                 </label>
                                 <input type="text" id="cpf" name="cpf" class="form-control" 
-                                       value="<?php echo htmlspecialchars($profileData['perfil']['cpf'] ?? ''); ?>" 
-                                       placeholder="000.000.000-00"
-                                       maxlength="14"
-                                       <?php echo $cpfPendente ? 'required' : ''; ?>>
-                                <p class="form-help">
-                                    <i class="fas fa-shield-alt"></i>
-                                    Seu CPF é necessário para maior segurança nas transações
-                                </p>
+                                    value="<?php echo htmlspecialchars($profileData['perfil']['cpf'] ?? ''); ?>" 
+                                    placeholder="000.000.000-00"
+                                    maxlength="14"
+                                    <?php echo !$profileData['perfil']['cpf_editavel'] ? 'disabled' : ''; ?>
+                                    <?php echo ($cpfPendente && $profileData['perfil']['cpf_editavel']) ? 'required' : ''; ?>>
+                                
+                                <?php if (!$profileData['perfil']['cpf_editavel']): ?>
+                                    <p class="form-help cpf-fixed">
+                                        <i class="fas fa-lock"></i>
+                                        CPF verificado e validado. Não pode ser alterado por segurança.
+                                    </p>
+                                <?php else: ?>
+                                    <p class="form-help">
+                                        <i class="fas fa-shield-alt"></i>
+                                        Seu CPF é necessário para maior segurança nas transações
+                                    </p>
+                                <?php endif; ?>
                             </div>
                             
                             <div class="form-group">
@@ -1146,6 +1213,11 @@ $cpfPendente = empty($profileData['perfil']['cpf']);
 
         // NOVO: Aplicar máscara no CPF
         document.getElementById('cpf').addEventListener('input', function() {
+            // Se o campo está desabilitado, não aplicar máscara
+            if (this.disabled) {
+                return;
+            }
+            
             let value = this.value.replace(/\D/g, '');
             
             if (value.length <= 11) {
@@ -1160,6 +1232,11 @@ $cpfPendente = empty($profileData['perfil']['cpf']);
 
         // NOVO: Validação de CPF em tempo real
         document.getElementById('cpf').addEventListener('blur', function() {
+            // Se o campo está desabilitado, não validar
+            if (this.disabled) {
+                return;
+            }
+            
             const cpf = this.value.replace(/\D/g, '');
             
             if (cpf.length === 0) {
