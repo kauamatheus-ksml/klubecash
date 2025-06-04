@@ -1,33 +1,8 @@
 <?php
-// index.php - Debug habilitado
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
-ini_set('log_errors', 1);
-
-echo "<!-- DEBUG: Iniciando index.php -->\n";
-
-// Verificar se os arquivos de configuração existem
-if (!file_exists('./config/constants.php')) {
-    die('ERRO: Arquivo constants.php não encontrado!');
-}
-
-if (!file_exists('./config/database.php')) {
-    die('ERRO: Arquivo database.php não encontrado!');
-}
-
-echo "<!-- DEBUG: Arquivos de config encontrados -->\n";
-
+// index.php - Versão 2.0 Completamente Redesenhada
 require_once './config/constants.php';
 require_once './config/database.php';
 
-echo "<!-- DEBUG: Arquivos incluídos com sucesso -->\n";
-// Verificar se as constantes foram carregadas
-if (!defined('SITE_URL')) {
-    die('ERRO: Constantes não foram carregadas corretamente!');
-}
-
-echo "<!-- DEBUG: SITE_URL = " . SITE_URL . " -->\n";
-echo "<!-- DEBUG: LOGIN_URL = " . LOGIN_URL . " -->\n";
 /**
  * Como um artista digital, esta função decide se vai mostrar uma foto real da loja
  * ou criar um ícone colorido personalizado - é como ter um designer automático!
@@ -125,9 +100,7 @@ if ($isLoggedIn) {
 // Busca das lojas parceiras - como procurar os melhores amigos para apresentar
 $partnerStores = [];
 try {
-    echo "<!-- DEBUG: Tentando conectar ao banco -->\n";
     $db = Database::getConnection();
-    echo "<!-- DEBUG: Conexão estabelecida -->\n";
     
     $stmt = $db->query("
         SELECT 
@@ -143,16 +116,10 @@ try {
     ");
     $partnerStores = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    echo "<!-- DEBUG: Lojas encontradas: " . count($partnerStores) . " -->\n";
     error_log("Lojas parceiras carregadas: " . count($partnerStores));
     
 } catch (PDOException $e) {
-    echo "<!-- DEBUG: Erro no banco: " . $e->getMessage() . " -->\n";
     error_log("Erro ao buscar lojas parceiras: " . $e->getMessage());
-    $partnerStores = [];
-} catch (Exception $e) {
-    echo "<!-- DEBUG: Erro geral: " . $e->getMessage() . " -->\n";
-    error_log("Erro geral: " . $e->getMessage());
     $partnerStores = [];
 }
 ?>
@@ -183,11 +150,11 @@ try {
     
     <!-- Preload de recursos críticos -->
     <link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" as="style">
-    <link rel="preload" href="<?php echo SITE_URL; ?>/assets/css/index-v2.css" as="style">
+    <link rel="preload" href="assets/css/index-v2.css" as="style">
     
     <!-- Styles -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?php echo SITE_URL; ?>/assets/css/index-v2.css?v=<?php echo time(); ?>">
+    <link rel="stylesheet" href="assets/css/index-v2.css">
     
     <!-- Bibliotecas de animação -->
     <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
@@ -1034,28 +1001,8 @@ try {
         </div>
     </footer>
 
-    <script>
-// Debug: JavaScript carregando
-console.log('DEBUG: JavaScript iniciando...');
-
-// Remover loading screen mais rapidamente para debug
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('DEBUG: DOM carregado');
-    
-    const loadingScreen = document.getElementById('loading-screen');
-    if (loadingScreen) {
-        console.log('DEBUG: Loading screen encontrado, removendo...');
-        setTimeout(() => {
-            loadingScreen.style.display = 'none';
-        }, 500); // Reduzido para debug
-    }
-    
-    console.log('DEBUG: Página totalmente carregada');
-});
-
-// Scripts existentes
-</script>
-<script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
-<script src="<?php echo SITE_URL; ?>/assets/js/index-v2.js?v=<?php echo time(); ?>"></script>
+    <!-- Scripts -->
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    <script src="assets/js/index-v2.js"></script>
 </body>
 </html>
