@@ -417,7 +417,7 @@ class ClientController {
             ";
 
             
-            // Aplicar os mesmos filtros nas estatísticas (que já existiam)
+            // Aplicar os mesmos filtros nas estatísticas
             if (!empty($filters)) {
                 if (isset($filters['data_inicio']) && !empty($filters['data_inicio'])) {
                     $statisticsQuery .= " AND data_transacao >= :data_inicio";
@@ -431,19 +431,21 @@ class ClientController {
                     $statisticsQuery .= " AND loja_id = :loja_id";
                 }
 
-                // Se o filtro 'status' for 'aprovado', ele será aplicado aqui também, reforçando o filtro da soma
+                // If status filter is 'aprovado', it will be applied here too
+                // If status filter is 'todos' or not present, only 'aprovado' cashback will be summed for total_cashback
                 if (isset($filters['status']) && !empty($filters['status'])) {
                     $statisticsQuery .= " AND status = :status";
                 }
             }
-
+            
             $statsStmt = $db->prepare($statisticsQuery);
             foreach ($params as $param => $value) {
                 $statsStmt->bindValue($param, $value);
             }
-            // Bind o novo parâmetro para status aprovado
-            $approvedStatus = TRANSACTION_APPROVED; // Certifique-se que TRANSACTION_APPROVED é a constante para 'aprovado'
+            // Bind the new parameter for approved status
+            $approvedStatus = TRANSACTION_APPROVED; // ou 'aprovado' dependendo da sua constante
             $statsStmt->bindValue(':status_approved', $approvedStatus);
+
 
             $statsStmt->execute();
             $statistics = $statsStmt->fetch(PDO::FETCH_ASSOC);
