@@ -409,14 +409,15 @@ class ClientController {
             // Calcular estatísticas
             $statisticsQuery = "
                 SELECT
-                    SUM(valor_total) as total_compras,
-                    SUM(CASE WHEN status = :status_approved THEN valor_cashback ELSE 0 END) as total_cashback, /* Esta linha já considera o valor_cashback (do cliente) */
-                    COUNT(*) as total_transacoes
+                    SUM(CASE WHEN status = :status_approved THEN valor_total ELSE 0 END) as total_compras, /* LINHA MODIFICADA AQUI */
+                    SUM(CASE WHEN status = :status_approved THEN valor_cashback ELSE 0 END) as total_cashback,
+                    COUNT(*) as total_transacoes /* Esta contagem pode permanecer sem filtro de status se você quiser o total geral de transações */
                 FROM transacoes_cashback
                 WHERE usuario_id = :user_id
             ";
+
             
-            // Aplicar os mesmos filtros nas estatísticas
+            // Aplicar os mesmos filtros nas estatísticas (que já existiam)
             if (!empty($filters)) {
                 if (isset($filters['data_inicio']) && !empty($filters['data_inicio'])) {
                     $statisticsQuery .= " AND data_transacao >= :data_inicio";
@@ -430,21 +431,19 @@ class ClientController {
                     $statisticsQuery .= " AND loja_id = :loja_id";
                 }
 
-                // If status filter is 'aprovado', it will be applied here too
-                // If status filter is 'todos' or not present, only 'aprovado' cashback will be summed for total_cashback
+                // Se o filtro 'status' for 'aprovado', ele será aplicado aqui também, reforçando o filtro da soma
                 if (isset($filters['status']) && !empty($filters['status'])) {
                     $statisticsQuery .= " AND status = :status";
                 }
             }
-            
+
             $statsStmt = $db->prepare($statisticsQuery);
             foreach ($params as $param => $value) {
                 $statsStmt->bindValue($param, $value);
             }
-            // Bind the new parameter for approved status
-            $approvedStatus = TRANSACTION_APPROVED; // ou 'aprovado' dependendo da sua constante
+            // Bind o novo parâmetro para status aprovado
+            $approvedStatus = TRANSACTION_APPROVED; // Certifique-se que TRANSACTION_APPROVED é a constante para 'aprovado'
             $statsStmt->bindValue(':status_approved', $approvedStatus);
-
 
             $statsStmt->execute();
             $statistics = $statsStmt->fetch(PDO::FETCH_ASSOC);
