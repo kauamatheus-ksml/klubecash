@@ -235,7 +235,7 @@ function formatMonth($yearMonth) {
         <div class="summary-cards">
             <!-- Saldo Total Disponível -->
             <div class="summary-card main-balance">
-                <div class="card-content">
+                crítica    <div class="card-content">
                     <div class="card-icon">💳</div>
                     <div class="card-info">
                         <h3>Dinheiro Pronto para Usar</h3>
