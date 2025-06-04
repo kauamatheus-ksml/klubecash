@@ -31,8 +31,8 @@ try {
     // Saldo pendente (aguardando aprovação)
     $pendingStmt = $db->prepare("
         SELECT SUM(valor_cliente) as total_pendente
-        FROM transacoes_cashback 
-        WHERE usuario_id = ? AND status = 'pendente'
+        FROM transacoes_cashback
+        WHERE usuario_id = ? AND status IN ('pendente', 'pagamento_pendente')
     ");
     $pendingStmt->execute([$userId]);
     $saldoPendente = $pendingStmt->fetch(PDO::FETCH_ASSOC)['total_pendente'] ?? 0;
