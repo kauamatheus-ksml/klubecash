@@ -587,9 +587,9 @@ class ClientController {
             
             // Obter dados do perfil
             $stmt = $db->prepare("
-                SELECT u.nome, u.email, u.cpf, u.telefone, u.status, u.data_criacao, u.ultimo_login
-                FROM usuarios u 
-                WHERE u.id = :id
+                SELECT id, nome, email, data_criacao, ultimo_login, status
+                FROM usuarios
+                WHERE id = :user_id AND tipo = :tipo
             ");
             $stmt->bindParam(':user_id', $userId);
             $tipo = USER_TYPE_CLIENT;
