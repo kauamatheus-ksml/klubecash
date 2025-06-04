@@ -913,7 +913,7 @@ try {
                     </div>
                     
                     <div class="text-center mt-20">
-                        <p><strong>+500</strong> lojas parceiras em todo Brasil</p>
+                        
                         <a href="<?php echo STORE_REGISTER_URL; ?>" class="btn btn-primary">Quero Ser Parceiro</a>
                     </div>
                 <?php else: ?>
