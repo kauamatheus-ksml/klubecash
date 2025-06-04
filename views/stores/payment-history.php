@@ -289,10 +289,16 @@ $metodosPagamento = [
                                                     <button class="btn btn-action" onclick="viewReceipt('<?php echo htmlspecialchars($payment['comprovante']); ?>')">Comprovante</button>
                                                 <?php endif; ?>
                                                 
-                                                <?php if (in_array($payment['status'], ['pix_aguardando', 'pendente']) && $payment['metodo_pagamento'] === 'pix_mercadopago' && !empty($payment['mp_payment_id'])): ?>
-                                                    <a href="<?php echo STORE_PAYMENT_PIX_URL; ?>?payment_id=<?php echo $payment['id']; ?>" class="btn btn-action btn-success">
-                                                        <span style="margin-right: 5px;">🔄</span>
-                                                        Continuar Pagamento PIX
+                                                <?php 
+                                                // Condição para exibir o botão Pagar/Renovar PIX:
+                                                // - O método de pagamento deve ser PIX do Mercado Pago.
+                                                // - O status NÃO deve ser 'aprovado'. Isso inclui 'pendente', 'pix_aguardando', 'rejeitado', 'cancelado', etc.
+                                                // A página payment-pix.php cuidará da lógica de verificar se o PIX existente expirou e gerar um novo se necessário.
+                                                if ($payment['metodo_pagamento'] === 'pix_mercadopago' && $payment['status'] !== 'aprovado'): 
+                                                ?>
+                                                    <a href="<?php echo STORE_PAYMENT_PIX_URL; ?>?payment_id=<?php echo $payment['id']; ?>" class="btn btn-action btn-warning">
+                                                        <span style="margin-right: 5px;">💰</span>
+                                                        Pagar/Renovar PIX
                                                     </a>
                                                 <?php endif; ?>
                                                 <?php if ($payment['status'] === 'pix_aguardando' && !empty($payment['mp_payment_id'])): ?>
