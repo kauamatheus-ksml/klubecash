@@ -409,13 +409,12 @@ class ClientController {
             // Calcular estatísticas
             $statisticsQuery = "
                 SELECT
-                    SUM(CASE WHEN status = :status_approved THEN valor_total ELSE 0 END) as total_compras, /* LINHA MODIFICADA AQUI */
-                    SUM(CASE WHEN status = :status_approved THEN valor_cashback ELSE 0 END) as total_cashback,
-                    COUNT(*) as total_transacoes /* Esta contagem pode permanecer sem filtro de status se você quiser o total geral de transações */
+                    SUM(valor_total) as total_compras,
+                    SUM(CASE WHEN status = :status_approved THEN valor_cashback ELSE 0 END) as total_cashback, /* Esta linha já considera o valor_cashback (do cliente) */
+                    COUNT(*) as total_transacoes
                 FROM transacoes_cashback
                 WHERE usuario_id = :user_id
             ";
-
             
             // Aplicar os mesmos filtros nas estatísticas
             if (!empty($filters)) {
