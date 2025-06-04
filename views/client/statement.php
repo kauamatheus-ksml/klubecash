@@ -235,15 +235,7 @@ try {
         
         <!-- Resumo visual em cards grandes -->
         <div class="summary-dashboard">
-            <div class="summary-card total-spent">
-                <div class="card-header">
-                    <span class="card-icon">🛒</span>
-                    <h3>Total Gasto</h3>
-                </div>
-                <div class="card-value">R$ <?php echo number_format($statementData['estatisticas']['total_compras'] ?? 0, 2, ',', '.'); ?></div>
-                <div class="card-description">Valor total das suas compras</div>
-            </div>
-            
+                        
             <div class="summary-card total-cashback">
                 <div class="card-header">
                     <span class="card-icon">🎁</span>
@@ -262,14 +254,7 @@ try {
                 <div class="card-description">Cashback que você já usou</div>
             </div>
             
-            <div class="summary-card total-transactions">
-                <div class="card-header">
-                    <span class="card-icon">📝</span>
-                    <h3>Compras Feitas</h3>
-                </div>
-                <div class="card-value"><?php echo $statementData['estatisticas']['total_transacoes'] ?? 0; ?></div>
-                <div class="card-description">Quantidade de compras realizadas</div>
-            </div>
+            
         </div>
         
         <!-- Lista de transações reformulada -->
