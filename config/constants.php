@@ -53,7 +53,11 @@ define('STORE_REJECTED', 'rejeitado');
 define('PASSWORD_MIN_LENGTH', 8);
 define('SESSION_LIFETIME', 86400);
 define('TOKEN_EXPIRATION', 7200);
-
+define('CPF_REQUIRED', true); // Novo: Indica se CPF é obrigatório
+// === MENSAGENS DE VALIDAÇÃO ===
+define('MSG_CPF_REQUIRED', 'CPF é obrigatório para completar seu perfil');
+define('MSG_CPF_INVALID', 'CPF informado é inválido');
+define('MSG_CPF_EXISTS', 'Este CPF já está cadastrado no sistema');
 // === MERCADO PAGO CONFIGURAÇÕES OTIMIZADAS ===
 define('MP_PUBLIC_KEY', 'APP_USR-60bd9502-2ea5-46c8-80b5-765f10277949'); // Chave pública de Produção
 define('MP_ACCESS_TOKEN', 'APP_USR-8622491157025652-060223-01208b007f3c9b708958e846841e0a63-2320640278'); // Access token de produção

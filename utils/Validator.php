@@ -51,6 +51,49 @@ class Validator {
     }
     
     /**
+     * Valida um CPF
+     * 
+     * @param string $cpf O CPF a ser validado
+     * @return bool Retorna true se o CPF for válido
+     */
+    public static function validaCPF($cpf) {
+        // Remove caracteres não numéricos
+        $cpf = preg_replace('/\D/', '', $cpf);
+        
+        // Verifica se tem 11 dígitos
+        if (strlen($cpf) != 11) {
+            return false;
+        }
+        
+        // Verifica se todos os dígitos são iguais (CPF inválido)
+        if (preg_match('/(\d)\1{10}/', $cpf)) {
+            return false;
+        }
+        
+        // Validação do primeiro dígito verificador
+        $soma = 0;
+        for ($i = 0; $i < 9; $i++) {
+            $soma += $cpf[$i] * (10 - $i);
+        }
+        $resto = $soma % 11;
+        $digito1 = ($resto < 2) ? 0 : 11 - $resto;
+        
+        if ($cpf[9] != $digito1) {
+            return false;
+        }
+        
+        // Validação do segundo dígito verificador
+        $soma = 0;
+        for ($i = 0; $i < 10; $i++) {
+            $soma += $cpf[$i] * (11 - $i);
+        }
+        $resto = $soma % 11;
+        $digito2 = ($resto < 2) ? 0 : 11 - $resto;
+        
+        return $cpf[10] == $digito2;
+    }
+    
+    /**
      * Sanitiza uma string para evitar injeção de código
      * 
      * @param string $string A string a ser sanitizada
@@ -68,5 +111,19 @@ class Validator {
      */
     public static function sanitizaEmail($email) {
         return filter_var(trim($email), FILTER_SANITIZE_EMAIL);
+    }
+    
+    /**
+     * Formata um CPF para exibição
+     * 
+     * @param string $cpf O CPF a ser formatado
+     * @return string O CPF formatado (000.000.000-00)
+     */
+    public static function formataCPF($cpf) {
+        $cpf = preg_replace('/\D/', '', $cpf);
+        if (strlen($cpf) == 11) {
+            return substr($cpf, 0, 3) . '.' . substr($cpf, 3, 3) . '.' . substr($cpf, 6, 3) . '-' . substr($cpf, 9, 2);
+        }
+        return $cpf;
     }
 }
