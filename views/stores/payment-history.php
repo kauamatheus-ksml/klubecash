@@ -284,9 +284,18 @@ $metodosPagamento = [
                                         <td>
                                             <div class="action-buttons">
                                                 <button class="btn btn-action" onclick="viewPaymentDetails(<?php echo $payment['id']; ?>)">Detalhes</button>
+                                                
                                                 <?php if (!empty($payment['comprovante'])): ?>
                                                     <button class="btn btn-action" onclick="viewReceipt('<?php echo htmlspecialchars($payment['comprovante']); ?>')">Comprovante</button>
                                                 <?php endif; ?>
+                                                
+                                                <?php if (in_array($payment['status'], ['pix_aguardando', 'pendente']) && $payment['metodo_pagamento'] === 'pix_mercadopago' && !empty($payment['mp_payment_id'])): ?>
+                                                    <a href="<?php echo STORE_PAYMENT_PIX_URL; ?>?payment_id=<?php echo $payment['id']; ?>" class="btn btn-action btn-success">
+                                                        <span style="margin-right: 5px;">🔄</span>
+                                                        Continuar Pagamento PIX
+                                                    </a>
+                                                <?php endif; ?>
+                                                
                                                 <?php if ($payment['status'] === 'aprovado' && !empty($payment['mp_payment_id'])): ?>
                                                     <button class="btn btn-action btn-warning" onclick="requestRefund(<?php echo $payment['id']; ?>, '<?php echo $payment['valor_total']; ?>', '<?php echo $payment['mp_payment_id']; ?>')">
                                                         Solicitar Devolução

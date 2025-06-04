@@ -40,6 +40,9 @@ if (!$payment) {
     exit;
 }
 
+// Verificar se já existe PIX gerado (para recuperar estado)
+$hasExistingPix = !empty($payment['mp_payment_id']) && !empty($payment['mp_qr_code']) && !empty($payment['mp_qr_code_base64']);
+
 $activeMenu = 'payment-pix';
 ?>
 
@@ -551,7 +554,7 @@ $activeMenu = 'payment-pix';
             `;
         }
         
-        // Buscar quantidade de transações - mantendo lógica original
+        // Buscar quantidade de transações e verificar estado existente
         document.addEventListener('DOMContentLoaded', async function() {
             try {
                 const response = await fetch(`../../controllers/TransactionController.php?action=payment_details&payment_id=${paymentId}`, {
@@ -571,9 +574,89 @@ $activeMenu = 'payment-pix';
                 document.getElementById('transactionCount').textContent = 'N/A';
             }
             
-            // Inicializar no estado inicial
-            showState('initial');
+            // Verificar se já existe PIX gerado
+            <?php if ($hasExistingPix): ?>
+                // Restaurar estado do QR Code existente
+                console.log('PIX já foi gerado anteriormente, restaurando estado...');
+                restoreExistingPix();
+            <?php else: ?>
+                // Inicializar no estado inicial
+                showState('initial');
+            <?php endif; ?>
         });
+
+        // Função para restaurar PIX existente
+        function restoreExistingPix() {
+            // Dados do PIX existente do PHP
+            const existingPixData = {
+                mp_payment_id: '<?php echo $payment['mp_payment_id'] ?? ''; ?>',
+                qr_code: '<?php echo addslashes($payment['mp_qr_code'] ?? ''); ?>',
+                qr_code_base64: '<?php echo $payment['mp_qr_code_base64'] ?? ''; ?>'
+            };
+            
+            if (existingPixData.mp_payment_id && existingPixData.qr_code && existingPixData.qr_code_base64) {
+                // Mostrar estado do QR Code
+                showState('qrcode');
+                
+                // Preencher dados
+                setTimeout(() => {
+                    qrCodeImage.src = 'data:image/png;base64,' + existingPixData.qr_code_base64;
+                    qrCodeImage.style.display = 'block';
+                    qrLoading.style.display = 'none';
+                    
+                    pixCodeTextarea.value = existingPixData.qr_code;
+                    copyBtn.disabled = false;
+                    
+                    mpPaymentIdInput.value = existingPixData.mp_payment_id;
+                    
+                    // Iniciar polling automático
+                    startPaymentPolling();
+                    
+                    showNotification('PIX restaurado! Você pode continuar o pagamento.', 'info');
+                }, 500);
+            } else {
+                console.log('Dados do PIX incompletos, iniciando novo PIX');
+                showState('initial');
+            }
+        }
     </script>
+    <style>
+/* Botão de continuar pagamento PIX */
+.btn-success {
+    background-color: #28a745;
+    border-color: #28a745;
+    color: white;
+}
+
+.btn-success:hover {
+    background-color: #218838;
+    border-color: #1e7e34;
+}
+
+.action-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 150px;
+}
+
+.action-buttons .btn {
+    width: 100%;
+    font-size: 0.875rem;
+    padding: 0.4rem 0.6rem;
+}
+
+/* Responsivo para mobile */
+@media (max-width: 768px) {
+    .action-buttons {
+        min-width: 120px;
+    }
+    
+    .action-buttons .btn {
+        font-size: 0.8rem;
+        padding: 0.3rem 0.5rem;
+    }
+}
+</style>
 </body>
 </html>
