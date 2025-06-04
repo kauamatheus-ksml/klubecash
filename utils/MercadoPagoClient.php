@@ -153,10 +153,7 @@ class MercadoPagoClient {
                 $payload['payer']['address'] = $this->parseAddress($data['payer_address']);
             }
             
-            // ADICIONAR DEVICE ID SE DISPONÍVEL (OBRIGATÓRIO PARA APROVAÇÃO)
-            if (!empty($data['device_id'])) {
-                $payload['device_id'] = $data['device_id'];
-            }
+            // Removido: O parâmetro 'device_id' não é aceito pela API do Mercado Pago para pagamentos PIX (Erro 400).
             
             // ADICIONAR INFORMAÇÕES EXTRAS DO PAGADOR
             if (!empty($data['payer_registration_date'])) {
