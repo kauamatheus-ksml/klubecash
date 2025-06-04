@@ -295,7 +295,13 @@ $metodosPagamento = [
                                                         Continuar Pagamento PIX
                                                     </a>
                                                 <?php endif; ?>
-                                                
+                                                <?php if ($payment['status'] === 'pix_aguardando' && !empty($payment['mp_payment_id'])): ?>
+                                                    <button class="btn btn-action btn-info" onclick="checkPaymentStatus(<?php echo $payment['id']; ?>, '<?php echo $payment['mp_payment_id']; ?>')">
+                                                        <span style="margin-right: 5px;">🔍</span>
+                                                        Verificar Status
+                                                    </button>
+                                                <?php endif; ?>
+
                                                 <?php if ($payment['status'] === 'aprovado' && !empty($payment['mp_payment_id'])): ?>
                                                     <button class="btn btn-action btn-warning" onclick="requestRefund(<?php echo $payment['id']; ?>, '<?php echo $payment['valor_total']; ?>', '<?php echo $payment['mp_payment_id']; ?>')">
                                                         Solicitar Devolução
@@ -510,7 +516,39 @@ $metodosPagamento = [
     
     <script>
         let currentRefundData = null;
-        
+        // Verificar status de pagamento PIX
+        async function checkPaymentStatus(paymentId, mpPaymentId) {
+            try {
+                const response = await fetch(`../../api/mercadopago.php?action=status&mp_payment_id=${mpPaymentId}`);
+                const result = await response.json();
+                
+                if (result.status && result.data.status === 'approved') {
+                    alert('✅ Pagamento PIX confirmado! A página será recarregada para mostrar o status atualizado.');
+                    window.location.reload();
+                } else if (result.data && result.data.status === 'pending') {
+                    alert('⏳ Pagamento PIX ainda está pendente. Continue aguardando ou tente novamente em alguns minutos.');
+                } else if (result.data && result.data.status === 'rejected') {
+                    alert('❌ Pagamento PIX foi rejeitado. Você precisará fazer um novo pagamento.');
+                } else {
+                    alert('ℹ️ Status atual: ' + (result.data ? result.data.status : 'Desconhecido'));
+                }
+            } catch (error) {
+                console.error('Erro ao verificar status:', error);
+                alert('Erro ao verificar status do pagamento. Tente novamente.');
+            }
+        }
+
+        // Verificar automaticamente pagamentos pendentes a cada 30 segundos
+        setInterval(function() {
+            const pendingRows = document.querySelectorAll('tr[data-status="pix_aguardando"]');
+            if (pendingRows.length > 0) {
+                console.log('Verificando status de pagamentos pendentes...');
+                // Recarregar a página discretamente para atualizar status
+                if (document.hidden === false) { // Só recarrega se a aba estiver ativa
+                    window.location.reload();
+                }
+            }
+        }, 30000);
         function toggleInfoSection() {
             const content = document.getElementById('infoSectionContent');
             const icon = document.getElementById('infoDropdownIcon');
@@ -1387,6 +1425,42 @@ document.addEventListener('DOMContentLoaded', function() {
     
     .info-section h4 {
         font-size: 1rem;
+    }
+}
+/* Botão de continuar pagamento PIX */
+.btn-success {
+    background-color: #28a745;
+    border-color: #28a745;
+    color: white;
+}
+
+.btn-success:hover {
+    background-color: #218838;
+    border-color: #1e7e34;
+}
+
+.action-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 150px;
+}
+
+.action-buttons .btn {
+    width: 100%;
+    font-size: 0.875rem;
+    padding: 0.4rem 0.6rem;
+}
+
+/* Responsivo para mobile */
+@media (max-width: 768px) {
+    .action-buttons {
+        min-width: 120px;
+    }
+    
+    .action-buttons .btn {
+        font-size: 0.8rem;
+        padding: 0.3rem 0.5rem;
     }
 }
 </style>

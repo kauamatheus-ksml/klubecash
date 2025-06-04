@@ -1704,184 +1704,190 @@ class TransactionController {
         try {
             $db = Database::getConnection();
             
-            // Verificar se o pagamento existe e pode ser aprovado
-            $paymentStmt = $db->prepare("
-                SELECT p.*, l.nome_fantasia as loja_nome
-                FROM pagamentos_comissao p
-                JOIN lojas l ON p.loja_id = l.id
-                WHERE p.id = ? AND p.status IN ('pendente', 'pix_aguardando')
-            ");
-            $paymentStmt->execute([$paymentId]);
-            $payment = $paymentStmt->fetch(PDO::FETCH_ASSOC);
-            
-            if (!$payment) {
-                return ['status' => false, 'message' => 'Pagamento não encontrado ou já processado.'];
-            }
-            
-            error_log("APROVAÇÃO AUTO: Iniciando aprovação do pagamento {$paymentId}");
-            
-            // Buscar transações associadas ANTES de iniciar a transação
-            $transStmt = $db->prepare("
-                SELECT t.id, t.usuario_id, t.loja_id, t.valor_cliente, t.valor_admin
-                FROM pagamentos_transacoes pt
-                JOIN transacoes_cashback t ON pt.transacao_id = t.id
-                WHERE pt.pagamento_id = ?
-            ");
-            $transStmt->execute([$paymentId]);
-            $transactions = $transStmt->fetchAll(PDO::FETCH_ASSOC);
-            
-            if (empty($transactions)) {
-                return ['status' => false, 'message' => 'Nenhuma transação encontrada para este pagamento.'];
-            }
-            
-            error_log("APROVAÇÃO AUTO: Encontradas " . count($transactions) . " transações");
-            
-            // Iniciar transação principal
+            // Iniciar transação
             $db->beginTransaction();
             
-            try {
-                // 1. Atualizar status do pagamento
-                $updatePaymentStmt = $db->prepare("
-                    UPDATE pagamentos_comissao
-                    SET status = 'aprovado', 
-                        data_aprovacao = NOW(), 
-                        observacao_admin = ?,
-                        pix_paid_at = NOW()
-                    WHERE id = ?
-                ");
-                $updatePaymentStmt->execute([$observacao, $paymentId]);
-                
-                // 2. Atualizar status das transações
-                $transactionIds = array_column($transactions, 'id');
-                $placeholders = implode(',', array_fill(0, count($transactionIds), '?'));
-                
-                $updateTransStmt = $db->prepare("
+            // Buscar dados do pagamento
+            $stmt = $db->prepare("
+                SELECT * FROM pagamentos_comissao 
+                WHERE id = ? AND status IN ('pendente', 'pix_aguardando')
+            ");
+            $stmt->execute([$paymentId]);
+            $payment = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$payment) {
+                $db->rollBack();
+                return ['status' => false, 'message' => 'Pagamento não encontrado ou já processado'];
+            }
+            
+            // Buscar transações relacionadas
+            $transactionsStmt = $db->prepare("
+                SELECT tc.*, cm.valor_usado 
+                FROM pagamentos_transacoes pt
+                JOIN transacoes_cashback tc ON pt.transacao_id = tc.id
+                LEFT JOIN (
+                    SELECT transacao_uso_id, SUM(valor) as valor_usado 
+                    FROM cashback_movimentacoes 
+                    WHERE tipo_operacao = 'uso' 
+                    GROUP BY transacao_uso_id
+                ) cm ON tc.id = cm.transacao_uso_id
+                WHERE pt.pagamento_id = ?
+            ");
+            $transactionsStmt->execute([$paymentId]);
+            $transactions = $transactionsStmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            if (empty($transactions)) {
+                $db->rollBack();
+                return ['status' => false, 'message' => 'Nenhuma transação encontrada para este pagamento'];
+            }
+            
+            // Atualizar status do pagamento
+            $updatePaymentStmt = $db->prepare("
+                UPDATE pagamentos_comissao 
+                SET status = 'aprovado',
+                    data_aprovacao = NOW(),
+                    observacao_admin = ?
+                WHERE id = ?
+            ");
+            $updatePaymentStmt->execute([$observacao, $paymentId]);
+            
+            $totalCashbackLiberado = 0;
+            $transacoesAprovadas = 0;
+            
+            // Processar cada transação
+            foreach ($transactions as $transaction) {
+                // Atualizar status da transação para 'aprovado'
+                $updateTransactionStmt = $db->prepare("
                     UPDATE transacoes_cashback 
                     SET status = 'aprovado' 
-                    WHERE id IN ($placeholders)
+                    WHERE id = ?
                 ");
-                $updateTransStmt->execute($transactionIds);
+                $updateTransactionStmt->execute([$transaction['id']]);
                 
-                // 3. Atualizar comissões
-                $updateCommissionStmt = $db->prepare("
-                    UPDATE transacoes_comissao 
-                    SET status = 'aprovado' 
-                    WHERE transacao_id IN ($placeholders)
+                // Liberar cashback para o cliente
+                $cashbackValue = $transaction['valor_cliente'];
+                $totalCashbackLiberado += $cashbackValue;
+                
+                // Verificar se o saldo já existe
+                $saldoCheckStmt = $db->prepare("
+                    SELECT id FROM cashback_saldos 
+                    WHERE usuario_id = ? AND loja_id = ?
                 ");
-                $updateCommissionStmt->execute($transactionIds);
+                $saldoCheckStmt->execute([$transaction['usuario_id'], $transaction['loja_id']]);
                 
-                // Commit da transação principal ANTES de creditar saldos
-                $db->commit();
-                error_log("APROVAÇÃO AUTO: Transação principal commitada");
+                if ($saldoCheckStmt->rowCount() > 0) {
+                    // Atualizar saldo existente
+                    $updateSaldoStmt = $db->prepare("
+                        UPDATE cashback_saldos 
+                        SET saldo_disponivel = saldo_disponivel + ?,
+                            total_creditado = total_creditado + ?,
+                            ultima_atualizacao = NOW()
+                        WHERE usuario_id = ? AND loja_id = ?
+                    ");
+                    $updateSaldoStmt->execute([
+                        $cashbackValue, 
+                        $cashbackValue, 
+                        $transaction['usuario_id'], 
+                        $transaction['loja_id']
+                    ]);
+                } else {
+                    // Criar novo saldo
+                    $insertSaldoStmt = $db->prepare("
+                        INSERT INTO cashback_saldos 
+                        (usuario_id, loja_id, saldo_disponivel, total_creditado) 
+                        VALUES (?, ?, ?, ?)
+                    ");
+                    $insertSaldoStmt->execute([
+                        $transaction['usuario_id'], 
+                        $transaction['loja_id'], 
+                        $cashbackValue, 
+                        $cashbackValue
+                    ]);
+                }
                 
-            } catch (Exception $e) {
-                $db->rollBack();
-                throw $e;
-            }
-            
-            // 4. Creditar saldos dos clientes (fora da transação principal)
-            require_once __DIR__ . '/../models/CashbackBalance.php';
-            $balanceModel = new CashbackBalance();
-            $saldosCreditados = 0;
-            $totalCashbackReservado = 0;
-            
-            foreach ($transactions as $transaction) {
-                if ($transaction['valor_cliente'] > 0) {
-                    $description = "Cashback da compra - Transação #{$transaction['id']} (PIX aprovado automaticamente)";
-                    
-                    $creditResult = $balanceModel->addBalance(
-                        $transaction['usuario_id'],
-                        $transaction['loja_id'],
-                        $transaction['valor_cliente'],
-                        $description,
-                        $transaction['id']
-                    );
-                    
-                    if ($creditResult) {
-                        $saldosCreditados++;
-                        $totalCashbackReservado += $transaction['valor_cliente'];
-                        error_log("APROVAÇÃO AUTO: Saldo creditado para usuário {$transaction['usuario_id']}: R$ {$transaction['valor_cliente']}");
-                    } else {
-                        error_log("APROVAÇÃO AUTO: ERRO ao creditar saldo para usuário {$transaction['usuario_id']}");
-                    }
-                }
-            }
-            
-            // 5. Criar reserva de cashback
-            if ($totalCashbackReservado > 0) {
-                $reservaResult = self::createCashbackReserve(
-                    $totalCashbackReservado, 
-                    $paymentId, 
-                    "Reserva de cashback - Pagamento PIX #{$paymentId} aprovado automaticamente"
-                );
+                // Registrar movimentação de cashback
+                $insertMovStmt = $db->prepare("
+                    INSERT INTO cashback_movimentacoes 
+                    (usuario_id, loja_id, tipo_operacao, valor, saldo_anterior, saldo_atual, 
+                    descricao, transacao_origem_id, pagamento_id) 
+                    VALUES (?, ?, 'credito', ?, 
+                            COALESCE((SELECT saldo_disponivel FROM cashback_saldos WHERE usuario_id = ? AND loja_id = ? LIMIT 1), 0) - ?,
+                            COALESCE((SELECT saldo_disponivel FROM cashback_saldos WHERE usuario_id = ? AND loja_id = ? LIMIT 1), 0),
+                            ?, ?, ?)
+                ");
+                $insertMovStmt->execute([
+                    $transaction['usuario_id'],
+                    $transaction['loja_id'],
+                    $cashbackValue,
+                    $transaction['usuario_id'],
+                    $transaction['loja_id'],
+                    $cashbackValue,
+                    $transaction['usuario_id'],
+                    $transaction['loja_id'],
+                    'Cashback liberado - Pagamento aprovado automaticamente',
+                    $transaction['id'],
+                    $paymentId
+                ]);
                 
-                if (!$reservaResult) {
-                    error_log("APROVAÇÃO AUTO: ERRO ao criar reserva de cashback");
-                }
+                // Atualizar saldo do admin
+                self::updateAdminBalance($cashbackValue, 'credito', "Comissão recebida - Transação {$transaction['id']}");
+                
+                $transacoesAprovadas++;
+                
+                // Enviar notificação para o cliente
+                self::sendCashbackNotification($transaction['usuario_id'], $cashbackValue, $payment['loja_id']);
             }
             
-            // 6. Atualizar saldo do administrador
-            $totalComissaoAdmin = 0;
-            foreach ($transactions as $transaction) {
-                if ($transaction['valor_admin'] > 0) {
-                    $totalComissaoAdmin += $transaction['valor_admin'];
-                    
-                    // Registrar movimentação do admin
-                    self::updateAdminBalance($transaction['valor_admin'], $transaction['id'], $paymentId);
-                }
-            }
-            
-            // 7. Criar notificações
-            $clientesNotificados = [];
-            foreach ($transactions as $transaction) {
-                if (!in_array($transaction['usuario_id'], $clientesNotificados)) {
-                    self::createNotification(
-                        $transaction['usuario_id'],
-                        'Cashback disponível!',
-                        'Seu cashback foi liberado automaticamente após confirmação do pagamento PIX.',
-                        'success'
-                    );
-                    $clientesNotificados[] = $transaction['usuario_id'];
-                }
-            }
-            
-            // 8. Notificar loja
-            $storeUserStmt = $db->prepare("SELECT usuario_id FROM lojas WHERE id = ?");
-            $storeUserStmt->execute([$payment['loja_id']]);
-            $storeUser = $storeUserStmt->fetch(PDO::FETCH_ASSOC);
-            
-            if ($storeUser && !empty($storeUser['usuario_id'])) {
-                self::createNotification(
-                    $storeUser['usuario_id'],
-                    'Pagamento PIX confirmado',
-                    'Seu pagamento PIX foi confirmado automaticamente e o cashback foi liberado para os clientes.',
-                    'success'
-                );
-            }
-            
-            error_log("APROVAÇÃO AUTO: ✅ Processo concluído com sucesso");
+            // Commit da transação
+            $db->commit();
             
             return [
                 'status' => true,
-                'message' => 'Pagamento PIX aprovado automaticamente',
+                'message' => 'Pagamento aprovado e cashback liberado automaticamente',
                 'data' => [
-                    'payment_id' => $paymentId,
-                    'transacoes_aprovadas' => count($transactions),
-                    'saldos_creditados' => $saldosCreditados,
-                    'cashback_liberado' => $totalCashbackReservado,
-                    'comissao_admin' => $totalComissaoAdmin
+                    'pagamento_id' => $paymentId,
+                    'transacoes_aprovadas' => $transacoesAprovadas,
+                    'cashback_liberado' => $totalCashbackLiberado
                 ]
             ];
             
         } catch (Exception $e) {
-            if (isset($db) && $db->inTransaction()) {
+            if (isset($db)) {
                 $db->rollBack();
             }
-            error_log('APROVAÇÃO AUTO: ❌ ERRO: ' . $e->getMessage());
+            error_log("Erro ao aprovar pagamento automaticamente: " . $e->getMessage());
             return ['status' => false, 'message' => 'Erro interno: ' . $e->getMessage()];
         }
     }
 
+    /**
+     * Enviar notificação de cashback para o cliente
+     */
+    private static function sendCashbackNotification($userId, $cashbackValue, $lojaId) {
+        try {
+            $db = Database::getConnection();
+            
+            // Buscar nome da loja
+            $lojaStmt = $db->prepare("SELECT nome_fantasia FROM lojas WHERE id = ?");
+            $lojaStmt->execute([$lojaId]);
+            $loja = $lojaStmt->fetch(PDO::FETCH_ASSOC);
+            $nomeLoja = $loja ? $loja['nome_fantasia'] : 'Loja Parceira';
+            
+            // Inserir notificação
+            $notifStmt = $db->prepare("
+                INSERT INTO notificacoes (usuario_id, titulo, mensagem, tipo) 
+                VALUES (?, ?, ?, 'success')
+            ");
+            $notifStmt->execute([
+                $userId,
+                'Cashback Liberado!',
+                "Seu cashback de R$ " . number_format($cashbackValue, 2, ',', '.') . " da loja {$nomeLoja} foi liberado e está disponível para uso!"
+            ]);
+            
+        } catch (Exception $e) {
+            error_log("Erro ao enviar notificação de cashback: " . $e->getMessage());
+        }
+    }
 
     /**
      * Rejeita um pagamento de comissão
