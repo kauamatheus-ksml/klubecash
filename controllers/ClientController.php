@@ -474,169 +474,163 @@ class ClientController {
      * @return array Lista de lojas parceiras
      */
     public static function getPartnerStores($userId, $filters = [], $page = 1) {
-        try {
-            // Verificar se é um cliente válido
-            if (!self::validateClient($userId)) {
-                return ['status' => false, 'message' => 'Cliente não encontrado ou inativo.'];
-            }
-            
-            $db = Database::getConnection();
-            
-            // CONSULTA PRINCIPAL CORRIGIDA - SEM SUBCONSULTAS PROBLEMÁTICAS
-            $query = "
-                SELECT DISTINCT l.id, l.nome_fantasia, l.razao_social, l.cnpj, l.email, 
-                    l.telefone, l.categoria, l.porcentagem_cashback, l.descricao, 
-                    l.website, l.logo, l.status, l.data_cadastro
-                FROM lojas l
-                WHERE l.status = :status
-            ";
-            
-            $params = [':status' => STORE_APPROVED];
-            
-            // Aplicar filtros
-            if (!empty($filters)) {
-                // Filtro por categoria
-                if (isset($filters['categoria']) && !empty($filters['categoria'])) {
-                    $query .= " AND l.categoria = :categoria";
-                    $params[':categoria'] = $filters['categoria'];
-                }
-                
-                // Filtro por nome
-                if (isset($filters['nome']) && !empty($filters['nome'])) {
-                    $query .= " AND (l.nome_fantasia LIKE :nome OR l.razao_social LIKE :nome)";
-                    $params[':nome'] = '%' . $filters['nome'] . '%';
-                }
-                
-                // Filtro por porcentagem de cashback
-                if (isset($filters['cashback_min']) && !empty($filters['cashback_min'])) {
-                    $query .= " AND l.porcentagem_cashback >= :cashback_min";
-                    $params[':cashback_min'] = $filters['cashback_min'];
-                }
-            }
-            
-            // Adicionar ordenação (padrão: nome)
-            $orderBy = isset($filters['ordenar']) ? $filters['ordenar'] : 'nome_fantasia';
-            $orderDir = isset($filters['order_dir']) && strtolower($filters['order_dir']) == 'desc' ? 'DESC' : 'ASC';
-            
-            // Mapear opções de ordenação
-            $orderMapping = [
-                'nome' => 'l.nome_fantasia',
-                'cashback' => 'l.porcentagem_cashback',
-                'categoria' => 'l.categoria'
-            ];
-            
-            $orderColumn = isset($orderMapping[$orderBy]) ? $orderMapping[$orderBy] : 'l.nome_fantasia';
-            $query .= " ORDER BY $orderColumn $orderDir";
-            
-            // Calcular total de registros para paginação
-            $countQuery = str_replace(
-                'SELECT DISTINCT l.id, l.nome_fantasia, l.razao_social, l.cnpj, l.email, l.telefone, l.categoria, l.porcentagem_cashback, l.descricao, l.website, l.logo, l.status, l.data_cadastro',
-                'SELECT COUNT(DISTINCT l.id) as total',
-                $query
-            );
-            
-            // Remover ORDER BY da query de contagem
-            $countQuery = preg_replace('/ORDER BY.*$/', '', $countQuery);
-            
-            $countStmt = $db->prepare($countQuery);
-            foreach ($params as $param => $value) {
-                $countStmt->bindValue($param, $value);
-            }
-            $countStmt->execute();
-            $totalCount = $countStmt->fetch(PDO::FETCH_ASSOC)['total'];
-            
-            // Adicionar paginação
-            $perPage = ITEMS_PER_PAGE;
-            $offset = ($page - 1) * $perPage;
-            $query .= " LIMIT $offset, $perPage";
-            
-            // Executar consulta principal
-            $stmt = $db->prepare($query);
-            foreach ($params as $param => $value) {
-                $stmt->bindValue($param, $value);
-            }
-            $stmt->execute();
-            $stores = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            
-            // AGORA ENRIQUECER OS DADOS SEM DUPLICAÇÃO
-            if (!empty($stores)) {
-                foreach ($stores as &$store) {
-                    // Obter dados específicos do cliente para esta loja
-                    $userStoreDataQuery = "
-                        SELECT 
-                            -- Cashback recebido (aprovado)
-                            COALESCE(SUM(CASE WHEN t.status = 'aprovado' THEN t.valor_cliente ELSE 0 END), 0) as cashback_recebido,
-                            -- Compras realizadas
-                            COUNT(DISTINCT CASE WHEN t.status = 'aprovado' THEN t.id END) as compras_realizadas,
-                            -- Cashback pendente
-                            COALESCE(SUM(CASE WHEN t.status = 'pendente' THEN t.valor_cliente ELSE 0 END), 0) as cashback_pendente
-                        FROM transacoes_cashback t 
-                        WHERE t.loja_id = :loja_id AND t.usuario_id = :user_id
-                    ";
-                    
-                    $userStoreStmt = $db->prepare($userStoreDataQuery);
-                    $userStoreStmt->bindValue(':loja_id', $store['id']);
-                    $userStoreStmt->bindValue(':user_id', $userId);
-                    $userStoreStmt->execute();
-                    $userStoreData = $userStoreStmt->fetch(PDO::FETCH_ASSOC);
-                    
-                    // Adicionar os dados ao array da loja
-                    $store['cashback_recebido'] = $userStoreData['cashback_recebido'] ?? 0;
-                    $store['compras_realizadas'] = $userStoreData['compras_realizadas'] ?? 0;
-                    $store['cashback_pendente'] = $userStoreData['cashback_pendente'] ?? 0;
-                    
-                    // Verificar se é favorita
-                    $favoriteQuery = "SELECT 1 FROM lojas_favoritas WHERE usuario_id = :user_id AND loja_id = :loja_id LIMIT 1";
-                    $favoriteStmt = $db->prepare($favoriteQuery);
-                    $favoriteStmt->bindValue(':user_id', $userId);
-                    $favoriteStmt->bindValue(':loja_id', $store['id']);
-                    $favoriteStmt->execute();
-                    $store['is_favorite'] = $favoriteStmt->rowCount() > 0 ? 1 : 0;
-                }
-            }
-            
-            // Obter categorias disponíveis para filtro
-            $categoriesStmt = $db->prepare("SELECT DISTINCT categoria FROM lojas WHERE status = :status ORDER BY categoria");
-            $categoriesStmt->bindValue(':status', STORE_APPROVED);
-            $categoriesStmt->execute();
-            $categories = $categoriesStmt->fetchAll(PDO::FETCH_COLUMN);
-            
-            // Obter estatísticas
-            $statsStmt = $db->prepare("
-                SELECT 
-                    COUNT(DISTINCT l.id) as total_lojas,
-                    AVG(l.porcentagem_cashback) as media_cashback,
-                    MAX(l.porcentagem_cashback) as maior_cashback
-                FROM lojas l
-                WHERE l.status = :status
-            ");
-            $statsStmt->bindValue(':status', STORE_APPROVED);
-            $statsStmt->execute();
-            $statistics = $statsStmt->fetch(PDO::FETCH_ASSOC);
-            
-            // Calcular informações de paginação
-            $totalPages = ceil($totalCount / $perPage);
-            
-            return [
-                'status' => true,
-                'data' => [
-                    'lojas' => $stores,
-                    'categorias' => $categories,
-                    'estatisticas' => $statistics,
-                    'paginacao' => [
-                        'total' => $totalCount,
-                        'por_pagina' => $perPage,
-                        'pagina_atual' => $page,
-                        'total_paginas' => $totalPages
-                    ]
-                ]
-            ];
-            
-        } catch (PDOException $e) {
-            error_log('Erro ao obter lojas parceiras: ' . $e->getMessage());
-            return ['status' => false, 'message' => 'Erro ao carregar lojas parceiras. Tente novamente.'];
+    try {
+        // Verificar se é um cliente válido
+        if (!self::validateClient($userId)) {
+            return ['status' => false, 'message' => 'Cliente não encontrado ou inativo.'];
         }
+        
+        $db = Database::getConnection();
+        
+        // CONSULTA PRINCIPAL CORRIGIDA - SEM SUBCONSULTAS PROBLEMÁTICAS
+        $query = "
+            SELECT DISTINCT l.id, l.nome_fantasia, l.razao_social, l.cnpj, l.email, 
+                   l.telefone, l.categoria, l.porcentagem_cashback, l.descricao, 
+                   l.website, l.logo, l.status, l.data_cadastro
+            FROM lojas l
+            WHERE l.status = 'aprovado'
+        ";
+        
+        $params = [];
+        
+        // Aplicar filtros
+        if (!empty($filters)) {
+            // Filtro por categoria
+            if (isset($filters['categoria']) && !empty($filters['categoria'])) {
+                $query .= " AND l.categoria = :categoria";
+                $params[':categoria'] = $filters['categoria'];
+            }
+            
+            // Filtro por nome
+            if (isset($filters['nome']) && !empty($filters['nome'])) {
+                $query .= " AND (l.nome_fantasia LIKE :nome OR l.razao_social LIKE :nome)";
+                $params[':nome'] = '%' . $filters['nome'] . '%';
+            }
+            
+            // Filtro por porcentagem de cashback
+            if (isset($filters['cashback_min']) && !empty($filters['cashback_min'])) {
+                $query .= " AND l.porcentagem_cashback >= :cashback_min";
+                $params[':cashback_min'] = $filters['cashback_min'];
+            }
+        }
+        
+        // Adicionar ordenação (padrão: nome)
+        $orderBy = isset($filters['ordenar']) ? $filters['ordenar'] : 'nome';
+        $orderDir = isset($filters['order_dir']) && strtolower($filters['order_dir']) == 'desc' ? 'DESC' : 'ASC';
+        
+        // Mapear opções de ordenação
+        $orderMapping = [
+            'nome' => 'l.nome_fantasia',
+            'cashback' => 'l.porcentagem_cashback',
+            'categoria' => 'l.categoria'
+        ];
+        
+        $orderColumn = isset($orderMapping[$orderBy]) ? $orderMapping[$orderBy] : 'l.nome_fantasia';
+        $query .= " ORDER BY $orderColumn $orderDir";
+        
+        // Calcular total de registros para paginação
+        $countQuery = str_replace(
+            'SELECT DISTINCT l.id, l.nome_fantasia, l.razao_social, l.cnpj, l.email, l.telefone, l.categoria, l.porcentagem_cashback, l.descricao, l.website, l.logo, l.status, l.data_cadastro',
+            'SELECT COUNT(DISTINCT l.id) as total',
+            $query
+        );
+        
+        // Remover ORDER BY da query de contagem
+        $countQuery = preg_replace('/ORDER BY.*$/', '', $countQuery);
+        
+        $countStmt = $db->prepare($countQuery);
+        foreach ($params as $param => $value) {
+            $countStmt->bindValue($param, $value);
+        }
+        $countStmt->execute();
+        $totalCount = $countStmt->fetch(PDO::FETCH_ASSOC)['total'];
+        
+        // Adicionar paginação
+        $perPage = defined('ITEMS_PER_PAGE') ? ITEMS_PER_PAGE : 10;
+        $offset = ($page - 1) * $perPage;
+        $query .= " LIMIT $offset, $perPage";
+        
+        // Executar consulta principal
+        $stmt = $db->prepare($query);
+        foreach ($params as $param => $value) {
+            $stmt->bindValue($param, $value);
+        }
+        $stmt->execute();
+        $stores = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // AGORA ENRIQUECER OS DADOS SEM DUPLICAÇÃO
+        if (!empty($stores)) {
+            foreach ($stores as &$store) {
+                // Obter dados específicos do cliente para esta loja
+                $userStoreDataQuery = "
+                    SELECT 
+                        COALESCE(SUM(CASE WHEN t.status = 'aprovado' THEN t.valor_cliente ELSE 0 END), 0) as cashback_recebido,
+                        COUNT(DISTINCT CASE WHEN t.status = 'aprovado' THEN t.id END) as compras_realizadas,
+                        COALESCE(SUM(CASE WHEN t.status = 'pendente' THEN t.valor_cliente ELSE 0 END), 0) as cashback_pendente
+                    FROM transacoes_cashback t 
+                    WHERE t.loja_id = ? AND t.usuario_id = ?
+                ";
+                
+                $userStoreStmt = $db->prepare($userStoreDataQuery);
+                $userStoreStmt->execute([$store['id'], $userId]);
+                $userStoreData = $userStoreStmt->fetch(PDO::FETCH_ASSOC);
+                
+                // Adicionar os dados ao array da loja
+                $store['cashback_recebido'] = $userStoreData['cashback_recebido'] ?? 0;
+                $store['compras_realizadas'] = $userStoreData['compras_realizadas'] ?? 0;
+                $store['cashback_pendente'] = $userStoreData['cashback_pendente'] ?? 0;
+                
+                // Verificar se é favorita
+                $favoriteQuery = "SELECT 1 FROM lojas_favoritas WHERE usuario_id = ? AND loja_id = ? LIMIT 1";
+                $favoriteStmt = $db->prepare($favoriteQuery);
+                $favoriteStmt->execute([$userId, $store['id']]);
+                $store['is_favorite'] = $favoriteStmt->rowCount() > 0 ? 1 : 0;
+            }
+        }
+        
+        // Obter categorias disponíveis para filtro
+        $categoriesStmt = $db->prepare("SELECT DISTINCT categoria FROM lojas WHERE status = 'aprovado' ORDER BY categoria");
+        $categoriesStmt->execute();
+        $categories = $categoriesStmt->fetchAll(PDO::FETCH_COLUMN);
+        
+        // Obter estatísticas
+        $statsStmt = $db->prepare("
+            SELECT 
+                COUNT(DISTINCT l.id) as total_lojas,
+                COALESCE(AVG(l.porcentagem_cashback), 0) as media_cashback,
+                COALESCE(MAX(l.porcentagem_cashback), 0) as maior_cashback
+            FROM lojas l
+            WHERE l.status = 'aprovado'
+        ");
+        $statsStmt->execute();
+        $statistics = $statsStmt->fetch(PDO::FETCH_ASSOC);
+        
+        // Calcular informações de paginação
+        $totalPages = ceil($totalCount / $perPage);
+        
+        return [
+            'status' => true,
+            'data' => [
+                'lojas' => $stores,
+                'categorias' => $categories,
+                'estatisticas' => $statistics,
+                'paginacao' => [
+                    'total' => $totalCount,
+                    'por_pagina' => $perPage,
+                    'pagina_atual' => $page,
+                    'total_paginas' => $totalPages
+                ]
+            ]
+        ];
+        
+    } catch (PDOException $e) {
+        error_log('Erro ao obter lojas parceiras: ' . $e->getMessage());
+        return ['status' => false, 'message' => 'Erro ao carregar lojas parceiras. Tente novamente.'];
+    } catch (Exception $e) {
+        error_log('Erro geral ao obter lojas parceiras: ' . $e->getMessage());
+        return ['status' => false, 'message' => 'Erro interno do sistema.'];
     }
+}
     
     /**
      * Obtém detalhes do perfil do cliente
