@@ -58,114 +58,63 @@ $errorMessage = $hasError ? $result['message'] : '';
 // Dados para exibição
 $statementData = $hasError ? [] : $result['data'];
 
-// CORREÇÃO 1: Buscar estatísticas corretas baseadas apenas nas transações do período
 try {
     $db = Database::getConnection();
     
-    // Query corrigida para estatísticas baseadas nas transações filtradas
-    $estatisticasQuery = "
+    // Obter estatísticas de saldo para o período filtrado
+    $saldoStatQuery = "
         SELECT 
-            COUNT(*) as total_transacoes,
-            COALESCE(SUM(t.valor_total), 0) as total_compras,
-            COALESCE(SUM(t.valor_cliente), 0) as total_cashback,
-            COALESCE(SUM(CASE WHEN t.status = 'aprovado' THEN t.valor_cliente ELSE 0 END), 0) as cashback_aprovado,
-            COALESCE(SUM(CASE WHEN t.status = 'pendente' THEN t.valor_cliente ELSE 0 END), 0) as cashback_pendente
-        FROM transacoes_cashback t
-        WHERE t.usuario_id = :user_id
-    ";
-
-    $estatisticasParams = [':user_id' => $userId];
-    
-    // Aplicar os mesmos filtros das transações
-    if (!empty($filters['data_inicio'])) {
-        $estatisticasQuery .= " AND t.data_transacao >= :data_inicio";
-        $estatisticasParams[':data_inicio'] = $filters['data_inicio'] . ' 00:00:00';
-    }
-    if (!empty($filters['data_fim'])) {
-        $estatisticasQuery .= " AND t.data_transacao <= :data_fim";
-        $estatisticasParams[':data_fim'] = $filters['data_fim'] . ' 23:59:59';
-    }
-    if (!empty($filters['loja_id'])) {
-        $estatisticasQuery .= " AND t.loja_id = :loja_id";
-        $estatisticasParams[':loja_id'] = $filters['loja_id'];
-    }
-    if (!empty($filters['status'])) {
-        $estatisticasQuery .= " AND t.status = :status";
-        $estatisticasParams[':status'] = $filters['status'];
-    }
-
-    $estatisticasStmt = $db->prepare($estatisticasQuery);
-    foreach ($estatisticasParams as $param => $value) {
-        $estatisticasStmt->bindValue($param, $value);
-    }
-    $estatisticasStmt->execute();
-    $estatisticasCorrigidas = $estatisticasStmt->fetch(PDO::FETCH_ASSOC);
-
-    // CORREÇÃO 2: Buscar estatísticas de saldo usado apenas para o período
-    $saldoUsadoQuery = "
-        SELECT 
-            COALESCE(SUM(cm.valor), 0) as total_saldo_usado,
-            COUNT(DISTINCT cm.transacao_uso_id) as qtd_usos_saldo
+            SUM(CASE WHEN cm.tipo_operacao = 'credito' THEN cm.valor ELSE 0 END) as total_creditado,
+            SUM(CASE WHEN cm.tipo_operacao = 'uso' THEN cm.valor ELSE 0 END) as total_usado,
+            SUM(CASE WHEN cm.tipo_operacao = 'estorno' THEN cm.valor ELSE 0 END) as total_estornado,
+            COUNT(CASE WHEN cm.tipo_operacao = 'uso' THEN 1 END) as qtd_usos
         FROM cashback_movimentacoes cm
-        JOIN transacoes_cashback t ON cm.transacao_uso_id = t.id
-        WHERE cm.usuario_id = :user_id 
-        AND cm.tipo_operacao = 'uso'
-        AND t.usuario_id = :user_id
+        WHERE cm.usuario_id = :user_id
     ";
-    
-    $saldoUsadoParams = [':user_id' => $userId];
-    
+
     // Aplicar filtros de data se existirem
+    $saldoParams = [':user_id' => $userId];
     if (!empty($filters['data_inicio'])) {
-        $saldoUsadoQuery .= " AND t.data_transacao >= :data_inicio";
-        $saldoUsadoParams[':data_inicio'] = $filters['data_inicio'] . ' 00:00:00';
+        $saldoStatQuery .= " AND cm.data_operacao >= :data_inicio";
+        $saldoParams[':data_inicio'] = $filters['data_inicio'] . ' 00:00:00';
     }
     if (!empty($filters['data_fim'])) {
-        $saldoUsadoQuery .= " AND t.data_transacao <= :data_fim";
-        $saldoUsadoParams[':data_fim'] = $filters['data_fim'] . ' 23:59:59';
+        $saldoStatQuery .= " AND cm.data_operacao <= :data_fim";
+        $saldoParams[':data_fim'] = $filters['data_fim'] . ' 23:59:59';
     }
 
-    $saldoUsadoStmt = $db->prepare($saldoUsadoQuery);
-    foreach ($saldoUsadoParams as $param => $value) {
-        $saldoUsadoStmt->bindValue($param, $value);
+    $saldoStatStmt = $db->prepare($saldoStatQuery);
+    foreach ($saldoParams as $param => $value) {
+        $saldoStatStmt->bindValue($param, $value);
     }
-    $saldoUsadoStmt->execute();
-    $saldoUsadoEstatisticas = $saldoUsadoStmt->fetch(PDO::FETCH_ASSOC);
+    $saldoStatStmt->execute();
+    $saldoEstatisticas = $saldoStatStmt->fetch(PDO::FETCH_ASSOC);
 
-    // CORREÇÃO 3: Buscar saldo usado por transação corretamente
+    // Obter transações com informações de saldo usado
     if (!$hasError && !empty($statementData['transacoes'])) {
         foreach ($statementData['transacoes'] as &$transacao) {
-            // Buscar saldo usado especificamente nesta transação
-            $saldoUsadoTransacaoQuery = "
-                SELECT COALESCE(SUM(valor), 0) as saldo_usado 
+            // Buscar saldo usado nesta transação
+            $saldoUsadoQuery = "
+                SELECT SUM(valor) as saldo_usado 
                 FROM cashback_movimentacoes 
-                WHERE transacao_uso_id = :transacao_id 
-                AND tipo_operacao = 'uso' 
-                AND usuario_id = :user_id
+                WHERE transacao_uso_id = :transacao_id AND tipo_operacao = 'uso'
             ";
-            $saldoUsadoTransacaoStmt = $db->prepare($saldoUsadoTransacaoQuery);
-            $saldoUsadoTransacaoStmt->bindParam(':transacao_id', $transacao['id']);
-            $saldoUsadoTransacaoStmt->bindParam(':user_id', $userId);
-            $saldoUsadoTransacaoStmt->execute();
-            $saldoUsadoTransacao = $saldoUsadoTransacaoStmt->fetch(PDO::FETCH_ASSOC);
+            $saldoUsadoStmt = $db->prepare($saldoUsadoQuery);
+            $saldoUsadoStmt->bindParam(':transacao_id', $transacao['id']);
+            $saldoUsadoStmt->execute();
+            $saldoUsado = $saldoUsadoStmt->fetch(PDO::FETCH_ASSOC);
             
-            $transacao['saldo_usado'] = $saldoUsadoTransacao['saldo_usado'] ?? 0;
+            $transacao['saldo_usado'] = $saldoUsado['saldo_usado'] ?? 0;
             $transacao['valor_pago'] = $transacao['valor_total'] - $transacao['saldo_usado'];
         }
     }
-    
 } catch (Exception $e) {
-    error_log('Erro ao carregar estatísticas: ' . $e->getMessage());
-    $estatisticasCorrigidas = [
-        'total_transacoes' => 0,
-        'total_compras' => 0,
-        'total_cashback' => 0,
-        'cashback_aprovado' => 0,
-        'cashback_pendente' => 0
-    ];
-    $saldoUsadoEstatisticas = [
-        'total_saldo_usado' => 0,
-        'qtd_usos_saldo' => 0
+    error_log('Erro ao carregar estatísticas de saldo: ' . $e->getMessage());
+    $saldoEstatisticas = [
+        'total_creditado' => 0,
+        'total_usado' => 0,
+        'total_estornado' => 0,
+        'qtd_usos' => 0
     ];
 }
 ?>
@@ -284,14 +233,14 @@ try {
             </form>
         </div>
         
-        <!-- CORREÇÃO 4: Cards do resumo corrigidos -->
+        <!-- Resumo visual em cards grandes -->
         <div class="summary-dashboard">
             <div class="summary-card total-spent">
                 <div class="card-header">
                     <span class="card-icon">🛒</span>
                     <h3>Total Gasto</h3>
                 </div>
-                <div class="card-value">R$ <?php echo number_format($estatisticasCorrigidas['total_compras'] ?? 0, 2, ',', '.'); ?></div>
+                <div class="card-value">R$ <?php echo number_format($statementData['estatisticas']['total_compras'] ?? 0, 2, ',', '.'); ?></div>
                 <div class="card-description">Valor total das suas compras</div>
             </div>
             
@@ -300,7 +249,7 @@ try {
                     <span class="card-icon">🎁</span>
                     <h3>Cashback Ganho</h3>
                 </div>
-                <div class="card-value">R$ <?php echo number_format($estatisticasCorrigidas['total_cashback'] ?? 0, 2, ',', '.'); ?></div>
+                <div class="card-value">R$ <?php echo number_format($statementData['estatisticas']['total_cashback'] ?? 0, 2, ',', '.'); ?></div>
                 <div class="card-description">Dinheiro que você ganhou de volta</div>
             </div>
             
@@ -309,7 +258,7 @@ try {
                     <span class="card-icon">💸</span>
                     <h3>Saldo Usado</h3>
                 </div>
-                <div class="card-value">R$ <?php echo number_format($saldoUsadoEstatisticas['total_saldo_usado'] ?? 0, 2, ',', '.'); ?></div>
+                <div class="card-value">R$ <?php echo number_format($saldoEstatisticas['total_usado'] ?? 0, 2, ',', '.'); ?></div>
                 <div class="card-description">Cashback que você já usou</div>
             </div>
             
@@ -318,7 +267,7 @@ try {
                     <span class="card-icon">📝</span>
                     <h3>Compras Feitas</h3>
                 </div>
-                <div class="card-value"><?php echo $estatisticasCorrigidas['total_transacoes'] ?? 0; ?></div>
+                <div class="card-value"><?php echo $statementData['estatisticas']['total_transacoes'] ?? 0; ?></div>
                 <div class="card-description">Quantidade de compras realizadas</div>
             </div>
         </div>
