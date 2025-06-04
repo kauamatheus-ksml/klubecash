@@ -249,7 +249,7 @@ try {
                     <span class="card-icon">🎁</span>
                     <h3>Cashback Ganho</h3>
                 </div>
-                <div class="card-value">R$ <?php echo number_format($statementData['estatisticas']['total_cashback'] ?? 0, 2, ',', '.'); ?></div>
+                <div class="card-value">R$ <?php echo number_format($statementData['estatisticas']['total_cashback'] ?? 0, 1, ',', '.'); ?></div>
                 <div class="card-description">Dinheiro que você ganhou de volta</div>
             </div>
             
