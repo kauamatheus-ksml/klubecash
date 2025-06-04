@@ -74,7 +74,12 @@ RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
     Header set X-MP-Integration "KlubeCash-v2.1"
     Header set X-MP-Quality "optimized"
 </IfModule>
-
+# === REGRA PARA INDEX ===
+# Garantir que index.php funcione
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_URI} ^/$
+RewriteRule ^(.*)$ index.php [L]
 # === CONFIGURAÇÕES PCI COMPLIANCE ===
 <IfModule mod_rewrite.c>
     # Força HTTPS para todas as páginas sensíveis
