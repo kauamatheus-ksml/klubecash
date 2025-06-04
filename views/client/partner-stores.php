@@ -1,6 +1,6 @@
 <?php
 // views/client/partner-stores.php
-// VERSÃO CORRIGIDA - SEM DUPLICAÇÃO
+// VERSÃO CORRIGIDA - SEM DUPLICAÇÃO E COM PRG PARA EVITAR REENVIO DE FORMULÁRIO
 
 // Definir o menu ativo
 $activeMenu = 'lojas';
@@ -23,6 +23,44 @@ if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id']) || !isset($_SESS
 // Obter dados do usuário
 $userId = $_SESSION['user_id'];
 
+// Processar adição/remoção de favoritos (AGORA COM PRG)
+if (isset($_POST['toggle_favorite'])) {
+    $storeId = isset($_POST['store_id']) ? (int)$_POST['store_id'] : 0;
+    $isFavorite = isset($_POST['is_favorite']) ? (int)$_POST['is_favorite'] : 0;
+
+    $favoriteResult = ClientController::toggleFavoriteStore($userId, $storeId, !$isFavorite);
+
+    // Armazenar a mensagem na sessão para exibir após o redirecionamento
+    $_SESSION['favorite_message'] = $favoriteResult['message'];
+    $_SESSION['favorite_message_type'] = $favoriteResult['status'] ? 'success' : 'error'; // Adicionar tipo para CSS
+
+    // Redirecionar para a mesma página via GET
+    $currentQueryString = '';
+    if (!empty($_SERVER['QUERY_STRING'])) {
+        // Remover parâmetros POST se existirem (embora não deveriam após POST)
+        $params = [];
+        parse_str($_SERVER['QUERY_STRING'], $params);
+        unset($params['toggle_favorite']); // Remover o parâmetro do POST para não confundir
+        unset($params['store_id']);
+        unset($params['is_favorite']);
+        $currentQueryString = http_build_query($params);
+    }
+    
+    header("Location: " . strtok($_SERVER["REQUEST_URI"], '?') . (!empty($currentQueryString) ? '?' . $currentQueryString : ''));
+    exit;
+}
+
+// Recuperar mensagem da sessão se existir e limpar
+$favoriteMessage = '';
+$favoriteMessageType = '';
+if (isset($_SESSION['favorite_message'])) {
+    $favoriteMessage = $_SESSION['favorite_message'];
+    $favoriteMessageType = $_SESSION['favorite_message_type'];
+    unset($_SESSION['favorite_message']); // Limpar a mensagem da sessão
+    unset($_SESSION['favorite_message_type']);
+}
+
+
 // Definir valores padrão para filtros e paginação
 $page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
 $filters = [];
@@ -32,15 +70,15 @@ if (isset($_GET['filtrar'])) {
     if (!empty($_GET['categoria']) && $_GET['categoria'] != 'todas') {
         $filters['categoria'] = $_GET['categoria'];
     }
-    
+
     if (!empty($_GET['nome'])) {
         $filters['nome'] = $_GET['nome'];
     }
-    
+
     if (!empty($_GET['cashback_min'])) {
         $filters['cashback_min'] = $_GET['cashback_min'];
     }
-    
+
     if (!empty($_GET['ordenar']) && $_GET['ordenar'] != 'nome') {
         $filters['ordenar'] = $_GET['ordenar'];
     }
@@ -48,21 +86,21 @@ if (isset($_GET['filtrar'])) {
 
 try {
     $db = Database::getConnection();
-    
-    // Obter dados das lojas parceiras (AGORA SEM DUPLICAÇÃO)
+
+    // Obter dados das lojas parceiras
     $result = ClientController::getPartnerStores($userId, $filters, $page);
-    
+
     // Verificar se houve erro
     $hasError = !$result['status'];
     $errorMessage = $hasError ? $result['message'] : '';
-    
+
     // Dados para exibição
     $storesData = $hasError ? [] : $result['data'];
-    
-    // Obter estatísticas gerais do saldo do cliente (CORRIGIDA)
+
+    // Obter estatísticas gerais do saldo do cliente
     if (!$hasError) {
         $estatisticasQuery = "
-            SELECT 
+            SELECT
                 COUNT(DISTINCT cs.loja_id) as lojas_com_saldo,
                 COALESCE(SUM(cs.saldo_disponivel), 0) as total_saldo_disponivel,
                 COALESCE(SUM(cs.total_usado), 0) as total_usado_geral,
@@ -73,7 +111,7 @@ try {
         $estatisticasStmt = $db->prepare($estatisticasQuery);
         $estatisticasStmt->execute([$userId]);
         $estatisticasGerais = $estatisticasStmt->fetch(PDO::FETCH_ASSOC);
-        
+
         // Se não houver dados, definir valores padrão
         if (!$estatisticasGerais || $estatisticasGerais['lojas_com_saldo'] === null) {
             $estatisticasGerais = [
@@ -83,24 +121,24 @@ try {
                 'lojas_saldo_disponivel' => 0
             ];
         }
-        
+
         // ENRIQUECER DADOS DAS LOJAS COM SALDO DO CLIENTE (CORRIGIDO)
         if (!empty($storesData['lojas'])) {
             foreach ($storesData['lojas'] as &$loja) {
                 // Buscar saldo específico desta loja para o cliente
                 $saldoQuery = "
-                    SELECT 
+                    SELECT
                         saldo_disponivel,
                         total_creditado,
                         total_usado
-                    FROM cashback_saldos 
+                    FROM cashback_saldos
                     WHERE usuario_id = ? AND loja_id = ?
                 ";
-                
+
                 $saldoStmt = $db->prepare($saldoQuery);
                 $saldoStmt->execute([$userId, $loja['id']]);
                 $saldoInfo = $saldoStmt->fetch(PDO::FETCH_ASSOC);
-                
+
                 if ($saldoInfo) {
                     $loja['saldo_disponivel'] = $saldoInfo['saldo_disponivel'];
                     $loja['total_creditado'] = $saldoInfo['total_creditado'];
@@ -110,22 +148,22 @@ try {
                     $loja['total_creditado'] = 0;
                     $loja['total_usado'] = 0;
                 }
-                
+
                 // Buscar último uso (CORRIGIDO)
                 $ultimoUsoQuery = "
-                    SELECT MAX(data_operacao) as ultima_data 
-                    FROM cashback_movimentacoes 
+                    SELECT MAX(data_operacao) as ultima_data
+                    FROM cashback_movimentacoes
                     WHERE usuario_id = ? AND loja_id = ? AND tipo_operacao = 'uso'
                 ";
                 $ultimoUsoStmt = $db->prepare($ultimoUsoQuery);
                 $ultimoUsoStmt->execute([$userId, $loja['id']]);
                 $ultimoUsoInfo = $ultimoUsoStmt->fetch(PDO::FETCH_ASSOC);
                 $loja['ultimo_uso'] = $ultimoUsoInfo['ultima_data'] ?? null;
-                
+
                 // Buscar total de usos
                 $totalUsosQuery = "
-                    SELECT COUNT(*) as total_usos 
-                    FROM cashback_movimentacoes 
+                    SELECT COUNT(*) as total_usos
+                    FROM cashback_movimentacoes
                     WHERE usuario_id = ? AND loja_id = ? AND tipo_operacao = 'uso'
                 ";
                 $totalUsosStmt = $db->prepare($totalUsosQuery);
@@ -142,7 +180,7 @@ try {
             'lojas_saldo_disponivel' => 0
         ];
     }
-    
+
 } catch (Exception $e) {
     error_log('Erro ao carregar lojas parceiras: ' . $e->getMessage());
     $hasError = true;
@@ -156,20 +194,6 @@ try {
     ];
 }
 
-// Processar adição/remoção de favoritos
-$favoriteMessage = '';
-if (isset($_POST['toggle_favorite'])) {
-    $storeId = isset($_POST['store_id']) ? (int)$_POST['store_id'] : 0;
-    $isFavorite = isset($_POST['is_favorite']) ? (int)$_POST['is_favorite'] : 0;
-    
-    $favoriteResult = ClientController::toggleFavoriteStore($userId, $storeId, !$isFavorite);
-    $favoriteMessage = $favoriteResult['message'];
-    
-    // Recarregar dados após alteração de favorito
-    $result = ClientController::getPartnerStores($userId, $filters, $page);
-    $hasError = !$result['status'];
-    $storesData = $hasError ? [] : $result['data'];
-}
 
 // Função para formatar valor
 function formatCurrency($value) {
@@ -195,7 +219,7 @@ function formatDate($date) {
 </head>
 <body>
     <?php include_once '../components/navbar.php'; ?>
-    
+
     <div class="page-wrapper" style="margin-top: 80px;">
         <div class="hero-section">
             <div class="container">
@@ -210,19 +234,19 @@ function formatDate($date) {
 
         <div class="container">
             <?php if (!empty($favoriteMessage)): ?>
-                <div class="toast toast-success">
-                    <i class="fas fa-check-circle"></i>
+                <div class="toast toast-<?php echo htmlspecialchars($favoriteMessageType); ?>">
+                    <i class="fas <?php echo ($favoriteMessageType == 'success') ? 'fa-check-circle' : 'fa-exclamation-circle'; ?>"></i>
                     <?php echo htmlspecialchars($favoriteMessage); ?>
                 </div>
             <?php endif; ?>
-            
+
             <?php if ($hasError): ?>
                 <div class="toast toast-error">
                     <i class="fas fa-exclamation-circle"></i>
                     <?php echo htmlspecialchars($errorMessage); ?>
                 </div>
             <?php else: ?>
-            
+
             <div class="filters-bar">
                 <div class="filters-toggle">
                     <button id="toggleFilters" class="btn-filter-toggle">
@@ -231,7 +255,7 @@ function formatDate($date) {
                         <i class="fas fa-chevron-down"></i>
                     </button>
                 </div>
-                
+
                 <div class="filters-content" id="filtersContent">
                     <form action="" method="GET" class="filter-form">
                         <div class="filter-row">
@@ -242,7 +266,7 @@ function formatDate($date) {
                                     <input type="text" name="nome" value="<?php echo $filters['nome'] ?? ''; ?>" placeholder="Digite o nome da loja">
                                 </div>
                             </div>
-                            
+
                             <div class="filter-group">
                                 <label>Categoria</label>
                                 <select name="categoria" class="filter-select">
@@ -256,7 +280,7 @@ function formatDate($date) {
                                     <?php endif; ?>
                                 </select>
                             </div>
-                            
+
                             <div class="filter-group">
                                 <label>Ordenar</label>
                                 <select name="ordenar" class="filter-select">
@@ -265,7 +289,7 @@ function formatDate($date) {
                                     <option value="categoria" <?php echo (isset($filters['ordenar']) && $filters['ordenar'] == 'categoria') ? 'selected' : ''; ?>>Categoria</option>
                                 </select>
                             </div>
-                            
+
                             <div class="filter-actions">
                                 <button type="submit" name="filtrar" value="1" class="btn-apply-filter">
                                     <i class="fas fa-search"></i>
@@ -280,14 +304,14 @@ function formatDate($date) {
                     </form>
                 </div>
             </div>
-            
+
             <div class="stores-section">
                 <div class="section-header">
                     <div class="section-title">
                         <h2>Suas Lojas Disponíveis</h2>
                         <span class="store-count"><?php echo $storesData['estatisticas']['total_lojas'] ?? 0; ?> lojas encontradas</span>
                     </div>
-                    
+
                     <?php if (!empty($storesData['lojas'])): ?>
                     <div class="quick-stats">
                         <div class="quick-stat">
@@ -306,7 +330,7 @@ function formatDate($date) {
 
                     <?php endif; ?>
                 </div>
-                
+
                 <div class="stores-grid">
                     <?php if (empty($storesData['lojas'])): ?>
                         <div class="empty-state">
@@ -324,7 +348,7 @@ function formatDate($date) {
                                     <div class="store-avatar">
                                         <span><?php echo strtoupper(substr($loja['nome_fantasia'], 0, 2)); ?></span>
                                     </div>
-                                    
+
                                     <div class="store-info">
                                         <h3 class="store-name"><?php echo htmlspecialchars($loja['nome_fantasia']); ?></h3>
                                         <span class="store-category">
@@ -332,7 +356,7 @@ function formatDate($date) {
                                             <?php echo htmlspecialchars($loja['categoria']); ?>
                                         </span>
                                     </div>
-                                    
+
                                     <form method="POST" class="favorite-form">
                                         <input type="hidden" name="store_id" value="<?php echo $loja['id']; ?>">
                                         <input type="hidden" name="is_favorite" value="<?php echo $loja['is_favorite'] ?? 0; ?>">
@@ -341,7 +365,7 @@ function formatDate($date) {
                                         </button>
                                     </form>
                                 </div>
-                                
+
                                 <div class="cashback-highlight">
                                     <div class="cashback-percentage">
                                         <span class="percentage">
@@ -355,7 +379,7 @@ function formatDate($date) {
                                         <span>Você ganha <?php echo number_format($loja['porcentagem_cashback'] / 2, 1); ?>% do valor da compra</span>
                                     </div>
                                 </div>
-                                
+
                                 <?php if ($loja['saldo_disponivel'] > 0): ?>
                                     <div class="balance-status available">
                                         <div class="balance-icon">
@@ -403,13 +427,13 @@ function formatDate($date) {
                                         </div>
                                     </div>
                                 <?php endif; ?>
-                                
+
                                 <div class="card-actions">
                                     <button class="btn-secondary" onclick="verDetalhes(<?php echo $loja['id']; ?>)">
                                         <i class="fas fa-info-circle"></i>
                                         Ver Detalhes
                                     </button>
-                                    
+
                                     <?php if ($loja['ultimo_uso']): ?>
                                         <div class="last-use">
                                             <i class="fas fa-calendar-alt"></i>
@@ -422,14 +446,14 @@ function formatDate($date) {
                     <?php endif; ?>
                 </div>
             </div>
-            
+
             <?php if (!empty($storesData['paginacao']) && $storesData['paginacao']['total_paginas'] > 1): ?>
                 <div class="pagination-wrapper">
                     <nav class="pagination">
-                        <?php 
+                        <?php
                         $currentPage = $storesData['paginacao']['pagina_atual'];
                         $totalPages = $storesData['paginacao']['total_paginas'];
-                        
+
                         // Construir parâmetros da URL
                         $urlParams = [];
                         foreach ($filters as $key => $value) {
@@ -437,32 +461,32 @@ function formatDate($date) {
                         }
                         $urlParams[] = "filtrar=1";
                         $queryString = !empty($urlParams) ? '&' . implode('&', $urlParams) : '';
-                        
+
                         // Anterior
-                        if ($currentPage > 1): 
+                        if ($currentPage > 1):
                         ?>
                             <a href="?page=<?php echo $currentPage - 1 . $queryString; ?>" class="pagination-btn prev">
                                 <i class="fas fa-chevron-left"></i>
                                 Anterior
                             </a>
                         <?php endif; ?>
-                        
+
                         <div class="pagination-numbers">
-                            <?php 
+                            <?php
                             $start = max(1, $currentPage - 2);
                             $end = min($totalPages, $start + 4);
-                            
-                            for ($i = $start; $i <= $end; $i++): 
+
+                            for ($i = $start; $i <= $end; $i++):
                             ?>
                                 <a href="?page=<?php echo $i . $queryString; ?>" class="pagination-number <?php echo ($i == $currentPage) ? 'active' : ''; ?>">
                                     <?php echo $i; ?>
                                 </a>
                             <?php endfor; ?>
                         </div>
-                        
-                        <?php 
+
+                        <?php
                         // Próximo
-                        if ($currentPage < $totalPages): 
+                        if ($currentPage < $totalPages):
                         ?>
                             <a href="?page=<?php echo $currentPage + 1 . $queryString; ?>" class="pagination-btn next">
                                 Próximo
@@ -475,7 +499,7 @@ function formatDate($date) {
             <?php endif; ?>
         </div>
     </div>
-    
+
     <div id="storeModal" class="modal">
         <div class="modal-overlay" onclick="closeModal()"></div>
         <div class="modal-content">
@@ -495,7 +519,7 @@ function formatDate($date) {
             </div>
         </div>
     </div>
-    
+
     <div id="useBalanceModal" class="modal">
         <div class="modal-overlay" onclick="closeUseBalanceModal()"></div>
         <div class="modal-content">
@@ -517,7 +541,7 @@ function formatDate($date) {
                                 <p>Saldo disponível: <strong id="modalStoreBalance"></strong></p>
                             </div>
                         </div>
-                        
+
                         <div class="usage-instructions">
                             <div class="instruction-item">
                                 <i class="fas fa-shopping-cart"></i>
@@ -532,7 +556,7 @@ function formatDate($date) {
                                 <span>O valor será descontado automaticamente</span>
                             </div>
                         </div>
-                        
+
                         <div class="contact-store">
                             <p><strong>Dica:</strong> Entre em contato com a loja antes de ir para confirmar que aceita o uso do saldo Klube Cash.</p>
                         </div>
@@ -541,22 +565,22 @@ function formatDate($date) {
             </div>
         </div>
     </div>
-    
+
     <script>
         // JavaScript permanece igual
         // Toggle dos filtros
         document.getElementById('toggleFilters').addEventListener('click', function() {
             const content = document.getElementById('filtersContent');
             const icon = this.querySelector('.fa-chevron-down');
-            
+
             content.classList.toggle('active');
             icon.style.transform = content.classList.contains('active') ? 'rotate(180deg)' : 'rotate(0deg)';
         });
-        
+
         // Função para exibir detalhes da loja
         function verDetalhes(storeId) {
             document.getElementById('storeModal').classList.add('active');
-            
+
             // Simular carregamento de dados (em produção, faria uma chamada AJAX)
             setTimeout(() => {
                 document.getElementById('storeDetails').innerHTML = `
@@ -565,17 +589,17 @@ function formatDate($date) {
                             <h4><i class="fas fa-chart-line"></i> Histórico de Cashback</h4>
                             <p>Aqui você verá todo o histórico de cashback ganho nesta loja, incluindo valores pendentes e já utilizados.</p>
                         </div>
-                        
+
                         <div class="detail-section">
                             <h4><i class="fas fa-clock"></i> Movimentações Recentes</h4>
                             <p>Últimas 10 movimentações de cashback desta loja aparecerão aqui.</p>
                         </div>
-                        
+
                         <div class="detail-section">
                             <h4><i class="fas fa-info-circle"></i> Informações da Loja</h4>
                             <p>Dados de contato, endereço e outras informações relevantes.</p>
                         </div>
-                        
+
                         <div class="coming-soon">
                             <i class="fas fa-tools"></i>
                             <p>Esta funcionalidade está sendo desenvolvida e estará disponível em breve!</p>
@@ -584,27 +608,27 @@ function formatDate($date) {
                 `;
             }, 500);
         }
-        
+
         // Função para usar saldo
         function usarSaldo(storeId, storeName, balance) {
             document.getElementById('useBalanceModal').classList.add('active');
-            
+
             // Preencher informações do modal
             document.getElementById('modalStoreInitials').textContent = storeName.substring(0, 2).toUpperCase();
             document.getElementById('modalStoreName').textContent = storeName;
             document.getElementById('modalStoreBalance').textContent = 'R$ ' + balance.toFixed(2).replace('.', ',');
         }
-        
+
         // Função para fechar modal principal
         function closeModal() {
             document.getElementById('storeModal').classList.remove('active');
         }
-        
+
         // Função para fechar modal de uso de saldo
         function closeUseBalanceModal() {
             document.getElementById('useBalanceModal').classList.remove('active');
         }
-        
+
         // Auto-hide para toasts
         document.addEventListener('DOMContentLoaded', function() {
             const toasts = document.querySelectorAll('.toast');
