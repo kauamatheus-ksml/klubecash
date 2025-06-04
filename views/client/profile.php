@@ -44,7 +44,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $updateData = [
                 'nome' => $_POST['nome'] ?? '',
-                'cpf' => $_POST['cpf'] ?? '', // Novo campo CPF
                 'contato' => [
                     'telefone' => $_POST['telefone'] ?? '',
                     'celular' => $_POST['celular'] ?? '',
@@ -52,9 +51,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ]
             ];
             
-            $result = ClientController::updateProfile($userId, $updateData);
-            $personalInfoSuccess = $result['status'];
-            $personalInfoMessage = $result['message'];
+            // Validação e processamento do CPF
+            if (!empty($_POST['cpf']) && empty($profileData['perfil']['cpf_validated'])) {
+                $cpf = Validator::sanitizaCPF($_POST['cpf']);
+                if (!Validator::validaCPF($cpf)) {
+                    $personalInfoSuccess = false;
+                    $personalInfoMessage = 'CPF inválido. Verifique os números digitados.';
+                } else {
+                    // Verificar se CPF já existe no sistema
+                    $db = Database::getConnection();
+                    $checkCpfStmt = $db->prepare("SELECT id FROM usuarios WHERE cpf = :cpf AND id != :user_id");
+                    $checkCpfStmt->bindParam(':cpf', $cpf);
+                    $checkCpfStmt->bindParam(':user_id', $userId);
+                    $checkCpfStmt->execute();
+                    
+                    if ($checkCpfStmt->rowCount() > 0) {
+                        $personalInfoSuccess = false;
+                        $personalInfoMessage = 'Este CPF já está cadastrado em outro usuário.';
+                    } else {
+                        $updateData['cpf'] = $cpf;
+                        // Só processa se a validação do CPF passou
+                        $result = ClientController::updateProfile($userId, $updateData);
+                        $personalInfoSuccess = $result['status'];
+                        $personalInfoMessage = $result['message'];
+                    }
+                }
+            } else {
+                // Se não há CPF novo ou já está validado, processa normalmente
+                $result = ClientController::updateProfile($userId, $updateData);
+                $personalInfoSuccess = $result['status'];
+                $personalInfoMessage = $result['message'];
+            }
             
         } catch (Exception $e) {
             $personalInfoSuccess = false;
@@ -165,7 +192,7 @@ $totalSteps = 6; // Aumentado de 5 para 6
 $completedSteps = 0;
 
 if (!empty($profileData['perfil']['nome'])) $completedSteps++;
-if (!empty($profileData['perfil']['cpf'])) $completedSteps++; // Novo: CPF
+if (!empty($profileData['perfil']['cpf']) && $profileData['perfil']['cpf_validated']) $completedSteps++; // Nova verificação
 if (!empty($profileData['contato']['telefone']) || !empty($profileData['contato']['celular'])) $completedSteps++;
 if (!empty($profileData['contato']['email_alternativo'])) $completedSteps++;
 if (!empty($profileData['endereco']['cep']) && !empty($profileData['endereco']['logradouro'])) $completedSteps++;
@@ -920,7 +947,30 @@ $cpfPendente = empty($profileData['perfil']['cpf']);
                                     O e-mail principal não pode ser alterado por segurança
                                 </p>
                             </div>
-                            
+                            <div class="form-group">
+                                <label class="form-label" for="cpf">CPF</label>
+                                <?php if (!empty($profileData['perfil']['cpf_validated']) && $profileData['perfil']['cpf_validated']): ?>
+                                    <input type="text" id="cpf" class="form-control" 
+                                        value="<?php echo htmlspecialchars(Validator::formataCPF($profileData['perfil']['cpf'] ?? '')); ?>" 
+                                        disabled>
+                                    <p class="form-help">
+                                        <i class="fas fa-check-circle" style="color: var(--success-color);"></i>
+                                        CPF validado em <?php echo date('d/m/Y', strtotime($profileData['perfil']['cpf_validated_at'])); ?>. Não pode ser alterado por segurança.
+                                    </p>
+                                <?php else: ?>
+                                    <input type="text" id="cpf" name="cpf" class="form-control" 
+                                        value="<?php echo htmlspecialchars(Validator::formataCPF($profileData['perfil']['cpf'] ?? '')); ?>"
+                                        placeholder="000.000.000-00" maxlength="14">
+                                    <p class="form-help">
+                                        <i class="fas fa-info-circle"></i>
+                                        <?php if (empty($profileData['perfil']['cpf'])): ?>
+                                            Digite seu CPF para validação. Após validado, não poderá ser alterado.
+                                        <?php else: ?>
+                                            <span style="color: var(--warning-color);">CPF aguardando validação pelo suporte</span>
+                                        <?php endif; ?>
+                                    </p>
+                                <?php endif; ?>
+                            </div>
                             <div class="form-row">
                                 <div class="form-group">
                                     <label class="form-label" for="telefone">Telefone</label>
@@ -1096,6 +1146,63 @@ $cpfPendente = empty($profileData['perfil']['cpf']);
     </div>
     
     <script>
+        // Aplicar máscara no CPF
+        document.getElementById('cpf').addEventListener('input', function() {
+            if (!this.disabled) {
+                let value = this.value.replace(/\D/g, '');
+                if (value.length <= 11) {
+                    value = value.replace(/(\d{3})(\d)/, '$1.$2');
+                    value = value.replace(/(\d{3})(\d)/, '$1.$2');
+                    value = value.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+                }
+                this.value = value;
+            }
+        });
+
+        // Validação em tempo real do CPF
+        document.getElementById('cpf').addEventListener('blur', function() {
+            if (!this.disabled && this.value.length > 0) {
+                const cpf = this.value.replace(/\D/g, '');
+                if (cpf.length === 11) {
+                    // Validação básica de CPF
+                    if (validarCPF(cpf)) {
+                        this.style.borderColor = 'var(--success-color)';
+                        showNotification('✅ CPF válido', 'success');
+                    } else {
+                        this.style.borderColor = 'var(--danger-color)';
+                        showNotification('❌ CPF inválido', 'error');
+                    }
+                } else {
+                    this.style.borderColor = 'var(--danger-color)';
+                }
+            }
+        });
+
+        // Função para validar CPF
+        function validarCPF(cpf) {
+            cpf = cpf.replace(/\D/g, '');
+            
+            if (cpf.length !== 11 || /^(\d)\1{10}$/.test(cpf)) {
+                return false;
+            }
+            
+            let soma = 0;
+            for (let i = 0; i < 9; i++) {
+                soma += parseInt(cpf.charAt(i)) * (10 - i);
+            }
+            let resto = (soma * 10) % 11;
+            if (resto === 10 || resto === 11) resto = 0;
+            if (resto !== parseInt(cpf.charAt(9))) return false;
+            
+            soma = 0;
+            for (let i = 0; i < 10; i++) {
+                soma += parseInt(cpf.charAt(i)) * (11 - i);
+            }
+            resto = (soma * 10) % 11;
+            if (resto === 10 || resto === 11) resto = 0;
+            
+            return resto === parseInt(cpf.charAt(10));
+        }
         // Script aprimorado para preenchimento automático de endereço via CEP
         document.getElementById('cep').addEventListener('blur', function() {
             const cep = this.value.replace(/\D/g, '');

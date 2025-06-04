@@ -54,6 +54,10 @@ define('PASSWORD_MIN_LENGTH', 8);
 define('SESSION_LIFETIME', 86400);
 define('TOKEN_EXPIRATION', 7200);
 define('CPF_REQUIRED', true); // Novo: Indica se CPF é obrigatório
+// === VALIDAÇÃO DE DOCUMENTOS ===
+define('CPF_VALIDATION_REQUIRED', true);
+define('CPF_AUTO_VALIDATE', false); // Se true, valida automaticamente. Se false, precisa de aprovação manual
+define('DOCUMENT_VALIDATION_TIMEOUT', 72); // Horas para validar documentos
 // === MENSAGENS DE VALIDAÇÃO ===
 define('MSG_CPF_REQUIRED', 'CPF é obrigatório para completar seu perfil');
 define('MSG_CPF_INVALID', 'CPF informado é inválido');
