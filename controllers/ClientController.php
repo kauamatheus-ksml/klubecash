@@ -409,8 +409,8 @@ class ClientController {
             // Calcular estatísticas
             $statisticsQuery = "
                 SELECT
-                    SUM(CASE WHEN status = :status_approved THEN valor_total ELSE 0 END) as total_compras,
-                    SUM(CASE WHEN status = :status_approved THEN valor_cashback ELSE 0 END) as total_cashback,
+                    SUM(valor_total) as total_compras,
+                    SUM(CASE WHEN status = :status_approved THEN valor_cashback ELSE 0 END) as total_cashback, /* Esta linha já considera o valor_cashback (do cliente) */
                     COUNT(*) as total_transacoes
                 FROM transacoes_cashback
                 WHERE usuario_id = :user_id
@@ -442,7 +442,7 @@ class ClientController {
                 $statsStmt->bindValue($param, $value);
             }
             // Bind the new parameter for approved status
-            $approvedStatus = TRANSACTION_APPROVED;
+            $approvedStatus = TRANSACTION_APPROVED; // ou 'aprovado' dependendo da sua constante
             $statsStmt->bindValue(':status_approved', $approvedStatus);
 
 
