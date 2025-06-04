@@ -793,21 +793,7 @@ try {
                     </div>
                 <?php endif; ?>
                 
-                <!-- Estatísticas -->
-                <div class="hero-stats fade-in">
-                    <div class="stat-item">
-                        <span class="stat-number">50K+</span>
-                        <span class="stat-label">Usuários Ativos</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-number">500+</span>
-                        <span class="stat-label">Lojas Parceiras</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-number">R$ 2.5M</span>
-                        <span class="stat-label">Em Cashback Pago</span>
-                    </div>
-                </div>
+                
             </div>
         </section>
 
