@@ -142,7 +142,8 @@ class ClientController {
     }
     /**
      * Verifica se o CPF pode ser editado (não foi validado/salvo anteriormente)
-     * * @param int $userId ID do usuário
+     * 
+     * @param int $userId ID do usuário
      * @return bool true se pode editar, false se está fixo
      */
     private static function canEditCPF($userId) {
@@ -166,7 +167,8 @@ class ClientController {
 
     /**
     * Simula o uso de saldo de uma loja específica
-    * * @param int $userId ID do cliente
+    * 
+    * @param int $userId ID do cliente
     * @param int $lojaId ID da loja
     * @param float $valor Valor a ser usado
     * @return array Resultado da simulação
@@ -216,7 +218,8 @@ class ClientController {
     }
     /**
     * Obtém os dados do dashboard do cliente
-    * * @param int $userId ID do cliente
+    * 
+    * @param int $userId ID do cliente
     * @return array Dados do dashboard
     */
     public static function getDashboardData($userId) {
@@ -327,7 +330,8 @@ class ClientController {
     
     /**
      * Obtém o extrato de transações do cliente
-     * * @param int $userId ID do cliente
+     * 
+     * @param int $userId ID do cliente
      * @param array $filters Filtros para o extrato (período, loja, etc)
      * @param int $page Página atual
      * @return array Extrato de transações
@@ -341,7 +345,7 @@ class ClientController {
             
             $db = Database::getConnection();
             
-            // Preparar consulta base para a lista de transações
+            // Preparar consulta base
             $query = "
                 SELECT t.*, l.nome_fantasia as loja_nome
                 FROM transacoes_cashback t
@@ -351,7 +355,7 @@ class ClientController {
             
             $params = [':user_id' => $userId];
             
-            // Aplicar filtros à consulta da lista de transações
+            // Aplicar filtros
             if (!empty($filters)) {
                 // Filtro por data inicial
                 if (isset($filters['data_inicio']) && !empty($filters['data_inicio'])) {
@@ -371,17 +375,17 @@ class ClientController {
                     $params[':loja_id'] = $filters['loja_id'];
                 }
                 
-                // Filtro por status para a lista de transações
-                if (isset($filters['status']) && !empty($filters['status']) && $filters['status'] !== 'todos') {
-                    $query .= " AND t.status = :status_list"; // Usar um nome de parâmetro diferente
-                    $params[':status_list'] = $filters['status'];
+                // Filtro por status
+                if (isset($filters['status']) && !empty($filters['status'])) {
+                    $query .= " AND t.status = :status";
+                    $params[':status'] = $filters['status'];
                 }
             }
             
             // Adicionar ordenação
             $query .= " ORDER BY t.data_transacao DESC";
             
-            // Calcular total de registros para paginação da lista de transações
+            // Calcular total de registros para paginação
             $countStmt = $db->prepare(str_replace('t.*, l.nome_fantasia as loja_nome', 'COUNT(*) as total', $query));
             foreach ($params as $param => $value) {
                 $countStmt->bindValue($param, $value);
@@ -394,7 +398,7 @@ class ClientController {
             $offset = ($page - 1) * $perPage;
             $query .= " LIMIT $offset, $perPage";
             
-            // Executar consulta para a lista de transações
+            // Executar consulta
             $stmt = $db->prepare($query);
             foreach ($params as $param => $value) {
                 $stmt->bindValue($param, $value);
@@ -402,42 +406,45 @@ class ClientController {
             $stmt->execute();
             $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
-            // Calcular estatísticas para o resumo (Total Gasto, Cashback Ganho, Compras Feitas)
-            // Estas estatísticas devem SEMPRE considerar apenas transações com status 'aprovado'.
+            // Calcular estatísticas
             $statisticsQuery = "
                 SELECT
-                    SUM(CASE WHEN t.status = :status_approved_for_summary THEN t.valor_total ELSE 0 END) as total_compras,
-                    SUM(CASE WHEN t.status = :status_approved_for_summary THEN t.valor_cashback ELSE 0 END) as total_cashback,
-                    COUNT(CASE WHEN t.status = :status_approved_for_summary THEN 1 END) as total_transacoes
-                FROM transacoes_cashback t
-                WHERE t.usuario_id = :user_id
+                    SUM(valor_total) as total_compras,
+                    SUM(CASE WHEN status = :status_approved THEN valor_cashback ELSE 0 END) as total_cashback, /* Esta linha já considera o valor_cashback (do cliente) */
+                    COUNT(*) as total_transacoes
+                FROM transacoes_cashback
+                WHERE usuario_id = :user_id
             ";
             
-            // Parâmetros para a consulta de estatísticas (separados da consulta da lista)
-            $statsParams = [':user_id' => $userId];
-            
-            // Aplicar filtros de data e loja às estatísticas
-            if (isset($filters['data_inicio']) && !empty($filters['data_inicio'])) {
-                $statisticsQuery .= " AND t.data_transacao >= :data_inicio_stats";
-                $statsParams[':data_inicio_stats'] = $filters['data_inicio'] . ' 00:00:00';
-            }
+            // Aplicar os mesmos filtros nas estatísticas
+            if (!empty($filters)) {
+                if (isset($filters['data_inicio']) && !empty($filters['data_inicio'])) {
+                    $statisticsQuery .= " AND data_transacao >= :data_inicio";
+                }
 
-            if (isset($filters['data_fim']) && !empty($filters['data_fim'])) {
-                $statisticsQuery .= " AND t.data_transacao <= :data_fim_stats";
-                $statsParams[':data_fim_stats'] = $filters['data_fim'] . ' 23:59:59';
-            }
+                if (isset($filters['data_fim']) && !empty($filters['data_fim'])) {
+                    $statisticsQuery .= " AND data_transacao <= :data_fim";
+                }
 
-            if (isset($filters['loja_id']) && !empty($filters['loja_id'])) {
-                $statisticsQuery .= " AND t.loja_id = :loja_id_stats";
-                $statsParams[':loja_id_stats'] = $filters['loja_id'];
+                if (isset($filters['loja_id']) && !empty($filters['loja_id'])) {
+                    $statisticsQuery .= " AND loja_id = :loja_id";
+                }
+
+                // If status filter is 'aprovado', it will be applied here too
+                // If status filter is 'todos' or not present, only 'aprovado' cashback will be summed for total_cashback
+                if (isset($filters['status']) && !empty($filters['status'])) {
+                    $statisticsQuery .= " AND status = :status";
+                }
             }
             
             $statsStmt = $db->prepare($statisticsQuery);
-            foreach ($statsParams as $param => $value) {
+            foreach ($params as $param => $value) {
                 $statsStmt->bindValue($param, $value);
             }
-            $approvedStatus = TRANSACTION_APPROVED; // Define a constante para status aprovado
-            $statsStmt->bindValue(':status_approved_for_summary', $approvedStatus); // Nova bind para o status aprovado
+            // Bind the new parameter for approved status
+            $approvedStatus = TRANSACTION_APPROVED; // ou 'aprovado' dependendo da sua constante
+            $statsStmt->bindValue(':status_approved', $approvedStatus);
+
 
             $statsStmt->execute();
             $statistics = $statsStmt->fetch(PDO::FETCH_ASSOC);
@@ -467,7 +474,8 @@ class ClientController {
     
     /**
      * Obtém lista de lojas parceiras para o cliente
-     * * @param int $userId ID do cliente
+     * 
+     * @param int $userId ID do cliente
      * @param array $filters Filtros para as lojas
      * @param int $page Página atual
      * @return array Lista de lojas parceiras
@@ -664,7 +672,8 @@ class ClientController {
     
     /**
      * Obtém detalhes do perfil do cliente
-     * * @param int $userId ID do cliente
+     * 
+     * @param int $userId ID do cliente
      * @return array Dados do perfil
      */
     public static function getProfileData($userId) {
@@ -808,7 +817,8 @@ class ClientController {
     
     /**
      * Atualiza os dados do perfil do cliente
-     * * @param int $userId ID do cliente
+     * 
+     * @param int $userId ID do cliente
      * @param array $data Dados a serem atualizados
      * @return array Resultado da operação
      */
@@ -1296,7 +1306,8 @@ class ClientController {
     
     /**
      * Verifica e cria as tabelas necessárias se não existirem
-     * * @param PDO $db Conexão com o banco de dados
+     * 
+     * @param PDO $db Conexão com o banco de dados
      * @return void
      */
     private static function ensureTablesExist($db) {
@@ -1344,7 +1355,8 @@ class ClientController {
     }
     /**
      * Valida se o cliente existe e está ativo
-     * * @param int $userId ID do cliente
+     * 
+     * @param int $userId ID do cliente
      * @return bool Verdadeiro se o cliente é válido, falso caso contrário
      */
     private static function isProfileIncomplete($userId) {
@@ -1390,7 +1402,8 @@ class ClientController {
     }
     /**
     * Verifica se já existe uma notificação recente sobre completar o perfil
-    * * @param int $userId ID do usuário
+    * 
+    * @param int $userId ID do usuário
     * @param int $dias Número de dias para considerar uma notificação recente
     * @return bool true se existe uma notificação recente
     */
@@ -1425,7 +1438,8 @@ class ClientController {
     }
     /**
      * Registra uma nova transação de cashback
-     * * @param array $data Dados da transação
+     * 
+     * @param array $data Dados da transação
      * @return array Resultado da operação
      */
     public static function registerTransaction($data) {
@@ -1621,7 +1635,8 @@ class ClientController {
     
     /**
      * Obtém detalhes de uma transação específica
-     * * @param int $userId ID do cliente
+     * 
+     * @param int $userId ID do cliente
      * @param int $transactionId ID da transação
      * @return array Dados da transação
      */
@@ -1677,7 +1692,8 @@ class ClientController {
     
     /**
      * Gera relatório de cashback para o cliente
-     * * @param int $userId ID do cliente
+     * 
+     * @param int $userId ID do cliente
      * @param array $filters Filtros para o relatório
      * @return array Dados do relatório
      */
@@ -1811,7 +1827,8 @@ class ClientController {
     }
     /**
     * Obtém o saldo completo do cliente com detalhes por loja
-    * * @param int $userId ID do cliente
+    * 
+    * @param int $userId ID do cliente
     * @return array Resultado da operação
     */
     public static function getClientBalanceDetails($userId) {
@@ -1849,7 +1866,8 @@ class ClientController {
 
     /**
     * Usa saldo do cliente em uma loja específica
-    * * @param int $userId ID do cliente
+    * 
+    * @param int $userId ID do cliente
     * @param int $storeId ID da loja
     * @param float $amount Valor a ser usado
     * @param string $description Descrição do uso
@@ -1905,7 +1923,8 @@ class ClientController {
 
     /**
     * Obtém o histórico de movimentações do saldo de uma loja
-    * * @param int $userId ID do cliente
+    * 
+    * @param int $userId ID do cliente
     * @param int $storeId ID da loja
     * @param int $page Página atual
     * @param int $limit Itens por página
@@ -1943,7 +1962,8 @@ class ClientController {
 
     /**
      * Marca uma loja como favorita
-     * * @param int $userId ID do cliente
+     * 
+     * @param int $userId ID do cliente
      * @param int $storeId ID da loja
      * @param bool $favorite true para favoritar, false para desfavoritar
      * @return array Resultado da operação
@@ -2015,7 +2035,8 @@ class ClientController {
     
     /**
      * Obtém as lojas favoritas do cliente
-     * * @param int $userId ID do cliente
+     * 
+     * @param int $userId ID do cliente
      * @return array Lista de lojas favoritas
      */
     public static function getFavoriteStores($userId) {
@@ -2057,7 +2078,8 @@ class ClientController {
     
     /**
      * Valida se o usuário é um cliente ativo
-     * * @param int $userId ID do usuário
+     * 
+     * @param int $userId ID do usuário
      * @return bool true se for cliente ativo, false caso contrário
      */
     private static function validateClient($userId) {
@@ -2084,7 +2106,8 @@ class ClientController {
     
     /**
      * Obtém notificações para o cliente
-     * * @param int $userId ID do cliente
+     * 
+     * @param int $userId ID do cliente
      * @param int $limit Limite de notificações
      * @return array Lista de notificações
      */
@@ -2121,7 +2144,8 @@ class ClientController {
     }
     /**
     * Obtém o saldo de cashback do cliente por loja
-    * * @param int $userId ID do cliente
+    * 
+    * @param int $userId ID do cliente
     * @return array Saldos por loja e total
     */
     public static function getClientBalance($userId) {
@@ -2238,7 +2262,8 @@ class ClientController {
     }
     /**
     * Envia uma notificação para o cliente
-    * * @param int $userId ID do cliente
+    * 
+    * @param int $userId ID do cliente
     * @param string $titulo Título da notificação
     * @param string $mensagem Mensagem da notificação
     * @param string $tipo Tipo da notificação (info, success, warning, error)
@@ -2597,7 +2622,8 @@ class ClientController {
     }
         /**
          * Cria a tabela de favoritos se não existir
-         * * @param PDO $db Conexão com o banco de dados
+         * 
+         * @param PDO $db Conexão com o banco de dados
          * @return void
          */
         private static function createFavoritesTableIfNotExists($db) {
@@ -2627,7 +2653,8 @@ class ClientController {
     
     /**
      * Cria a tabela de notificações se não existir
-     * * @param PDO $db Conexão com o banco de dados
+     * 
+     * @param PDO $db Conexão com o banco de dados
      * @return void
      */
     private static function createNotificationsTableIfNotExists($db) {
