@@ -129,7 +129,7 @@ $activeMenu = 'register-transaction';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Registrar Venda - Klube Cash</title>
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
-    <link rel="stylesheet" href="../../assets/css/views/stores/register-transaction.css"> {/* Seu CSS base */}
+    <link rel="stylesheet" href="../../assets/css/views/stores/register-transaction.css"> 
     <style>
         /* ESTILOS PARA O WIZARD - Idealmente mover para register-transaction.css */
         .wizard-container {
