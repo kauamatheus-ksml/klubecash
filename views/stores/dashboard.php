@@ -759,11 +759,14 @@ $activeMenu = 'dashboard';
         }
     }
     </style>
+    <link rel="stylesheet" href="../../assets/css/navigation-system.css">
 </head>
 <body>
     <div class="dashboard-container">
         <!-- Incluir o componente sidebar -->
         <?php include_once '../components/navbar.php'; ?>
+    
+        <!-- Sidebar unificada -->
         <?php include_once '../components/sidebar-unified.php'; ?>
         
         <div class="main-content" id="mainContent">
@@ -1056,5 +1059,6 @@ $activeMenu = 'dashboard';
         font-size: 0.9rem;
     }
     </style>
+    <script src="../../assets/js/navigation-system.js"></script>
 </body>
 </html>
