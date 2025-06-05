@@ -52,7 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     error_log("FORM DEBUG: Dados POST recebidos: " . print_r($_POST, true));
     
     // Obter dados do formulário
-    $clientEmail = $_POST['cliente_email'] ?? '';
+    $clientId = intval($_POST['cliente_id_hidden'] ?? 0); // Usar o ID do cliente do campo hidden
     $valorTotal = floatval($_POST['valor_total'] ?? 0);
     $codigoTransacao = $_POST['codigo_transacao'] ?? '';
     $descricao = $_POST['descricao'] ?? '';
@@ -67,6 +67,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     error_log("FORM DEBUG: usarSaldo (bool) = " . ($usarSaldo ? 'true' : 'false'));
     error_log("FORM DEBUG: valorSaldoUsado = " . $valorSaldoUsado);
     
+
+    if ($clientId <= 0) {
+        $error = 'Cliente não selecionado. Por favor, busque e selecione um cliente.';
+    } else {
+        // Buscar usuário pelo ID
+        $userQuery = $db->prepare("SELECT id, nome, email FROM usuarios WHERE id = :id AND tipo = :tipo AND status = :status");
+        $userQuery->bindParam(':id', $clientId, PDO::PARAM_INT);
+        $tipoCliente = USER_TYPE_CLIENT;
+        $userQuery->bindParam(':tipo', $tipoCliente);
+        $status = USER_ACTIVE;
+        $userQuery->bindParam(':status', $status);
+        $userQuery->execute();
+
+        if ($userQuery->rowCount() === 0) {
+            $error = 'Cliente não encontrado ou não está ativo. Verifique o cliente selecionado.';
+        } else {
+            $client = $userQuery->fetch(PDO::FETCH_ASSOC);
+        }
+    }
     // Buscar usuário pelo email
     $userQuery = $db->prepare("SELECT id, nome FROM usuarios WHERE email = :email AND tipo = :tipo AND status = :status");
     $userQuery->bindParam(':email', $clientEmail);
@@ -299,6 +318,7 @@ $activeMenu = 'register-transaction';
                         <!-- Campos ocultos para uso de saldo -->
                         <input type="hidden" id="usar_saldo" name="usar_saldo" value="nao">
                         <input type="hidden" id="valor_saldo_usado_hidden" name="valor_saldo_usado" value="0">
+                        <input type="hidden" id="cliente_id_hidden" name="cliente_id" value=""> {/* NOVO CAMPO */}
                         
                         <!-- resto dos campos existentes... -->
                         <div class="form-row">
@@ -431,7 +451,7 @@ $activeMenu = 'register-transaction';
         document.addEventListener('DOMContentLoaded', function() {
             // Obter referências dos elementos principais
             const valorInput = document.getElementById('valor_total');
-            const emailInput = document.getElementById('cliente_email');
+            const searchInput = document.getElementById('search_term'); // Modificado de emailInput e cliente_email
             const searchBtn = document.getElementById('searchClientBtn');
             const usarSaldoCheck = document.getElementById('usarSaldoCheck');
             const valorSaldoUsado = document.getElementById('valorSaldoUsado');
@@ -442,7 +462,7 @@ $activeMenu = 'register-transaction';
             valorInput.addEventListener('blur', calcularAutomatico);
             
             // Event listeners para busca de cliente
-            emailInput.addEventListener('keypress', function(e) {
+            searchInput.addEventListener('keypress', function(e) { // Modificado de emailInput
                 if (e.key === 'Enter') {
                     e.preventDefault();
                     buscarCliente();
@@ -494,20 +514,21 @@ $activeMenu = 'register-transaction';
          * Exibe informações do cliente e habilita funcionalidades de saldo
          */
         async function buscarCliente() {
-            const email = document.getElementById('cliente_email').value.trim();
+            const searchTerm = document.getElementById('search_term').value.trim(); // Modificado de cliente_email para search_term
             const searchBtn = document.getElementById('searchClientBtn');
             const clientInfoCard = document.getElementById('clientInfoCard');
-            
-            // Validar se email foi informado
-            if (!email) {
-                alert('Por favor, digite um email válido');
+
+            // Validar se termo de busca foi informado
+            if (!searchTerm) { // Modificado de !email
+                alert('Por favor, digite um email ou CPF válido');
                 return;
             }
-            
+
             // Ativar estado de loading no botão
             searchBtn.disabled = true;
             searchBtn.querySelector('.btn-text').textContent = 'Buscando...';
             searchBtn.querySelector('.loading-spinner').style.display = 'inline-block';
+
             
             try {
                 // Fazer requisição para API de busca de cliente
@@ -518,7 +539,7 @@ $activeMenu = 'register-transaction';
                     },
                     body: JSON.stringify({
                         action: 'search_client',
-                        email: email,
+                        search_term: searchTerm, // Modificado de email: email para search_term: searchTerm
                         store_id: storeId
                     })
                 });
@@ -582,6 +603,8 @@ $activeMenu = 'register-transaction';
             `;
             
             clientInfoDetails.innerHTML = detailsHTML;
+            document.getElementById('cliente_id_hidden').value = client.id; // ADICIONAR ESTA LINHA
+
         }
 
         /**
@@ -611,6 +634,7 @@ $activeMenu = 'register-transaction';
             // Limpar dados do cliente
             clientData = null;
             clientBalance = 0;
+            document.getElementById('cliente_id_hidden').value = ''; // ADICIONAR ESTA LINHA (limpar ID)
         }
 
         // ========================================
