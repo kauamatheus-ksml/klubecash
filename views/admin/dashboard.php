@@ -13,12 +13,11 @@ session_start();
 
 // Verificar se o usuário está logado e é administrador
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION['user_type'] !== 'admin') {
-    // Redirecionar para a página de login com mensagem de erro
     header("Location: " . LOGIN_URL . "?error=acesso_restrito");
     exit;
 }
 
-// Obter dados do usuário logado
+// Obter dados do usuário logado e todas as estatísticas (mantendo toda a lógica original)
 try {
     $db = Database::getConnection();
     
@@ -29,7 +28,6 @@ try {
     $userData = $userStmt->fetch(PDO::FETCH_ASSOC);
     
     if (!$userData) {
-        // Se não encontrar usuário ativo e admin, redirecionar
         header("Location: " . LOGIN_URL . "?error=acesso_restrito");
         exit;
     }
@@ -158,6 +156,11 @@ try {
     <link rel="stylesheet" href="../../assets/css/views/admin/dashboard.css">
     <link rel="stylesheet" href="../../assets/css/views/admin/dashboard1.css">
     <link rel="stylesheet" href="../../assets/css/layout-fix.css">
+    
+    <!-- Fonte moderna para melhor legibilidade -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
     <?php include_once '../components/sidebar.php'; ?>
@@ -165,9 +168,26 @@ try {
     <!-- Conteúdo Principal -->
     <div class="main-content" id="mainContent">
         <div class="dashboard-wrapper">
-            <!-- Cabeçalho -->
+            <!-- Cabeçalho Responsivo -->
             <div class="dashboard-header">
-                <h1>Bem Vindo, <?php echo htmlspecialchars($adminName); ?>!</h1>
+                <div class="header-content">
+                    <div class="welcome-section">
+                        <h1 class="main-title">Bem-vindo, <?php echo htmlspecialchars($adminName); ?>!</h1>
+                        <p class="subtitle">Painel de controle administrativo</p>
+                    </div>
+                    <div class="header-actions">
+                        <div class="quick-stats">
+                            <div class="quick-stat-item">
+                                <span class="stat-number"><?php echo number_format($totalUsers); ?></span>
+                                <span class="stat-label">Usuários</span>
+                            </div>
+                            <div class="quick-stat-item">
+                                <span class="stat-number"><?php echo number_format($totalStores); ?></span>
+                                <span class="stat-label">Lojas</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
             
             <?php if (isset($error)): ?>
@@ -176,250 +196,373 @@ try {
                 </div>
             <?php else: ?>
             
-            <!-- Cards de estatísticas principais -->
-            <div class="stats-container">
-                <div class="stat-card">
-                    <div class="stat-card-title">Usuários Registrados</div>
-                    <div class="stat-card-value"><?php echo number_format($totalUsers); ?></div>
+            <!-- Cards de estatísticas principais - Layout Responsivo Melhorado -->
+            <div class="stats-grid">
+                <div class="stat-card primary-card">
+                    <div class="stat-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="12" cy="7" r="4"></circle>
+                        </svg>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value"><?php echo number_format($totalUsers); ?></div>
+                        <div class="stat-title">Usuários Registrados</div>
+                        <div class="stat-subtitle">Clientes ativos na plataforma</div>
+                    </div>
                 </div>
                 
-                <div class="stat-card">
-                    <div class="stat-card-title">Lojas Parceiras</div>
-                    <div class="stat-card-value"><?php echo number_format($totalStores); ?></div>
+                <div class="stat-card success-card">
+                    <div class="stat-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 3h18l-2 13H5L3 3z"></path>
+                            <path d="M16 16a4 4 0 0 1-8 0"></path>
+                        </svg>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value"><?php echo number_format($totalStores); ?></div>
+                        <div class="stat-title">Lojas Parceiras</div>
+                        <div class="stat-subtitle">Estabelecimentos aprovados</div>
+                    </div>
                 </div>
                 
-                <div class="stat-card">
-                    <div class="stat-card-title">Total de Cashback</div>
-                    <div class="stat-card-value">R$ <?php echo number_format($totalCashback, 2, ',', '.'); ?></div>
-                    <div class="stat-card-subtitle">Total creditado aos clientes</div>
+                <div class="stat-card info-card">
+                    <div class="stat-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="12" y1="1" x2="12" y2="23"></line>
+                            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                        </svg>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value">R$ <?php echo number_format($totalCashback, 2, ',', '.'); ?></div>
+                        <div class="stat-title">Total de Cashback</div>
+                        <div class="stat-subtitle">Creditado aos clientes</div>
+                    </div>
                 </div>
                 
-                <div class="stat-card">
-                    <div class="stat-card-title">Saldo Disponível</div>
-                    <div class="stat-card-value">R$ <?php echo number_format($totalSaldoDisponivel, 2, ',', '.'); ?></div>
-                    <div class="stat-card-subtitle">Saldo acumulado pelos clientes</div>
+                <div class="stat-card warning-card">
+                    <div class="stat-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+                            <line x1="1" y1="10" x2="23" y2="10"></line>
+                        </svg>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value">R$ <?php echo number_format($totalSaldoDisponivel, 2, ',', '.'); ?></div>
+                        <div class="stat-title">Saldo Disponível</div>
+                        <div class="stat-subtitle">Acumulado pelos clientes</div>
+                    </div>
                 </div>
             </div>
             
-            <!-- Cards de estatísticas de saldo -->
-            <div class="stats-container">
-                <div class="stat-card balance-stats">
-                    <div class="stat-card-title">
+            <!-- Cards de estatísticas de saldo - Seção especial -->
+            <div class="balance-section">
+                <div class="section-header">
+                    <h2 class="section-title">
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <circle cx="12" cy="12" r="10"></circle>
                             <path d="M12 6v6l4 2"></path>
                         </svg>
-                        Saldo Usado
-                    </div>
-                    <div class="stat-card-value">R$ <?php echo number_format($totalSaldoUsado, 2, ',', '.'); ?></div>
-                    <div class="stat-card-subtitle">Total usado pelos clientes</div>
+                        Análise de Saldo
+                    </h2>
+                    <p class="section-subtitle">Estatísticas detalhadas do uso de saldo pelos clientes</p>
                 </div>
                 
-                <div class="stat-card balance-stats">
-                    <div class="stat-card-title">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                            <polyline points="9 22 9 12 15 12 15 22"></polyline>
-                        </svg>
-                        Transações c/ Saldo
-                    </div>
-                    <div class="stat-card-value"><?php echo number_format($estatisticasSaldo['transacoes_com_saldo']); ?></div>
-                    <div class="stat-card-subtitle"><?php echo number_format($percentualComSaldo, 1); ?>% do total</div>
-                </div>
-                
-                <div class="stat-card balance-stats">
-                    <div class="stat-card-title">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
-                            <line x1="1" y1="10" x2="23" y2="10"></line>
-                        </svg>
-                        Taxa de Uso
-                    </div>
-                    <div class="stat-card-value"><?php echo number_format($percentualComSaldo, 1); ?>%</div>
-                    <div class="stat-card-subtitle">Clientes usando saldo</div>
-                </div>
-                
-                <div class="stat-card balance-stats">
-                    <div class="stat-card-title">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <line x1="12" y1="1" x2="12" y2="23"></line>
-                            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-                        </svg>
-                        Economia Clientes
-                    </div>
-                    <div class="stat-card-value">R$ <?php echo number_format($totalSaldoUsado, 2, ',', '.'); ?></div>
-                    <div class="stat-card-subtitle">Total economizado</div>
-                </div>
-            </div>
-            
-            <!-- Seção de impacto financeiro -->
-            <div class="two-column-layout">
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-title">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <line x1="12" y1="1" x2="12" y2="23"></line>
-                                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-                            </svg>
-                            Impacto Financeiro do Saldo
-                        </div>
-                    </div>
-                    <div class="financial-impact">
-                        <div class="impact-item">
-                            <span class="impact-label">Valor original das vendas:</span>
-                            <span class="impact-value">R$ <?php echo number_format($impactoFinanceiro['valor_vendas_originais'] ?? 0, 2, ',', '.'); ?></span>
-                        </div>
-                        <div class="impact-item">
-                            <span class="impact-label">Desconto via saldo:</span>
-                            <span class="impact-value balance-discount">- R$ <?php echo number_format($totalSaldoUsado, 2, ',', '.'); ?></span>
-                        </div>
-                        <div class="impact-item">
-                            <span class="impact-label">Valor líquido das vendas:</span>
-                            <span class="impact-value">R$ <?php echo number_format($impactoFinanceiro['valor_vendas_liquidas'] ?? 0, 2, ',', '.'); ?></span>
-                        </div>
-                        <div class="impact-item total">
-                            <span class="impact-label">Comissões recebidas:</span>
-                            <span class="impact-value">R$ <?php echo number_format($impactoFinanceiro['comissoes_recebidas'] ?? 0, 2, ',', '.'); ?></span>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-title">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                                <circle cx="8.5" cy="7" r="4"></circle>
-                                <line x1="20" y1="8" x2="20" y2="14"></line>
-                                <line x1="23" y1="11" x2="17" y2="11"></line>
-                            </svg>
-                            Top Clientes - Uso de Saldo
+                <div class="balance-stats-grid">
+                    <div class="balance-stat-card">
+                        <div class="balance-stat-icon used">💰</div>
+                        <div class="balance-stat-content">
+                            <div class="balance-stat-value">R$ <?php echo number_format($totalSaldoUsado, 2, ',', '.'); ?></div>
+                            <div class="balance-stat-title">Saldo Usado</div>
+                            <div class="balance-stat-subtitle">Total utilizado pelos clientes</div>
                         </div>
                     </div>
                     
-                    <?php if (!empty($topClientesSaldo)): ?>
-                        <div class="top-clients-list">
-                            <?php foreach ($topClientesSaldo as $index => $cliente): ?>
-                                <div class="client-item">
-                                    <div class="client-rank">#<?php echo $index + 1; ?></div>
-                                    <div class="client-info">
-                                        <div class="client-name"><?php echo htmlspecialchars($cliente['nome']); ?></div>
-                                        <div class="client-details">
-                                            R$ <?php echo number_format($cliente['total_saldo_usado'], 2, ',', '.'); ?> 
-                                            (<?php echo $cliente['vezes_usado']; ?> uso<?php echo $cliente['vezes_usado'] > 1 ? 's' : ''; ?>)
-                                        </div>
-                                    </div>
-                                </div>
-                            <?php endforeach; ?>
+                    <div class="balance-stat-card">
+                        <div class="balance-stat-icon transactions">🏪</div>
+                        <div class="balance-stat-content">
+                            <div class="balance-stat-value"><?php echo number_format($estatisticasSaldo['transacoes_com_saldo']); ?></div>
+                            <div class="balance-stat-title">Transações c/ Saldo</div>
+                            <div class="balance-stat-subtitle"><?php echo number_format($percentualComSaldo, 1); ?>% do total</div>
                         </div>
-                    <?php else: ?>
-                        <div class="empty-state-small">
-                            <p>Nenhum cliente usou saldo ainda.</p>
+                    </div>
+                    
+                    <div class="balance-stat-card">
+                        <div class="balance-stat-icon rate">📊</div>
+                        <div class="balance-stat-content">
+                            <div class="balance-stat-value"><?php echo number_format($percentualComSaldo, 1); ?>%</div>
+                            <div class="balance-stat-title">Taxa de Uso</div>
+                            <div class="balance-stat-subtitle">Clientes usando saldo</div>
                         </div>
-                    <?php endif; ?>
+                    </div>
+                    
+                    <div class="balance-stat-card">
+                        <div class="balance-stat-icon savings">💸</div>
+                        <div class="balance-stat-content">
+                            <div class="balance-stat-value">R$ <?php echo number_format($totalSaldoUsado, 2, ',', '.'); ?></div>
+                            <div class="balance-stat-title">Economia Clientes</div>
+                            <div class="balance-stat-subtitle">Total economizado</div>
+                        </div>
+                    </div>
                 </div>
             </div>
             
-            <!-- Layout de duas colunas -->
-            <div class="two-column-layout">
-                <!-- Aprovar Lojas -->
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-title">Aprovar Lojas</div>
+            <!-- Layout de duas colunas responsivo -->
+            <div class="dashboard-grid">
+                <!-- Coluna Esquerda -->
+                <div class="dashboard-column">
+                    <!-- Impacto Financeiro -->
+                    <div class="dashboard-card">
+                        <div class="card-header">
+                            <div class="card-title">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <line x1="12" y1="1" x2="12" y2="23"></line>
+                                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                                </svg>
+                                Impacto Financeiro do Saldo
+                            </div>
+                        </div>
+                        <div class="financial-impact">
+                            <div class="impact-item">
+                                <span class="impact-label">Valor original das vendas</span>
+                                <span class="impact-value">R$ <?php echo number_format($impactoFinanceiro['valor_vendas_originais'] ?? 0, 2, ',', '.'); ?></span>
+                            </div>
+                            <div class="impact-item">
+                                <span class="impact-label">Desconto via saldo</span>
+                                <span class="impact-value balance-discount">- R$ <?php echo number_format($totalSaldoUsado, 2, ',', '.'); ?></span>
+                            </div>
+                            <div class="impact-item">
+                                <span class="impact-label">Valor líquido das vendas</span>
+                                <span class="impact-value">R$ <?php echo number_format($impactoFinanceiro['valor_vendas_liquidas'] ?? 0, 2, ',', '.'); ?></span>
+                            </div>
+                            <div class="impact-item total">
+                                <span class="impact-label">Comissões recebidas</span>
+                                <span class="impact-value">R$ <?php echo number_format($impactoFinanceiro['comissoes_recebidas'] ?? 0, 2, ',', '.'); ?></span>
+                            </div>
+                        </div>
                     </div>
                     
-                    <div class="table-responsive">
-                        <table class="table">
-                            <thead> 
-                                <tr>
-                                    <th>Nome da Loja</th>
-                                    <th>Tipo</th>
-                                    <th></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php if (empty($pendingStores)): ?>
+                    <!-- Aprovar Lojas -->
+                    <div class="dashboard-card">
+                        <div class="card-header">
+                            <div class="card-title">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M9 12l2 2 4-4"></path>
+                                    <path d="M21 12c-1 0-3-1-3-3s2-3 3-3 3 1 3 3-2 3-3 3"></path>
+                                    <path d="M3 12c1 0 3-1 3-3s-2-3-3-3-3 1-3 3 2 3 3 3"></path>
+                                </svg>
+                                Aprovar Lojas
+                            </div>
+                        </div>
+                        
+                        <div class="responsive-table-container">
+                            <table class="responsive-table">
+                                <thead>
                                     <tr>
-                                        <td colspan="3" style="text-align: center;">Nenhuma loja pendente de aprovação</td>
+                                        <th>Nome da Loja</th>
+                                        <th class="desktop-only">Tipo</th>
+                                        <th>Ação</th>
                                     </tr>
-                                <?php else: ?>
-                                    <?php foreach ($pendingStores as $store): ?>
+                                </thead>
+                                <tbody>
+                                    <?php if (empty($pendingStores)): ?>
                                         <tr>
-                                            <td><?php echo htmlspecialchars($store['nome_fantasia']); ?></td>
-                                            <td>Varejo</td>
-                                            <td>
-                                                <button class="btn btn-primary" onclick="approveStore(<?php echo $store['id']; ?>)">Aprovar</button>
+                                            <td colspan="3" class="empty-state">
+                                                <div class="empty-content">
+                                                    <span class="empty-icon">✅</span>
+                                                    <span>Nenhuma loja pendente</span>
+                                                </div>
                                             </td>
                                         </tr>
-                                    <?php endforeach; ?>
-                                <?php endif; ?>
-                            </tbody>
-                        </table>
+                                    <?php else: ?>
+                                        <?php foreach ($pendingStores as $store): ?>
+                                            <tr>
+                                                <td>
+                                                    <div class="store-info">
+                                                        <div class="store-name"><?php echo htmlspecialchars($store['nome_fantasia']); ?></div>
+                                                        <div class="store-details mobile-only">Varejo</div>
+                                                    </div>
+                                                </td>
+                                                <td class="desktop-only">Varejo</td>
+                                                <td>
+                                                    <button class="btn btn-primary btn-sm" onclick="approveStore(<?php echo $store['id']; ?>)">
+                                                        Aprovar
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
                 
-                <!-- Notificações -->
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-title">Notificações</div>
+                <!-- Coluna Direita -->
+                <div class="dashboard-column">
+                    <!-- Top Clientes -->
+                    <div class="dashboard-card">
+                        <div class="card-header">
+                            <div class="card-title">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                    <circle cx="8.5" cy="7" r="4"></circle>
+                                    <line x1="20" y1="8" x2="20" y2="14"></line>
+                                    <line x1="23" y1="11" x2="17" y2="11"></line>
+                                </svg>
+                                Top Clientes - Uso de Saldo
+                            </div>
+                        </div>
+                        
+                        <?php if (!empty($topClientesSaldo)): ?>
+                            <div class="top-clients-list">
+                                <?php foreach ($topClientesSaldo as $index => $cliente): ?>
+                                    <div class="client-item">
+                                        <div class="client-rank">#<?php echo $index + 1; ?></div>
+                                        <div class="client-info">
+                                            <div class="client-name"><?php echo htmlspecialchars($cliente['nome']); ?></div>
+                                            <div class="client-details">
+                                                R$ <?php echo number_format($cliente['total_saldo_usado'], 2, ',', '.'); ?> 
+                                                (<?php echo $cliente['vezes_usado']; ?> uso<?php echo $cliente['vezes_usado'] > 1 ? 's' : ''; ?>)
+                                            </div>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php else: ?>
+                            <div class="empty-state-small">
+                                <span class="empty-icon">👥</span>
+                                <p>Nenhum cliente usou saldo ainda.</p>
+                            </div>
+                        <?php endif; ?>
                     </div>
                     
-                    <div class="notifications-container">
-                        <div class="notification-empty">
-                            Nenhuma notificação
+                    <!-- Notificações -->
+                    <div class="dashboard-card">
+                        <div class="card-header">
+                            <div class="card-title">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                                    <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                                </svg>
+                                Notificações
+                            </div>
+                        </div>
+                        
+                        <div class="notifications-container">
+                            <div class="empty-state-small">
+                                <span class="empty-icon">🔔</span>
+                                <p>Nenhuma notificação</p>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
             
-            <!-- Últimas Transações -->
-            <div class="card transactions-container">
+            <!-- Últimas Transações - Tabela Responsiva Completa -->
+            <div class="dashboard-card transactions-card">
                 <div class="card-header">
-                    <div class="card-title">Ultimas Transações</div>
+                    <div class="card-title">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="9" cy="21" r="1"></circle>
+                            <circle cx="20" cy="21" r="1"></circle>
+                            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+                        </svg>
+                        Últimas Transações
+                    </div>
                 </div>
                 
-                <div class="table-responsive">
-                    <table class="table">
+                <div class="responsive-table-container">
+                    <table class="responsive-table transactions-table">
                         <thead>
                             <tr>
                                 <th>Código</th>
                                 <th>Cliente</th>
-                                <th>Loja</th>
-                                <th>Valor Original</th>
-                                <th>Saldo Usado</th>
-                                <th>Cashback</th>
-                                <th>Data</th>
-                                <th>Detalhes</th>
+                                <th class="desktop-only">Loja</th>
+                                <th>Valor</th>
+                                <th class="desktop-only">Saldo Usado</th>
+                                <th class="desktop-only">Cashback</th>
+                                <th class="mobile-only">Data</th>
+                                <th class="desktop-only">Data</th>
+                                <th>Ações</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php if (empty($recentTransactions)): ?>
                                 <tr>
-                                    <td colspan="8" style="text-align: center;">Nenhuma transação encontrada</td>
+                                    <td colspan="9" class="empty-state">
+                                        <div class="empty-content">
+                                            <span class="empty-icon">📝</span>
+                                            <span>Nenhuma transação encontrada</span>
+                                        </div>
+                                    </td>
                                 </tr>
                             <?php else: ?>
                                 <?php foreach ($recentTransactions as $transaction): ?>
                                     <tr>
-                                        <td><?php echo htmlspecialchars($transaction['codigo_transacao'] ?? 'N/A'); ?></td>
-                                        <td><?php echo htmlspecialchars($transaction['usuario']); ?></td>
                                         <td>
-                                            <?php echo htmlspecialchars($transaction['loja']); ?>
-                                            <?php if ($transaction['saldo_usado'] > 0): ?>
-                                                <span class="balance-indicator" title="Cliente usou saldo">💰</span>
-                                            <?php endif; ?>
+                                            <div class="transaction-code">
+                                                <?php echo htmlspecialchars($transaction['codigo_transacao'] ?? 'N/A'); ?>
+                                                <?php if ($transaction['saldo_usado'] > 0): ?>
+                                                    <span class="balance-indicator" title="Cliente usou saldo">💰</span>
+                                                <?php endif; ?>
+                                            </div>
                                         </td>
-                                        <td>R$ <?php echo number_format($transaction['valor_total'], 2, ',', '.'); ?></td>
                                         <td>
+                                            <div class="client-info">
+                                                <div class="client-name"><?php echo htmlspecialchars($transaction['usuario']); ?></div>
+                                                <div class="mobile-only transaction-details">
+                                                    <div class="mobile-detail">
+                                                        <strong>Loja:</strong> <?php echo htmlspecialchars($transaction['loja']); ?>
+                                                    </div>
+                                                    <?php if ($transaction['saldo_usado'] > 0): ?>
+                                                        <div class="mobile-detail">
+                                                            <strong>Saldo:</strong> R$ <?php echo number_format($transaction['saldo_usado'], 2, ',', '.'); ?>
+                                                        </div>
+                                                    <?php endif; ?>
+                                                    <div class="mobile-detail">
+                                                        <strong>Cashback:</strong> R$ <?php echo number_format($transaction['valor_cashback'], 2, ',', '.'); ?>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="desktop-only">
+                                            <div class="store-info">
+                                                <?php echo htmlspecialchars($transaction['loja']); ?>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="value-display">
+                                                R$ <?php echo number_format($transaction['valor_total'], 2, ',', '.'); ?>
+                                            </div>
+                                        </td>
+                                        <td class="desktop-only">
                                             <?php if ($transaction['saldo_usado'] > 0): ?>
                                                 <span class="saldo-usado">R$ <?php echo number_format($transaction['saldo_usado'], 2, ',', '.'); ?></span>
                                             <?php else: ?>
                                                 <span class="sem-saldo">-</span>
                                             <?php endif; ?>
                                         </td>
-                                        <td>R$ <?php echo number_format($transaction['valor_cashback'], 2, ',', '.'); ?></td>
-                                        <td><?php echo date('d/m/Y H:i', strtotime($transaction['data_transacao'])); ?></td>
+                                        <td class="desktop-only">
+                                            <div class="cashback-value">
+                                                R$ <?php echo number_format($transaction['valor_cashback'], 2, ',', '.'); ?>
+                                            </div>
+                                        </td>
+                                        <td class="mobile-only">
+                                            <div class="date-compact">
+                                                <?php echo date('d/m', strtotime($transaction['data_transacao'])); ?>
+                                            </div>
+                                        </td>
+                                        <td class="desktop-only">
+                                            <div class="date-full">
+                                                <?php echo date('d/m/Y H:i', strtotime($transaction['data_transacao'])); ?>
+                                            </div>
+                                        </td>
                                         <td>
-                                            <button class="btn btn-primary" onclick="viewTransaction(<?php echo $transaction['id']; ?>)">Detalhar</button>
+                                            <button class="btn btn-secondary btn-sm" onclick="viewTransaction(<?php echo $transaction['id']; ?>)">
+                                                <span class="desktop-only">Detalhar</span>
+                                                <span class="mobile-only">Ver</span>
+                                            </button>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
@@ -434,10 +577,9 @@ try {
     </div>
     
     <script>
-        // Função para aprovar uma loja
+        // Mantendo toda a funcionalidade JavaScript original
         function approveStore(storeId) {
             if (confirm('Tem certeza que deseja aprovar esta loja?')) {
-                // Criar requisição AJAX para aprovar a loja
                 const xhr = new XMLHttpRequest();
                 xhr.open('POST', '<?php echo SITE_URL; ?>/controllers/StoreController.php', true);
                 xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
@@ -453,27 +595,66 @@ try {
             }
         }
         
-        // Função para visualizar detalhes de uma transação
         function viewTransaction(transactionId) {
             window.location.href = '<?php echo SITE_URL; ?>/admin/transacao/' + transactionId;
         }
         
-        // Animar números nos cards de estatísticas
+        // Animações e melhorias de UX
         document.addEventListener('DOMContentLoaded', function() {
-            const statValues = document.querySelectorAll('.stat-card-value');
-            statValues.forEach(element => {
-                const value = element.textContent;
-                if (value.includes('R$') || value.includes('%') || !isNaN(value.replace(/[^\d]/g, ''))) {
-                    element.style.opacity = '0';
-                    setTimeout(() => {
-                        element.style.transition = 'opacity 0.5s ease';
-                        element.style.opacity = '1';
-                    }, Math.random() * 500);
+            // Animar números nos cards
+            animateNumbers();
+            
+            // Adicionar interatividade aos cards
+            addCardInteractions();
+            
+            // Melhorar responsividade da tabela
+            handleTableResponsiveness();
+        });
+        
+        function animateNumbers() {
+            const statValues = document.querySelectorAll('.stat-value, .balance-stat-value');
+            statValues.forEach((element, index) => {
+                element.style.opacity = '0';
+                element.style.transform = 'translateY(20px)';
+                
+                setTimeout(() => {
+                    element.style.transition = 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)';
+                    element.style.opacity = '1';
+                    element.style.transform = 'translateY(0)';
+                }, index * 100);
+            });
+        }
+        
+        function addCardInteractions() {
+            const cards = document.querySelectorAll('.stat-card, .balance-stat-card, .dashboard-card');
+            cards.forEach(card => {
+                card.addEventListener('mouseenter', function() {
+                    this.style.transform = 'translateY(-2px)';
+                });
+                
+                card.addEventListener('mouseleave', function() {
+                    this.style.transform = 'translateY(0)';
+                });
+            });
+        }
+        
+        function handleTableResponsiveness() {
+            const tables = document.querySelectorAll('.responsive-table');
+            tables.forEach(table => {
+                // Adicionar indicador de scroll horizontal em mobile
+                const container = table.parentElement;
+                if (container.scrollWidth > container.clientWidth) {
+                    container.classList.add('has-scroll');
                 }
             });
+        }
+        
+        // Função para detectar mudanças de orientação em mobile
+        window.addEventListener('orientationchange', function() {
+            setTimeout(() => {
+                handleTableResponsiveness();
+            }, 100);
         });
     </script>
-    
-    
 </body>
 </html>
