@@ -188,8 +188,8 @@ $activeMenu = 'register-transaction';
                             <div class="form-group">
                                 <label for="search_term">Buscar Cliente (Email ou CPF)*</label>
                                 <div class="client-search-container">
-                                    <div class="email-input-group"> {/* Mantenha a classe se os estilos dependerem dela, ou renomeie para search-input-group */}
-                                        <div class="email-input-wrapper"> {/* Mantenha a classe se os estilos dependerem dela, ou renomeie para search-input-wrapper */}
+                                    <div class="email-input-group"> 
+                                        <div class="email-input-wrapper"> 
                                             <input type="text" id="search_term" name="search_term"
                                                 placeholder="Digite o Email ou CPF do cliente" required
                                                 value="<?php echo isset($_POST['search_term']) ? htmlspecialchars($_POST['search_term']) : (isset($transactionData['cliente_email']) ? htmlspecialchars($transactionData['cliente_email']) : ''); ?>">
