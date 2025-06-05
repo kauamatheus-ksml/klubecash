@@ -1,6 +1,5 @@
 <?php
-// views/stores/dashboard.php
-// Incluir arquivos de configuração
+// views/stores/dashboard.php - VERSÃO RENOVADA E RESPONSIVA
 require_once '../../config/constants.php';
 require_once '../../config/database.php';
 require_once '../../controllers/AuthController.php';
@@ -41,7 +40,9 @@ if ($storeQuery->rowCount() == 0) {
 $store = $storeQuery->fetch(PDO::FETCH_ASSOC);
 $storeId = $store['id'];
 
-// Obter estatísticas da loja
+// === MANTER TODA A LÓGICA EXISTENTE DE CONSULTAS ===
+// [Todo o código PHP de consultas permanece exatamente igual]
+
 // 1. Total de vendas registradas
 $salesQuery = $db->prepare("
     SELECT COUNT(*) as total_vendas, 
@@ -140,784 +141,1033 @@ $activeMenu = 'dashboard';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard da Loja - Klube Cash</title>
+    <title>Dashboard - <?php echo htmlspecialchars($store['nome_fantasia']); ?> | Klube Cash</title>
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
+    
+    <!-- Fonts otimizadas -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- CSS Modernizado -->
     <style>
-    /* Variáveis e configurações globais */
-    :root {
-        --primary-color: #FF7A00;
-        --primary-dark: #E06E00;
-        --primary-light: #FFF0E6;
-        --secondary-color: #2A3F54;
-        --success-color: #28A745;
-        --warning-color: #FFC107; 
-        --danger-color: #DC3545;
-        --info-color: #17A2B8;
-        --light-gray: #F8F9FA;
-        --medium-gray: #6C757D;
-        --dark-gray: #343A40;
-        --white: #FFFFFF;
-        --shadow-sm: 0 2px 8px rgba(0,0,0,0.04);
-        --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
-        --shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
-        --border-radius: 12px;
-        --transition: all 0.3s ease;
-    }
-    
-    body {
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        background-color: #F5F7FA;
-        color: var(--dark-gray);
-        line-height: 1.5;
-        margin: 0;
-        padding: 0;
-    }
-    
-    /* Layout do dashboard */
-    .dashboard-container {
-        display: flex;
-        min-height: 100vh;
-    }
-    
-    .main-content {
-        flex: 1;
-        padding: 1.5rem;
-        margin-left: 250px; /* Largura da sidebar */
-        transition: margin-left 0.3s ease;
-    }
-    
-    /* Cabeçalho */
-    .dashboard-header {
-        margin-bottom: 1.5rem;
-        padding-bottom: 1rem;
-        border-bottom: 1px solid rgba(0,0,0,0.05);
-    }
-    
-    .dashboard-title {
-        font-size: 1.75rem;
-        font-weight: 700;
-        color: var(--secondary-color);
-        margin-bottom: 0.5rem;
-    }
-    
-    .welcome-user {
-        color: var(--medium-gray);
-        font-size: 1rem;
-    }
-    
-    /* Cards estatísticos */
-    .summary-cards {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-        gap: 1.5rem;
-        margin-bottom: 2rem;
-    }
-    
-    .card {
-        background-color: var(--white);
-        border-radius: var(--border-radius);
-        padding: 1.5rem;
-        box-shadow: var(--shadow-md);
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        transition: var(--transition);
-        border: none;
-        overflow: hidden;
-        position: relative;
-    }
-    
-    .card:hover {
-        transform: translateY(-5px);
-        box-shadow: var(--shadow-lg);
-    }
-    
-    .card::before {
-        content: '';
-        position: absolute;
-        left: 0;
-        top: 0;
-        height: 100%;
-        width: 4px;
-        background-color: var(--primary-color);
-        opacity: 0;
-        transition: var(--transition);
-    }
-    
-    .card:hover::before {
-        opacity: 1;
-    }
-    
-    .card-content {
-        flex: 1;
-    }
-    
-    .card-content h3 {
-        font-size: 0.85rem;
-        color: var(--medium-gray);
-        margin-bottom: 0.75rem;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-    
-    .card-value {
-        font-size: 1.75rem;
-        font-weight: 700;
-        color: var(--secondary-color);
-        margin-bottom: 0.5rem;
-        line-height: 1.2;
-    }
-    
-    .card-period {
-        font-size: 0.85rem;
-        color: var(--medium-gray);
-    }
-    
-    .info-card {
-        background-color: #f8f9fa;
-        border-radius: 10px;
-        padding: 20px;
-        margin-bottom: 25px;
-        border: 1px solid #e9ecef;
-    }
-    
-    .info-card h3 {
-        margin-bottom: 15px;
-        color: #333;
-        font-size: 18px;
-    }
-    
-    .info-number {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 30px;
-        height: 30px;
-        border-radius: 50%;
-        background-color: #FF7A00;
-        color: white;
-        font-weight: bold;
-    }
-    
-    .info-content {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-        gap: 20px;
-    }
-    
-    .info-item {
-        display: flex;
-        align-items: flex-start;
-        gap: 15px;
-    }
-    
-    .info-item h4 {
-        margin: 0 0 5px 0;
-        font-size: 16px;
-        color: #444;
-    }
-    
-    .info-item p {
-        margin: 0;
-        color: #666;
-        font-size: 14px;
-    }
-    
-    .card-icon {
-        width: 48px;
-        height: 48px;
-        border-radius: 12px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background-color: var(--primary-light);
-        color: var(--primary-color);
-        transition: var(--transition);
-    }
-    
-    .card:hover .card-icon {
-        transform: scale(1.1);
-    }
-    
-    .card-icon.success {
-        background-color: rgba(40, 167, 69, 0.1);
-        color: var(--success-color);
-    }
-    
-    .card-icon.warning {
-        background-color: rgba(255, 193, 7, 0.1);
-        color: var(--warning-color);
-    }
-    
-    .card-icon.info {
-        background-color: rgba(23, 162, 184, 0.1);
-        color: var(--info-color);
-    }
-    
-    /* Alerta */
-    .alert {
-        background-color: var(--white);
-        border-radius: var(--border-radius);
-        padding: 1.25rem;
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        box-shadow: var(--shadow-md);
-        margin-bottom: 2rem;
-        border-left: 4px solid;
-    }
-    
-    .alert.warning {
-        border-color: var(--warning-color);
-    }
-    
-    .alert.warning svg {
-        color: var(--warning-color);
-    }
-    
-    .alert h4 {
-        margin: 0 0 0.35rem 0;
-        font-size: 1.1rem;
-        color: var(--dark-gray);
-    }
-    
-    .alert p {
-        margin: 0;
-        color: var(--medium-gray);
-        font-size: 0.9rem;
-    }
-    
-    .btn-warning {
-        background-color: #ffc107;
-        color: #333;
-        font-weight: 600;
-        padding: 8px 15px;
-        border-radius: 5px;
-        text-decoration: none;
-        transition: background-color 0.3s;
-        white-space: nowrap;
-    }
-    
-    .btn-warning:hover {
-        background-color: #e0a800;
-        transform: translateY(-2px);
-    }
-    
-    /* Seções */
-    .quick-actions, .chart-container, .recent-transactions {
-        background-color: var(--white);
-        border-radius: var(--border-radius);
-        padding: 1.5rem;
-        box-shadow: var(--shadow-md);
-        margin-bottom: 2rem;
-    }
-    
-    .quick-actions h2, .chart-container h2, .section-header h2 {
-        font-size: 1.25rem;
-        color: var(--secondary-color);
-        margin-top: 0;
-        margin-bottom: 1.25rem;
-        font-weight: 600;
-        display: flex;
-        align-items: center;
-    }
-    
-    .quick-actions h2::after, .chart-container h2::after, .section-header h2::after {
-        content: '';
-        height: 3px;
-        width: 2rem;
-        background-color: var(--primary-color);
-        margin-left: 0.75rem;
-        border-radius: 3px;
-    }
-    
-    /* Ações rápidas */
-    .actions-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-        gap: 1.25rem;
-    }
-    
-    .action-card {
-        background-color: var(--light-gray);
-        border-radius: var(--border-radius);
-        padding: 1.5rem;
-        text-decoration: none;
-        color: var(--dark-gray);
-        transition: var(--transition);
-        text-align: center;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        position: relative;
-        overflow: hidden;
-    }
-    
-    .action-card::after {
-        content: '';
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        height: 3px;
-        width: 0;
-        background-color: var(--primary-color);
-        transition: var(--transition);
-    }
-    
-    .action-card:hover {
-        transform: translateY(-5px);
-        background-color: var(--white);
-        box-shadow: var(--shadow-md);
-    }
-    
-    .action-card:hover::after {
-        width: 100%;
-    }
-    
-    .action-icon {
-        width: 60px;
-        height: 60px;
-        border-radius: 50%;
-        background-color: var(--primary-light);
-        color: var(--primary-color);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin-bottom: 1rem;
-        transition: var(--transition);
-    }
-    
-    .action-card:hover .action-icon {
-        transform: scale(1.1);
-        background-color: var(--primary-color);
-        color: var(--white);
-    }
-    
-    .action-card h3 {
-        font-size: 1.1rem;
-        margin-bottom: 0.5rem;
-        color: var(--secondary-color);
-    }
-    
-    .action-card p {
-        font-size: 0.9rem;
-        color: var(--medium-gray);
-        margin: 0;
-    }
-    
-    /* Gráfico */
-    .chart-wrapper {
-        height: 300px;
-        position: relative;
-    }
-    
-    /* Tabela */
-    .section-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 1.25rem;
-    }
-    
-    .link-more {
-        color: var(--primary-color);
-        text-decoration: none;
-        font-size: 0.9rem;
-        font-weight: 500;
-        display: flex;
-        align-items: center;
-        transition: var(--transition);
-    }
-    
-    .link-more:hover {
-        color: var(--primary-dark);
-    }
-    
-    .link-more::after {
-        content: '→';
-        margin-left: 0.4rem;
-        transition: var(--transition);
-    }
-    
-    .link-more:hover::after {
-        transform: translateX(3px);
-    }
-    
-    .table-responsive {
-        overflow-x: auto;
-    }
-    
-    .data-table {
-        width: 100%;
-        border-collapse: collapse;
-    }
-    
-    .data-table th {
-        padding: 0.75rem 1rem;
-        text-align: left;
-        font-size: 0.85rem;
-        color: var(--medium-gray);
-        border-bottom: 2px solid var(--light-gray);
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-    
-    .data-table td {
-        padding: 1rem;
-        border-bottom: 1px solid var(--light-gray);
-        font-size: 0.95rem;
-        color: var(--dark-gray);
-        vertical-align: middle;
-    }
-    
-    .data-table tr:last-child td {
-        border-bottom: none;
-    }
-    
-    .data-table tr:hover td {
-        background-color: rgba(245, 247, 250, 0.5);
-    }
-    
-    .status-badge {
-        display: inline-block;
-        padding: 0.25rem 0.75rem;
-        border-radius: 50px;
-        font-size: 0.75rem;
-        font-weight: 600;
-        text-transform: uppercase;
-    }
-    
-    .status-badge.pendente {
-        background-color: rgba(255, 193, 7, 0.1);
-        color: var(--warning-color);
-    }
-    
-    .status-badge.aprovado {
-        background-color: rgba(40, 167, 69, 0.1);
-        color: var(--success-color);
-    }
-    
-    .status-badge.cancelado {
-        background-color: rgba(220, 53, 69, 0.1);
-        color: var(--danger-color);
-    }
-    
-    /* Estado vazio */
-    .empty-state {
-        text-align: center;
-        padding: 3rem 1rem;
-    }
-    
-    .empty-state svg {
-        color: #D1D5DB;
-        margin-bottom: 1rem;
-    }
-    
-    .empty-state h3 {
-        font-size: 1.1rem;
-        margin-bottom: 0.5rem;
-        color: var(--secondary-color);
-    }
-    
-    .empty-state p {
-        color: var(--medium-gray);
-        margin-bottom: 1.5rem;
-        font-size: 0.95rem;
-    }
-    
-    .btn-primary {
-        background-color: var(--primary-color);
-        color: var(--white);
-        font-weight: 600;
-        padding: 0.6rem 1.2rem;
-        border-radius: var(--border-radius);
-        text-decoration: none;
-        display: inline-block;
-        transition: var(--transition);
-        border: none;
-        cursor: pointer;
-    }
-    
-    .btn-primary:hover {
-        background-color: var(--primary-dark);
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(255, 122, 0, 0.25);
-    }
-    
-    /* Responsividade */
-    @media (max-width: 1199.98px) {
-        .actions-grid {
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        /* === RESET E CONFIGURAÇÕES GLOBAIS === */
+        :root {
+            --primary-color: #FF7A00;
+            --primary-dark: #E06E00;
+            --primary-light: #FFF0E6;
+            --primary-gradient: linear-gradient(135deg, #FF7A00 0%, #FF8A1A 100%);
+            
+            --secondary-color: #2A3F54;
+            --success-color: #10B981;
+            --warning-color: #F59E0B; 
+            --danger-color: #EF4444;
+            --info-color: #3B82F6;
+            
+            --gray-50: #F9FAFB;
+            --gray-100: #F3F4F6;
+            --gray-200: #E5E7EB;
+            --gray-300: #D1D5DB;
+            --gray-400: #9CA3AF;
+            --gray-500: #6B7280;
+            --gray-600: #4B5563;
+            --gray-700: #374151;
+            --gray-800: #1F2937;
+            --gray-900: #111827;
+            
+            --white: #FFFFFF;
+            --background: #F8FAFC;
+            
+            /* Sombras modernas */
+            --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            
+            /* Radiuses modernos */
+            --radius-sm: 6px;
+            --radius-md: 8px;
+            --radius-lg: 12px;
+            --radius-xl: 16px;
+            --radius-2xl: 24px;
+            
+            /* Transições suaves */
+            --transition-fast: all 0.15s ease;
+            --transition-normal: all 0.3s ease;
+            --transition-slow: all 0.5s ease;
+            
+            /* Layout */
+            --sidebar-width: 250px;
+            --header-height: 70px;
+            --content-padding: 24px;
         }
-    }
-    
-    @media (max-width: 991.98px) {
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--background);
+            color: var(--gray-900);
+            line-height: 1.6;
+            font-size: 14px;
+            overflow-x: hidden;
+        }
+
+        /* === LAYOUT PRINCIPAL === */
+        .dashboard-layout {
+            display: flex;
+            min-height: 100vh;
+            position: relative;
+        }
+
         .main-content {
-            margin-left: 0; /* Remove a margem quando a sidebar é ocultada */
+            flex: 1;
+            margin-left: var(--sidebar-width);
+            padding: var(--content-padding);
+            transition: margin-left 0.3s ease;
+            max-width: calc(100vw - var(--sidebar-width));
         }
-        
+
+        /* === HEADER MODERNO === */
         .dashboard-header {
-            margin-top: 60px;
+            background: var(--white);
+            border-radius: var(--radius-xl);
+            padding: 24px 28px;
+            margin-bottom: 32px;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--gray-100);
+            position: relative;
+            overflow: hidden;
         }
-        
-        .summary-cards {
-            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+
+        .dashboard-header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: var(--primary-gradient);
+            border-radius: var(--radius-xl) var(--radius-xl) 0 0;
         }
-    }
-    
-    @media (max-width: 767.98px) {
-        .summary-cards {
-            grid-template-columns: 1fr 1fr;
-            gap: 1rem;
-        }
-        
-        .actions-grid {
-            grid-template-columns: 1fr 1fr;
-        }
-        
-        .alert {
-            flex-direction: column;
-            text-align: center;
-            align-items: center;
-        }
-        
-        .alert .btn {
-            margin-left: 0;
-            margin-top: 1rem;
-            width: 100%;
-        }
-        
-        .card-value {
-            font-size: 1.5rem;
-        }
-    }
-    
-    @media (max-width: 575.98px) {
-        .summary-cards {
-            grid-template-columns: 1fr;
-        }
-        
-        .actions-grid {
-            grid-template-columns: 1fr;
-        }
-        
-        .main-content {
-            padding: 1rem;
-        }
-        
-        .dashboard-title {
-            font-size: 1.5rem;
-        }
-        
-        .card {
-            padding: 1.25rem;
-        }
-        
-        /* Melhorar visibilidade da tabela em celulares */
-        .data-table {
-            display: block;
-            width: 100%;
-        }
-        
-        .data-table thead {
-            display: none;
-        }
-        
-        .data-table tbody {
-            display: block;
-            width: 100%;
-        }
-        
-        .data-table tr {
-            display: block;
-            margin-bottom: 1rem;
-            border: 1px solid var(--light-gray);
-            border-radius: var(--border-radius);
-            padding: 0.75rem;
-        }
-        
-        .data-table td {
+
+        .header-content {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-bottom: 1px solid var(--light-gray);
-            padding: 0.75rem 0;
+            flex-wrap: wrap;
+            gap: 16px;
         }
-        
-        .data-table td:last-child {
+
+        .header-text h1 {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--gray-900);
+            margin-bottom: 4px;
+            letter-spacing: -0.025em;
+        }
+
+        .header-text p {
+            color: var(--gray-600);
+            font-size: 16px;
+            margin: 0;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .quick-action-btn {
+            background: var(--primary-gradient);
+            color: var(--white);
+            border: none;
+            padding: 12px 20px;
+            border-radius: var(--radius-lg);
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: var(--transition-fast);
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .quick-action-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .quick-action-btn:active {
+            transform: translateY(0);
+        }
+
+        /* === GRID DE CARDS RESPONSIVO === */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        .stat-card {
+            background: var(--white);
+            border-radius: var(--radius-xl);
+            padding: 24px;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--gray-100);
+            transition: var(--transition-normal);
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-lg);
+            border-color: var(--primary-color);
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--primary-gradient);
+            transform: scaleX(0);
+            transition: var(--transition-normal);
+        }
+
+        .stat-card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 16px;
+        }
+
+        .card-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--gray-600);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin: 0;
+        }
+
+        .card-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: var(--radius-lg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--primary-light);
+            color: var(--primary-color);
+            flex-shrink: 0;
+        }
+
+        .card-icon.success {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success-color);
+        }
+
+        .card-icon.warning {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--warning-color);
+        }
+
+        .card-icon.info {
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--info-color);
+        }
+
+        .card-value {
+            font-size: 32px;
+            font-weight: 800;
+            color: var(--gray-900);
+            margin-bottom: 8px;
+            line-height: 1;
+            letter-spacing: -0.025em;
+        }
+
+        .card-subtitle {
+            font-size: 14px;
+            color: var(--gray-500);
+            margin: 0;
+            font-weight: 500;
+        }
+
+        .card-trend {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            margin-top: 8px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .trend-up {
+            color: var(--success-color);
+        }
+
+        .trend-down {
+            color: var(--danger-color);
+        }
+
+        /* === ALERTA MODERNO === */
+        .alert-modern {
+            background: linear-gradient(135deg, #FEF3E2 0%, #FDF2E9 100%);
+            border: 1px solid #F59E0B;
+            border-radius: var(--radius-xl);
+            padding: 20px 24px;
+            margin-bottom: 32px;
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .alert-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: var(--radius-lg);
+            background: var(--warning-color);
+            color: var(--white);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .alert-content h4 {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--gray-900);
+            margin-bottom: 8px;
+        }
+
+        .alert-content p {
+            color: var(--gray-700);
+            margin-bottom: 16px;
+            line-height: 1.5;
+        }
+
+        .alert-action {
+            background: var(--warning-color);
+            color: var(--white);
+            border: none;
+            padding: 10px 16px;
+            border-radius: var(--radius-md);
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: var(--transition-fast);
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .alert-action:hover {
+            background: #D97706;
+            transform: translateY(-1px);
+        }
+
+        /* === SEÇÕES PRINCIPAIS === */
+        .content-section {
+            background: var(--white);
+            border-radius: var(--radius-xl);
+            padding: 28px;
+            margin-bottom: 32px;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--gray-100);
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--gray-100);
+        }
+
+        .section-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--gray-900);
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .section-link {
+            color: var(--primary-color);
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: var(--transition-fast);
+        }
+
+        .section-link:hover {
+            color: var(--primary-dark);
+            transform: translateX(2px);
+        }
+
+        /* === AÇÕES RÁPIDAS === */
+        .actions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 20px;
+        }
+
+        .action-card {
+            background: var(--gray-50);
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius-lg);
+            padding: 24px 20px;
+            text-decoration: none;
+            color: var(--gray-900);
+            transition: var(--transition-normal);
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .action-card::before {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--primary-gradient);
+            transform: scaleX(0);
+            transition: var(--transition-normal);
+        }
+
+        .action-card:hover {
+            transform: translateY(-4px);
+            background: var(--white);
+            box-shadow: var(--shadow-md);
+            border-color: var(--primary-color);
+        }
+
+        .action-card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .action-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: var(--radius-lg);
+            background: var(--primary-light);
+            color: var(--primary-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition-normal);
+        }
+
+        .action-card:hover .action-icon {
+            background: var(--primary-gradient);
+            color: var(--white);
+            transform: scale(1.1);
+        }
+
+        .action-card h3 {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--gray-900);
+            margin: 0;
+        }
+
+        .action-card p {
+            font-size: 14px;
+            color: var(--gray-600);
+            margin: 0;
+            line-height: 1.4;
+        }
+
+        /* === GRÁFICO === */
+        .chart-container {
+            position: relative;
+            height: 320px;
+            width: 100%;
+        }
+
+        /* === TABELA MODERNA === */
+        .table-container {
+            overflow-x: auto;
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--gray-200);
+        }
+
+        .modern-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        .modern-table th {
+            background: var(--gray-50);
+            padding: 16px;
+            text-align: left;
+            font-weight: 600;
+            color: var(--gray-700);
+            border-bottom: 1px solid var(--gray-200);
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .modern-table td {
+            padding: 16px;
+            border-bottom: 1px solid var(--gray-100);
+            color: var(--gray-900);
+            vertical-align: middle;
+        }
+
+        .modern-table tr:last-child td {
             border-bottom: none;
         }
-        
-        .data-table td::before {
-            content: attr(data-label);
-            font-weight: 600;
-            margin-right: 1rem;
-            width: 40%;
-            color: var(--secondary-color);
+
+        .modern-table tbody tr:hover {
+            background: var(--gray-50);
         }
-    }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: capitalize;
+        }
+
+        .status-badge.pendente {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--warning-color);
+        }
+
+        .status-badge.aprovado {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success-color);
+        }
+
+        .status-badge.cancelado {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger-color);
+        }
+
+        /* === ESTADO VAZIO === */
+        .empty-state {
+            text-align: center;
+            padding: 48px 24px;
+            color: var(--gray-500);
+        }
+
+        .empty-icon {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 16px;
+            opacity: 0.5;
+        }
+
+        .empty-state h3 {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--gray-700);
+            margin-bottom: 8px;
+        }
+
+        .empty-state p {
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+
+        /* === CARD INFORMATIVO === */
+        .info-card {
+            background: linear-gradient(135deg, var(--gray-50) 0%, var(--white) 100%);
+            border: 1px solid var(--gray-200);
+            border-radius: var(--radius-xl);
+            padding: 28px;
+            margin-bottom: 32px;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 24px;
+            margin-top: 24px;
+        }
+
+        .info-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+            padding: 20px;
+            background: var(--white);
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--gray-200);
+            transition: var(--transition-fast);
+        }
+
+        .info-item:hover {
+            border-color: var(--primary-color);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .info-number {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--primary-gradient);
+            color: var(--white);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+
+        .info-content h4 {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--gray-900);
+            margin-bottom: 6px;
+        }
+
+        .info-content p {
+            font-size: 14px;
+            color: var(--gray-600);
+            line-height: 1.5;
+            margin: 0;
+        }
+
+        .info-highlight {
+            margin-top: 24px;
+            padding: 20px;
+            background: linear-gradient(135deg, var(--primary-light) 0%, #FFF5ED 100%);
+            border: 1px solid var(--primary-color);
+            border-radius: var(--radius-lg);
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        /* === RESPONSIVIDADE === */
+        @media (max-width: 1024px) {
+            .main-content {
+                padding: 20px;
+            }
+            
+            .stats-grid {
+                grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+                gap: 20px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                margin-left: 0;
+                padding: 16px;
+            }
+            
+            .dashboard-header {
+                padding: 20px;
+                margin-bottom: 24px;
+            }
+            
+            .header-content {
+                flex-direction: column;
+                align-items: flex-start;
+                text-align: left;
+            }
+            
+            .header-text h1 {
+                font-size: 24px;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+                gap: 16px;
+            }
+            
+            .actions-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 16px;
+            }
+            
+            .content-section {
+                padding: 20px;
+                margin-bottom: 24px;
+            }
+            
+            .info-grid {
+                grid-template-columns: 1fr;
+                gap: 16px;
+            }
+            
+            .modern-table {
+                font-size: 12px;
+            }
+            
+            .modern-table th,
+            .modern-table td {
+                padding: 12px 8px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .main-content {
+                padding: 12px;
+            }
+            
+            .actions-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .card-value {
+                font-size: 28px;
+            }
+            
+            .section-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
+            
+            /* Tabela responsiva no mobile */
+            .table-container {
+                border: none;
+            }
+            
+            .modern-table,
+            .modern-table thead,
+            .modern-table tbody,
+            .modern-table th,
+            .modern-table td,
+            .modern-table tr {
+                display: block;
+            }
+            
+            .modern-table thead tr {
+                position: absolute;
+                top: -9999px;
+                left: -9999px;
+            }
+            
+            .modern-table tr {
+                background: var(--white);
+                border: 1px solid var(--gray-200);
+                border-radius: var(--radius-lg);
+                margin-bottom: 12px;
+                padding: 16px;
+            }
+            
+            .modern-table td {
+                border: none;
+                position: relative;
+                padding: 8px 0 8px 40%;
+                text-align: right;
+            }
+            
+            .modern-table td:before {
+                content: attr(data-label);
+                position: absolute;
+                left: 0;
+                width: 35%;
+                text-align: left;
+                font-weight: 600;
+                color: var(--gray-700);
+            }
+        }
+
+        /* === ANIMAÇÕES === */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .animate-fade-in {
+            animation: fadeInUp 0.6s ease-out;
+        }
+
+        /* === LOADING STATES === */
+        .loading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        .pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: .5;
+            }
+        }
     </style>
 </head>
 <body>
-    <div class="dashboard-container">
-        <!-- Incluir o componente sidebar -->
+    <div class="dashboard-layout">
+        <!-- Incluir sidebar da loja -->
         <?php include_once '../components/sidebar-store.php'; ?>
         
-        <div class="main-content" id="mainContent">
-            <div class="dashboard-header">
-                <div>
-                    <h1 class="dashboard-title">Dashboard da Loja</h1>
-                    <p class="welcome-user">Bem-vindo(a), <?php echo htmlspecialchars($store['nome_fantasia']); ?></p>
-                </div>
-            </div>
-            
-            <!-- Cards de estatísticas -->
-            <div class="summary-cards">
-                <div class="card">
-                    <div class="card-content">
-                        <h3>Total de Vendas</h3>
-                        <div class="card-value"><?php echo number_format($salesStats['total_vendas'], 0, ',', '.'); ?></div>
-                        <div class="card-period">Transações registradas</div>
+        <main class="main-content" id="mainContent">
+            <!-- === HEADER PRINCIPAL === -->
+            <header class="dashboard-header animate-fade-in">
+                <div class="header-content">
+                    <div class="header-text">
+                        <h1>Olá, <?php echo htmlspecialchars($store['nome_fantasia']); ?>! 👋</h1>
+                        <p>Acompanhe suas vendas e gerencie suas comissões de forma simples</p>
                     </div>
-                    <div class="card-icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <div class="header-actions">
+                        <a href="<?php echo STORE_REGISTER_TRANSACTION_URL; ?>" class="quick-action-btn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg>
+                            Nova Venda
+                        </a>
+                    </div>
+                </div>
+            </header>
+
+            <!-- === CARDS DE ESTATÍSTICAS === -->
+            <section class="stats-grid">
+                <!-- Card: Total de Vendas -->
+                <div class="stat-card animate-fade-in">
+                    <div class="card-header">
+                        <div>
+                            <h3 class="card-title">Total de Vendas</h3>
+                            <div class="card-value"><?php echo number_format($salesStats['total_vendas'], 0, ',', '.'); ?></div>
+                            <p class="card-subtitle">Transações registradas</p>
+                        </div>
+                        <div class="card-icon">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M3 3h18l-2 13H5L3 3z"></path>
+                                <path d="M16 16a4 4 0 0 1-8 0"></path>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card: Valor Total -->
+                <div class="stat-card animate-fade-in">
+                    <div class="card-header">
+                        <div>
+                            <h3 class="card-title">Valor Total</h3>
+                            <div class="card-value">R$ <?php echo number_format($salesStats['valor_total_vendas'], 2, ',', '.'); ?></div>
+                            <p class="card-subtitle">Em vendas processadas</p>
+                        </div>
+                        <div class="card-icon success">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="12" y1="1" x2="12" y2="23"></line>
+                                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card: Comissões Pendentes -->
+                <div class="stat-card animate-fade-in">
+                    <div class="card-header">
+                        <div>
+                            <h3 class="card-title">Comissões Pendentes</h3>
+                            <div class="card-value">R$ <?php echo number_format($pendingStats['valor_pendente'], 2, ',', '.'); ?></div>
+                            <p class="card-subtitle"><?php echo number_format($pendingStats['total_pendentes'], 0, ',', '.'); ?> transações aguardando</p>
+                        </div>
+                        <div class="card-icon warning">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="12" y1="8" x2="12" y2="12"></line>
+                                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card: Cashback Gerado -->
+                <div class="stat-card animate-fade-in">
+                    <div class="card-header">
+                        <div>
+                            <h3 class="card-title">Cashback Gerado</h3>
+                            <div class="card-value">R$ <?php echo number_format($salesStats['valor_total_cliente'], 2, ',', '.'); ?></div>
+                            <p class="card-subtitle">Destinado aos clientes</p>
+                        </div>
+                        <div class="card-icon info">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- === ALERTA DE COMISSÕES PENDENTES === -->
+            <?php if ($pendingStats['total_pendentes'] > 0): ?>
+            <div class="alert-modern animate-fade-in">
+                <div class="alert-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
+                </div>
+                <div class="alert-content">
+                    <h4>⚠️ Atenção: Comissões Pendentes</h4>
+                    <p>Você tem <strong><?php echo $pendingStats['total_pendentes']; ?> transações</strong> com pagamento pendente, totalizando <strong>R$ <?php echo number_format($pendingStats['valor_pendente'], 2, ',', '.'); ?></strong>. Esta pendência afeta <strong><?php echo $pendingStats['clientes_afetados']; ?> clientes</strong> que aguardam a liberação de R$ <?php echo number_format($pendingStats['valor_cliente_pendente'], 2, ',', '.'); ?> em cashback.</p>
+                    <a href="<?php echo STORE_PENDING_TRANSACTIONS_URL; ?>" class="alert-action">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <line x1="12" y1="1" x2="12" y2="23"></line>
                             <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
                         </svg>
-                    </div>
+                        Pagar Comissões
+                    </a>
                 </div>
-                
-                <div class="card">
-                    <div class="card-content">
-                        <h3>Valor Total</h3>
-                        <div class="card-value">R$ <?php echo number_format($salesStats['valor_total_vendas'], 2, ',', '.'); ?></div>
-                        <div class="card-period">Em vendas processadas</div>
-                    </div>
-                    <div class="card-icon success">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
-                            <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
-                        </svg>
-                    </div>
-                </div>
-                
-                <div class="card">
-                    <div class="card-content">
-                        <h3>Comissões Pendentes (10%)</h3>
-                        <div class="card-value">R$ <?php echo number_format($pendingStats['valor_pendente'], 2, ',', '.'); ?></div>
-                        <div class="card-period"><?php echo number_format($pendingStats['total_pendentes'], 0, ',', '.'); ?> transações aguardando pagamento</div>
-                    </div>
-                    <div class="card-icon warning">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <line x1="12" y1="8" x2="12" y2="12"></line>
-                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                        </svg>
-                    </div>
-                </div>
-                
-                <div class="card">
-                    <div class="card-content">
-                        <h3>Cashback Gerado (5%)</h3>
-                        <div class="card-value">R$ <?php echo number_format($salesStats['valor_total_cliente'], 2, ',', '.'); ?></div>
-                        <div class="card-period">Destinado aos clientes</div>
-                    </div>
-                    <div class="card-icon info">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                            <polyline points="22 4 12 14.01 9 11.01"></polyline>
-                        </svg>
-                    </div>
-                </div>
-            </div>
-            
-            <?php if ($pendingStats['total_pendentes'] > 0): ?>
-            <div class="alert warning">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <line x1="12" y1="8" x2="12" y2="12"></line>
-                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                </svg>
-                <div>
-                    <h4>Comissões Pendentes</h4>
-                    <p>Você tem <?php echo $pendingStats['total_pendentes']; ?> transações com pagamento pendente, totalizando R$ <?php echo number_format($pendingStats['valor_pendente'], 2, ',', '.'); ?>. 
-                    Esta pendência afeta <?php echo $pendingStats['clientes_afetados']; ?> clientes que aguardam a liberação de R$ <?php echo number_format($pendingStats['valor_cliente_pendente'], 2, ',', '.'); ?> em cashback.</p>
-                </div>
-                <a href="<?php echo STORE_PENDING_TRANSACTIONS_URL; ?>" class="btn btn-warning">Pagar Comissões</a>
             </div>
             <?php endif; ?>
 
-            
-            <!-- Links rápidos para ações -->
-            <div class="quick-actions">
-                <h2>Ações Rápidas</h2>
+            <!-- === AÇÕES RÁPIDAS === -->
+            <section class="content-section animate-fade-in">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="3"></circle>
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1 1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                        </svg>
+                        Ações Rápidas
+                    </h2>
+                </div>
+                
                 <div class="actions-grid">
                     <a href="<?php echo STORE_REGISTER_TRANSACTION_URL; ?>" class="action-card">
                         <div class="action-icon">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <line x1="12" y1="5" x2="12" y2="19"></line>
                                 <line x1="5" y1="12" x2="19" y2="12"></line>
                             </svg>
                         </div>
-                        <h3>Nova Transação</h3>
-                        <p>Registrar uma nova venda</p>
-                    </a>
-                    
-                    <a href="<?php echo STORE_BATCH_UPLOAD_URL; ?>" class="action-card">
-                        <div class="action-icon">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                <polyline points="17 8 12 3 7 8"></polyline>
-                                <line x1="12" y1="3" x2="12" y2="15"></line>
-                            </svg>
-                        </div>
-                        <h3>Upload em Lote</h3>
-                        <p>Importar múltiplas transações</p>
+                        <h3>Registrar Venda</h3>
+                        <p>Cadastre uma nova transação</p>
                     </a>
                     
                     <a href="<?php echo STORE_PENDING_TRANSACTIONS_URL; ?>" class="action-card">
                         <div class="action-icon">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <circle cx="12" cy="12" r="10"></circle>
                                 <polyline points="12 6 12 12 16 14"></polyline>
                             </svg>
                         </div>
                         <h3>Comissões Pendentes</h3>
-                        <p>Gerenciar pagamentos</p>
+                        <p>Gerencie seus pagamentos</p>
                     </a>
                     
                     <a href="<?php echo STORE_PAYMENT_HISTORY_URL; ?>" class="action-card">
                         <div class="action-icon">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
                                 <line x1="1" y1="10" x2="23" y2="10"></line>
                             </svg>
                         </div>
-                        <h3>Histórico de Pagamentos</h3>
-                        <p>Visualizar pagamentos realizados</p>
+                        <h3>Histórico</h3>
+                        <p>Visualize pagamentos realizados</p>
+                    </a>
+                    
+                    <a href="<?php echo STORE_TRANSACTIONS_URL; ?>" class="action-card">
+                        <div class="action-icon">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                                <line x1="8" y1="21" x2="16" y2="21"></line>
+                                <line x1="12" y1="17" x2="12" y2="21"></line>
+                            </svg>
+                        </div>
+                        <h3>Todas as Transações</h3>
+                        <p>Visualize seu histórico completo</p>
                     </a>
                 </div>
-            </div>
-            
-            <!-- Gráficos -->
-            <div class="chart-container">
-                <h2>Vendas nos Últimos 6 Meses</h2>
-                <div class="chart-wrapper">
+            </section>
+
+            <!-- === GRÁFICO DE VENDAS === -->
+            <section class="content-section animate-fade-in">
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="20" x2="18" y2="10"></line>
+                            <line x1="12" y1="20" x2="12" y2="4"></line>
+                            <line x1="6" y1="20" x2="6" y2="14"></line>
+                        </svg>
+                        Vendas dos Últimos 6 Meses
+                    </h2>
+                </div>
+                <div class="chart-container">
                     <canvas id="salesChart"></canvas>
                 </div>
-            </div>
-            
-            <!-- Últimas Transações -->
-            <div class="recent-transactions">
+            </section>
+
+            <!-- === ÚLTIMAS TRANSAÇÕES === -->
+            <section class="content-section animate-fade-in">
                 <div class="section-header">
-                    <h2>Últimas Transações</h2>
-                    <a href="<?php echo STORE_TRANSACTIONS_URL; ?>" class="link-more">Ver Todas</a>
+                    <h2 class="section-title">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <line x1="16" y1="13" x2="8" y2="13"></line>
+                            <line x1="16" y1="17" x2="8" y2="17"></line>
+                            <polyline points="10 9 9 9 8 9"></polyline>
+                        </svg>
+                        Últimas Transações
+                    </h2>
+                    <a href="<?php echo STORE_TRANSACTIONS_URL; ?>" class="section-link">
+                        Ver Todas
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                    </a>
                 </div>
                 
-                <div class="table-responsive">
-                    <table class="data-table">
+                <div class="table-container">
+                    <table class="modern-table">
                         <thead>
                             <tr>
                                 <th>Data</th>
@@ -953,107 +1203,243 @@ $activeMenu = 'dashboard';
                                 <?php endforeach; ?>
                             <?php else: ?>
                                 <tr>
-                                    <td colspan="6" class="empty-state">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                            <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
-                                            <polyline points="13 2 13 9 20 9"></polyline>
-                                        </svg>
-                                        <h3>Nenhuma transação registrada</h3>
-                                        <p>Comece registrando sua primeira venda com cashback</p>
-                                        <a href="<?php echo STORE_REGISTER_TRANSACTION_URL; ?>" class="btn btn-primary">Registrar Venda</a>
+                                    <td colspan="6">
+                                        <div class="empty-state">
+                                            <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                                <polyline points="13 2 13 9 20 9"></polyline>
+                                            </svg>
+                                            <h3>Nenhuma transação registrada</h3>
+                                            <p>Comece registrando sua primeira venda com cashback</p>
+                                            <a href="<?php echo STORE_REGISTER_TRANSACTION_URL; ?>" class="quick-action-btn">
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                                </svg>
+                                                Registrar Primeira Venda
+                                            </a>
+                                        </div>
                                     </td>
                                 </tr>
                             <?php endif; ?>
                         </tbody>
                     </table>
                 </div>
-            </div>
-            
-            <!-- Adicionar novo card informativo sobre o fluxo de cashback -->
-            <div class="info-card">
-                <h3>Como Funciona o Sistema de Comissão no Klube Cash</h3>
-                <div class="info-content">
+            </section>
+
+            <!-- === CARD INFORMATIVO === -->
+            <section class="info-card animate-fade-in">
+                <h3>💡 Como Funciona o Sistema de Comissão no Klube Cash</h3>
+                <div class="info-grid">
                     <div class="info-item">
                         <span class="info-number">1</span>
-                        <div>
+                        <div class="info-content">
                             <h4>Registro da Venda</h4>
                             <p>Você registra suas vendas no sistema com o valor total e identificação do cliente</p>
                         </div>
                     </div>
                     <div class="info-item">
                         <span class="info-number">2</span>
-                        <div>
+                        <div class="info-content">
                             <h4>Pagamento da Comissão</h4>
                             <p>Você paga 10% de comissão sobre o valor efetivamente cobrado (descontando saldo usado)</p>
                         </div>
                     </div>
                     <div class="info-item">
                         <span class="info-number">3</span>
-                        <div>
+                        <div class="info-content">
                             <h4>Distribuição dos 10%</h4>
                             <p>5% vira cashback para o cliente e 5% fica como receita do Klube Cash</p>
                         </div>
                     </div>
                     <div class="info-item">
                         <span class="info-number">4</span>
-                        <div>
+                        <div class="info-content">
                             <h4>Liberação do Cashback</h4>
                             <p>Após aprovação do seu pagamento, o cashback é liberado para o cliente usar na sua loja</p>
                         </div>
                     </div>
                 </div>
                 
-                <!-- ADICIONADO: Informação importante -->
                 <div class="info-highlight">
-                    <strong>💡 Importante:</strong> Sua loja não recebe cashback. O saldo do cliente só pode ser usado na sua própria loja, gerando uma nova comissão sobre o valor efetivamente pago.
+                    <strong>💰 Importante:</strong> Sua loja não recebe cashback. O saldo do cliente só pode ser usado na sua própria loja, gerando uma nova comissão sobre o valor efetivamente pago.
                 </div>
-            </div>
-        </div>
+            </section>
+        </main>
     </div>
-    
+
+    <!-- === SCRIPTS === -->
     <script>
-        // Configuração do gráfico de vendas mensais
-        const salesCtx = document.getElementById('salesChart').getContext('2d');
-        const salesChart = new Chart(salesCtx, {
-            type: 'bar',
-            data: {
-                labels: <?php echo json_encode($chartLabels); ?>,
-                datasets: [{
-                    label: 'Valor Total (R$)',
-                    data: <?php echo json_encode($chartData); ?>,
-                    backgroundColor: 'rgba(255, 122, 0, 0.7)',
-                    borderColor: 'rgba(255, 122, 0, 1)',
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: {
-                            callback: function(value) {
-                                return 'R$ ' + value.toLocaleString('pt-BR');
+        // ✅ CONFIGURAÇÃO DO GRÁFICO MODERNO
+        document.addEventListener('DOMContentLoaded', function() {
+            const ctx = document.getElementById('salesChart').getContext('2d');
+            
+            // Gradient para o gráfico
+            const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+            gradient.addColorStop(0, 'rgba(255, 122, 0, 0.8)');
+            gradient.addColorStop(1, 'rgba(255, 122, 0, 0.1)');
+            
+            const chart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: <?php echo json_encode($chartLabels); ?>,
+                    datasets: [{
+                        label: 'Valor Total (R$)',
+                        data: <?php echo json_encode($chartData); ?>,
+                        backgroundColor: gradient,
+                        borderColor: '#FF7A00',
+                        borderWidth: 2,
+                        borderRadius: 8,
+                        borderSkipped: false,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            titleColor: '#fff',
+                            bodyColor: '#fff',
+                            borderColor: '#FF7A00',
+                            borderWidth: 1,
+                            cornerRadius: 8,
+                            callbacks: {
+                                label: function(context) {
+                                    return 'R$ ' + context.parsed.y.toLocaleString('pt-BR', {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2
+                                    });
+                                }
                             }
                         }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)',
+                                drawBorder: false
+                            },
+                            ticks: {
+                                color: '#6B7280',
+                                font: {
+                                    size: 12
+                                },
+                                callback: function(value) {
+                                    return 'R$ ' + value.toLocaleString('pt-BR');
+                                }
+                            }
+                        },
+                        x: {
+                            grid: {
+                                display: false
+                            },
+                            ticks: {
+                                color: '#6B7280',
+                                font: {
+                                    size: 12
+                                }
+                            }
+                        }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
                     }
                 }
-            }
+            });
+
+            // ✅ ANIMAÇÕES NOS CARDS
+            const animateValue = (element, start, end, duration) => {
+                let startTimestamp = null;
+                const step = (timestamp) => {
+                    if (!startTimestamp) startTimestamp = timestamp;
+                    const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                    const currentValue = Math.floor(progress * (end - start) + start);
+                    
+                    if (element.textContent.includes('R$')) {
+                        element.textContent = 'R$ ' + currentValue.toLocaleString('pt-BR', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2
+                        });
+                    } else {
+                        element.textContent = currentValue.toLocaleString('pt-BR');
+                    }
+                    
+                    if (progress < 1) {
+                        window.requestAnimationFrame(step);
+                    }
+                };
+                window.requestAnimationFrame(step);
+            };
+
+            // Animar valores dos cards
+            const cardValues = document.querySelectorAll('.card-value');
+            cardValues.forEach((card, index) => {
+                const text = card.textContent;
+                const numberValue = parseFloat(text.replace(/[^\d,]/g, '').replace(',', '.'));
+                if (numberValue > 0) {
+                    setTimeout(() => {
+                        animateValue(card, 0, numberValue, 1500);
+                    }, index * 200);
+                }
+            });
+
+            // ✅ LAZY LOADING PARA PERFORMANCE
+            const observerOptions = {
+                threshold: 0.1,
+                rootMargin: '0px 0px -50px 0px'
+            };
+
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.style.opacity = '1';
+                        entry.target.style.transform = 'translateY(0)';
+                    }
+                });
+            }, observerOptions);
+
+            // Aplicar observer nos elementos animáveis
+            document.querySelectorAll('.animate-fade-in').forEach(el => {
+                el.style.opacity = '0';
+                el.style.transform = 'translateY(20px)';
+                el.style.transition = 'all 0.6s ease-out';
+                observer.observe(el);
+            });
+
+            // ✅ MELHORIA DE UX - Loading states
+            document.querySelectorAll('a[href]').forEach(link => {
+                link.addEventListener('click', function(e) {
+                    // Adicionar loading state se for navegação interna
+                    if (this.hostname === window.location.hostname) {
+                        this.classList.add('loading');
+                        
+                        // Remover loading após timeout (fallback)
+                        setTimeout(() => {
+                            this.classList.remove('loading');
+                        }, 3000);
+                    }
+                });
+            });
+
+            // ✅ FEEDBACK VISUAL NOS CARDS
+            document.querySelectorAll('.stat-card, .action-card').forEach(card => {
+                card.addEventListener('mouseenter', function() {
+                    this.style.transform = 'translateY(-4px) scale(1.02)';
+                });
+                
+                card.addEventListener('mouseleave', function() {
+                    this.style.transform = 'translateY(0) scale(1)';
+                });
+            });
+
+            console.log('✅ Dashboard Store carregado com sucesso!');
         });
     </script>
-
-    <style>
-    /* Adicione no final do CSS existente */
-    .info-highlight {
-        margin-top: 20px;
-        padding: 15px;
-        background-color: #fff3e0;
-        border-left: 4px solid #FF7A00;
-        border-radius: 8px;
-        color: #e65100;
-        font-size: 0.9rem;
-    }
-    </style>
 </body>
 </html>
