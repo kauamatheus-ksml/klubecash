@@ -32,24 +32,28 @@ if ($action !== 'search_client') {
     exit;
 }
 
-$email = trim($input['email'] ?? '');
+$searchTerm = trim($input['search_term'] ?? ''); // Modificado de 'email' para 'search_term'
 $storeId = intval($input['store_id'] ?? 0);
 
-if (empty($email) || $storeId <= 0) {
-    echo json_encode(['status' => false, 'message' => 'Email e ID da loja são obrigatórios']);
+if (empty($searchTerm) || $storeId <= 0) { // Modificado de empty($email)
+    echo json_encode(['status' => false, 'message' => 'Termo de busca (Email ou CPF) e ID da loja são obrigatórios']);
     exit;
 }
+
+// Limpar CPF de possíveis formatações (pontos, traços)
+$cpfSearch = preg_replace('/[^0-9]/', '', $searchTerm);
 
 try {
     $db = Database::getConnection();
     
     // Buscar cliente por email
     $stmt = $db->prepare("
-        SELECT id, nome, email, status, data_criacao
-        FROM usuarios 
-        WHERE email = :email AND tipo = :tipo
+        SELECT id, nome, email, status, data_criacao, cpf -- Adicionado cpf ao SELECT
+        FROM usuarios
+        WHERE (email = :searchTerm OR cpf = :cpfSearch) AND tipo = :tipo
     ");
-    $stmt->bindParam(':email', $email);
+    $stmt->bindParam(':searchTerm', $searchTerm); // Para busca de email
+    $stmt->bindParam(':cpfSearch', $cpfSearch);     // Para busca de CPF (já limpo)
     $tipo = USER_TYPE_CLIENT;
     $stmt->bindParam(':tipo', $tipo);
     $stmt->execute();
@@ -101,6 +105,7 @@ try {
             'id' => $client['id'],
             'nome' => $client['nome'],
             'email' => $client['email'],
+            'cpf' => $client['cpf'] ?? null, // Adicionar esta linha (se 'cpf' foi selecionado na query)
             'status' => $client['status'],
             'data_cadastro' => date('d/m/Y', strtotime($client['data_criacao'])),
             'saldo' => $saldo,

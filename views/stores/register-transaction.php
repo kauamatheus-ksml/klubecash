@@ -116,7 +116,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (empty($error)) {
             // Preparar dados da transação
             $transactionData = [
-                'usuario_id' => $client['id'],
+                'usuario_id' => $client['id'], // Já estava correto
                 'loja_id' => $storeId,
                 'valor_total' => $valorTotal,
                 'codigo_transacao' => $codigoTransacao,
