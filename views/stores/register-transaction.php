@@ -186,22 +186,21 @@ $activeMenu = 'register-transaction';
                     <form id="transactionForm" method="POST" action="">
                         <div class="form-row">
                             <div class="form-group">
-                                <label for="cliente_email">Email do Cliente*</label>
+                                <label for="search_term">Buscar Cliente (Email ou CPF)*</label>
                                 <div class="client-search-container">
-                                    <div class="email-input-group">
-                                        <div class="email-input-wrapper">
-                                            <input type="email" id="cliente_email" name="cliente_email" 
-                                                placeholder="Email do cliente cadastrado no Klube Cash" required
-                                                value="<?php echo isset($transactionData['cliente_email']) ? htmlspecialchars($transactionData['cliente_email']) : ''; ?>">
-                                            <small>O cliente deve estar cadastrado no Klube Cash</small>
+                                    <div class="email-input-group"> {/* Mantenha a classe se os estilos dependerem dela, ou renomeie para search-input-group */}
+                                        <div class="email-input-wrapper"> {/* Mantenha a classe se os estilos dependerem dela, ou renomeie para search-input-wrapper */}
+                                            <input type="text" id="search_term" name="search_term"
+                                                placeholder="Digite o Email ou CPF do cliente" required
+                                                value="<?php echo isset($_POST['search_term']) ? htmlspecialchars($_POST['search_term']) : (isset($transactionData['cliente_email']) ? htmlspecialchars($transactionData['cliente_email']) : ''); ?>">
+                                            <small>Digite o email ou CPF completo do cliente cadastrado no Klube Cash.</small>
                                         </div>
                                         <button type="button" id="searchClientBtn" class="search-client-btn">
                                             <span class="btn-text">Buscar Cliente</span>
                                             <span class="loading-spinner" style="display: none;"></span>
                                         </button>
                                     </div>
-                                    
-                                    <!-- Card de informações do cliente -->
+
                                     <div id="clientInfoCard" class="client-info-card">
                                         <div class="client-info-header">
                                             <svg class="client-info-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -211,8 +210,7 @@ $activeMenu = 'register-transaction';
                                             <h4 class="client-info-title" id="clientInfoTitle">Informações do Cliente</h4>
                                         </div>
                                         <div class="client-info-details" id="clientInfoDetails">
-                                            <!-- Será preenchido dinamicamente -->
-                                        </div>
+                                            </div>
                                     </div>
                                 </div>
                             </div>
