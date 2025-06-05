@@ -526,12 +526,7 @@ $activeMenu = 'register-transaction';
             </div>
             <?php endif; ?>
 
-            <div class="help-section" style="margin-top: 30px;">
-                <h3>Dúvidas Frequentes</h3>
-                <div class="accordion">
-                    {Seu HTML do accordion aqui}
-                </div>
-            </div>
+            
         </div>
     </div>
     
