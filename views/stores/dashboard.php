@@ -763,7 +763,8 @@ $activeMenu = 'dashboard';
 <body>
     <div class="dashboard-container">
         <!-- Incluir o componente sidebar -->
-        <?php include_once '../components/sidebar-store.php'; ?>
+        <?php include_once '../components/navbar.php'; ?>
+        <?php include_once '../components/sidebar-unified.php'; ?>
         
         <div class="main-content" id="mainContent">
             <div class="dashboard-header">
