@@ -380,41 +380,8 @@ $activeMenu = 'register-transaction';
                 </div>
             </div>
             
-            <!-- Seção de ajuda existente -->
-            <div class="help-section">
-                <h3>Dúvidas Frequentes</h3>
-                <div class="accordion">
-                    <div class="accordion-item">
-                        <button class="accordion-header">
-                            <span>Como o cliente recebe o cashback?</span>
-                            <span class="accordion-icon">+</span>
-                        </button>
-                        <div class="accordion-content">
-                            <p>Após o registro da venda, o cliente visualizará o cashback como "pendente" em seu painel. Quando sua loja realizar o pagamento da comissão para o Klube Cash, o valor será liberado automaticamente para o cliente.</p>
-                        </div>
-                    </div>
-                    
-                    <div class="accordion-item">
-                        <button class="accordion-header">
-                            <span>Posso usar o saldo do cliente na venda?</span>
-                            <span class="accordion-icon">+</span>
-                        </button>
-                        <div class="accordion-content">
-                            <p>Sim! Se o cliente possui saldo de cashback em sua loja, você pode usar parte ou todo o saldo na nova venda. Basta buscar o cliente pelo email e escolher o valor a ser usado.</p>
-                        </div>
-                    </div>
-                    
-                    <div class="accordion-item">
-                        <button class="accordion-header">
-                            <span>E se o cliente não estiver cadastrado?</span>
-                            <span class="accordion-icon">+</span>
-                        </button>
-                        <div class="accordion-content">
-                            <p>Apenas clientes já cadastrados no Klube Cash podem receber cashback. Você pode convidar seus clientes a se cadastrarem em nossa plataforma para começarem a ganhar cashback em suas compras.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            
+            
         </div>
     </div>
     
