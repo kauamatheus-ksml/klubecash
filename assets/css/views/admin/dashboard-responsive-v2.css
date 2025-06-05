@@ -1377,15 +1377,7 @@
     }
 }
 
-/* === DARK MODE SUPPORT (Preparação para futura implementação) === */
-@media (prefers-color-scheme: dark) {
-    :root {
-        --white: #1F2937;
-        --gray-50: #111827;
-        --gray-100: #1F2937;
-        --gray-900: #F9FAFB;
-    }
-}
+
 
 /* === IMPRESSÃO === */
 @media print {
