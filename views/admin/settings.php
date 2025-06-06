@@ -660,7 +660,7 @@ try {
         </div>
     </div>
     
-    <script>
+    <scrip>
         function sendTestEmail() {
             if (!confirm('Deseja enviar um email de teste simples para o administrador?')) {
                 return;
