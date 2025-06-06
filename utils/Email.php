@@ -1,4 +1,15 @@
 <?php
+// Configurações SMTP
+define('SMTP_HOST', 'smtp.hostinger.com');
+define('SMTP_PORT', 465);
+define('SMTP_USERNAME', 'klubecash@klubecash.com');
+define('SMTP_PASSWORD', 'Aaku_2004@');
+define('SMTP_FROM_EMAIL', 'noreply@klubecash.com');
+define('SMTP_FROM_NAME', 'Klube Cash');
+define('SMTP_ENCRYPTION', 'ssl'); // ou 'tls'
+
+// Email do administrador
+define('ADMIN_EMAIL', 'klubecash@klubecash.com');
 // utils/Email.php - VERSÃO CORRIGIDA E COMPLETA
 require_once __DIR__ . '/../config/constants.php';
 

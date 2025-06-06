@@ -519,11 +519,25 @@ try {
                         
                         <div class="btn-group">
                             <button type="submit" class="btn btn-primary">Salvar Configurações de 2FA</button>
-                            <button type="button" class="btn btn-outline-info" onclick="pingEndpoint()">🏓 Ping Endpoint</button>
-                            <button type="button" class="btn btn-outline-secondary" onclick="checkEmailConfig()">⚙️ Ver Config</button>
-                            <button type="button" class="btn btn-secondary" onclick="testEmailConnection()">🔗 Testar SMTP</button>
-                            <button type="button" class="btn btn-info" onclick="sendTestEmail()">📧 Email Simples</button>
-                            <button type="button" class="btn btn-secondary" onclick="test2FAEmail()">🔐 Email 2FA</button>
+                        </div>
+
+                        <div class="btn-group" style="margin-top: 15px;">
+                            <h4>🔧 Diagnósticos Básicos</h4>
+                            <button type="button" class="btn btn-outline-info" onclick="pingEndpoint()">🏓 Ping</button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="checkEmailConfig()">⚙️ Config</button>
+                        </div>
+
+                        <div class="btn-group" style="margin-top: 10px;">
+                            <h4>🔍 Testes Manuais (PHPMailer direto)</h4>
+                            <button type="button" class="btn btn-warning" onclick="testSMTPManual()">🔗 SMTP Manual</button>
+                            <button type="button" class="btn btn-warning" onclick="sendEmailManual()">📧 Email Manual</button>
+                        </div>
+
+                        <div class="btn-group" style="margin-top: 10px;">
+                            <h4>📨 Testes via Classe Email</h4>
+                            <button type="button" class="btn btn-secondary" onclick="testEmailConnection()">🔗 SMTP Classe</button>
+                            <button type="button" class="btn btn-info" onclick="sendTestEmail()">📧 Email Classe</button>
+                            <button type="button" class="btn btn-secondary" onclick="test2FAEmail()">🔐 2FA Classe</button>
                         </div>
                     </div>
                 </div>
@@ -756,6 +770,21 @@ try {
     </div>
     
     <script>
+        // Função para teste SMTP manual
+        function testSMTPManual() {
+            if (!confirm('Testar conexão SMTP manualmente (sem classe Email)?')) {
+                return;
+            }
+            makeEmailTestRequest('test_connection_manual', event.target);
+        }
+
+        // Função para envio de email manual
+        function sendEmailManual() {
+            if (!confirm('Enviar email de teste manualmente (sem classe Email)?')) {
+                return;
+            }
+            makeEmailTestRequest('send_simple_manual', event.target);
+        }
 // URL do endpoint de teste
 const EMAIL_TEST_URL = '<?php echo SITE_URL; ?>/test-email-endpoint.php';
 
