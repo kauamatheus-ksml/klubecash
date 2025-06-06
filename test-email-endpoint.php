@@ -2,7 +2,10 @@
 // test-email-endpoint.php - VERSÃO COM DIAGNÓSTICO SMTP AVANÇADO
 error_reporting(E_ALL);
 ini_set('display_errors', 0);
-
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\SMTP;
+use PHPMailer\PHPMailer\Exception;
+            
 // Forçar resposta JSON
 header('Content-Type: application/json; charset=UTF-8');
 header('Access-Control-Allow-Origin: *');
@@ -107,10 +110,8 @@ try {
             require_once 'libs/PHPMailer/src/SMTP.php';
             require_once 'libs/PHPMailer/src/Exception.php';
             
-            use PHPMailer\PHPMailer\PHPMailer;
-            use PHPMailer\PHPMailer\SMTP;
-            use PHPMailer\PHPMailer\Exception;
-            
+        
+        
             try {
                 $mail = new PHPMailer(true);
                 
@@ -180,10 +181,9 @@ try {
             require_once 'libs/PHPMailer/src/SMTP.php';
             require_once 'libs/PHPMailer/src/Exception.php';
             
-            use PHPMailer\PHPMailer\PHPMailer;
-            use PHPMailer\PHPMailer\SMTP;
-            use PHPMailer\PHPMailer\Exception;
             
+        
+
             try {
                 $mail = new PHPMailer(true);
                 
