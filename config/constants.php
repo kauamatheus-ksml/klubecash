@@ -227,6 +227,14 @@ define('DEVICE_ID_PREFIX', 'klube_web_');
 define('DEVICE_ID_ALGORITHM', 'enhanced');
 define('DEVICE_ID_STORAGE', 'multi'); // localStorage + sessionStorage + cookie
 
+
+// === CONFIGURAÇÕES DE 2FA ===
+define('TWO_FA_VERIFY_URL', SITE_URL . '/verificar-2fa');
+define('TWO_FA_CODE_LENGTH', 6);
+define('TWO_FA_DEFAULT_EXPIRATION', 5); // minutos
+define('TWO_FA_MAX_ATTEMPTS', 3);
+define('TWO_FA_BLOCK_DURATION', 15); // minutos
+
 // Funções helper para certificados
 function is_ssl_enabled() {
     return isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';

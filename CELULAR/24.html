@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Klubecash - Lojas Parceiras</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"/>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #F7F7F7;
+        }
+        .material-icons {
+            font-family: 'Material Icons';
+            font-weight: normal;
+            font-style: normal;
+            font-size: 24px;
+            line-height: 1;
+            letter-spacing: normal;
+            text-transform: none;
+            display: inline-block;
+            white-space: nowrap;
+            word-wrap: normal;
+            direction: ltr;
+            -webkit-font-feature-settings: 'liga';
+            -webkit-font-smoothing: antialiased;
+        }
+        .top-bar {
+            background-color: #FF6F00;}
+        .card {
+            background-color: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+        .btn-primary {
+            background-color: #22C55E;color: white;
+            border-radius: 8px;
+            padding: 10px 16px;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+        .btn-primary:hover {
+            background-color: #16A34A;}
+        .btn-secondary {
+            color: #FF6F00;border: 1px solid #FF6F00;
+            border-radius: 8px;
+            padding: 8px 14px;
+            font-weight: 500;
+            transition: background-color 0.2s, color 0.2s;
+        }
+        .btn-secondary:hover {
+            background-color: #FFF7ED;}
+        .badge {
+            background-color: #FEF3C7;color: #D97706;padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .text-orange-primary {
+            color: #FF6F00;
+        }
+        .text-gray-secondary {
+            color: #6B7280;}
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="pb-20">
+<header class="top-bar p-4 text-white flex items-center justify-between sticky top-0 z-50 shadow-md">
+<button>
+<span class="material-icons">arrow_back_ios_new</span>
+</button>
+<h1 class="text-xl font-semibold">Lojas Parceiras</h1>
+<button>
+<span class="material-icons">notifications</span>
+</button>
+</header>
+<main class="p-4">
+<div class="mb-6">
+<h2 class="text-2xl font-bold text-gray-800 mb-1">Suas Lojas Parceiras</h2>
+<p class="text-gray-secondary text-sm">Descubra onde você pode ganhar e usar seu cashback.</p>
+</div>
+<div class="mb-6">
+<button class="w-full flex items-center justify-between p-3 bg-white rounded-lg shadow-sm text-gray-700 border border-gray-200">
+<div class="flex items-center">
+<span class="material-icons text-orange-primary mr-2">filter_list</span>
+<span>Filtrar Lojas</span>
+</div>
+<span class="material-icons text-gray-500">expand_more</span>
+</button>
+</div>
+<div class="mb-4 flex justify-between items-baseline">
+<h3 class="text-lg font-semibold text-gray-800">Suas Lojas Disponíveis</h3>
+<span class="text-xs text-gray-500">3 lojas encontradas</span>
+</div>
+<div class="space-y-4">
+<div class="card p-4">
+<div class="flex items-start justify-between mb-3">
+<div class="flex items-center">
+<div class="w-10 h-10 bg-orange-500 text-white rounded-full flex items-center justify-center font-bold text-lg mr-3">KA</div>
+<div>
+<h4 class="font-semibold text-gray-800">Kaua Matheus da Silva Lopes</h4>
+<p class="text-xs text-gray-secondary">Serviços</p>
+</div>
+</div>
+<button>
+<span class="material-icons text-gray-400">favorite_border</span>
+</button>
+</div>
+<div class="bg-orange-50 rounded-lg p-3 text-center mb-4">
+<p class="text-2xl font-bold text-orange-primary">5.0%</p>
+<p class="text-xs text-orange-primary uppercase">DE CASHBACK</p>
+</div>
+<div class="flex items-center text-xs text-gray-600 bg-gray-100 p-2 rounded-md mb-4">
+<span class="material-icons text-sm text-green-500 mr-1">info_outline</span>
+                    Você ganha 5.0% do valor da compra
+                </div>
+<div class="bg-green-50 p-3 rounded-lg mb-4">
+<p class="text-xs text-green-700 mb-1">Saldo Disponível</p>
+<div class="flex items-center justify-between">
+<span class="text-xl font-bold text-green-600">R$ 21,75</span>
+<button class="btn-primary text-sm flex items-center">
+<span class="material-icons text-base mr-1">shopping_cart</span>
+                            Usar Agora
+                        </button>
+</div>
+</div>
+<div class="flex justify-between items-center">
+<button class="btn-secondary text-sm flex items-center">
+<span class="material-icons text-sm mr-1">visibility</span>
+                        Ver Detalhes
+                    </button>
+<p class="text-xs text-gray-secondary flex items-center">
+<span class="material-icons text-xs mr-1">calendar_today</span>
+                        Último uso: 04/06/2025
+                    </p>
+</div>
+</div>
+<div class="card p-4">
+<div class="flex items-start justify-between mb-3">
+<div class="flex items-center">
+<div class="w-10 h-10 bg-orange-500 text-white rounded-full flex items-center justify-center font-bold text-lg mr-3">MI</div>
+<div>
+<h4 class="font-semibold text-gray-800">Minha Loja</h4>
+<p class="text-xs text-gray-secondary">Outros</p>
+</div>
+</div>
+<button>
+<span class="material-icons text-gray-400">favorite_border</span>
+</button>
+</div>
+<div class="bg-orange-50 rounded-lg p-3 text-center mb-4">
+<p class="text-2xl font-bold text-orange-primary">5.0%</p>
+<p class="text-xs text-orange-primary uppercase">DE CASHBACK</p>
+</div>
+<div class="flex items-center text-xs text-gray-600 bg-gray-100 p-2 rounded-md mb-4">
+<span class="material-icons text-sm text-green-500 mr-1">info_outline</span>
+                     Você ganha 5.0% do valor da compra
+                </div>
+<div class="bg-gray-50 p-3 rounded-lg text-center mb-4">
+<span class="material-icons text-3xl text-gray-400 mb-1">storefront</span>
+<p class="text-sm text-gray-600">Comece a Comprar Ganhe cashback nesta loja</p>
+</div>
+<div class="flex justify-start items-center">
+<button class="btn-secondary text-sm flex items-center">
+<span class="material-icons text-sm mr-1">visibility</span>
+                        Ver Detalhes
+                    </button>
+</div>
+</div>
+<div class="card p-4">
+<div class="flex items-start justify-between mb-3">
+<div class="flex items-center">
+<div class="w-10 h-10 bg-orange-500 text-white rounded-full flex items-center justify-center font-bold text-lg mr-3">MI</div>
+<div>
+<h4 class="font-semibold text-gray-800">Minha Loja</h4>
+<p class="text-xs text-gray-secondary">Outros</p>
+</div>
+</div>
+<button>
+<span class="material-icons text-gray-400">favorite_border</span>
+</button>
+</div>
+<div class="bg-orange-50 rounded-lg p-3 text-center mb-4">
+<p class="text-2xl font-bold text-orange-primary">5.0%</p>
+<p class="text-xs text-orange-primary uppercase">DE CASHBACK</p>
+</div>
+<div class="flex items-center text-xs text-gray-600 bg-gray-100 p-2 rounded-md mb-4">
+<span class="material-icons text-sm text-green-500 mr-1">info_outline</span>
+                     Você ganha 5.0% do valor da compra
+                </div>
+<div class="bg-gray-50 p-3 rounded-lg text-center mb-4">
+<span class="material-icons text-3xl text-gray-400 mb-1">storefront</span>
+<p class="text-sm text-gray-600">Comece a Comprar Ganhe cashback nesta loja</p>
+</div>
+<div class="flex justify-start items-center">
+<button class="btn-secondary text-sm flex items-center">
+<span class="material-icons text-sm mr-1">visibility</span>
+                        Ver Detalhes
+                    </button>
+</div>
+</div>
+</div>
+</main>
+<nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around items-center p-2 shadow-top-lg">
+<a class="flex flex-col items-center text-gray-600 hover:text-orange-500 transition-colors p-2" href="#">
+<span class="material-icons">home</span>
+<span class="text-xs">Início</span>
+</a>
+<a class="flex flex-col items-center text-orange-500 hover:text-orange-600 transition-colors p-2" href="#">
+<span class="material-icons">storefront</span>
+<span class="text-xs">Lojas</span>
+</a>
+<a class="flex flex-col items-center text-gray-600 hover:text-orange-500 transition-colors p-2" href="#">
+<span class="material-icons">account_balance_wallet</span>
+<span class="text-xs">Saldo</span>
+</a>
+<a class="flex flex-col items-center text-gray-600 hover:text-orange-500 transition-colors p-2" href="#">
+<span class="material-icons">receipt_long</span>
+<span class="text-xs">Extrato</span>
+</a>
+<a class="flex flex-col items-center text-gray-600 hover:text-orange-500 transition-colors p-2" href="#">
+<span class="material-icons">person</span>
+<span class="text-xs">Perfil</span>
+</a>
+</nav>
+
+</body></html>

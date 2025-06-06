@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Meu Saldo - KiubeCash</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"/>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8f8f8;
+        }
+        .material-icons {
+            font-family: 'Material Icons';
+            font-weight: normal;
+            font-style: normal;
+            font-size: 24px;
+            line-height: 1;
+            letter-spacing: normal;
+            text-transform: none;
+            display: inline-block;
+            white-space: nowrap;
+            word-wrap: normal;
+            direction: ltr;
+            -webkit-font-smoothing: antialiased;
+            text-rendering: optimizeLegibility;
+            -moz-osx-font-smoothing: grayscale;
+            font-feature-settings: 'liga';
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="pb-20">
+<header class="bg-white shadow-sm sticky top-0 z-50">
+<div class="container mx-auto px-4 py-3 flex items-center justify-between">
+<div class="flex items-center">
+<img alt="KiubeCash Logo" class="h-8 mr-3" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD4d5Mp5mYTrj4olx6Lvtf4t-RPH9vD4pCVkxhmXcocYVbJnnuAc6P_NCa5ctyLbUa39zXR5q53o_wFbXgKxtmzc0NHcTR62GQ85SREPjGaUQzoANFO5XNchx3ZiGlF33D3S2f4yio7TEIFQuu7inLMW7_-wpM23RZ0eZ8Wei5ciF7b7rM61KyUcJxlvcwgQczK_bQHrEKZMMlM3_h69tMmwh4YMeaqoWTB5KUiLlQovOjfKIOdAf6VxRRAjLepEfclp3qnw-RQ6Pw"/>
+</div>
+<div class="flex items-center">
+<button class="p-2 rounded-full hover:bg-gray-100">
+<span class="material-icons text-gray-600">notifications</span>
+</button>
+<div class="ml-3 flex items-center">
+<div class="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center text-white font-semibold text-sm">K</div>
+<span class="ml-2 text-sm text-gray-700 font-medium hidden sm:block">Kaua M.</span>
+<span class="material-icons text-gray-500 ml-1">expand_more</span>
+</div>
+</div>
+</div>
+</header>
+<main class="container mx-auto px-4 py-6">
+<div class="mb-8">
+<h1 class="text-2xl font-bold text-gray-800">Meu Saldo de Cashback</h1>
+<p class="text-sm text-gray-500 mt-1">Acompanhe seus ganhos e use seu cashback!</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+<div class="bg-gradient-to-br from-green-500 to-green-600 p-6 rounded-xl shadow-lg text-white">
+<div class="flex items-center justify-between mb-3">
+<h2 class="text-lg font-semibold">Dinheiro Pronto para Usar</h2>
+<span class="material-icons opacity-80">account_balance_wallet</span>
+</div>
+<p class="text-4xl font-bold">R$ 21,75</p>
+<p class="text-xs opacity-80 mt-1">Valor que você pode usar nas suas próximas compras.</p>
+<div class="mt-4 pt-3 border-t border-white/20 text-sm flex justify-between items-center">
+<span>1 loja com saldo</span>
+<span class="material-icons text-xs">storefront</span>
+</div>
+</div>
+<div class="bg-gradient-to-br from-orange-400 to-orange-500 p-6 rounded-xl shadow-lg text-white">
+<div class="flex items-center justify-between mb-3">
+<h2 class="text-lg font-semibold">Chegando em Breve</h2>
+<span class="material-icons opacity-80">hourglass_top</span>
+</div>
+<p class="text-4xl font-bold">R$ 5,00</p>
+<p class="text-xs opacity-80 mt-1">Cashback que ainda vai ser liberado pelas lojas.</p>
+<div class="mt-4 pt-3 border-t border-white/20 text-sm">
+<div class="flex justify-between">
+<span>Kaua Matheus da Silva Lopes</span>
+<span class="font-medium">R$ 5,00</span>
+</div>
+</div>
+</div>
+<div class="bg-gradient-to-br from-blue-500 to-blue-600 p-6 rounded-xl shadow-lg text-white">
+<div class="flex items-center justify-between mb-3">
+<h2 class="text-lg font-semibold">Total Economizado</h2>
+<span class="material-icons opacity-80">trending_up</span>
+</div>
+<p class="text-4xl font-bold">R$ 26,75</p>
+<p class="text-xs opacity-80 mt-1">Quanto dinheiro você já ganhou de volta.</p>
+<div class="mt-4 pt-3 border-t border-white/20 text-sm">
+<div class="flex justify-between mb-1">
+<span><span class="material-icons text-xs mr-1 align-middle">check_circle</span>Já usei:</span>
+<span class="font-medium">R$ 5,00</span>
+</div>
+<div class="flex justify-between">
+<span><span class="material-icons text-xs mr-1 align-middle">account_balance_wallet</span>Disponível:</span>
+<span class="font-medium">R$ 21,75</span>
+</div>
+</div>
+</div>
+</div>
+<div class="mb-8">
+<div class="flex justify-between items-center mb-4">
+<h2 class="text-xl font-semibold text-gray-800">Suas Carteiras por Loja</h2>
+<a class="text-sm text-orange-500 font-medium flex items-center" href="#">
+                    Ver Todas <span class="material-icons text-sm ml-1">arrow_forward_ios</span>
+</a>
+</div>
+<p class="text-sm text-gray-500 mb-4">Cada loja tem seu próprio saldo que você pode usar.</p>
+<div class="space-y-4">
+<div class="bg-white p-5 rounded-xl shadow-md">
+<div class="flex items-start justify-between">
+<div class="flex items-start">
+<div class="w-10 h-10 bg-orange-500 rounded-lg flex items-center justify-center text-white font-semibold text-lg mr-4">K</div>
+<div>
+<h3 class="font-semibold text-gray-800">Kaua Matheus da Silva Lopes</h3>
+<p class="text-xs text-gray-500">Serviços</p>
+<p class="text-xs text-green-500 font-medium mt-1">Você ganha 5.0% de volta</p>
+</div>
+</div>
+<button class="text-gray-400 hover:text-gray-600">
+<span class="material-icons">more_vert</span>
+</button>
+</div>
+<div class="mt-4 pt-4 border-t border-gray-100">
+<p class="text-xs text-gray-500 mb-1">Você pode usar:</p>
+<p class="text-2xl font-bold text-green-600">R$ 21,75</p>
+</div>
+<div class="grid grid-cols-2 gap-3 mt-3 text-xs text-gray-600">
+<div class="bg-gray-50 p-2 rounded-md">
+<p>Total recebido</p>
+<p class="font-semibold text-gray-800">R$ 26,75</p>
+</div>
+<div class="bg-gray-50 p-2 rounded-md">
+<p>Já usado</p>
+<p class="font-semibold text-gray-800">R$ 5,00</p>
+</div>
+</div>
+<div class="mt-5 flex space-x-3">
+<button class="flex-1 bg-orange-500 text-white py-3 rounded-lg text-sm font-medium hover:bg-orange-600 transition duration-150 flex items-center justify-center">
+<span class="material-icons text-base mr-1">receipt_long</span>Ver Detalhes
+                        </button>
+<button class="flex-1 bg-gray-100 text-gray-700 py-3 rounded-lg text-sm font-medium hover:bg-gray-200 transition duration-150 flex items-center justify-center">
+<span class="material-icons text-base mr-1">store</span>Visitar Loja
+                        </button>
+</div>
+<p class="text-xs text-gray-400 text-center mt-4">Última atividade: 05/06/2025</p>
+</div>
+<div class="bg-white p-5 rounded-xl shadow-md">
+<div class="flex items-start justify-between">
+<div class="flex items-start">
+<div class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center text-white font-semibold text-lg mr-4">L</div>
+<div>
+<h3 class="font-semibold text-gray-800">Loja Exemplo Dois</h3>
+<p class="text-xs text-gray-500">Eletrônicos</p>
+<p class="text-xs text-green-500 font-medium mt-1">Você ganha 3.0% de volta</p>
+</div>
+</div>
+<button class="text-gray-400 hover:text-gray-600">
+<span class="material-icons">more_vert</span>
+</button>
+</div>
+<div class="mt-4 pt-4 border-t border-gray-100">
+<p class="text-xs text-gray-500 mb-1">Você pode usar:</p>
+<p class="text-2xl font-bold text-green-600">R$ 12,50</p>
+</div>
+<div class="grid grid-cols-2 gap-3 mt-3 text-xs text-gray-600">
+<div class="bg-gray-50 p-2 rounded-md">
+<p>Total recebido</p>
+<p class="font-semibold text-gray-800">R$ 15,00</p>
+</div>
+<div class="bg-gray-50 p-2 rounded-md">
+<p>Já usado</p>
+<p class="font-semibold text-gray-800">R$ 2,50</p>
+</div>
+</div>
+<div class="mt-5 flex space-x-3">
+<button class="flex-1 bg-orange-500 text-white py-3 rounded-lg text-sm font-medium hover:bg-orange-600 transition duration-150 flex items-center justify-center">
+<span class="material-icons text-base mr-1">receipt_long</span>Ver Detalhes
+                        </button>
+<button class="flex-1 bg-gray-100 text-gray-700 py-3 rounded-lg text-sm font-medium hover:bg-gray-200 transition duration-150 flex items-center justify-center">
+<span class="material-icons text-base mr-1">store</span>Visitar Loja
+                        </button>
+</div>
+<p class="text-xs text-gray-400 text-center mt-4">Última atividade: 01/06/2025</p>
+</div>
+</div>
+</div>
+<div>
+<div class="flex justify-between items-center mb-3">
+<h2 class="text-xl font-semibold text-gray-800">Suas Últimas Atividades</h2>
+<a class="text-sm text-orange-500 font-medium flex items-center" href="#">
+                    Ver Todas <span class="material-icons text-sm ml-1">arrow_forward_ios</span>
+</a>
+</div>
+<div class="bg-white rounded-xl shadow-md">
+<ul class="divide-y divide-gray-100">
+<li class="p-4 flex justify-between items-center">
+<div class="flex items-center">
+<div class="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mr-3">
+<span class="material-icons text-green-500 text-xl">arrow_downward</span>
+</div>
+<div>
+<p class="text-sm font-medium text-gray-800">Você ganhou cashback - Kaua Matheus da Silva Lopes</p>
+<p class="text-xs text-gray-500">04/06/2025 22:31</p>
+</div>
+</div>
+<span class="text-sm font-semibold text-green-500">+ R$ 0,25</span>
+</li>
+<li class="p-4 flex justify-between items-center">
+<div class="flex items-center">
+<div class="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center mr-3">
+<span class="material-icons text-red-500 text-xl">arrow_upward</span>
+</div>
+<div>
+<p class="text-sm font-medium text-gray-800">Você usou cashback - Loja Exemplo Dois</p>
+<p class="text-xs text-gray-500">03/06/2025 10:15</p>
+</div>
+</div>
+<span class="text-sm font-semibold text-red-500">- R$ 2,50</span>
+</li>
+<li class="p-4 flex justify-between items-center">
+<div class="flex items-center">
+<div class="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center mr-3">
+<span class="material-icons text-yellow-500 text-xl">hourglass_empty</span>
+</div>
+<div>
+<p class="text-sm font-medium text-gray-800">Cashback pendente - Nova Compra XYZ</p>
+<p class="text-xs text-gray-500">02/06/2025 18:40</p>
+</div>
+</div>
+<span class="text-sm font-semibold text-yellow-600">R$ 7,80</span>
+</li>
+</ul>
+</div>
+</div>
+</main>
+<nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-top flex justify-around items-center py-2">
+<a class="flex flex-col items-center text-gray-500 hover:text-orange-500 transition-colors" href="#">
+<span class="material-icons">home</span>
+<span class="text-xs">Início</span>
+</a>
+<a class="flex flex-col items-center text-orange-500 hover:text-orange-600 transition-colors" href="#">
+<span class="material-icons">account_balance_wallet</span>
+<span class="text-xs">Meu Saldo</span>
+</a>
+<a class="flex flex-col items-center text-gray-500 hover:text-orange-500 transition-colors" href="#">
+<span class="material-icons">receipt_long</span>
+<span class="text-xs">Extrato</span>
+</a>
+<a class="flex flex-col items-center text-gray-500 hover:text-orange-500 transition-colors" href="#">
+<span class="material-icons">storefront</span>
+<span class="text-xs">Lojas</span>
+</a>
+<a class="flex flex-col items-center text-gray-500 hover:text-orange-500 transition-colors" href="#">
+<span class="material-icons">person</span>
+<span class="text-xs">Perfil</span>
+</a>
+</nav>
+
+</body></html>

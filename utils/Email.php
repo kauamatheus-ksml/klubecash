@@ -55,7 +55,157 @@ class Email {
             error_log('Constantes SMTP não encontradas. Utilizando valores padrão.');
         }
     }
+    /**
+     * Envia código de verificação 2FA por email
+     * 
+     * @param string $to Email do destinatário
+     * @param string $name Nome do destinatário
+     * @param string $code Código de verificação
+     * @param string $ipAddress IP do usuário
+     * @return bool Verdadeiro se enviado com sucesso
+     */
+    public static function send2FACode($to, $name, $code, $ipAddress = '') {
+        $subject = 'Código de Verificação - Klube Cash';
+        $nameEscaped = htmlspecialchars($name);
+        $location = self::getLocationFromIP($ipAddress);
+        $deviceInfo = self::getDeviceInfo();
+        
+        $message = '
+        <h2 style="color: #333333; font-size: 22px; margin-bottom: 20px;">Código de Verificação</h2>
+        <p style="color: #333333; font-size: 16px; line-height: 1.7; margin-bottom: 18px;">Olá, ' . $nameEscaped . '!</p>
+        <p style="color: #333333; font-size: 16px; line-height: 1.7; margin-bottom: 18px;">Foi solicitado um código de verificação para acessar sua conta no Klube Cash.</p>
+        
+        <div style="background-color: #FFF0E6; border: 2px solid #FF7A00; border-radius: 8px; padding: 20px; text-align: center; margin: 25px 0;">
+            <p style="margin: 0; color: #333; font-size: 14px; margin-bottom: 10px;">Seu código de verificação é:</p>
+            <h1 style="margin: 0; color: #FF7A00; font-size: 32px; font-weight: bold; letter-spacing: 8px; font-family: monospace;">' . $code . '</h1>
+            <p style="margin: 0; color: #666; font-size: 12px; margin-top: 10px;">Este código expira em 5 minutos</p>
+        </div>
+        
+        <p style="color: #333333; font-size: 14px; line-height: 1.6; margin-bottom: 15px;"><strong>Detalhes do acesso:</strong></p>
+        <ul style="color: #666; font-size: 14px; line-height: 1.6; margin-bottom: 20px;">
+            <li><strong>Data/Hora:</strong> ' . date('d/m/Y H:i:s') . '</li>
+            <li><strong>Dispositivo:</strong> ' . $deviceInfo . '</li>
+            <li><strong>Localização:</strong> ' . $location . '</li>
+        </ul>
+        
+        <div style="background-color: #FEF2F2; border-left: 4px solid #EF4444; padding: 15px; margin: 20px 0;">
+            <p style="margin: 0; color: #991B1B; font-size: 14px;"><strong>⚠️ Importante:</strong> Se você não solicitou este código, alguém pode estar tentando acessar sua conta. Entre em contato conosco imediatamente.</p>
+        </div>
+        
+        <p style="font-size: 13px; color: #777; margin-top: 25px;">
+            Por segurança, não compartilhe este código com ninguém.<br>
+            Atenciosamente,<br><strong>Equipe Klube Cash</strong>
+        </p>';
+        
+        return self::send($to, $subject, $message, $name);
+    }
+
+
+/**
+     * Obtém informação do dispositivo
+     * 
+     * @return string Informação do dispositivo
+     */
+    private static function getDeviceInfo() {
+        $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? 'Desconhecido';
+        
+        // Detectar navegador
+        if (strpos($userAgent, 'Chrome') !== false) {
+            $browser = 'Chrome';
+        } elseif (strpos($userAgent, 'Firefox') !== false) {
+            $browser = 'Firefox';
+        } elseif (strpos($userAgent, 'Safari') !== false) {
+            $browser = 'Safari';
+        } elseif (strpos($userAgent, 'Edge') !== false) {
+            $browser = 'Edge';
+        } else {
+            $browser = 'Navegador não identificado';
+        }
+        
+        // Detectar sistema operacional
+        if (strpos($userAgent, 'Windows') !== false) {
+            $os = 'Windows';
+        } elseif (strpos($userAgent, 'Mac') !== false) {
+            $os = 'Mac OS';
+        } elseif (strpos($userAgent, 'Linux') !== false) {
+            $os = 'Linux';
+        } elseif (strpos($userAgent, 'Android') !== false) {
+            $os = 'Android';
+        } elseif (strpos($userAgent, 'iOS') !== false) {
+            $os = 'iOS';
+        } else {
+            $os = 'Sistema não identificado';
+        }
+        
+        return $browser . ' em ' . $os;
+    }
     
+    /**
+     * Obtém localização aproximada do IP
+     * 
+     * @param string $ip Endereço IP
+     * @return string Localização aproximada
+     */
+    private static function getLocationFromIP($ip) {
+        if (empty($ip) || $ip === '127.0.0.1' || $ip === '::1') {
+            return 'Localhost';
+        }
+        
+        // Para implementação completa, você pode usar serviços como:
+        // - ipapi.co
+        // - ip-api.com
+        // - geoip-db.com
+        
+        // Por enquanto, retorna uma localização genérica
+        return 'Brasil'; // Você pode implementar uma API de geolocalização aqui
+    }
+    
+    /**
+     * Envia alerta de novo acesso por email
+     * 
+     * @param string $to Email do destinatário
+     * @param string $name Nome do destinatário
+     * @param string $ipAddress IP do usuário
+     * @return bool Verdadeiro se enviado com sucesso
+     */
+    public static function sendLoginAlert($to, $name, $ipAddress = '') {
+        $subject = 'Novo Acesso à sua Conta - Klube Cash';
+        $nameEscaped = htmlspecialchars($name);
+        $location = self::getLocationFromIP($ipAddress);
+        $deviceInfo = self::getDeviceInfo();
+        
+        $message = '
+        <h2 style="color: #333333; font-size: 22px; margin-bottom: 20px;">Novo Acesso Detectado</h2>
+        <p style="color: #333333; font-size: 16px; line-height: 1.7; margin-bottom: 18px;">Olá, ' . $nameEscaped . '!</p>
+        <p style="color: #333333; font-size: 16px; line-height: 1.7; margin-bottom: 18px;">Detectamos um novo acesso à sua conta no Klube Cash.</p>
+        
+        <div style="background-color: #F0F9FF; border: 1px solid #0EA5E9; border-radius: 8px; padding: 20px; margin: 25px 0;">
+            <p style="margin: 0; color: #333; font-size: 14px; margin-bottom: 15px;"><strong>Detalhes do acesso:</strong></p>
+            <ul style="color: #666; font-size: 14px; line-height: 1.6; margin: 0;">
+                <li><strong>Data/Hora:</strong> ' . date('d/m/Y H:i:s') . '</li>
+                <li><strong>Dispositivo:</strong> ' . $deviceInfo . '</li>
+                <li><strong>Localização:</strong> ' . $location . '</li>
+            </ul>
+        </div>
+        
+        <p style="color: #333333; font-size: 16px; line-height: 1.7; margin-bottom: 18px;">Se foi você quem fez este acesso, pode ignorar este email.</p>
+        
+        <div style="background-color: #FEF2F2; border-left: 4px solid #EF4444; padding: 15px; margin: 20px 0;">
+            <p style="margin: 0; color: #991B1B; font-size: 14px;"><strong>⚠️ Se não foi você:</strong></p>
+            <p style="margin: 5px 0 0 0; color: #991B1B; font-size: 14px;">Recomendamos que altere sua senha imediatamente e entre em contato conosco.</p>
+        </div>
+        
+        <p style="text-align: center; margin: 30px 0;">
+            <a href="' . SITE_URL . '/recuperar-senha" class="btn">Alterar Minha Senha</a>
+        </p>
+        
+        <p style="font-size: 13px; color: #777; margin-top: 25px;">
+            Atenciosamente,<br><strong>Equipe Klube Cash</strong>
+        </p>';
+        
+        return self::send($to, $subject, $message, $name);
+    }
+
     /**
      * Envia um email
      * 

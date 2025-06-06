@@ -217,6 +217,12 @@ RewriteRule ^auth/google/auth/?$ auth/google/auth.php [L]
 RewriteRule ^auth/google/register/?$ auth/google/register.php [L]
 RewriteRule ^auth/google/callback/?$ auth/google/callback.php [L]
 
+
+# .htaccess - ADICIONE ESTA LINHA NA SEÇÃO DE AUTENTICAÇÃO
+
+# Verificação 2FA
+RewriteRule ^verificar-2fa/?$ views/auth/verify-2fa.php [L]
+
 # === OTIMIZAÇÕES ESPECIAIS PARA MERCADO PAGO ===
 <IfModule mod_headers.c>
     # Preload de recursos críticos

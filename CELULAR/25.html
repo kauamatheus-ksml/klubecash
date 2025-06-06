@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Perfil KlubeCash</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"/>
+<style>
+        body {
+            font-family: 'Roboto', sans-serif;
+        }
+        .material-icons {
+            font-size: 24px;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-gray-100">
+<div class="container mx-auto max-w-lg">
+<header class="bg-white shadow-md sticky top-0 z-50">
+<div class="flex items-center justify-between p-4">
+<button class="text-gray-600">
+<span class="material-icons">arrow_back</span>
+</button>
+<h1 class="text-xl font-semibold text-gray-800">Meu Perfil</h1>
+<button class="text-gray-600">
+<span class="material-icons">more_vert</span>
+</button>
+</div>
+</header>
+<section class="bg-white p-6 mt-4 rounded-lg shadow">
+<div class="flex items-center space-x-4">
+<div class="w-20 h-20 bg-orange-500 rounded-full flex items-center justify-center text-white text-3xl font-bold">
+                    K
+                </div>
+<div>
+<h2 class="text-2xl font-semibold text-gray-800">Kaua Matheus da Silva Lopes</h2>
+<p class="text-gray-600">kauamatheus920@gmail.com</p>
+<p class="text-gray-500 text-sm">CPF: 156.921.346-16</p>
+</div>
+</div>
+</section>
+<section class="bg-white p-6 mt-4 rounded-lg shadow">
+<div class="flex justify-between items-center mb-2">
+<h3 class="text-lg font-medium text-gray-700">Completude do Perfil</h3>
+<span class="text-orange-500 font-semibold">100%</span>
+</div>
+<div class="w-full bg-gray-200 rounded-full h-2.5">
+<div class="bg-orange-500 h-2.5 rounded-full" style="width: 100%"></div>
+</div>
+<p class="mt-3 text-sm text-green-600 flex items-center">
+<span class="material-icons mr-1 text-green-600">check_circle</span>
+                Parabéns! Seu perfil está completo
+            </p>
+</section>
+<section class="bg-white p-6 mt-4 rounded-lg shadow">
+<h3 class="text-xl font-semibold text-gray-800 mb-4">Informações Pessoais</h3>
+<div class="space-y-4">
+<div>
+<label class="block text-sm font-medium text-gray-700" for="fullName">Nome Completo <span class="text-red-500">*</span></label>
+<input class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm" id="fullName" readonly="" type="text" value="Kaua Matheus da Silva Lopes"/>
+</div>
+<div>
+<label class="block text-sm font-medium text-gray-700" for="cpf">CPF</label>
+<div class="flex items-center mt-1">
+<input class="block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md shadow-sm sm:text-sm" id="cpf" readonly="" type="text" value="15692134616"/>
+<span class="ml-2 text-green-600 flex items-center text-sm">
+<span class="material-icons text-sm mr-1">verified</span>Verificado
+                        </span>
+</div>
+<p class="mt-1 text-xs text-gray-500">Seu CPF foi validado. Não pode ser alterado por segurança.</p>
+</div>
+<div>
+<label class="block text-sm font-medium text-gray-700" for="emailPrincipal">E-mail Principal</label>
+<input class="mt-1 block w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm" id="emailPrincipal" readonly="" type="email" value="kauamatheus920@gmail.com"/>
+<p class="mt-1 text-xs text-gray-500">O e-mail principal não pode ser alterado por segurança.</p>
+</div>
+<div>
+<label class="block text-sm font-medium text-gray-700" for="phone">Telefone</label>
+<input class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm" id="phone" type="tel" value="38991045205"/>
+</div>
+<div>
+<label class="block text-sm font-medium text-gray-700" for="alternativeEmail">E-mail Alternativo</label>
+<input class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm" id="alternativeEmail" type="email" value="kauamatheus92000@gmail.com"/>
+<p class="mt-1 text-xs text-gray-500">Usado para recuperação de conta e comunicações importantes.</p>
+</div>
+</div>
+<button class="mt-6 w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 px-4 rounded-lg shadow-md transition duration-150 flex items-center justify-center">
+<span class="material-icons mr-2">save</span>Salvar Informações
+            </button>
+</section>
+<section class="bg-white p-6 mt-4 rounded-lg shadow">
+<h3 class="text-xl font-semibold text-gray-800 mb-4">Endereço</h3>
+<div class="space-y-4">
+<div>
+<label class="block text-sm font-medium text-gray-700" for="cep">CEP</label>
+<input class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm" id="cep" type="text" value="38705376"/>
+<p class="mt-1 text-xs text-gray-500">Digite o CEP para preencher automaticamente o endereço.</p>
+</div>
+<div class="grid grid-cols-3 gap-4">
+<div class="col-span-2">
+<label class="block text-sm font-medium text-gray-700" for="street">Logradouro</label>
+<input class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm" id="street" type="text" value="Rua Francisco Braga da Mota"/>
+</div>
+<div>
+<label class="block text-sm font-medium text-gray-700" for="number">Número</label>
+<input class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm" id="number" type="text" value="146"/>
+</div>
+</div>
+<div>
+<label class="block text-sm font-medium text-gray-700" for="complement">Complemento</label>
+<input class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm" id="complement" type="text" value="Ap 101"/>
+</div>
+<div class="grid grid-cols-3 gap-4">
+<div class="col-span-1">
+<label class="block text-sm font-medium text-gray-700" for="neighborhood">Bairro</label>
+<input class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm" id="neighborhood" type="text" value="Jardim Panorâmico"/>
+</div>
+<div class="col-span-1">
+<label class="block text-sm font-medium text-gray-700" for="city">Cidade</label>
+<input class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm" id="city" type="text" value="Patos de Minas"/>
+</div>
+<div class="col-span-1">
+<label class="block text-sm font-medium text-gray-700" for="state">Estado</label>
+<input class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm" id="state" type="text" value="MG"/>
+</div>
+</div>
+</div>
+<button class="mt-6 w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 px-4 rounded-lg shadow-md transition duration-150 flex items-center justify-center">
+<span class="material-icons mr-2">save</span>Salvar Endereço
+            </button>
+</section>
+<section class="bg-white p-6 mt-4 mb-20 rounded-lg shadow">
+<h3 class="text-xl font-semibold text-gray-800 mb-4">Segurança da Conta</h3>
+<div class="space-y-4">
+<div>
+<label class="block text-sm font-medium text-gray-700" for="currentPassword">Senha Atual <span class="text-red-500">*</span></label>
+<input class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm" id="currentPassword" placeholder="Digite sua senha atual" type="password"/>
+</div>
+<div>
+<label class="block text-sm font-medium text-gray-700" for="newPassword">Nova Senha <span class="text-red-500">*</span></label>
+<input class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm" id="newPassword" placeholder="Digite a nova senha" type="password"/>
+<p class="mt-1 text-xs text-gray-500">Mínimo de 8 caracteres.</p>
+</div>
+<div>
+<label class="block text-sm font-medium text-gray-700" for="confirmNewPassword">Confirmar Nova Senha <span class="text-red-500">*</span></label>
+<input class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm" id="confirmNewPassword" placeholder="Digite novamente a nova senha" type="password"/>
+</div>
+</div>
+<button class="mt-6 w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-3 px-4 rounded-lg shadow-md transition duration-150 flex items-center justify-center">
+<span class="material-icons mr-2">lock_reset</span>Alterar Senha
+            </button>
+</section>
+<nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-t-md flex justify-around items-center py-3 max-w-lg mx-auto">
+<a class="text-gray-600 hover:text-orange-500 flex flex-col items-center" href="#">
+<span class="material-icons">home</span>
+<span class="text-xs">Início</span>
+</a>
+<a class="text-gray-600 hover:text-orange-500 flex flex-col items-center" href="#">
+<span class="material-icons">bookmark_border</span>
+<span class="text-xs">Salvos</span>
+</a>
+<a class="text-gray-600 hover:text-orange-500 flex flex-col items-center" href="#">
+<span class="material-icons">search</span>
+<span class="text-xs">Buscar</span>
+</a>
+<a class="text-orange-500 flex flex-col items-center relative" href="#">
+<span class="material-icons">person</span>
+<span class="text-xs">Perfil</span>
+<span class="absolute -top-1 -right-2 bg-orange-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">40</span>
+</a>
+</nav>
+</div>
+
+</body></html>

@@ -78,7 +78,27 @@ function ensureConfigurationTables($db) {
 // Inicializar variáveis
 $message = '';
 $messageType = '';
+// Processar configurações de 2FA
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'update_2fa_settings') {
+    $config2FA = [
+        'habilitado' => isset($_POST['2fa_habilitado']) ? 1 : 0,
+        'tempo_expiracao_minutos' => intval($_POST['tempo_expiracao_minutos'] ?? 5),
+        'max_tentativas' => intval($_POST['max_tentativas'] ?? 3)
+    ];
+    
+    $result = AuthController::update2FASettings($config2FA);
+    
+    if ($result['status']) {
+        $message = 'Configurações de 2FA atualizadas com sucesso!';
+        $messageType = 'success';
+    } else {
+        $message = $result['message'];
+        $messageType = 'danger';
+    }
+}
 
+// Obter configurações de 2FA
+$config2FA = AuthController::get2FASettings();
 // Processar formulário se enviado
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
@@ -564,6 +584,76 @@ try {
                         </div>
                     </div>
                 </div>
+                <form method="post" action="" id="twoFactorForm">
+                    <input type="hidden" name="action" value="update_2fa_settings">
+                    <div class="card">
+                        <div class="card-header">
+                            <h2 class="card-title">Autenticação de Dois Fatores (2FA)</h2>
+                        </div>
+                        <div class="card-body">
+                            <div class="info-box">
+                                <div class="info-icon">🔐</div>
+                                <div class="info-content">
+                                    <strong>Sobre o 2FA:</strong> A autenticação de dois fatores adiciona uma camada extra de segurança, 
+                                    enviando um código por email para verificar a identidade do usuário durante o login.
+                                </div>
+                            </div>
+                            
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="form-label">
+                                        <input type="checkbox" name="2fa_habilitado" value="1" <?php echo $config2FA['habilitado'] ? 'checked' : ''; ?>>
+                                        Habilitar verificação em duas etapas
+                                    </label>
+                                    <small class="form-text">Quando habilitado, todos os usuários precisarão verificar um código enviado por email</small>
+                                </div>
+                            </div>
+                            
+                            <div class="form-divider"></div>
+                            
+                            <h3 class="subsection-title">Configurações Avançadas</h3>
+                            
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="form-label" for="tempoExpiracaoMinutos">Tempo de Expiração do Código (minutos)</label>
+                                    <input type="number" min="1" max="60" class="form-control" id="tempoExpiracaoMinutos" 
+                                        name="tempo_expiracao_minutos" value="<?php echo $config2FA['tempo_expiracao_minutos']; ?>">
+                                    <small class="form-text">Por quanto tempo o código de verificação permanece válido</small>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label class="form-label" for="maxTentativas">Máximo de Tentativas</label>
+                                    <input type="number" min="1" max="10" class="form-control" id="maxTentativas" 
+                                        name="max_tentativas" value="<?php echo $config2FA['max_tentativas']; ?>">
+                                    <small class="form-text">Número máximo de tentativas antes de bloquear temporariamente</small>
+                                </div>
+                            </div>
+                            
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label class="form-label">Status do Sistema</label>
+                                    <div class="status-info">
+                                        <?php if ($config2FA['habilitado']): ?>
+                                            <span class="status-indicator active"></span>
+                                            <strong style="color: var(--success-color);">2FA Ativo</strong>
+                                            <p class="form-text">Todos os novos logins requerem verificação por email</p>
+                                        <?php else: ?>
+                                            <span class="status-indicator inactive"></span>
+                                            <strong style="color: var(--medium-gray);">2FA Inativo</strong>
+                                            <p class="form-text">Login tradicional (apenas email e senha)</p>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="btn-group">
+                                <button type="submit" class="btn btn-primary">Salvar Configurações de 2FA</button>
+                                <button type="button" class="btn btn-secondary" onclick="test2FAEmail()">Testar Email</button>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+
             </div>
         </div>
     </div>
@@ -660,6 +750,96 @@ try {
             toggleDependentFields();
         });
     </script>
+    <style>
+.status-info {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    flex-direction: column;
+}
+
+.status-info strong {
+    margin-left: 20px;
+}
+
+.status-info .form-text {
+    margin-left: 20px;
+    margin-top: 5px;
+}
+
+.info-box {
+    background-color: #e7f3ff;
+    border: 1px solid #b3d7ff;
+    border-radius: 8px;
+    padding: 15px;
+    margin: 20px 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.info-icon {
+    font-size: 1.2rem;
+    margin-top: 2px;
+}
+
+.info-content {
+    flex: 1;
+    color: #2c5aa0;
+    line-height: 1.5;
+}
+
+.info-content strong {
+    color: #1a4480;
+}
+</style>
+
+<!-- ADICIONE ESTE JAVASCRIPT NO FINAL DO ARQUIVO -->
+<script>
+// Controlar campos dependentes do 2FA
+document.addEventListener('DOMContentLoaded', function() {
+    const habilitado2FA = document.querySelector('input[name="2fa_habilitado"]');
+    const tempoExpiracao = document.querySelector('#tempoExpiracaoMinutos');
+    const maxTentativas = document.querySelector('#maxTentativas');
     
+    function toggle2FAFields() {
+        const isEnabled = habilitado2FA.checked;
+        
+        [tempoExpiracao, maxTentativas].forEach(field => {
+            field.disabled = !isEnabled;
+            field.style.opacity = isEnabled ? '1' : '0.5';
+        });
+    }
+    
+    habilitado2FA.addEventListener('change', toggle2FAFields);
+    toggle2FAFields(); // Executar inicialmente
+});
+
+// Função para testar email de 2FA
+function test2FAEmail() {
+    if (!confirm('Deseja enviar um email de teste para o administrador?')) {
+        return;
+    }
+    
+    fetch('<?php echo SITE_URL; ?>/controllers/AuthController.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'action=test_2fa_email'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status) {
+            alert('Email de teste enviado com sucesso!');
+        } else {
+            alert('Erro ao enviar email: ' + data.message);
+        }
+    })
+    .catch(error => {
+        alert('Erro na requisição: ' + error.message);
+    });
+}
+</script>
 </body>
 </html>

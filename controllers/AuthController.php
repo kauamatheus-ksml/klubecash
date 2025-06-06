@@ -11,7 +11,446 @@ require_once __DIR__ . '/../utils/Validator.php';
  * Gerencia login, registro, recuperação de senha e logout
  */
 class AuthController {
+    /**
+     * Verifica se o 2FA está habilitado no sistema
+     * 
+     * @return bool
+     */
+    public static function is2FAEnabled() {
+        try {
+            $db = Database::getConnection();
+            $stmt = $db->query("SELECT habilitado FROM configuracoes_2fa WHERE id = 1");
+            $config = $stmt->fetch(PDO::FETCH_ASSOC);
+            return $config ? (bool)$config['habilitado'] : false;
+        } catch (Exception $e) {
+            error_log('Erro ao verificar status 2FA: ' . $e->getMessage());
+            return false;
+        }
+    }
     
+    /**
+     * Gera e envia código de verificação 2FA
+     * 
+     * @param int $userId ID do usuário
+     * @return array Resultado da operação
+     */
+    public static function send2FACode($userId) {
+        try {
+            if (!self::is2FAEnabled()) {
+                return ['status' => false, 'message' => '2FA não está habilitado no sistema.'];
+            }
+            
+            $db = Database::getConnection();
+            
+            // Verificar se o usuário existe
+            $userStmt = $db->prepare("SELECT id, nome, email FROM usuarios WHERE id = ? AND status = 'ativo'");
+            $userStmt->execute([$userId]);
+            $user = $userStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$user) {
+                return ['status' => false, 'message' => 'Usuário não encontrado ou inativo.'];
+            }
+            
+            // Verificar se não está bloqueado
+            if (self::isUser2FABlocked($userId)) {
+                return ['status' => false, 'message' => 'Muitas tentativas. Tente novamente em alguns minutos.'];
+            }
+            
+            // Verificar limite de envio (máximo 1 código por minuto)
+            $lastSentStmt = $db->prepare("SELECT ultimo_2fa_enviado FROM usuarios WHERE id = ?");
+            $lastSentStmt->execute([$userId]);
+            $lastSent = $lastSentStmt->fetchColumn();
+            
+            if ($lastSent && (time() - strtotime($lastSent)) < 60) {
+                return ['status' => false, 'message' => 'Aguarde 1 minuto antes de solicitar um novo código.'];
+            }
+            
+            // Gerar código de 6 dígitos
+            $codigo = str_pad(random_int(100000, 999999), 6, '0', STR_PAD_LEFT);
+            
+            // Obter configurações
+            $configStmt = $db->query("SELECT tempo_expiracao_minutos FROM configuracoes_2fa WHERE id = 1");
+            $config = $configStmt->fetch(PDO::FETCH_ASSOC);
+            $tempoExpiracao = $config['tempo_expiracao_minutos'] ?? 5;
+            
+            $dataExpiracao = date('Y-m-d H:i:s', strtotime("+{$tempoExpiracao} minutes"));
+            $ipAddress = $_SERVER['REMOTE_ADDR'] ?? '';
+            $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
+            
+            // Invalidar códigos anteriores não utilizados
+            $invalidateStmt = $db->prepare("UPDATE verificacao_2fa SET usado = 1 WHERE usuario_id = ? AND usado = 0");
+            $invalidateStmt->execute([$userId]);
+            
+            // Inserir novo código
+            $insertStmt = $db->prepare("
+                INSERT INTO verificacao_2fa (usuario_id, codigo, data_expiracao, ip_address, user_agent)
+                VALUES (?, ?, ?, ?, ?)
+            ");
+            $insertStmt->execute([$userId, $codigo, $dataExpiracao, $ipAddress, $userAgent]);
+            
+            // Atualizar último envio
+            $updateStmt = $db->prepare("UPDATE usuarios SET ultimo_2fa_enviado = NOW() WHERE id = ?");
+            $updateStmt->execute([$userId]);
+            
+            // Enviar email
+            if (Email::send2FACode($user['email'], $user['nome'], $codigo, $ipAddress)) {
+                return [
+                    'status' => true, 
+                    'message' => 'Código de verificação enviado para seu email.',
+                    'expira_em' => $tempoExpiracao
+                ];
+            } else {
+                return ['status' => false, 'message' => 'Erro ao enviar email. Tente novamente.'];
+            }
+            
+        } catch (Exception $e) {
+            error_log('Erro ao enviar código 2FA: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro interno. Tente novamente.'];
+        }
+    }
+    
+    /**
+     * Verifica código de verificação 2FA
+     * 
+     * @param int $userId ID do usuário
+     * @param string $codigo Código fornecido pelo usuário
+     * @return array Resultado da verificação
+     */
+    public static function verify2FACode($userId, $codigo) {
+        try {
+            if (!self::is2FAEnabled()) {
+                return ['status' => false, 'message' => '2FA não está habilitado no sistema.'];
+            }
+            
+            $db = Database::getConnection();
+            
+            // Verificar se o usuário não está bloqueado
+            if (self::isUser2FABlocked($userId)) {
+                return ['status' => false, 'message' => 'Muitas tentativas. Tente novamente em alguns minutos.'];
+            }
+            
+            // Buscar código válido
+            $stmt = $db->prepare("
+                SELECT id, codigo, data_expiracao 
+                FROM verificacao_2fa 
+                WHERE usuario_id = ? AND codigo = ? AND usado = 0 AND data_expiracao > NOW()
+                ORDER BY data_criacao DESC 
+                LIMIT 1
+            ");
+            $stmt->execute([$userId, $codigo]);
+            $verificacao = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$verificacao) {
+                // Incrementar tentativas
+                self::increment2FAAttempts($userId);
+                return ['status' => false, 'message' => 'Código inválido ou expirado.'];
+            }
+            
+            // Marcar código como usado
+            $updateStmt = $db->prepare("UPDATE verificacao_2fa SET usado = 1 WHERE id = ?");
+            $updateStmt->execute([$verificacao['id']]);
+            
+            // Resetar tentativas
+            $resetStmt = $db->prepare("UPDATE usuarios SET tentativas_2fa = 0, bloqueado_2fa_ate = NULL WHERE id = ?");
+            $resetStmt->execute([$userId]);
+            
+            return ['status' => true, 'message' => 'Código verificado com sucesso.'];
+            
+        } catch (Exception $e) {
+            error_log('Erro ao verificar código 2FA: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro interno. Tente novamente.'];
+        }
+    }
+    
+    /**
+     * Incrementa tentativas de 2FA e bloqueia se necessário
+     * 
+     * @param int $userId ID do usuário
+     */
+    private static function increment2FAAttempts($userId) {
+        try {
+            $db = Database::getConnection();
+            
+            // Obter configurações
+            $configStmt = $db->query("SELECT max_tentativas FROM configuracoes_2fa WHERE id = 1");
+            $config = $configStmt->fetch(PDO::FETCH_ASSOC);
+            $maxTentativas = $config['max_tentativas'] ?? 3;
+            
+            // Incrementar tentativas
+            $incrementStmt = $db->prepare("UPDATE usuarios SET tentativas_2fa = tentativas_2fa + 1 WHERE id = ?");
+            $incrementStmt->execute([$userId]);
+            
+            // Verificar se atingiu o limite
+            $checkStmt = $db->prepare("SELECT tentativas_2fa FROM usuarios WHERE id = ?");
+            $checkStmt->execute([$userId]);
+            $tentativas = $checkStmt->fetchColumn();
+            
+            if ($tentativas >= $maxTentativas) {
+                // Bloquear por 15 minutos
+                $bloqueioAte = date('Y-m-d H:i:s', strtotime('+15 minutes'));
+                $blockStmt = $db->prepare("UPDATE usuarios SET bloqueado_2fa_ate = ? WHERE id = ?");
+                $blockStmt->execute([$bloqueioAte, $userId]);
+            }
+            
+        } catch (Exception $e) {
+            error_log('Erro ao incrementar tentativas 2FA: ' . $e->getMessage());
+        }
+    }
+    
+    /**
+     * Verifica se o usuário está bloqueado para 2FA
+     * 
+     * @param int $userId ID do usuário
+     * @return bool
+     */
+    private static function isUser2FABlocked($userId) {
+        try {
+            $db = Database::getConnection();
+            $stmt = $db->prepare("SELECT bloqueado_2fa_ate FROM usuarios WHERE id = ?");
+            $stmt->execute([$userId]);
+            $bloqueioAte = $stmt->fetchColumn();
+            
+            if ($bloqueioAte && strtotime($bloqueioAte) > time()) {
+                return true;
+            }
+            
+            // Se o bloqueio expirou, limpar
+            if ($bloqueioAte) {
+                $clearStmt = $db->prepare("UPDATE usuarios SET tentativas_2fa = 0, bloqueado_2fa_ate = NULL WHERE id = ?");
+                $clearStmt->execute([$userId]);
+            }
+            
+            return false;
+            
+        } catch (Exception $e) {
+            error_log('Erro ao verificar bloqueio 2FA: ' . $e->getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Atualiza configurações de 2FA (apenas admin)
+     * 
+     * @param array $config Configurações
+     * @return array Resultado da operação
+     */
+    public static function update2FASettings($config) {
+        try {
+            if (!self::isAdmin()) {
+                return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
+            }
+            
+            $db = Database::getConnection();
+            
+            $stmt = $db->prepare("
+                UPDATE configuracoes_2fa 
+                SET habilitado = ?, tempo_expiracao_minutos = ?, max_tentativas = ?
+                WHERE id = 1
+            ");
+            
+            $habilitado = isset($config['habilitado']) ? 1 : 0;
+            $tempoExpiracao = max(1, min(60, intval($config['tempo_expiracao_minutos'] ?? 5)));
+            $maxTentativas = max(1, min(10, intval($config['max_tentativas'] ?? 3)));
+            
+            $stmt->execute([$habilitado, $tempoExpiracao, $maxTentativas]);
+            
+            return ['status' => true, 'message' => 'Configurações de 2FA atualizadas com sucesso.'];
+            
+        } catch (Exception $e) {
+            error_log('Erro ao atualizar configurações 2FA: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro ao atualizar configurações.'];
+        }
+    }
+    
+    /**
+     * Obtém configurações de 2FA
+     * 
+     * @return array Configurações
+     */
+    public static function get2FASettings() {
+        try {
+            $db = Database::getConnection();
+            $stmt = $db->query("SELECT * FROM configuracoes_2fa WHERE id = 1");
+            $config = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$config) {
+                return [
+                    'habilitado' => false,
+                    'tempo_expiracao_minutos' => 5,
+                    'max_tentativas' => 3
+                ];
+            }
+            
+            return $config;
+            
+        } catch (Exception $e) {
+            error_log('Erro ao obter configurações 2FA: ' . $e->getMessage());
+            return [
+                'habilitado' => false,
+                'tempo_expiracao_minutos' => 5,
+                'max_tentativas' => 3
+            ];
+        }
+    }
+    
+    /**
+     * Login modificado para incluir 2FA
+     * 
+     * @param string $email Email do usuário
+     * @param string $password Senha do usuário
+     * @return array Resultado da operação
+     */
+    public static function loginWith2FA($email, $password) {
+        try {
+            // Primeiro, fazer login normal
+            if (empty($email) || empty($password)) {
+                return ['status' => false, 'message' => 'Por favor, preencha todos os campos.'];
+            }
+            
+            $db = Database::getConnection();
+            
+            $stmt = $db->prepare("SELECT id, nome, senha_hash, tipo, status FROM usuarios WHERE email = :email");
+            $stmt->bindParam(':email', $email);
+            $stmt->execute();
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($user && password_verify($password, $user['senha_hash'])) {
+                if ($user['status'] !== USER_ACTIVE) {
+                    return ['status' => false, 'message' => 'Sua conta está ' . $user['status'] . '. Entre em contato com o suporte.'];
+                }
+                
+                // Se 2FA estiver habilitado, enviar código
+                if (self::is2FAEnabled()) {
+                    $codeResult = self::send2FACode($user['id']);
+                    
+                    if ($codeResult['status']) {
+                        // Guardar dados do usuário em sessão temporária
+                        session_start();
+                        $_SESSION['pending_2fa_user_id'] = $user['id'];
+                        $_SESSION['pending_2fa_user_data'] = [
+                            'id' => $user['id'],
+                            'name' => $user['nome'],
+                            'email' => $email,
+                            'type' => $user['tipo']
+                        ];
+                        
+                        return [
+                            'status' => true,
+                            'requires_2fa' => true,
+                            'message' => $codeResult['message'],
+                            'expira_em' => $codeResult['expira_em']
+                        ];
+                    } else {
+                        return $codeResult;
+                    }
+                } else {
+                    // Se 2FA não estiver habilitado, fazer login normal
+                    return self::completeLogin($user);
+                }
+            } else {
+                return ['status' => false, 'message' => 'Email ou senha incorretos.'];
+            }
+            
+        } catch (PDOException $e) {
+            error_log('Erro no login com 2FA: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro ao processar o login. Tente novamente.'];
+        }
+    }
+    
+    /**
+     * Completa o login após verificação 2FA
+     * 
+     * @param string $codigo Código de verificação
+     * @return array Resultado da operação
+     */
+    public static function complete2FALogin($codigo) {
+        try {
+            session_start();
+            
+            if (!isset($_SESSION['pending_2fa_user_id'])) {
+                return ['status' => false, 'message' => 'Sessão expirada. Faça login novamente.'];
+            }
+            
+            $userId = $_SESSION['pending_2fa_user_id'];
+            $userData = $_SESSION['pending_2fa_user_data'];
+            
+            // Verificar código
+            $verifyResult = self::verify2FACode($userId, $codigo);
+            
+            if ($verifyResult['status']) {
+                // Limpar dados temporários
+                unset($_SESSION['pending_2fa_user_id']);
+                unset($_SESSION['pending_2fa_user_data']);
+                
+                // Buscar dados completos do usuário
+                $db = Database::getConnection();
+                $stmt = $db->prepare("SELECT * FROM usuarios WHERE id = ?");
+                $stmt->execute([$userId]);
+                $user = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if ($user) {
+                    return self::completeLogin($user);
+                } else {
+                    return ['status' => false, 'message' => 'Erro ao carregar dados do usuário.'];
+                }
+            } else {
+                return $verifyResult;
+            }
+            
+        } catch (Exception $e) {
+            error_log('Erro ao completar login 2FA: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro interno. Tente novamente.'];
+        }
+    }
+    
+    /**
+     * Completa o processo de login
+     * 
+     * @param array $user Dados do usuário
+     * @return array Resultado da operação
+     */
+    private static function completeLogin($user) {
+        try {
+            $db = Database::getConnection();
+            
+            // Iniciar sessão
+            session_start();
+            $_SESSION['user_id'] = $user['id'];
+            $_SESSION['user_name'] = $user['nome'];
+            $_SESSION['user_type'] = $user['tipo'];
+            $_SESSION['user_email'] = $user['email'];
+            
+            // Atualizar último login
+            $updateStmt = $db->prepare("UPDATE usuarios SET ultimo_login = NOW() WHERE id = ?");
+            $updateStmt->execute([$user['id']]);
+            
+            // Registrar sessão
+            self::registerSession($user['id']);
+            
+            // Associar loja se necessário
+            if ($user['tipo'] === USER_TYPE_STORE) {
+                self::associateStoreUser($user['id'], $user['email']);
+            }
+            
+            // Enviar alerta de login (opcional)
+            $ipAddress = $_SERVER['REMOTE_ADDR'] ?? '';
+            Email::sendLoginAlert($user['email'], $user['nome'], $ipAddress);
+            
+            return [
+                'status' => true,
+                'message' => 'Login efetuado com sucesso.',
+                'user' => [
+                    'id' => $user['id'],
+                    'name' => $user['nome'],
+                    'type' => $user['tipo']
+                ]
+            ];
+            
+        } catch (Exception $e) {
+            error_log('Erro ao completar login: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro ao finalizar login.'];
+        }
+    }
     /**
      * Processa login de usuário
      * 
@@ -899,6 +1338,37 @@ if (basename($_SERVER['PHP_SELF']) === 'AuthController.php') {
         default:
             // Acesso inválido ao controlador
             header('Location: ' . SITE_URL);
+            exit;
+    }
+}
+// Processar requisições AJAX para 2FA
+if (isset($_POST['action'])) {
+    switch ($_POST['action']) {
+        case 'login_with_2fa':
+            $email = $_POST['email'] ?? '';
+            $password = $_POST['password'] ?? '';
+            $result = AuthController::loginWith2FA($email, $password);
+            header('Content-Type: application/json');
+            echo json_encode($result);
+            exit;
+            
+        case 'verify_2fa':
+            $codigo = $_POST['codigo'] ?? '';
+            $result = AuthController::complete2FALogin($codigo);
+            header('Content-Type: application/json');
+            echo json_encode($result);
+            exit;
+            
+        case 'resend_2fa':
+            session_start();
+            if (isset($_SESSION['pending_2fa_user_id'])) {
+                $result = AuthController::send2FACode($_SESSION['pending_2fa_user_id']);
+                header('Content-Type: application/json');
+                echo json_encode($result);
+            } else {
+                header('Content-Type: application/json');
+                echo json_encode(['status' => false, 'message' => 'Sessão expirada.']);
+            }
             exit;
     }
 }
