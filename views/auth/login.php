@@ -674,7 +674,7 @@ if (!empty($urlError)) {
                 <li>Cashback real</li>
                 <li>Muitas lojas parceiras</li>
                 <li>Sem taxas ou anuidades</li>
-                <li>Utilize em lojas que ele fopi gerado</li>
+                <li>Utilize em lojas que ele foi gerado</li>
             </ul>
         </div>
 
