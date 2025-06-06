@@ -859,22 +859,26 @@ class AuthController {
             $adminName = $_SESSION['user_name'] ?? 'Administrador';
             $adminEmail = $_SESSION['user_email'] ?? ADMIN_EMAIL;
             
+            if (empty($adminEmail)) {
+                return ['status' => false, 'message' => 'Email do administrador não encontrado.'];
+            }
+            
             // Gerar código de teste
             $codigoTeste = '123456';
             $ipAddress = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
             
-            // Enviar email de teste
+            // Enviar email de teste 2FA
             $emailSent = Email::send2FACode($adminEmail, $adminName, $codigoTeste, $ipAddress);
             
             if ($emailSent) {
                 return [
                     'status' => true,
-                    'message' => 'Email de teste enviado com sucesso para: ' . $adminEmail
+                    'message' => 'Email de teste 2FA enviado com sucesso para: ' . $adminEmail
                 ];
             } else {
                 return [
                     'status' => false,
-                    'message' => 'Falha ao enviar email. Verifique as configurações SMTP.'
+                    'message' => 'Falha ao enviar email. Verifique as configurações SMTP e tente novamente.'
                 ];
             }
             
@@ -887,7 +891,34 @@ class AuthController {
         }
     }
 
-
+    /**
+     * Envia email de teste simples
+     * 
+     * @return array Resultado do teste
+     */
+    public static function sendTestEmail() {
+        try {
+            if (!self::isAdmin()) {
+                return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
+            }
+            
+            $adminEmail = $_SESSION['user_email'] ?? ADMIN_EMAIL;
+            $adminName = $_SESSION['user_name'] ?? 'Administrador';
+            
+            if (empty($adminEmail)) {
+                return ['status' => false, 'message' => 'Email do administrador não encontrado.'];
+            }
+            
+            return Email::sendTestEmail($adminEmail, $adminName);
+            
+        } catch (Exception $e) {
+            error_log('Erro no envio de email de teste: ' . $e->getMessage());
+            return [
+                'status' => false,
+                'message' => 'Erro ao enviar email de teste: ' . $e->getMessage()
+            ];
+        }
+    }
     /**
      * Testa a conexão com o servidor de email
      * 
@@ -899,7 +930,7 @@ class AuthController {
                 return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
             }
             
-            // Usar o método de teste da classe Email
+            // Usar o método corrigido da classe Email
             return Email::testEmailConnection();
             
         } catch (Exception $e) {
@@ -1454,36 +1485,20 @@ if (isset($_POST['action']) || isset($_GET['action'])) {
                 echo json_encode($result);
                 exit;
                 
-            case 'update_2fa_settings':
-                if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-                    $config = [
-                        'habilitado' => isset($_POST['2fa_habilitado']) ? 1 : 0,
-                        'tempo_expiracao_minutos' => intval($_POST['tempo_expiracao_minutos'] ?? 5),
-                        'max_tentativas' => intval($_POST['max_tentativas'] ?? 3)
-                    ];
-                    $result = AuthController::update2FASettings($config);
-                    echo json_encode($result);
-                    exit;
-                }
-                break;
-                
-            case 'get_2fa_settings':
-                $result = [
-                    'status' => true,
-                    'data' => AuthController::get2FASettings()
-                ];
+            case 'send_test_email':
+                $result = AuthController::sendTestEmail();
                 echo json_encode($result);
                 exit;
                 
             default:
-                echo json_encode(['status' => false, 'message' => 'Ação não reconhecida.']);
+                echo json_encode(['status' => false, 'message' => 'Ação não reconhecida: ' . $action]);
                 exit;
         }
     } catch (Exception $e) {
         error_log('Erro no processamento de ação 2FA: ' . $e->getMessage());
         echo json_encode([
             'status' => false,
-            'message' => 'Erro interno no servidor.'
+            'message' => 'Erro interno no servidor: ' . $e->getMessage()
         ]);
         exit;
     }

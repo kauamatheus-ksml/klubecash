@@ -650,6 +650,7 @@ try {
                                 <button type="submit" class="btn btn-primary">Salvar Configurações de 2FA</button>
                                 <button type="button" class="btn btn-secondary" onclick="test2FAEmail()">Testar Email 2FA</button>
                                 <button type="button" class="btn btn-secondary" onclick="testEmailConnection()">Testar Conexão SMTP</button>
+                                <button type="button" class="btn btn-info" onclick="sendTestEmail()">Enviar Email Simples</button>
                             </div>
                         </div>
                     </div>
@@ -660,9 +661,49 @@ try {
     </div>
     
     <script>
+        function sendTestEmail() {
+            if (!confirm('Deseja enviar um email de teste simples para o administrador?')) {
+                return;
+            }
+            
+            const button = event.target;
+            const originalText = button.textContent;
+            button.disabled = true;
+            button.textContent = 'Enviando...';
+            
+            fetch('<?php echo SITE_URL; ?>/controllers/AuthController.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'action=send_test_email'
+            })
+            .then(response => {
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    throw new Error('Resposta inválida do servidor');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.status) {
+                    alert('✅ ' + data.message);
+                } else {
+                    alert('❌ Erro: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Erro completo:', error);
+                alert('❌ Erro na requisição: ' + error.message);
+            })
+            .finally(() => {
+                button.disabled = false;
+                button.textContent = originalText;
+            });
+        }
         // Atualizar soma das porcentagens em tempo real
         // Atualizar soma das porcentagens em tempo real
-        <script>
+        
         // Atualizar soma das porcentagens em tempo real
         function updateSoma() {
             const porcentagemCliente = parseFloat(document.getElementById('porcentagemCliente').value) || 0;
