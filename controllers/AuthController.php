@@ -840,6 +840,77 @@ class AuthController {
             return false;
         }
     }
+
+
+    /**
+     * Testa o envio de email 2FA para o administrador
+     * 
+     * @return array Resultado do teste
+     */
+    public static function test2FAEmail() {
+        try {
+            // Verificar se é admin
+            if (!self::isAdmin()) {
+                return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
+            }
+            
+            // Obter dados do admin atual
+            $adminId = $_SESSION['user_id'];
+            $adminName = $_SESSION['user_name'] ?? 'Administrador';
+            $adminEmail = $_SESSION['user_email'] ?? ADMIN_EMAIL;
+            
+            // Gerar código de teste
+            $codigoTeste = '123456';
+            $ipAddress = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+            
+            // Enviar email de teste
+            $emailSent = Email::send2FACode($adminEmail, $adminName, $codigoTeste, $ipAddress);
+            
+            if ($emailSent) {
+                return [
+                    'status' => true,
+                    'message' => 'Email de teste enviado com sucesso para: ' . $adminEmail
+                ];
+            } else {
+                return [
+                    'status' => false,
+                    'message' => 'Falha ao enviar email. Verifique as configurações SMTP.'
+                ];
+            }
+            
+        } catch (Exception $e) {
+            error_log('Erro no teste de email 2FA: ' . $e->getMessage());
+            return [
+                'status' => false,
+                'message' => 'Erro interno: ' . $e->getMessage()
+            ];
+        }
+    }
+
+
+    /**
+     * Testa a conexão com o servidor de email
+     * 
+     * @return array Resultado do teste de conexão
+     */
+    public static function testEmailConnection() {
+        try {
+            if (!self::isAdmin()) {
+                return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
+            }
+            
+            // Usar o método de teste da classe Email
+            return Email::testEmailConnection();
+            
+        } catch (Exception $e) {
+            error_log('Erro no teste de conexão de email: ' . $e->getMessage());
+            return [
+                'status' => false,
+                'message' => 'Erro ao testar conexão: ' . $e->getMessage()
+            ];
+        }
+    }
+
     /**
     * Registra um novo usuário
     * 
@@ -1342,34 +1413,79 @@ if (basename($_SERVER['PHP_SELF']) === 'AuthController.php') {
     }
 }
 // Processar requisições AJAX para 2FA
-if (isset($_POST['action'])) {
-    switch ($_POST['action']) {
-        case 'login_with_2fa':
-            $email = $_POST['email'] ?? '';
-            $password = $_POST['password'] ?? '';
-            $result = AuthController::loginWith2FA($email, $password);
-            header('Content-Type: application/json');
-            echo json_encode($result);
-            exit;
-            
-        case 'verify_2fa':
-            $codigo = $_POST['codigo'] ?? '';
-            $result = AuthController::complete2FALogin($codigo);
-            header('Content-Type: application/json');
-            echo json_encode($result);
-            exit;
-            
-        case 'resend_2fa':
-            session_start();
-            if (isset($_SESSION['pending_2fa_user_id'])) {
-                $result = AuthController::send2FACode($_SESSION['pending_2fa_user_id']);
-                header('Content-Type: application/json');
+if (isset($_POST['action']) || isset($_GET['action'])) {
+    $action = $_POST['action'] ?? $_GET['action'] ?? '';
+    
+    // Sempre retornar JSON
+    header('Content-Type: application/json; charset=UTF-8');
+    
+    try {
+        switch ($action) {
+            case 'login_with_2fa':
+                $email = $_POST['email'] ?? '';
+                $password = $_POST['password'] ?? '';
+                $result = AuthController::loginWith2FA($email, $password);
                 echo json_encode($result);
-            } else {
-                header('Content-Type: application/json');
-                echo json_encode(['status' => false, 'message' => 'Sessão expirada.']);
-            }
-            exit;
+                exit;
+                
+            case 'verify_2fa':
+                $codigo = $_POST['codigo'] ?? '';
+                $result = AuthController::complete2FALogin($codigo);
+                echo json_encode($result);
+                exit;
+                
+            case 'resend_2fa':
+                session_start();
+                if (isset($_SESSION['pending_2fa_user_id'])) {
+                    $result = AuthController::send2FACode($_SESSION['pending_2fa_user_id']);
+                } else {
+                    $result = ['status' => false, 'message' => 'Sessão expirada.'];
+                }
+                echo json_encode($result);
+                exit;
+                
+            case 'test_2fa_email':
+                $result = AuthController::test2FAEmail();
+                echo json_encode($result);
+                exit;
+                
+            case 'test_email_connection':
+                $result = AuthController::testEmailConnection();
+                echo json_encode($result);
+                exit;
+                
+            case 'update_2fa_settings':
+                if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+                    $config = [
+                        'habilitado' => isset($_POST['2fa_habilitado']) ? 1 : 0,
+                        'tempo_expiracao_minutos' => intval($_POST['tempo_expiracao_minutos'] ?? 5),
+                        'max_tentativas' => intval($_POST['max_tentativas'] ?? 3)
+                    ];
+                    $result = AuthController::update2FASettings($config);
+                    echo json_encode($result);
+                    exit;
+                }
+                break;
+                
+            case 'get_2fa_settings':
+                $result = [
+                    'status' => true,
+                    'data' => AuthController::get2FASettings()
+                ];
+                echo json_encode($result);
+                exit;
+                
+            default:
+                echo json_encode(['status' => false, 'message' => 'Ação não reconhecida.']);
+                exit;
+        }
+    } catch (Exception $e) {
+        error_log('Erro no processamento de ação 2FA: ' . $e->getMessage());
+        echo json_encode([
+            'status' => false,
+            'message' => 'Erro interno no servidor.'
+        ]);
+        exit;
     }
 }
 ?>

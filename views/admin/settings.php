@@ -648,7 +648,8 @@ try {
                             
                             <div class="btn-group">
                                 <button type="submit" class="btn btn-primary">Salvar Configurações de 2FA</button>
-                                <button type="button" class="btn btn-secondary" onclick="test2FAEmail()">Testar Email</button>
+                                <button type="button" class="btn btn-secondary" onclick="test2FAEmail()">Testar Email 2FA</button>
+                                <button type="button" class="btn btn-secondary" onclick="testEmailConnection()">Testar Conexão SMTP</button>
                             </div>
                         </div>
                     </div>
@@ -660,6 +661,8 @@ try {
     
     <script>
         // Atualizar soma das porcentagens em tempo real
+        // Atualizar soma das porcentagens em tempo real
+        <script>
         // Atualizar soma das porcentagens em tempo real
         function updateSoma() {
             const porcentagemCliente = parseFloat(document.getElementById('porcentagemCliente').value) || 0;
@@ -678,14 +681,36 @@ try {
             }
         }
 
-        // Eventos
+        // Eventos para porcentagens
         document.getElementById('porcentagemCliente').addEventListener('input', updateSoma);
         document.getElementById('porcentagemAdmin').addEventListener('input', updateSoma);
 
         // Inicializar
-        document.addEventListener('DOMContentLoaded', updateSoma);
-        
-        // Validar formulário de cashback antes de enviar
+        document.addEventListener('DOMContentLoaded', function() {
+            updateSoma();
+            
+            // Controlar campos dependentes do 2FA
+            const habilitado2FA = document.querySelector('input[name="2fa_habilitado"]');
+            const tempoExpiracao = document.querySelector('#tempoExpiracaoMinutos');
+            const maxTentativas = document.querySelector('#maxTentativas');
+            
+            function toggle2FAFields() {
+                const isEnabled = habilitado2FA.checked;
+                
+                [tempoExpiracao, maxTentativas].forEach(field => {
+                    if (field) {
+                        field.disabled = !isEnabled;
+                        field.style.opacity = isEnabled ? '1' : '0.5';
+                    }
+                });
+            }
+            
+            if (habilitado2FA) {
+                habilitado2FA.addEventListener('change', toggle2FAFields);
+                toggle2FAFields(); // Executar inicialmente
+            }
+        });
+
         // Validar formulário de cashback antes de enviar
         document.getElementById('cashbackForm').addEventListener('submit', function(event) {
             const porcentagemCliente = parseFloat(document.getElementById('porcentagemCliente').value);
@@ -711,6 +736,92 @@ try {
                 return false;
             }
         });
+
+        // Função para testar email de 2FA (CORRIGIDA)
+        function test2FAEmail() {
+            if (!confirm('Deseja enviar um email de teste 2FA para o administrador?')) {
+                return;
+            }
+            
+            const button = event.target;
+            const originalText = button.textContent;
+            button.disabled = true;
+            button.textContent = 'Enviando...';
+            
+            fetch('<?php echo SITE_URL; ?>/controllers/AuthController.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'action=test_2fa_email'
+            })
+            .then(response => {
+                // Verificar se a resposta é JSON válida
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    throw new Error('Resposta inválida do servidor');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.status) {
+                    alert('✅ ' + data.message);
+                } else {
+                    alert('❌ Erro: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Erro completo:', error);
+                alert('❌ Erro na requisição: ' + error.message);
+            })
+            .finally(() => {
+                button.disabled = false;
+                button.textContent = originalText;
+            });
+        }
+
+        // Função para testar conexão SMTP
+        function testEmailConnection() {
+            if (!confirm('Deseja testar a conexão com o servidor de email?')) {
+                return;
+            }
+            
+            const button = event.target;
+            const originalText = button.textContent;
+            button.disabled = true;
+            button.textContent = 'Testando...';
+            
+            fetch('<?php echo SITE_URL; ?>/controllers/AuthController.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'action=test_email_connection'
+            })
+            .then(response => {
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    throw new Error('Resposta inválida do servidor');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.status) {
+                    alert('✅ Conexão SMTP: ' + data.message);
+                } else {
+                    alert('❌ Erro na conexão SMTP: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Erro completo:', error);
+                alert('❌ Erro na requisição: ' + error.message);
+            })
+            .finally(() => {
+                button.disabled = false;
+                button.textContent = originalText;
+            });
+        }
+
         
         // Controlar visibilidade de campos dependentes
         document.addEventListener('DOMContentLoaded', function() {

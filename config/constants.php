@@ -3,6 +3,13 @@
  * Constantes do sistema - Klube Cash v2.1
  * Configurações otimizadas para Mercado Pago com qualidade máxima
  */
+define('SMTP_HOST', 'smtp.hostinger.com');
+define('SMTP_PORT', 465);
+define('SMTP_USERNAME', 'klubecash@klubecash.com');
+define('SMTP_PASSWORD', 'Aaku_2004@');
+define('SMTP_FROM_EMAIL', 'noreply@klubecash.com');
+define('SMTP_FROM_NAME', 'Klube Cash');
+define('SMTP_ENCRYPTION', 'ssl');
 
 // === INFORMAÇÕES DO SISTEMA ===
 define('SYSTEM_NAME', 'Klube Cash');
