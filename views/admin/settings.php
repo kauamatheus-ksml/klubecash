@@ -522,6 +522,7 @@ try {
                             <button type="button" class="btn btn-secondary" onclick="test2FAEmail()">Testar Email 2FA</button>
                             <button type="button" class="btn btn-secondary" onclick="testEmailConnection()">Testar Conexão SMTP</button>
                             <button type="button" class="btn btn-info" onclick="sendTestEmail()">Enviar Email Simples</button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="getEmailConfig()">Ver Configurações</button>
                         </div>
                     </div>
                 </div>
@@ -754,246 +755,208 @@ try {
     </div>
     
     <script>
-        // Funções para teste de email
-        function sendTestEmail() {
-            if (!confirm('Deseja enviar um email de teste simples para o administrador?')) {
-                return;
-            }
-            
-            const button = event.target;
-            const originalText = button.textContent;
-            button.disabled = true;
-            button.textContent = 'Enviando...';
-            
-            fetch('<?php echo SITE_URL; ?>/controllers/AuthController.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: 'action=send_test_email'
-            })
-            .then(response => {
-                const contentType = response.headers.get('content-type');
-                if (!contentType || !contentType.includes('application/json')) {
-                    throw new Error('Resposta inválida do servidor');
-                }
-                return response.json();
-            })
-            .then(data => {
-                if (data.status) {
-                    alert('✅ ' + data.message);
-                } else {
-                    alert('❌ Erro: ' + data.message);
-                }
-            })
-            .catch(error => {
-                console.error('Erro completo:', error);
-                alert('❌ Erro na requisição: ' + error.message);
-            })
-            .finally(() => {
-                button.disabled = false;
-                button.textContent = originalText;
-            });
-        }
+// URL base para testes de email
+const EMAIL_TEST_URL = '<?php echo SITE_URL; ?>/api/email-test.php';
 
-        function test2FAEmail() {
-            if (!confirm('Deseja enviar um email de teste 2FA para o administrador?')) {
-                return;
-            }
-            
-            const button = event.target;
-            const originalText = button.textContent;
-            button.disabled = true;
-            button.textContent = 'Enviando...';
-            
-            fetch('<?php echo SITE_URL; ?>/controllers/AuthController.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: 'action=test_2fa_email'
-            })
-            .then(response => {
-                const contentType = response.headers.get('content-type');
-                if (!contentType || !contentType.includes('application/json')) {
-                    throw new Error('Resposta inválida do servidor');
-                }
-                return response.json();
-            })
-            .then(data => {
-                if (data.status) {
-                    alert('✅ ' + data.message);
-                } else {
-                    alert('❌ Erro: ' + data.message);
-                }
-            })
-            .catch(error => {
-                console.error('Erro completo:', error);
-                alert('❌ Erro na requisição: ' + error.message);
-            })
-            .finally(() => {
-                button.disabled = false;
-                button.textContent = originalText;
-            });
-        }
-
-        function testEmailConnection() {
-            if (!confirm('Deseja testar a conexão com o servidor de email?')) {
-                return;
-            }
-            
-            const button = event.target;
-            const originalText = button.textContent;
-            button.disabled = true;
-            button.textContent = 'Testando...';
-            
-            fetch('<?php echo SITE_URL; ?>/controllers/AuthController.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: 'action=test_email_connection'
-            })
-            .then(response => {
-                const contentType = response.headers.get('content-type');
-                if (!contentType || !contentType.includes('application/json')) {
-                    throw new Error('Resposta inválida do servidor');
-                }
-                return response.json();
-            })
-            .then(data => {
-                if (data.status) {
-                    alert('✅ Conexão SMTP: ' + data.message);
-                } else {
-                    alert('❌ Erro na conexão SMTP: ' + data.message);
-                }
-            })
-            .catch(error => {
-                console.error('Erro completo:', error);
-                alert('❌ Erro na requisição: ' + error.message);
-            })
-            .finally(() => {
-                button.disabled = false;
-                button.textContent = originalText;
-            });
-        }
-
-        // Função para atualizar soma das porcentagens em tempo real
-        function updateSoma() {
-            const porcentagemCliente = parseFloat(document.getElementById('porcentagemCliente').value) || 0;
-            const porcentagemAdmin = parseFloat(document.getElementById('porcentagemAdmin').value) || 0;
-            
-            const soma = porcentagemCliente + porcentagemAdmin;
-            document.getElementById('somaAtual').textContent = soma.toFixed(2);
-            
-            // Verificar se soma é exatamente 10%
-            const somaInfo = document.getElementById('somaInfo');
-            
-            if (Math.abs(soma - 10.00) > 0.01) {
-                somaInfo.style.color = 'var(--danger-color)';
-            } else {
-                somaInfo.style.color = 'var(--success-color)';
-            }
-        }
-
-        // Inicialização do DOM
-        document.addEventListener('DOMContentLoaded', function() {
-            // Atualizar soma das porcentagens
-            const porcentagemCliente = document.getElementById('porcentagemCliente');
-            const porcentagemAdmin = document.getElementById('porcentagemAdmin');
-            
-            if (porcentagemCliente && porcentagemAdmin) {
-                porcentagemCliente.addEventListener('input', updateSoma);
-                porcentagemAdmin.addEventListener('input', updateSoma);
-                updateSoma(); // Executar inicialmente
-            }
-            
-            // Controlar campos dependentes do 2FA
-            const habilitado2FA = document.querySelector('input[name="2fa_habilitado"]');
-            const tempoExpiracao = document.querySelector('#tempoExpiracaoMinutos');
-            const maxTentativas = document.querySelector('#maxTentativas');
-            
-            function toggle2FAFields() {
-                const isEnabled = habilitado2FA.checked;
-                
-                [tempoExpiracao, maxTentativas].forEach(field => {
-                    if (field) {
-                        field.disabled = !isEnabled;
-                        field.style.opacity = isEnabled ? '1' : '0.5';
-                    }
-                });
-            }
-            
-            if (habilitado2FA) {
-                habilitado2FA.addEventListener('change', toggle2FAFields);
-                toggle2FAFields(); // Executar inicialmente
-            }
-            
-            // Controlar campos dependentes de configurações de saldo
-            const permitirUsoSaldo = document.querySelector('input[name="permitir_uso_saldo"]');
-            const notificarSaldoBaixo = document.querySelector('input[name="notificar_saldo_baixo"]');
-            const permitirTransferencia = document.querySelector('input[name="permitir_transferencia"]');
-            
-            function toggleDependentFields() {
-                // Campos relacionados ao uso de saldo
-                const balanceFields = document.querySelectorAll('#valorMinimoUso, #percentualMaximoUso');
-                const lowBalanceField = document.querySelector('#limiteSaldoBaixo');
-                const transferFields = document.querySelectorAll('#taxaTransferencia');
-                
-                if (permitirUsoSaldo) {
-                    balanceFields.forEach(field => {
-                        field.disabled = !permitirUsoSaldo.checked;
-                        field.style.opacity = permitirUsoSaldo.checked ? '1' : '0.5';
-                    });
-                }
-                
-                if (notificarSaldoBaixo && lowBalanceField) {
-                    lowBalanceField.disabled = !notificarSaldoBaixo.checked;
-                    lowBalanceField.style.opacity = notificarSaldoBaixo.checked ? '1' : '0.5';
-                }
-                
-                if (permitirTransferencia) {
-                    transferFields.forEach(field => {
-                        field.disabled = !permitirTransferencia.checked;
-                        field.style.opacity = permitirTransferencia.checked ? '1' : '0.5';
-                    });
-                }
-            }
-            
-            // Adicionar eventos
-            if (permitirUsoSaldo) permitirUsoSaldo.addEventListener('change', toggleDependentFields);
-            if (notificarSaldoBaixo) notificarSaldoBaixo.addEventListener('change', toggleDependentFields);
-            if (permitirTransferencia) permitirTransferencia.addEventListener('change', toggleDependentFields);
-            
-            // Executar inicialmente
-            toggleDependentFields();
+// Função genérica para fazer requisições AJAX
+async function makeEmailTestRequest(action, buttonElement) {
+    const originalText = buttonElement.textContent;
+    
+    try {
+        // Desabilitar botão
+        buttonElement.disabled = true;
+        buttonElement.textContent = 'Processando...';
+        
+        const response = await fetch(EMAIL_TEST_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `action=${encodeURIComponent(action)}`
         });
+        
+        // Verificar se a resposta é OK
+        if (!response.ok) {
+            throw new Error(`Erro HTTP: ${response.status}`);
+        }
+        
+        // Verificar se é JSON
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            const text = await response.text();
+            console.error('Resposta não-JSON recebida:', text);
+            throw new Error('Servidor retornou resposta inválida (não-JSON)');
+        }
+        
+        const data = await response.json();
+        
+        if (data.status) {
+            alert('✅ Sucesso: ' + data.message);
+            if (data.data) {
+                console.log('Dados adicionais:', data.data);
+            }
+        } else {
+            alert('❌ Erro: ' + data.message);
+        }
+        
+    } catch (error) {
+        console.error('Erro completo:', error);
+        alert('❌ Erro na requisição: ' + error.message);
+    } finally {
+        // Restaurar botão
+        buttonElement.disabled = false;
+        buttonElement.textContent = originalText;
+    }
+}
 
-        // Validar formulário de cashback antes de enviar
-        document.getElementById('cashbackForm').addEventListener('submit', function(event) {
-            const porcentagemCliente = parseFloat(document.getElementById('porcentagemCliente').value);
-            const porcentagemAdmin = parseFloat(document.getElementById('porcentagemAdmin').value);
-            
-            if (isNaN(porcentagemCliente) || isNaN(porcentagemAdmin)) {
-                alert('Por favor, preencha todos os campos com valores numéricos válidos.');
-                event.preventDefault();
-                return false;
-            }
-            
-            if (porcentagemCliente < 0 || porcentagemCliente > 10 || 
-                porcentagemAdmin < 0 || porcentagemAdmin > 10) {
-                alert('As porcentagens devem estar entre 0 e 10.');
-                event.preventDefault();
-                return false;
-            }
-            
-            const soma = porcentagemCliente + porcentagemAdmin;
-            if (Math.abs(soma - 10.00) > 0.01) {
-                alert('A soma das porcentagens deve ser exatamente 10%.');
-                event.preventDefault();
-                return false;
+// Função para testar conexão SMTP
+function testEmailConnection() {
+    if (!confirm('Deseja testar a conexão com o servidor SMTP?')) {
+        return;
+    }
+    
+    makeEmailTestRequest('test_connection', event.target);
+}
+
+// Função para enviar email simples
+function sendTestEmail() {
+    if (!confirm('Deseja enviar um email de teste simples?')) {
+        return;
+    }
+    
+    makeEmailTestRequest('send_simple', event.target);
+}
+
+// Função para testar email 2FA
+function test2FAEmail() {
+    if (!confirm('Deseja enviar um email de teste 2FA?')) {
+        return;
+    }
+    
+    makeEmailTestRequest('send_2fa', event.target);
+}
+
+// Função para obter configurações
+function getEmailConfig() {
+    makeEmailTestRequest('get_config', event.target);
+}
+
+// Função para atualizar soma das porcentagens em tempo real
+function updateSoma() {
+    const porcentagemCliente = parseFloat(document.getElementById('porcentagemCliente').value) || 0;
+    const porcentagemAdmin = parseFloat(document.getElementById('porcentagemAdmin').value) || 0;
+    
+    const soma = porcentagemCliente + porcentagemAdmin;
+    document.getElementById('somaAtual').textContent = soma.toFixed(2);
+    
+    // Verificar se soma é exatamente 10%
+    const somaInfo = document.getElementById('somaInfo');
+    
+    if (Math.abs(soma - 10.00) > 0.01) {
+        somaInfo.style.color = 'var(--danger-color)';
+    } else {
+        somaInfo.style.color = 'var(--success-color)';
+    }
+}
+
+// Inicialização do DOM
+document.addEventListener('DOMContentLoaded', function() {
+    // Atualizar soma das porcentagens
+    const porcentagemCliente = document.getElementById('porcentagemCliente');
+    const porcentagemAdmin = document.getElementById('porcentagemAdmin');
+    
+    if (porcentagemCliente && porcentagemAdmin) {
+        porcentagemCliente.addEventListener('input', updateSoma);
+        porcentagemAdmin.addEventListener('input', updateSoma);
+        updateSoma(); // Executar inicialmente
+    }
+    
+    // Controlar campos dependentes do 2FA
+    const habilitado2FA = document.querySelector('input[name="2fa_habilitado"]');
+    const tempoExpiracao = document.querySelector('#tempoExpiracaoMinutos');
+    const maxTentativas = document.querySelector('#maxTentativas');
+    
+    function toggle2FAFields() {
+        const isEnabled = habilitado2FA && habilitado2FA.checked;
+        
+        [tempoExpiracao, maxTentativas].forEach(field => {
+            if (field) {
+                field.disabled = !isEnabled;
+                field.style.opacity = isEnabled ? '1' : '0.5';
             }
         });
-    </script>
+    }
+    
+    if (habilitado2FA) {
+        habilitado2FA.addEventListener('change', toggle2FAFields);
+        toggle2FAFields(); // Executar inicialmente
+    }
+    
+    // Controlar campos dependentes de configurações de saldo
+    const permitirUsoSaldo = document.querySelector('input[name="permitir_uso_saldo"]');
+    const notificarSaldoBaixo = document.querySelector('input[name="notificar_saldo_baixo"]');
+    const permitirTransferencia = document.querySelector('input[name="permitir_transferencia"]');
+    
+    function toggleDependentFields() {
+        // Campos relacionados ao uso de saldo
+        const balanceFields = document.querySelectorAll('#valorMinimoUso, #percentualMaximoUso');
+        const lowBalanceField = document.querySelector('#limiteSaldoBaixo');
+        const transferFields = document.querySelectorAll('#taxaTransferencia');
+        
+        if (permitirUsoSaldo) {
+            balanceFields.forEach(field => {
+                field.disabled = !permitirUsoSaldo.checked;
+                field.style.opacity = permitirUsoSaldo.checked ? '1' : '0.5';
+            });
+        }
+        
+        if (notificarSaldoBaixo && lowBalanceField) {
+            lowBalanceField.disabled = !notificarSaldoBaixo.checked;
+            lowBalanceField.style.opacity = notificarSaldoBaixo.checked ? '1' : '0.5';
+        }
+        
+        if (permitirTransferencia) {
+            transferFields.forEach(field => {
+                field.disabled = !permitirTransferencia.checked;
+                field.style.opacity = permitirTransferencia.checked ? '1' : '0.5';
+            });
+        }
+    }
+    
+    // Adicionar eventos
+    if (permitirUsoSaldo) permitirUsoSaldo.addEventListener('change', toggleDependentFields);
+    if (notificarSaldoBaixo) notificarSaldoBaixo.addEventListener('change', toggleDependentFields);
+    if (permitirTransferencia) permitirTransferencia.addEventListener('change', toggleDependentFields);
+    
+    // Executar inicialmente
+    toggleDependentFields();
+});
+
+// Validar formulário de cashback antes de enviar
+document.getElementById('cashbackForm').addEventListener('submit', function(event) {
+    const porcentagemCliente = parseFloat(document.getElementById('porcentagemCliente').value);
+    const porcentagemAdmin = parseFloat(document.getElementById('porcentagemAdmin').value);
+    
+    if (isNaN(porcentagemCliente) || isNaN(porcentagemAdmin)) {
+        alert('Por favor, preencha todos os campos com valores numéricos válidos.');
+        event.preventDefault();
+        return false;
+    }
+    
+    if (porcentagemCliente < 0 || porcentagemCliente > 10 || 
+        porcentagemAdmin < 0 || porcentagemAdmin > 10) {
+        alert('As porcentagens devem estar entre 0 e 10.');
+        event.preventDefault();
+        return false;
+    }
+    
+    const soma = porcentagemCliente + porcentagemAdmin;
+    if (Math.abs(soma - 10.00) > 0.01) {
+        alert('A soma das porcentagens deve ser exatamente 10%.');
+        event.preventDefault();
+        return false;
+    }
+});
+</script>
 </body>
 </html>

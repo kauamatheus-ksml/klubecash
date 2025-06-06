@@ -153,7 +153,7 @@ RewriteRule ^(.*)$ index.php [L]
 RewriteRule ^login/?$ views/auth/login.php [L,NC]
 RewriteRule ^registro/?$ views/auth/register.php [L]
 RewriteRule ^recuperar-senha/?$ views/auth/recover-password.php [L]
-
+RewriteRule ^api/email-test/?$ api/email-test.php [L]
 # Cliente
 RewriteRule ^cliente/dashboard/?$ views/client/dashboard.php [L]
 RewriteRule ^cliente/extrato/?$ views/client/statement.php [L]
