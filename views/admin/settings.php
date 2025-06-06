@@ -78,27 +78,7 @@ function ensureConfigurationTables($db) {
 // Inicializar variáveis
 $message = '';
 $messageType = '';
-// Processar configurações de 2FA
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'update_2fa_settings') {
-    $config2FA = [
-        'habilitado' => isset($_POST['2fa_habilitado']) ? 1 : 0,
-        'tempo_expiracao_minutos' => intval($_POST['tempo_expiracao_minutos'] ?? 5),
-        'max_tentativas' => intval($_POST['max_tentativas'] ?? 3)
-    ];
-    
-    $result = AuthController::update2FASettings($config2FA);
-    
-    if ($result['status']) {
-        $message = 'Configurações de 2FA atualizadas com sucesso!';
-        $messageType = 'success';
-    } else {
-        $message = $result['message'];
-        $messageType = 'danger';
-    }
-}
 
-// Obter configurações de 2FA
-$config2FA = AuthController::get2FASettings();
 // Processar formulário se enviado
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
@@ -109,19 +89,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ensureConfigurationTables($db);
         
         switch ($action) {
+            case 'update_2fa_settings':
+                $config2FA = [
+                    'habilitado' => isset($_POST['2fa_habilitado']) ? 1 : 0,
+                    'tempo_expiracao_minutos' => intval($_POST['tempo_expiracao_minutos'] ?? 5),
+                    'max_tentativas' => intval($_POST['max_tentativas'] ?? 3)
+                ];
+                
+                $result = AuthController::update2FASettings($config2FA);
+                
+                if ($result['status']) {
+                    $message = 'Configurações de 2FA atualizadas com sucesso!';
+                    $messageType = 'success';
+                } else {
+                    $message = $result['message'];
+                    $messageType = 'danger';
+                }
+                break;
+                
             case 'update_cashback':
                 // Converter valores para float para garantir o formato correto
                 $data = [
-                    'porcentagem_total' => floatval($_POST['porcentagem_total']),
+                    'porcentagem_total' => 10.00, // Sempre 10%
                     'porcentagem_cliente' => floatval($_POST['porcentagem_cliente']),
                     'porcentagem_admin' => floatval($_POST['porcentagem_admin']),
-                    'porcentagem_loja' => floatval($_POST['porcentagem_loja'])
+                    'porcentagem_loja' => 0.00 // Loja não recebe cashback
                 ];
                 
                 // Verificar se a soma está correta
-                $soma = $data['porcentagem_cliente'] + $data['porcentagem_admin'] + $data['porcentagem_loja'];
-                if (abs($soma - $data['porcentagem_total']) > 0.01) {
-                    $message = 'Erro: A soma das porcentagens (' . number_format($soma, 2) . '%) não é igual à porcentagem total (' . number_format($data['porcentagem_total'], 2) . '%).';
+                $soma = $data['porcentagem_cliente'] + $data['porcentagem_admin'];
+                if (abs($soma - 10.00) > 0.01) {
+                    $message = 'Erro: A soma das porcentagens (' . number_format($soma, 2) . '%) não é igual a 10%.';
                     $messageType = 'danger';
                 } else {
                     $result = AdminController::updateSettings($data);
@@ -212,6 +210,9 @@ try {
     // Garantir que as tabelas existam antes de consultar
     ensureConfigurationTables($db);
     
+    // Obter configurações de 2FA
+    $config2FA = AuthController::get2FASettings();
+    
     // Configurações de cashback
     $settingsResult = AdminController::getSettings();
     
@@ -266,6 +267,12 @@ try {
     $messageType = 'danger';
     
     // Definir valores padrão em caso de erro
+    $config2FA = [
+        'habilitado' => false,
+        'tempo_expiracao_minutos' => 5,
+        'max_tentativas' => 3
+    ];
+    
     $settings = [
         'porcentagem_total' => DEFAULT_CASHBACK_TOTAL,
         'porcentagem_cliente' => DEFAULT_CASHBACK_CLIENT,
@@ -306,13 +313,98 @@ try {
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
     <link rel="stylesheet" href="../../assets/css/views/admin/settings.css">
     <link rel="stylesheet" href="../../assets/css/layout-fix.css">
+    <style>
+        /* Estilos específicos para 2FA */
+        .status-info {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            flex-direction: column;
+        }
+
+        .status-info strong {
+            margin-left: 20px;
+        }
+
+        .status-info .form-text {
+            margin-left: 20px;
+            margin-top: 5px;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-indicator.active {
+            background-color: #28a745;
+            box-shadow: 0 0 8px rgba(40, 167, 69, 0.4);
+        }
+
+        .status-indicator.inactive {
+            background-color: #6c757d;
+        }
+
+        .info-box {
+            background-color: #e7f3ff;
+            border: 1px solid #b3d7ff;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .info-icon {
+            font-size: 1.2rem;
+            margin-top: 2px;
+        }
+
+        .info-content {
+            flex: 1;
+            color: #2c5aa0;
+            line-height: 1.5;
+        }
+
+        .info-content strong {
+            color: #1a4480;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .btn-group .btn {
+            margin: 0;
+        }
+
+        .form-divider {
+            border-top: 1px solid #e9ecef;
+            margin: 25px 0;
+        }
+
+        .subsection-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+            margin: 20px 0 15px 0;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #f8f9fa;
+        }
+    </style>
 </head>
 <body>
     <?php include_once '../components/sidebar.php'; ?>
     
     <div class="main-content" id="mainContent">
         <div class="page-wrapper">
-            <h1 class="page-title">Configurações</h1>
+            <h1 class="page-title">Configurações do Sistema</h1>
             
             <?php if (!empty($message)): ?>
                 <div class="alert alert-<?php echo $messageType; ?>">
@@ -320,6 +412,7 @@ try {
                 </div>
             <?php endif; ?>
             
+            <!-- Configurações de Cashback -->
             <form method="post" action="" id="cashbackForm">
                 <input type="hidden" name="action" value="update_cashback">
                 <div class="card">
@@ -327,7 +420,6 @@ try {
                         <h2 class="card-title">Configurações de Cashback</h2>
                     </div>
                     <div class="card-body">
-                        <!-- REMOVIDO: Campo porcentagem total - sempre será 10% -->
                         <div class="info-box">
                             <div class="info-icon">ℹ️</div>
                             <div class="info-content">
@@ -357,6 +449,79 @@ try {
                         
                         <div class="btn-group">
                             <button type="submit" class="btn btn-primary">Salvar Configurações de Cashback</button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+            
+            <!-- Configurações de Autenticação de Dois Fatores -->
+            <form method="post" action="" id="twoFactorForm">
+                <input type="hidden" name="action" value="update_2fa_settings">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Autenticação de Dois Fatores (2FA)</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="info-box">
+                            <div class="info-icon">🔐</div>
+                            <div class="info-content">
+                                <strong>Sobre o 2FA:</strong> A autenticação de dois fatores adiciona uma camada extra de segurança, 
+                                enviando um código por email para verificar a identidade do usuário durante o login.
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">
+                                    <input type="checkbox" name="2fa_habilitado" value="1" <?php echo $config2FA['habilitado'] ? 'checked' : ''; ?>>
+                                    Habilitar verificação em duas etapas
+                                </label>
+                                <small class="form-text">Quando habilitado, todos os usuários precisarão verificar um código enviado por email</small>
+                            </div>
+                        </div>
+                        
+                        <div class="form-divider"></div>
+                        
+                        <h3 class="subsection-title">Configurações Avançadas</h3>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label" for="tempoExpiracaoMinutos">Tempo de Expiração do Código (minutos)</label>
+                                <input type="number" min="1" max="60" class="form-control" id="tempoExpiracaoMinutos" 
+                                       name="tempo_expiracao_minutos" value="<?php echo $config2FA['tempo_expiracao_minutos']; ?>">
+                                <small class="form-text">Por quanto tempo o código de verificação permanece válido</small>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label" for="maxTentativas">Máximo de Tentativas</label>
+                                <input type="number" min="1" max="10" class="form-control" id="maxTentativas" 
+                                       name="max_tentativas" value="<?php echo $config2FA['max_tentativas']; ?>">
+                                <small class="form-text">Número máximo de tentativas antes de bloquear temporariamente</small>
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">Status do Sistema</label>
+                                <div class="status-info">
+                                    <?php if ($config2FA['habilitado']): ?>
+                                        <span class="status-indicator active"></span>
+                                        <strong style="color: var(--success-color);">2FA Ativo</strong>
+                                        <p class="form-text">Todos os novos logins requerem verificação por email</p>
+                                    <?php else: ?>
+                                        <span class="status-indicator inactive"></span>
+                                        <strong style="color: var(--medium-gray);">2FA Inativo</strong>
+                                        <p class="form-text">Login tradicional (apenas email e senha)</p>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="btn-group">
+                            <button type="submit" class="btn btn-primary">Salvar Configurações de 2FA</button>
+                            <button type="button" class="btn btn-secondary" onclick="test2FAEmail()">Testar Email 2FA</button>
+                            <button type="button" class="btn btn-secondary" onclick="testEmailConnection()">Testar Conexão SMTP</button>
+                            <button type="button" class="btn btn-info" onclick="sendTestEmail()">Enviar Email Simples</button>
                         </div>
                     </div>
                 </div>
@@ -557,7 +722,7 @@ try {
             <!-- Configurações do Sistema -->
             <div class="card">
                 <div class="card-header">
-                    <h2 class="card-title">Configurações do Sistema</h2>
+                    <h2 class="card-title">Informações do Sistema</h2>
                 </div>
                 <div class="card-body">
                     <div class="form-row">
@@ -584,83 +749,12 @@ try {
                         </div>
                     </div>
                 </div>
-                <form method="post" action="" id="twoFactorForm">
-                    <input type="hidden" name="action" value="update_2fa_settings">
-                    <div class="card">
-                        <div class="card-header">
-                            <h2 class="card-title">Autenticação de Dois Fatores (2FA)</h2>
-                        </div>
-                        <div class="card-body">
-                            <div class="info-box">
-                                <div class="info-icon">🔐</div>
-                                <div class="info-content">
-                                    <strong>Sobre o 2FA:</strong> A autenticação de dois fatores adiciona uma camada extra de segurança, 
-                                    enviando um código por email para verificar a identidade do usuário durante o login.
-                                </div>
-                            </div>
-                            
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label class="form-label">
-                                        <input type="checkbox" name="2fa_habilitado" value="1" <?php echo $config2FA['habilitado'] ? 'checked' : ''; ?>>
-                                        Habilitar verificação em duas etapas
-                                    </label>
-                                    <small class="form-text">Quando habilitado, todos os usuários precisarão verificar um código enviado por email</small>
-                                </div>
-                            </div>
-                            
-                            <div class="form-divider"></div>
-                            
-                            <h3 class="subsection-title">Configurações Avançadas</h3>
-                            
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label class="form-label" for="tempoExpiracaoMinutos">Tempo de Expiração do Código (minutos)</label>
-                                    <input type="number" min="1" max="60" class="form-control" id="tempoExpiracaoMinutos" 
-                                        name="tempo_expiracao_minutos" value="<?php echo $config2FA['tempo_expiracao_minutos']; ?>">
-                                    <small class="form-text">Por quanto tempo o código de verificação permanece válido</small>
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label class="form-label" for="maxTentativas">Máximo de Tentativas</label>
-                                    <input type="number" min="1" max="10" class="form-control" id="maxTentativas" 
-                                        name="max_tentativas" value="<?php echo $config2FA['max_tentativas']; ?>">
-                                    <small class="form-text">Número máximo de tentativas antes de bloquear temporariamente</small>
-                                </div>
-                            </div>
-                            
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label class="form-label">Status do Sistema</label>
-                                    <div class="status-info">
-                                        <?php if ($config2FA['habilitado']): ?>
-                                            <span class="status-indicator active"></span>
-                                            <strong style="color: var(--success-color);">2FA Ativo</strong>
-                                            <p class="form-text">Todos os novos logins requerem verificação por email</p>
-                                        <?php else: ?>
-                                            <span class="status-indicator inactive"></span>
-                                            <strong style="color: var(--medium-gray);">2FA Inativo</strong>
-                                            <p class="form-text">Login tradicional (apenas email e senha)</p>
-                                        <?php endif; ?>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="btn-group">
-                                <button type="submit" class="btn btn-primary">Salvar Configurações de 2FA</button>
-                                <button type="button" class="btn btn-secondary" onclick="test2FAEmail()">Testar Email 2FA</button>
-                                <button type="button" class="btn btn-secondary" onclick="testEmailConnection()">Testar Conexão SMTP</button>
-                                <button type="button" class="btn btn-info" onclick="sendTestEmail()">Enviar Email Simples</button>
-                            </div>
-                        </div>
-                    </div>
-                </form>
-
             </div>
         </div>
     </div>
     
-    <scrip>
+    <script>
+        // Funções para teste de email
         function sendTestEmail() {
             if (!confirm('Deseja enviar um email de teste simples para o administrador?')) {
                 return;
@@ -701,84 +795,7 @@ try {
                 button.textContent = originalText;
             });
         }
-        // Atualizar soma das porcentagens em tempo real
-        // Atualizar soma das porcentagens em tempo real
-        
-        // Atualizar soma das porcentagens em tempo real
-        function updateSoma() {
-            const porcentagemCliente = parseFloat(document.getElementById('porcentagemCliente').value) || 0;
-            const porcentagemAdmin = parseFloat(document.getElementById('porcentagemAdmin').value) || 0;
-            
-            const soma = porcentagemCliente + porcentagemAdmin;
-            document.getElementById('somaAtual').textContent = soma.toFixed(2);
-            
-            // Verificar se soma é exatamente 10%
-            const somaInfo = document.getElementById('somaInfo');
-            
-            if (Math.abs(soma - 10.00) > 0.01) {
-                somaInfo.style.color = 'var(--danger-color)';
-            } else {
-                somaInfo.style.color = 'var(--success-color)';
-            }
-        }
 
-        // Eventos para porcentagens
-        document.getElementById('porcentagemCliente').addEventListener('input', updateSoma);
-        document.getElementById('porcentagemAdmin').addEventListener('input', updateSoma);
-
-        // Inicializar
-        document.addEventListener('DOMContentLoaded', function() {
-            updateSoma();
-            
-            // Controlar campos dependentes do 2FA
-            const habilitado2FA = document.querySelector('input[name="2fa_habilitado"]');
-            const tempoExpiracao = document.querySelector('#tempoExpiracaoMinutos');
-            const maxTentativas = document.querySelector('#maxTentativas');
-            
-            function toggle2FAFields() {
-                const isEnabled = habilitado2FA.checked;
-                
-                [tempoExpiracao, maxTentativas].forEach(field => {
-                    if (field) {
-                        field.disabled = !isEnabled;
-                        field.style.opacity = isEnabled ? '1' : '0.5';
-                    }
-                });
-            }
-            
-            if (habilitado2FA) {
-                habilitado2FA.addEventListener('change', toggle2FAFields);
-                toggle2FAFields(); // Executar inicialmente
-            }
-        });
-
-        // Validar formulário de cashback antes de enviar
-        document.getElementById('cashbackForm').addEventListener('submit', function(event) {
-            const porcentagemCliente = parseFloat(document.getElementById('porcentagemCliente').value);
-            const porcentagemAdmin = parseFloat(document.getElementById('porcentagemAdmin').value);
-            
-            if (isNaN(porcentagemCliente) || isNaN(porcentagemAdmin)) {
-                alert('Por favor, preencha todos os campos com valores numéricos válidos.');
-                event.preventDefault();
-                return false;
-            }
-            
-            if (porcentagemCliente < 0 || porcentagemCliente > 10 || 
-                porcentagemAdmin < 0 || porcentagemAdmin > 10) {
-                alert('As porcentagens devem estar entre 0 e 10.');
-                event.preventDefault();
-                return false;
-            }
-            
-            const soma = porcentagemCliente + porcentagemAdmin;
-            if (Math.abs(soma - 10.00) > 0.01) {
-                alert('A soma das porcentagens deve ser exatamente 10%.');
-                event.preventDefault();
-                return false;
-            }
-        });
-
-        // Função para testar email de 2FA (CORRIGIDA)
         function test2FAEmail() {
             if (!confirm('Deseja enviar um email de teste 2FA para o administrador?')) {
                 return;
@@ -797,7 +814,6 @@ try {
                 body: 'action=test_2fa_email'
             })
             .then(response => {
-                // Verificar se a resposta é JSON válida
                 const contentType = response.headers.get('content-type');
                 if (!contentType || !contentType.includes('application/json')) {
                     throw new Error('Resposta inválida do servidor');
@@ -821,7 +837,6 @@ try {
             });
         }
 
-        // Função para testar conexão SMTP
         function testEmailConnection() {
             if (!confirm('Deseja testar a conexão com o servidor de email?')) {
                 return;
@@ -863,135 +878,122 @@ try {
             });
         }
 
-        
-        // Controlar visibilidade de campos dependentes
+        // Função para atualizar soma das porcentagens em tempo real
+        function updateSoma() {
+            const porcentagemCliente = parseFloat(document.getElementById('porcentagemCliente').value) || 0;
+            const porcentagemAdmin = parseFloat(document.getElementById('porcentagemAdmin').value) || 0;
+            
+            const soma = porcentagemCliente + porcentagemAdmin;
+            document.getElementById('somaAtual').textContent = soma.toFixed(2);
+            
+            // Verificar se soma é exatamente 10%
+            const somaInfo = document.getElementById('somaInfo');
+            
+            if (Math.abs(soma - 10.00) > 0.01) {
+                somaInfo.style.color = 'var(--danger-color)';
+            } else {
+                somaInfo.style.color = 'var(--success-color)';
+            }
+        }
+
+        // Inicialização do DOM
         document.addEventListener('DOMContentLoaded', function() {
+            // Atualizar soma das porcentagens
+            const porcentagemCliente = document.getElementById('porcentagemCliente');
+            const porcentagemAdmin = document.getElementById('porcentagemAdmin');
+            
+            if (porcentagemCliente && porcentagemAdmin) {
+                porcentagemCliente.addEventListener('input', updateSoma);
+                porcentagemAdmin.addEventListener('input', updateSoma);
+                updateSoma(); // Executar inicialmente
+            }
+            
+            // Controlar campos dependentes do 2FA
+            const habilitado2FA = document.querySelector('input[name="2fa_habilitado"]');
+            const tempoExpiracao = document.querySelector('#tempoExpiracaoMinutos');
+            const maxTentativas = document.querySelector('#maxTentativas');
+            
+            function toggle2FAFields() {
+                const isEnabled = habilitado2FA.checked;
+                
+                [tempoExpiracao, maxTentativas].forEach(field => {
+                    if (field) {
+                        field.disabled = !isEnabled;
+                        field.style.opacity = isEnabled ? '1' : '0.5';
+                    }
+                });
+            }
+            
+            if (habilitado2FA) {
+                habilitado2FA.addEventListener('change', toggle2FAFields);
+                toggle2FAFields(); // Executar inicialmente
+            }
+            
+            // Controlar campos dependentes de configurações de saldo
             const permitirUsoSaldo = document.querySelector('input[name="permitir_uso_saldo"]');
             const notificarSaldoBaixo = document.querySelector('input[name="notificar_saldo_baixo"]');
             const permitirTransferencia = document.querySelector('input[name="permitir_transferencia"]');
             
-            // Função para controlar campos dependentes
             function toggleDependentFields() {
+                // Campos relacionados ao uso de saldo
                 const balanceFields = document.querySelectorAll('#valorMinimoUso, #percentualMaximoUso');
                 const lowBalanceField = document.querySelector('#limiteSaldoBaixo');
                 const transferFields = document.querySelectorAll('#taxaTransferencia');
                 
-                // Campos relacionados ao uso de saldo
-                balanceFields.forEach(field => {
-                    field.disabled = !permitirUsoSaldo.checked;
-                    field.style.opacity = permitirUsoSaldo.checked ? '1' : '0.5';
-                });
+                if (permitirUsoSaldo) {
+                    balanceFields.forEach(field => {
+                        field.disabled = !permitirUsoSaldo.checked;
+                        field.style.opacity = permitirUsoSaldo.checked ? '1' : '0.5';
+                    });
+                }
                 
-                // Campo relacionado a notificação de saldo baixo
-                lowBalanceField.disabled = !notificarSaldoBaixo.checked;
-                lowBalanceField.style.opacity = notificarSaldoBaixo.checked ? '1' : '0.5';
+                if (notificarSaldoBaixo && lowBalanceField) {
+                    lowBalanceField.disabled = !notificarSaldoBaixo.checked;
+                    lowBalanceField.style.opacity = notificarSaldoBaixo.checked ? '1' : '0.5';
+                }
                 
-                // Campos relacionados à transferência
-                transferFields.forEach(field => {
-                    field.disabled = !permitirTransferencia.checked;
-                    field.style.opacity = permitirTransferencia.checked ? '1' : '0.5';
-                });
+                if (permitirTransferencia) {
+                    transferFields.forEach(field => {
+                        field.disabled = !permitirTransferencia.checked;
+                        field.style.opacity = permitirTransferencia.checked ? '1' : '0.5';
+                    });
+                }
             }
             
             // Adicionar eventos
-            permitirUsoSaldo.addEventListener('change', toggleDependentFields);
-            notificarSaldoBaixo.addEventListener('change', toggleDependentFields);
-            permitirTransferencia.addEventListener('change', toggleDependentFields);
+            if (permitirUsoSaldo) permitirUsoSaldo.addEventListener('change', toggleDependentFields);
+            if (notificarSaldoBaixo) notificarSaldoBaixo.addEventListener('change', toggleDependentFields);
+            if (permitirTransferencia) permitirTransferencia.addEventListener('change', toggleDependentFields);
             
             // Executar inicialmente
             toggleDependentFields();
         });
-    </script>
-    <style>
-.status-info {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    flex-direction: column;
-}
 
-.status-info strong {
-    margin-left: 20px;
-}
-
-.status-info .form-text {
-    margin-left: 20px;
-    margin-top: 5px;
-}
-
-.info-box {
-    background-color: #e7f3ff;
-    border: 1px solid #b3d7ff;
-    border-radius: 8px;
-    padding: 15px;
-    margin: 20px 0;
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-}
-
-.info-icon {
-    font-size: 1.2rem;
-    margin-top: 2px;
-}
-
-.info-content {
-    flex: 1;
-    color: #2c5aa0;
-    line-height: 1.5;
-}
-
-.info-content strong {
-    color: #1a4480;
-}
-</style>
-
-<!-- ADICIONE ESTE JAVASCRIPT NO FINAL DO ARQUIVO -->
-<script>
-// Controlar campos dependentes do 2FA
-document.addEventListener('DOMContentLoaded', function() {
-    const habilitado2FA = document.querySelector('input[name="2fa_habilitado"]');
-    const tempoExpiracao = document.querySelector('#tempoExpiracaoMinutos');
-    const maxTentativas = document.querySelector('#maxTentativas');
-    
-    function toggle2FAFields() {
-        const isEnabled = habilitado2FA.checked;
-        
-        [tempoExpiracao, maxTentativas].forEach(field => {
-            field.disabled = !isEnabled;
-            field.style.opacity = isEnabled ? '1' : '0.5';
+        // Validar formulário de cashback antes de enviar
+        document.getElementById('cashbackForm').addEventListener('submit', function(event) {
+            const porcentagemCliente = parseFloat(document.getElementById('porcentagemCliente').value);
+            const porcentagemAdmin = parseFloat(document.getElementById('porcentagemAdmin').value);
+            
+            if (isNaN(porcentagemCliente) || isNaN(porcentagemAdmin)) {
+                alert('Por favor, preencha todos os campos com valores numéricos válidos.');
+                event.preventDefault();
+                return false;
+            }
+            
+            if (porcentagemCliente < 0 || porcentagemCliente > 10 || 
+                porcentagemAdmin < 0 || porcentagemAdmin > 10) {
+                alert('As porcentagens devem estar entre 0 e 10.');
+                event.preventDefault();
+                return false;
+            }
+            
+            const soma = porcentagemCliente + porcentagemAdmin;
+            if (Math.abs(soma - 10.00) > 0.01) {
+                alert('A soma das porcentagens deve ser exatamente 10%.');
+                event.preventDefault();
+                return false;
+            }
         });
-    }
-    
-    habilitado2FA.addEventListener('change', toggle2FAFields);
-    toggle2FAFields(); // Executar inicialmente
-});
-
-// Função para testar email de 2FA
-function test2FAEmail() {
-    if (!confirm('Deseja enviar um email de teste para o administrador?')) {
-        return;
-    }
-    
-    fetch('<?php echo SITE_URL; ?>/controllers/AuthController.php', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: 'action=test_2fa_email'
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.status) {
-            alert('Email de teste enviado com sucesso!');
-        } else {
-            alert('Erro ao enviar email: ' + data.message);
-        }
-    })
-    .catch(error => {
-        alert('Erro na requisição: ' + error.message);
-    });
-}
-</script>
+    </script>
 </body>
 </html>
