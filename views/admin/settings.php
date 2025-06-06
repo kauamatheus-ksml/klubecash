@@ -519,10 +519,11 @@ try {
                         
                         <div class="btn-group">
                             <button type="submit" class="btn btn-primary">Salvar Configurações de 2FA</button>
-                            <button type="button" class="btn btn-secondary" onclick="test2FAEmail()">Testar Email 2FA</button>
-                            <button type="button" class="btn btn-secondary" onclick="testEmailConnection()">Testar Conexão SMTP</button>
-                            <button type="button" class="btn btn-info" onclick="sendTestEmail()">Enviar Email Simples</button>
-                            <button type="button" class="btn btn-outline-secondary" onclick="getEmailConfig()">Ver Configurações</button>
+                            <button type="button" class="btn btn-outline-info" onclick="pingEndpoint()">🏓 Ping Endpoint</button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="checkEmailConfig()">⚙️ Ver Config</button>
+                            <button type="button" class="btn btn-secondary" onclick="testEmailConnection()">🔗 Testar SMTP</button>
+                            <button type="button" class="btn btn-info" onclick="sendTestEmail()">📧 Email Simples</button>
+                            <button type="button" class="btn btn-secondary" onclick="test2FAEmail()">🔐 Email 2FA</button>
                         </div>
                     </div>
                 </div>
@@ -755,18 +756,27 @@ try {
     </div>
     
     <script>
-// URL base para testes de email
-const EMAIL_TEST_URL = '<?php echo SITE_URL; ?>/api/email-test.php';
+// URL do endpoint de teste
+const EMAIL_TEST_URL = '<?php echo SITE_URL; ?>/test-email-endpoint.php';
 
-// Função genérica para fazer requisições AJAX
+// Função para log de debug
+function debugLog(message, data = null) {
+    console.log(`[EMAIL_TEST] ${message}`, data || '');
+}
+
+// Função para fazer requisições com debug completo
 async function makeEmailTestRequest(action, buttonElement) {
     const originalText = buttonElement.textContent;
     
     try {
+        debugLog(`Iniciando teste: ${action}`);
+        
         // Desabilitar botão
         buttonElement.disabled = true;
         buttonElement.textContent = 'Processando...';
         
+        // Fazer requisição
+        debugLog(`Fazendo requisição para: ${EMAIL_TEST_URL}`);
         const response = await fetch(EMAIL_TEST_URL, {
             method: 'POST',
             headers: {
@@ -775,33 +785,58 @@ async function makeEmailTestRequest(action, buttonElement) {
             body: `action=${encodeURIComponent(action)}`
         });
         
-        // Verificar se a resposta é OK
+        debugLog(`Resposta recebida. Status: ${response.status}`);
+        
+        // Verificar status HTTP
         if (!response.ok) {
-            throw new Error(`Erro HTTP: ${response.status}`);
+            throw new Error(`Erro HTTP ${response.status}: ${response.statusText}`);
         }
         
-        // Verificar se é JSON
-        const contentType = response.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-            const text = await response.text();
-            console.error('Resposta não-JSON recebida:', text);
-            throw new Error('Servidor retornou resposta inválida (não-JSON)');
+        // Obter texto da resposta primeiro
+        const responseText = await response.text();
+        debugLog('Texto da resposta:', responseText);
+        
+        // Verificar se começa com JSON
+        if (!responseText.trim().startsWith('{')) {
+            console.error('Resposta HTML recebida:', responseText);
+            throw new Error('Servidor retornou HTML em vez de JSON. Verifique os logs.');
         }
         
-        const data = await response.json();
+        // Tentar parsear JSON
+        let data;
+        try {
+            data = JSON.parse(responseText);
+        } catch (parseError) {
+            console.error('Erro ao parsear JSON:', parseError);
+            console.error('Texto que não pôde ser parseado:', responseText);
+            throw new Error('Resposta não é um JSON válido');
+        }
         
+        debugLog('Dados parseados:', data);
+        
+        // Exibir resultado
         if (data.status) {
-            alert('✅ Sucesso: ' + data.message);
+            alert(`✅ Sucesso: ${data.message}`);
             if (data.data) {
                 console.log('Dados adicionais:', data.data);
             }
         } else {
-            alert('❌ Erro: ' + data.message);
+            alert(`❌ Erro: ${data.message}`);
         }
         
     } catch (error) {
+        debugLog('Erro na requisição:', error);
         console.error('Erro completo:', error);
-        alert('❌ Erro na requisição: ' + error.message);
+        
+        // Mensagem de erro mais específica
+        let errorMessage = error.message;
+        if (error.message.includes('Failed to fetch')) {
+            errorMessage = 'Erro de conexão. Verifique se o servidor está respondendo.';
+        } else if (error.message.includes('HTML')) {
+            errorMessage = 'Servidor retornou página de erro. Verifique se o endpoint existe.';
+        }
+        
+        alert(`❌ Erro: ${errorMessage}`);
     } finally {
         // Restaurar botão
         buttonElement.disabled = false;
@@ -809,12 +844,23 @@ async function makeEmailTestRequest(action, buttonElement) {
     }
 }
 
+// Função específica para ping (testar se endpoint funciona)
+function pingEndpoint() {
+    debugLog('Fazendo ping no endpoint');
+    makeEmailTestRequest('ping', event.target);
+}
+
+// Função para verificar configurações
+function checkEmailConfig() {
+    debugLog('Verificando configurações');
+    makeEmailTestRequest('check_config', event.target);
+}
+
 // Função para testar conexão SMTP
 function testEmailConnection() {
     if (!confirm('Deseja testar a conexão com o servidor SMTP?')) {
         return;
     }
-    
     makeEmailTestRequest('test_connection', event.target);
 }
 
@@ -823,7 +869,6 @@ function sendTestEmail() {
     if (!confirm('Deseja enviar um email de teste simples?')) {
         return;
     }
-    
     makeEmailTestRequest('send_simple', event.target);
 }
 
@@ -832,13 +877,7 @@ function test2FAEmail() {
     if (!confirm('Deseja enviar um email de teste 2FA?')) {
         return;
     }
-    
     makeEmailTestRequest('send_2fa', event.target);
-}
-
-// Função para obter configurações
-function getEmailConfig() {
-    makeEmailTestRequest('get_config', event.target);
 }
 
 // Função para atualizar soma das porcentagens em tempo real
@@ -861,6 +900,8 @@ function updateSoma() {
 
 // Inicialização do DOM
 document.addEventListener('DOMContentLoaded', function() {
+    debugLog('DOM carregado, inicializando...');
+    
     // Atualizar soma das porcentagens
     const porcentagemCliente = document.getElementById('porcentagemCliente');
     const porcentagemAdmin = document.getElementById('porcentagemAdmin');
