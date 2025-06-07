@@ -101,7 +101,7 @@ echo "</div>";
  */
 function testConfigurations() {
     $configs = [
-        'OPENPIX_API_KEY' => OPENPIX_API_KEY,
+        'Q2xpZW50X0lkXzIzOTVjYmMzLWYyOGItNGJmYi04MWE3LWNkZWIzYzJkYTI4ZTpDbGllbnRfU2VjcmV0X3JYOFRxM016ZWdoNUY5YnVnempJeHl1VlBsRkg2QkNubm0yRFFzUWxQU1E9' => OPENPIX_API_KEY,
         'OPENPIX_BASE_URL' => OPENPIX_BASE_URL,
         'OPENPIX_WEBHOOK_URL' => OPENPIX_WEBHOOK_URL,
         'SITE_URL' => SITE_URL
