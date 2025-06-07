@@ -234,13 +234,7 @@ RewriteRule ^verificar-2fa/?$ views/auth/verify-2fa.php [L]
     Header add Access-Control-Allow-Origin "https://sdk.mercadopago.com"
     Header add Access-Control-Allow-Credentials "true"
 </IfModule>
-# === OTIMIZAÇÕES ESPECIAIS PARA MERCADO PAGO ===
-<IfModule mod_headers.c>
-    # Para APIs e webhooks do Mercado Pago
-    Header always set Access-Control-Allow-Origin "*"
-    Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
-    Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
-</IfModule>
+
 # === BLOQUEIO DE ARQUIVOS SENSÍVEIS ===
 <FilesMatch "^(\.htaccess|\.htpasswd|\.git|\.env|config\.php|constants\.php)">
     Order Allow,Deny
