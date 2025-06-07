@@ -403,9 +403,8 @@ function hideUserModal() {
         modal.classList.remove('show');
     }
 }
-
 /**
- * Edita usuário
+ * Edita usuário - VERSÃO CORRIGIDA
  */
 function editUser(userId) {
     if (!userId) return;
@@ -437,10 +436,10 @@ function editUser(userId) {
     // Mostrar modal
     modal.classList.add('show');
     
-    // Carregar dados do usuário
+    // Carregar dados do usuário - CORREÇÃO AQUI
     showLoading();
     
-    fetch('/controllers/AdminController.php', {
+    fetch('../../controllers/AdminController.php', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
