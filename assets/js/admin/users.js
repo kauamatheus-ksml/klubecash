@@ -489,7 +489,7 @@ function fillUserForm(userData) {
 }
 
 /**
- * Visualiza detalhes do usuário
+ * Visualiza detalhes do usuário - VERSÃO CORRIGIDA
  */
 function viewUser(userId) {
     if (!userId) return;
@@ -502,7 +502,8 @@ function viewUser(userId) {
     modal.classList.add('show');
     content.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin"></i> Carregando...</div>';
     
-    fetch('/controllers/AdminController.php', {
+    // CORREÇÃO AQUI - caminho relativo correto
+    fetch('../../controllers/AdminController.php', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
@@ -605,7 +606,7 @@ function hideViewUserModal() {
 }
 
 /**
- * Altera status do usuário
+ * Altera status do usuário - VERSÃO CORRIGIDA
  */
 function changeUserStatus(userId, newStatus, userName) {
     if (!userId || !newStatus) return;
@@ -619,7 +620,8 @@ function changeUserStatus(userId, newStatus, userName) {
     
     showLoading();
     
-    fetch('/controllers/AdminController.php', {
+    // CORREÇÃO AQUI - caminho relativo correto
+    fetch('../../controllers/AdminController.php', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
@@ -647,7 +649,7 @@ function changeUserStatus(userId, newStatus, userName) {
 }
 
 /**
- * Submete formulário de usuário
+ * Submete formulário de usuário - VERSÃO CORRIGIDA
  */
 function submitUserForm(event) {
     event.preventDefault();
@@ -688,66 +690,40 @@ function submitUserForm(event) {
         }
     }
     
-    // Desabilitar botão e mostrar loading
+    // Desabilitar botão de envio
     if (submitBtn) {
         submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processando...';
     }
     
-    // Converter FormData para URLSearchParams
-    const data = new URLSearchParams();
+    // Preparar dados para envio
+    const submitData = new URLSearchParams();
+    submitData.append('action', isEditing ? 'update_user' : 'create_user');
     
-    if (isEditing) {
-        data.append('action', 'update_user');
-        data.append('user_id', userId);
-    } else {
-        data.append('action', 'register');
-        data.append('ajax', '1');
-    }
-    
-    // Adicionar dados do formulário
     for (let [key, value] of formData.entries()) {
-        if (key !== 'id') {
-            data.append(key, value);
+        if (key !== 'id' || (key === 'id' && value !== '')) {
+            submitData.append(key === 'id' ? 'user_id' : key, value);
         }
     }
     
-    const url = isEditing ? '/controllers/AdminController.php' : '/controllers/AuthController.php';
-    
-    fetch(url, {
+    // CORREÇÃO AQUI - caminho relativo correto
+    fetch('../../controllers/AdminController.php', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
-            'X-Requested-With': 'XMLHttpRequest'
         },
-        body: data
+        body: submitData.toString()
     })
-    .then(response => response.text())
-    .then(text => {
-        let data;
-        try {
-            data = JSON.parse(text);
-        } catch (e) {
-            console.error("Resposta inválida:", text);
-            throw new Error("Resposta do servidor não é JSON válido");
-        }
-        return data;
-    })
+    .then(response => response.json())
     .then(data => {
         if (data.status) {
+            showMessage(data.message || (isEditing ? 'Usuário atualizado com sucesso!' : 'Usuário criado com sucesso!'));
             hideUserModal();
-            let message = isEditing ? 'Usuário atualizado com sucesso!' : 'Usuário adicionado com sucesso!';
-            
-            if (data.store_linked) {
-                message += ' A loja foi vinculada automaticamente ao usuário.';
-            }
-            
-            showMessage(message);
             setTimeout(() => {
                 location.reload();
             }, 1000);
         } else {
-            showMessage(data.message || 'Erro ao processar solicitação', 'error');
+            showMessage(data.message || 'Erro ao processar dados do usuário', 'error');
         }
     })
     .catch(error => {
@@ -758,7 +734,9 @@ function submitUserForm(event) {
         // Reabilitar botão
         if (submitBtn) {
             submitBtn.disabled = false;
-            submitBtn.innerHTML = '<i class="fas fa-save"></i> Salvar';
+            submitBtn.innerHTML = isEditing ? 
+                '<i class="fas fa-save"></i> Salvar Alterações' : 
+                '<i class="fas fa-user-plus"></i> Criar Usuário';
         }
     });
 }
