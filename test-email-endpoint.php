@@ -1,132 +1,204 @@
 <?php
-// test-email-endpoint.php - VERSÃO COM DIAGNÓSTICO SMTP AVANÇADO
+// test-email-endpoint.php - VERSÃO ULTRA ROBUSTA
+// Capturar QUALQUER output indesejado
+ob_start();
+
+// Configurar tratamento de erros
 error_reporting(E_ALL);
 ini_set('display_errors', 0);
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\SMTP;
-use PHPMailer\PHPMailer\Exception;
-            
-// Forçar resposta JSON
-header('Content-Type: application/json; charset=UTF-8');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
+ini_set('log_errors', 1);
 
-// Função para log de erros
-function logError($message) {
-    error_log(date('[Y-m-d H:i:s] ') . "EMAIL_TEST: " . $message);
-}
-
-// Função para resposta JSON
-function jsonResponse($status, $message, $data = null) {
+// Função para limpar output buffer e enviar JSON
+function cleanJsonResponse($status, $message, $data = null, $errorDetails = null) {
+    // Limpar qualquer output anterior
+    while (ob_get_level()) {
+        ob_end_clean();
+    }
+    
+    // Garantir header JSON
+    header('Content-Type: application/json; charset=UTF-8');
+    header('Cache-Control: no-cache, must-revalidate');
+    
     $response = [
         'status' => $status,
         'message' => $message,
-        'timestamp' => date('Y-m-d H:i:s'),
+        'timestamp' => date('Y-m-d H:i:s')
     ];
     
     if ($data !== null) {
         $response['data'] = $data;
     }
     
-    echo json_encode($response, JSON_PRETTY_PRINT);
+    if ($errorDetails !== null) {
+        $response['error_details'] = $errorDetails;
+    }
+    
+    echo json_encode($response, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
     exit;
 }
 
+// Tratamento global de erros
+set_error_handler(function($severity, $message, $file, $line) {
+    cleanJsonResponse(false, "Erro PHP: $message", null, [
+        'file' => $file,
+        'line' => $line,
+        'severity' => $severity
+    ]);
+});
+
+// Tratamento de exceções não capturadas
+set_exception_handler(function($exception) {
+    cleanJsonResponse(false, "Exceção não tratada: " . $exception->getMessage(), null, [
+        'file' => $exception->getFile(),
+        'line' => $exception->getLine(),
+        'trace' => $exception->getTraceAsString()
+    ]);
+});
+
 try {
-    logError("Iniciando teste de endpoint");
-    
     // Verificar método
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        jsonResponse(false, "Método não permitido: " . ($_SERVER['REQUEST_METHOD'] ?? 'UNKNOWN'));
+        cleanJsonResponse(false, "Método não permitido: " . ($_SERVER['REQUEST_METHOD'] ?? 'UNKNOWN'));
     }
     
-    // Verificar se a sessão pode ser iniciada
+    // Iniciar sessão com tratamento de erro
     if (session_status() === PHP_SESSION_NONE) {
-        session_start();
+        if (!session_start()) {
+            cleanJsonResponse(false, "Não foi possível iniciar a sessão");
+        }
     }
     
     // Verificar autenticação
-    if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type'])) {
-        jsonResponse(false, "Usuário não autenticado");
+    if (!isset($_SESSION['user_id'])) {
+        cleanJsonResponse(false, "Usuário não está logado");
     }
     
-    if ($_SESSION['user_type'] !== 'admin') {
-        jsonResponse(false, "Acesso restrito a administradores");
+    if (!isset($_SESSION['user_type']) || $_SESSION['user_type'] !== 'admin') {
+        cleanJsonResponse(false, "Acesso restrito a administradores");
     }
-    
-    // Incluir arquivos necessários
-    require_once 'config/database.php';
-    require_once 'config/constants.php';
     
     // Obter ação
     $action = $_POST['action'] ?? $_GET['action'] ?? '';
-    
     if (empty($action)) {
-        jsonResponse(false, "Ação não especificada");
+        cleanJsonResponse(false, "Ação não especificada");
     }
     
-    logError("Executando ação: " . $action);
+    // Verificar arquivos essenciais ANTES de incluí-los
+    $requiredFiles = [
+        'config/constants.php',
+        'config/database.php'
+    ];
+    
+    foreach ($requiredFiles as $file) {
+        if (!file_exists($file)) {
+            cleanJsonResponse(false, "Arquivo não encontrado: $file");
+        }
+        if (!is_readable($file)) {
+            cleanJsonResponse(false, "Arquivo não pode ser lido: $file");
+        }
+    }
+    
+    // Incluir arquivos com tratamento de erro
+    require_once 'config/constants.php';
+    require_once 'config/database.php';
+    
+    // Verificar se as constantes SMTP estão definidas
+    $requiredConstants = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USERNAME', 'SMTP_PASSWORD', 'SMTP_FROM_EMAIL'];
+    $missingConstants = [];
+    
+    foreach ($requiredConstants as $constant) {
+        if (!defined($constant)) {
+            $missingConstants[] = $constant;
+        }
+    }
+    
+    if (!empty($missingConstants)) {
+        cleanJsonResponse(false, "Constantes SMTP não definidas: " . implode(', ', $missingConstants));
+    }
     
     // Obter dados do admin
     $adminName = $_SESSION['user_name'] ?? 'Administrador';
-    $adminEmail = $_SESSION['user_email'] ?? (defined('ADMIN_EMAIL') ? ADMIN_EMAIL : 'admin@klubecash.com');
+    $adminEmail = $_SESSION['user_email'] ?? (defined('ADMIN_EMAIL') ? ADMIN_EMAIL : SMTP_USERNAME);
     
+    // Processar ações
     switch ($action) {
         case 'ping':
-            jsonResponse(true, "Endpoint funcionando corretamente", [
+            cleanJsonResponse(true, "Endpoint funcionando", [
                 'admin_email' => $adminEmail,
-                'admin_name' => $adminName,
-                'session_id' => session_id()
+                'session_id' => substr(session_id(), 0, 8) . '...'
             ]);
             break;
             
         case 'check_config':
-            $config = [
-                'smtp_host' => defined('SMTP_HOST') ? SMTP_HOST : 'NÃO DEFINIDO',
-                'smtp_port' => defined('SMTP_PORT') ? SMTP_PORT : 'NÃO DEFINIDO',
-                'smtp_username' => defined('SMTP_USERNAME') ? SMTP_USERNAME : 'NÃO DEFINIDO',
-                'smtp_from_email' => defined('SMTP_FROM_EMAIL') ? SMTP_FROM_EMAIL : 'NÃO DEFINIDO',
-                'smtp_encryption' => defined('SMTP_ENCRYPTION') ? SMTP_ENCRYPTION : 'NÃO DEFINIDO',
+            cleanJsonResponse(true, "Configurações carregadas", [
+                'smtp_host' => SMTP_HOST,
+                'smtp_port' => SMTP_PORT,
+                'smtp_username' => SMTP_USERNAME,
+                'smtp_from_email' => SMTP_FROM_EMAIL,
+                'smtp_encryption' => defined('SMTP_ENCRYPTION') ? SMTP_ENCRYPTION : 'ssl',
                 'admin_email' => $adminEmail,
-                'phpmailer_exists' => class_exists('PHPMailer\\PHPMailer\\PHPMailer'),
-                'email_file_exists' => file_exists('utils/Email.php'),
-                'constants_loaded' => defined('SMTP_HOST')
-            ];
-            
-            jsonResponse(true, "Configurações obtidas", $config);
+                'phpmailer_path' => 'libs/PHPMailer/src/PHPMailer.php',
+                'phpmailer_exists' => file_exists('libs/PHPMailer/src/PHPMailer.php')
+            ]);
             break;
             
-        case 'test_connection_manual':
-            // Teste manual da conexão SMTP sem usar a classe Email
-            logError("Testando conexão SMTP manualmente");
+        case 'test_phpmailer_load':
+            // Testar se conseguimos carregar o PHPMailer
+            $phpmailerPath = 'libs/PHPMailer/src/PHPMailer.php';
             
-            // Carregar PHPMailer diretamente
+            if (!file_exists($phpmailerPath)) {
+                cleanJsonResponse(false, "PHPMailer não encontrado em: $phpmailerPath");
+            }
+            
+            try {
+                require_once 'libs/PHPMailer/src/PHPMailer.php';
+                require_once 'libs/PHPMailer/src/SMTP.php';
+                require_once 'libs/PHPMailer/src/Exception.php';
+                
+                if (!class_exists('PHPMailer\\PHPMailer\\PHPMailer')) {
+                    cleanJsonResponse(false, "Classe PHPMailer não pôde ser carregada");
+                }
+                
+                cleanJsonResponse(true, "PHPMailer carregado com sucesso", [
+                    'phpmailer_version' => 'Carregado',
+                    'classes_loaded' => [
+                        'PHPMailer' => class_exists('PHPMailer\\PHPMailer\\PHPMailer'),
+                        'SMTP' => class_exists('PHPMailer\\PHPMailer\\SMTP'),
+                        'Exception' => class_exists('PHPMailer\\PHPMailer\\Exception')
+                    ]
+                ]);
+                
+            } catch (Exception $e) {
+                cleanJsonResponse(false, "Erro ao carregar PHPMailer: " . $e->getMessage());
+            }
+            break;
+            
+        case 'test_smtp_basic':
+            // Teste básico de conexão SMTP
             if (!file_exists('libs/PHPMailer/src/PHPMailer.php')) {
-                jsonResponse(false, "PHPMailer não encontrado em libs/PHPMailer/src/");
+                cleanJsonResponse(false, "PHPMailer não encontrado");
             }
             
             require_once 'libs/PHPMailer/src/PHPMailer.php';
             require_once 'libs/PHPMailer/src/SMTP.php';
             require_once 'libs/PHPMailer/src/Exception.php';
             
-        
-        
+            use PHPMailer\PHPMailer\PHPMailer;
+            use PHPMailer\PHPMailer\SMTP;
+            use PHPMailer\PHPMailer\Exception;
+            
             try {
                 $mail = new PHPMailer(true);
-                
-                // Configurações básicas
                 $mail->isSMTP();
                 $mail->Host = SMTP_HOST;
                 $mail->SMTPAuth = true;
                 $mail->Username = SMTP_USERNAME;
                 $mail->Password = SMTP_PASSWORD;
-                $mail->SMTPSecure = SMTP_ENCRYPTION === 'tls' ? PHPMailer::ENCRYPTION_STARTTLS : PHPMailer::ENCRYPTION_SMTPS;
+                $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS; // Forçar SSL
                 $mail->Port = SMTP_PORT;
-                $mail->CharSet = 'UTF-8';
-                $mail->Timeout = 30;
+                $mail->Timeout = 10; // Timeout menor para teste
                 
-                // Configurações SSL para Hostinger
+                // Opções SSL permissivas para Hostinger
                 $mail->SMTPOptions = [
                     'ssl' => [
                         'verify_peer' => false,
@@ -135,68 +207,60 @@ try {
                     ]
                 ];
                 
-                // Ativar debug
-                $mail->SMTPDebug = SMTP::DEBUG_CONNECTION;
+                // Testar conexão
+                $connected = $mail->smtpConnect();
                 
-                // Capturar debug em buffer
-                ob_start();
-                $result = $mail->smtpConnect();
-                $debugInfo = ob_get_clean();
-                
-                if ($result) {
+                if ($connected) {
                     $mail->smtpClose();
-                    jsonResponse(true, "Conexão SMTP manual estabelecida com sucesso!", [
-                        'debug_info' => $debugInfo,
-                        'smtp_config' => [
-                            'host' => SMTP_HOST,
-                            'port' => SMTP_PORT,
-                            'encryption' => SMTP_ENCRYPTION
-                        ]
+                    cleanJsonResponse(true, "Conexão SMTP estabelecida com sucesso!", [
+                        'host' => SMTP_HOST,
+                        'port' => SMTP_PORT,
+                        'secure' => 'SSL'
                     ]);
                 } else {
-                    jsonResponse(false, "Falha na conexão SMTP manual", [
-                        'debug_info' => $debugInfo,
+                    cleanJsonResponse(false, "Falha na conexão SMTP", [
                         'error_info' => $mail->ErrorInfo
                     ]);
                 }
                 
             } catch (Exception $e) {
-                jsonResponse(false, "Erro na conexão SMTP: " . $e->getMessage(), [
+                cleanJsonResponse(false, "Erro SMTP: " . $e->getMessage(), [
                     'error_code' => $e->getCode(),
-                    'error_file' => $e->getFile(),
-                    'error_line' => $e->getLine()
+                    'smtp_config' => [
+                        'host' => SMTP_HOST,
+                        'port' => SMTP_PORT,
+                        'username' => SMTP_USERNAME
+                    ]
                 ]);
             }
             break;
             
-        case 'send_simple_manual':
-            // Envio manual de email sem usar a classe Email
-            logError("Enviando email simples manualmente");
-            
+        case 'send_test_basic':
+            // Teste básico de envio de email
             if (!file_exists('libs/PHPMailer/src/PHPMailer.php')) {
-                jsonResponse(false, "PHPMailer não encontrado");
+                cleanJsonResponse(false, "PHPMailer não encontrado");
             }
             
             require_once 'libs/PHPMailer/src/PHPMailer.php';
             require_once 'libs/PHPMailer/src/SMTP.php';
             require_once 'libs/PHPMailer/src/Exception.php';
             
+            use PHPMailer\PHPMailer\PHPMailer;
+            use PHPMailer\PHPMailer\SMTP;
+            use PHPMailer\PHPMailer\Exception;
             
-        
-
             try {
                 $mail = new PHPMailer(true);
                 
-                // Configurações do servidor
+                // Configuração SMTP
                 $mail->isSMTP();
                 $mail->Host = SMTP_HOST;
                 $mail->SMTPAuth = true;
                 $mail->Username = SMTP_USERNAME;
                 $mail->Password = SMTP_PASSWORD;
-                $mail->SMTPSecure = SMTP_ENCRYPTION === 'tls' ? PHPMailer::ENCRYPTION_STARTTLS : PHPMailer::ENCRYPTION_SMTPS;
+                $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
                 $mail->Port = SMTP_PORT;
                 $mail->CharSet = 'UTF-8';
-                $mail->Timeout = 30;
                 
                 $mail->SMTPOptions = [
                     'ssl' => [
@@ -206,115 +270,45 @@ try {
                     ]
                 ];
                 
-                // Configurações do email
-                $mail->setFrom(SMTP_FROM_EMAIL, 'Klube Cash - Teste');
+                // Configuração do email
+                $mail->setFrom(SMTP_FROM_EMAIL, 'Klube Cash Teste');
                 $mail->addAddress($adminEmail, $adminName);
                 $mail->isHTML(true);
-                $mail->Subject = 'Teste Manual - Klube Cash';
+                $mail->Subject = 'Teste Básico - Klube Cash';
                 $mail->Body = '
-                    <h2>✅ Teste Manual de Email</h2>
-                    <p>Este email foi enviado através de teste manual do endpoint.</p>
-                    <p><strong>Data/Hora:</strong> ' . date('d/m/Y H:i:s') . '</p>
-                    <p><strong>Servidor:</strong> ' . SMTP_HOST . '</p>
-                    <p>Se você recebeu este email, o sistema está funcionando!</p>
+                    <h2>🎯 Teste Básico de Email</h2>
+                    <p>Este é um teste básico do sistema de email.</p>
+                    <p><strong>Enviado em:</strong> ' . date('d/m/Y H:i:s') . '</p>
+                    <p><strong>Para:</strong> ' . $adminEmail . '</p>
+                    <p>Se você recebeu este email, o sistema básico está funcionando! ✅</p>
                 ';
                 
-                // Capturar debug
-                ob_start();
-                $result = $mail->send();
-                $debugInfo = ob_get_clean();
+                $sent = $mail->send();
                 
-                if ($result) {
-                    jsonResponse(true, "Email manual enviado com sucesso para: " . $adminEmail, [
-                        'debug_info' => $debugInfo
-                    ]);
+                if ($sent) {
+                    cleanJsonResponse(true, "Email de teste enviado com sucesso para: " . $adminEmail);
                 } else {
-                    jsonResponse(false, "Falha ao enviar email manual", [
-                        'error_info' => $mail->ErrorInfo,
-                        'debug_info' => $debugInfo
+                    cleanJsonResponse(false, "Falha ao enviar email", [
+                        'error_info' => $mail->ErrorInfo
                     ]);
                 }
                 
             } catch (Exception $e) {
-                jsonResponse(false, "Erro ao enviar email: " . $e->getMessage(), [
-                    'error_code' => $e->getCode(),
-                    'error_details' => $e->getTraceAsString()
+                cleanJsonResponse(false, "Erro ao enviar email: " . $e->getMessage(), [
+                    'error_code' => $e->getCode()
                 ]);
             }
             break;
             
-        case 'test_connection':
-            // Teste usando a classe Email
-            if (!file_exists('utils/Email.php')) {
-                jsonResponse(false, "Arquivo utils/Email.php não encontrado");
-            }
-            
-            require_once 'utils/Email.php';
-            
-            if (!class_exists('Email')) {
-                jsonResponse(false, "Classe Email não pode ser carregada");
-            }
-            
-            $result = Email::testEmailConnection();
-            
-            if ($result['status']) {
-                jsonResponse(true, "Conexão SMTP via classe Email: " . $result['message'], $result);
-            } else {
-                jsonResponse(false, "Falha SMTP via classe Email: " . $result['message'], $result);
-            }
-            break;
-            
-        case 'send_simple':
-            // Teste usando a classe Email
-            if (!file_exists('utils/Email.php')) {
-                jsonResponse(false, "Arquivo utils/Email.php não encontrado");
-            }
-            
-            require_once 'utils/Email.php';
-            
-            if (!class_exists('Email')) {
-                jsonResponse(false, "Classe Email não pode ser carregada");
-            }
-            
-            $result = Email::sendTestEmail($adminEmail, $adminName);
-            
-            if ($result['status']) {
-                jsonResponse(true, "Email via classe Email enviado para: " . $adminEmail);
-            } else {
-                jsonResponse(false, "Falha ao enviar via classe Email: " . $result['message']);
-            }
-            break;
-            
-        case 'send_2fa':
-            // Teste 2FA usando a classe Email
-            if (!file_exists('utils/Email.php')) {
-                jsonResponse(false, "Arquivo utils/Email.php não encontrado");
-            }
-            
-            require_once 'utils/Email.php';
-            
-            if (!class_exists('Email')) {
-                jsonResponse(false, "Classe Email não pode ser carregada");
-            }
-            
-            $codigoTeste = '123456';
-            $ipAddress = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
-            
-            $emailSent = Email::send2FACode($adminEmail, $adminName, $codigoTeste, $ipAddress);
-            
-            if ($emailSent) {
-                jsonResponse(true, "Email 2FA enviado para: " . $adminEmail);
-            } else {
-                jsonResponse(false, "Falha ao enviar email 2FA");
-            }
-            break;
-            
         default:
-            jsonResponse(false, "Ação não reconhecida: " . $action);
+            cleanJsonResponse(false, "Ação não reconhecida: $action");
     }
     
 } catch (Throwable $e) {
-    logError("ERRO FATAL: " . $e->getMessage() . " em " . $e->getFile() . ":" . $e->getLine());
-    jsonResponse(false, "Erro interno: " . $e->getMessage() . " (Linha " . $e->getLine() . ")");
+    cleanJsonResponse(false, "Erro fatal: " . $e->getMessage(), null, [
+        'file' => $e->getFile(),
+        'line' => $e->getLine(),
+        'type' => get_class($e)
+    ]);
 }
 ?>
