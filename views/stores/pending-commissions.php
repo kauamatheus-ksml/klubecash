@@ -565,7 +565,169 @@ function toggleInfoSection() {
     }
 }
 </script>
+    <script>
+document.addEventListener('DOMContentLoaded', function() {
+    const selectAllCheckbox = document.getElementById('selectAll');
+    const transactionCheckboxes = document.querySelectorAll('input[name="transaction_ids[]"]');
+    const paySelectedBtn = document.getElementById('paySelectedBtn');
+    const payPixBtn = document.getElementById('payPixBtn');
     
+    // Selecionar/desselecionar todos
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', function() {
+            transactionCheckboxes.forEach(checkbox => {
+                checkbox.checked = this.checked;
+            });
+            updateButtons();
+        });
+    }
+    
+    // Atualizar estado dos botões
+    transactionCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', updateButtons);
+    });
+    
+    function updateButtons() {
+        const selectedCount = document.querySelectorAll('input[name="transaction_ids[]"]:checked').length;
+        
+        if (paySelectedBtn) paySelectedBtn.disabled = selectedCount === 0;
+        if (payPixBtn) payPixBtn.disabled = selectedCount === 0;
+    }
+    
+    // Botão Pagar Selecionadas (formulário tradicional)
+    if (paySelectedBtn) {
+        paySelectedBtn.addEventListener('click', function() {
+            const selected = getSelectedTransactions();
+            if (selected.length === 0) {
+                alert('Selecione pelo menos uma transação');
+                return;
+            }
+            
+            if (confirm(`Confirma o pagamento de ${selected.length} transação(ões)?`)) {
+                processPayment('payment_form', selected);
+            }
+        });
+    }
+    
+    // Botão Pagar via PIX (direto para PIX)
+    if (payPixBtn) {
+        payPixBtn.addEventListener('click', function() {
+            const selected = getSelectedTransactions();
+            if (selected.length === 0) {
+                alert('Selecione pelo menos uma transação');
+                return;
+            }
+            
+            if (confirm(`Confirma o pagamento via PIX de ${selected.length} transação(ões)?`)) {
+                processPayment('create_pix_payment', selected);
+            }
+        });
+    }
+    
+    function getSelectedTransactions() {
+        return Array.from(document.querySelectorAll('input[name="transaction_ids[]"]:checked'))
+                   .map(checkbox => checkbox.value);
+    }
+    
+    function processPayment(action, transactionIds) {
+        const formData = new FormData();
+        formData.append('action', action);
+        transactionIds.forEach(id => {
+            formData.append('transaction_ids[]', id);
+        });
+        
+        // Mostrar loading
+        showLoading('Processando pagamento...');
+        
+        fetch('<?php echo STORE_ACTIONS_URL; ?>', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            hideLoading();
+            
+            if (data.status) {
+                if (data.redirect_url) {
+                    window.location.href = data.redirect_url;
+                } else if (data.data && data.data.pix_data) {
+                    // Exibir dados do PIX diretamente
+                    displayPixData(data.data.pix_data);
+                } else {
+                    alert('✅ ' + data.message);
+                    window.location.reload();
+                }
+            } else {
+                alert('❌ Erro: ' + data.message);
+            }
+        })
+        .catch(error => {
+            hideLoading();
+            console.error('Erro:', error);
+            alert('❌ Erro na comunicação. Tente novamente.');
+        });
+    }
+    
+    function showLoading(message) {
+        // Criar overlay de loading
+        const loadingOverlay = document.createElement('div');
+        loadingOverlay.id = 'loadingOverlay';
+        loadingOverlay.style.cssText = `
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(0,0,0,0.7); display: flex; align-items: center; 
+            justify-content: center; z-index: 9999; color: white; font-size: 18px;
+        `;
+        loadingOverlay.innerHTML = `
+            <div style="text-align: center;">
+                <div style="margin-bottom: 20px;">⏳</div>
+                <div>${message}</div>
+            </div>
+        `;
+        document.body.appendChild(loadingOverlay);
+    }
+    
+    function hideLoading() {
+        const overlay = document.getElementById('loadingOverlay');
+        if (overlay) overlay.remove();
+    }
+    
+    function displayPixData(pixData) {
+        // Criar modal com dados PIX
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(0,0,0,0.8); display: flex; align-items: center; 
+            justify-content: center; z-index: 10000;
+        `;
+        
+        modal.innerHTML = `
+            <div style="background: white; padding: 30px; border-radius: 10px; max-width: 500px; text-align: center;">
+                <h3>🏦 Pagamento PIX Gerado</h3>
+                <p>Use o QR Code ou copie o código PIX abaixo:</p>
+                <div style="margin: 20px 0;">
+                    ${pixData.qr_code_image ? `<img src="${pixData.qr_code_image}" style="max-width: 200px;">` : ''}
+                </div>
+                <div style="margin: 20px 0;">
+                    <textarea readonly style="width: 100%; height: 100px; font-family: monospace; font-size: 12px;">${pixData.qr_code}</textarea>
+                </div>
+                <button onclick="navigator.clipboard.writeText('${pixData.qr_code}').then(() => alert('Código PIX copiado!'))" 
+                        style="margin: 10px; padding: 10px 20px; background: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                    📋 Copiar Código PIX
+                </button>
+                <button onclick="this.closest('div').parentNode.remove()" 
+                        style="margin: 10px; padding: 10px 20px; background: #f44336; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                    ❌ Fechar
+                </button>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+    }
+    
+    // Inicializar estado dos botões
+    updateButtons();
+});
+</script>
     <style>
         /* Estilos adicionais para saldo usado */
         .balance-used-badge {
