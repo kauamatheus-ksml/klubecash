@@ -61,13 +61,21 @@ define('PASSWORD_MIN_LENGTH', 8);
 define('SESSION_LIFETIME', 86400);
 define('TOKEN_EXPIRATION', 7200);
 define('CPF_REQUIRED', true); // Novo: Indica se CPF é obrigatório
-// === 🆕 OPENPIX CONFIGURAÇÕES ===
+
+
+// === 🆕 OPENPIX CONFIGURAÇÕES COMPLETAS ===
 // ATENÇÃO: Substitua pela sua API Key real do OpenPix
-define('OPENPIX_API_KEY', 'Q2xpZW50X0lkXzIzOTVjYmMzLWYyOGItNGJmYi04MWE3LWNkZWIzYzJkYTI4ZTpDbGllbnRfU2VjcmV0X3JYOFRxM016ZWdoNUY5YnVnempJeHl1VlBsRkg2QkNubm0yRFFzUWxQU1E9'); // Sua API Key do OpenPix
+define('OPENPIX_API_KEY', 'Q2xpZW50X0lkXzY3MmFhZjVlLTEyZWYtNGI3YS04ZGQ1LTVkYTcyNzU4ZjczOTpDbGllbnRfU2VjcmV0X1hYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWA==');
 define('OPENPIX_WEBHOOK_URL', SITE_URL . '/api/openpix?action=webhook');
 define('OPENPIX_BASE_URL', 'https://api.openpix.com.br/api/v1');
 define('OPENPIX_TIMEOUT', 30);
 define('LOG_OPENPIX_REQUESTS', true);
+define('OPENPIX_DEBUG', false); // 🆕 Constante necessária para o OpenPixClient
+define('OPENPIX_ENABLE_SSL_VERIFICATION', true); // 🆕 Verificação SSL
+define('OPENPIX_MAX_RETRIES', 3); // 🆕 Máximo de tentativas
+define('OPENPIX_RETRY_DELAY', 1000); // 🆕 Delay entre tentativas (ms)
+
+
 // === MENSAGENS DE VALIDAÇÃO ===
 define('MSG_CPF_REQUIRED', 'CPF é obrigatório para completar seu perfil');
 define('MSG_CPF_INVALID', 'CPF informado é inválido');

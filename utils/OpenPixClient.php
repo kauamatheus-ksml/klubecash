@@ -1,14 +1,19 @@
 <?php
 /**
- * Cliente OpenPix para Klube Cash
- * Implementação completa da API OpenPix para pagamentos PIX
+ * Cliente OpenPix para integração com a API do OpenPix
+ * Klube Cash v2.1
  */
 
+require_once __DIR__ . '/../config/constants.php';
+
 class OpenPixClient {
-    private $baseUrl;
     private $apiKey;
+    private $baseUrl;
     private $timeout;
     private $debug;
+    private $maxRetries;
+    private $retryDelay;
+    private $sslVerification;
     
     public function __construct() {
         $this->baseUrl = OPENPIX_BASE_URL;
@@ -445,5 +450,8 @@ class OpenPixClient {
     public static function toReais($valueInCents) {
         return $valueInCents / 100;
     }
+
+
+    
 }
 ?>
