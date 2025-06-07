@@ -62,17 +62,18 @@ RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
     Header set X-SSL-Enabled "true" env=HTTPS
     Header set X-TLS-Version "1.2+" env=HTTPS
     
-    # CSP para PCI Compliance
-    Header set Content-Security-Policy "default-src 'self' https:; script-src 'self' 'unsafe-inline' https://sdk.mercadopago.com https://secure.mlstatic.com; style-src 'self' 'unsafe-inline' https:; font-src 'self' data: https:; img-src 'self' data: https:; connect-src 'self' https://api.mercadopago.com https://*.mercadopago.com; frame-src 'self' https://*.mercadopago.com"
+    # Headers específicos para OpenPix
+    Header set X-OpenPix-Integration "KlubeCash-v2.1"
+    Header set X-OpenPix-Quality "optimized"
     
-    # Headers para PCI DSS
-    Header set X-Permitted-Cross-Domain-Policies "none"
-    Header set X-Download-Options "noopen"
-    Header set Referrer-Policy "strict-origin-when-cross-origin"
+    # Preload de recursos críticos
+    Header add Link "</assets/css/index-v2.css>; rel=preload; as=style"
+    Header add Link "<https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap>; rel=preload; as=style; crossorigin"
+    Header add Link "</assets/js/index-v2.js>; rel=preload; as=script"
     
-    # Headers específicos para Mercado Pago
-    Header set X-MP-Integration "KlubeCash-v2.1"
-    Header set X-MP-Quality "optimized"
+    # Permitir conexões da OpenPix
+    Header add Access-Control-Allow-Origin "https://api.openpix.com.br"
+    Header add Access-Control-Allow-Credentials "true"
 </IfModule>
 
 
@@ -147,6 +148,13 @@ RewriteRule ^(.*)$ index.php [L]
     AddOutputFilterByType DEFLATE application/json
     AddOutputFilterByType DEFLATE image/svg+xml
 </IfModule>
+
+# === PIX E OPENPIX (NOVO) ===
+RewriteRule ^loja/pagamento-pix/?$ views/stores/payment-pix.php [L,QSA]
+RewriteRule ^api/openpix/?$ api/openpix.php [L,QSA]
+RewriteRule ^api/openpix-webhook/?$ api/openpix-webhook.php [L,QSA]
+RewriteRule ^api/store-payment/?$ api/store-payment.php [L,QSA]
+
 
 # === ROTAS EXISTENTES (MANTIDAS) ===
 # Autenticação
@@ -261,8 +269,8 @@ RewriteRule ^verificar-2fa/?$ views/auth/verify-2fa.php [L]
     php_value error_reporting "E_ALL & ~E_NOTICE & ~E_DEPRECATED"
     php_value memory_limit 256M
     
-    # Configurações específicas para Mercado Pago
-    php_value user_agent "KlubeCash/2.0 (PHP/7.4; MercadoPago-Optimized)"
+    # Configurações específicas para OpenPix
+    php_value user_agent "KlubeCash/2.1 (PHP/7.4; OpenPix-Optimized)"
     php_value default_socket_timeout 30
 </IfModule>
 
