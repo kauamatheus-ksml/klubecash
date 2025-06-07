@@ -203,6 +203,9 @@ RewriteRule ^api/mercadopago/?$ api/mercadopago.php [L,QSA]
 RewriteRule ^api/mercadopago-webhook/?$ api/mercadopago-webhook.php [L,QSA]
 RewriteRule ^api/store-payment/?$ api/store-payment.php [L,QSA]
 
+
+RewriteRule ^api/openpix/?$ api/openpix.php [L,QSA]
+RewriteRule ^test-openpix/?$ test-openpix.php [L,QSA]
 # Lojas
 RewriteRule ^lojas/cadastro/?$ views/stores/register.php [L]
 RewriteRule ^lojas/detalhes/([0-9]+)/?$ views/stores/details.php?id=$1 [L]
