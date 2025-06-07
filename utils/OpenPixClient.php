@@ -1,7 +1,7 @@
 <?php
 /**
  * Cliente OpenPix para integração com a API do OpenPix
- * Klube Cash v2.1 - Versão Completa e Otimizada
+ * Klube Cash v2.1 - Com Debug Avançado
  */
 
 require_once __DIR__ . '/../config/constants.php';
@@ -29,8 +29,9 @@ class OpenPixClient {
         $this->retryDelay = defined('OPENPIX_RETRY_DELAY') ? OPENPIX_RETRY_DELAY : 1000;
         $this->sslVerification = defined('OPENPIX_ENABLE_SSL_VERIFICATION') ? OPENPIX_ENABLE_SSL_VERIFICATION : true;
         
-        if (empty($this->apiKey)) {
-            throw new Exception('OPENPIX_API_KEY não configurada');
+        // Verificar se a API Key está configurada corretamente
+        if (empty($this->apiKey) || $this->apiKey === 'APP_ID_YOUR_APP_ID_HERE') {
+            throw new Exception('OPENPIX_API_KEY não configurada corretamente. Substitua pela sua API Key real do OpenPix.');
         }
         
         // Log de inicialização
@@ -38,15 +39,114 @@ class OpenPixClient {
             'baseUrl' => $this->baseUrl,
             'timeout' => $this->timeout,
             'debug' => $this->debug,
-            'maxRetries' => $this->maxRetries
+            'maxRetries' => $this->maxRetries,
+            'api_key_format' => $this->validateApiKeyFormat($this->apiKey)
         ]);
     }
     
     /**
-     * Criar uma cobrança PIX
+     * Validar formato da API Key
+     */
+    private function validateApiKeyFormat($apiKey) {
+        if (empty($apiKey)) {
+            return ['valid' => false, 'reason' => 'API Key vazia'];
+        }
+        
+        if ($apiKey === 'APP_ID_YOUR_APP_ID_HERE') {
+            return ['valid' => false, 'reason' => 'API Key de exemplo não substituída'];
+        }
+        
+        // Verificar se parece com uma API Key válida do OpenPix
+        if (strpos($apiKey, 'Q2xpZW50X0lk') === 0) {
+            return ['valid' => true, 'type' => 'Base64 encoded'];
+        }
+        
+        if (preg_match('/^[A-Za-z0-9_-]+$/', $apiKey) && strlen($apiKey) > 20) {
+            return ['valid' => true, 'type' => 'Standard format'];
+        }
+        
+        return ['valid' => false, 'reason' => 'Formato não reconhecido'];
+    }
+    
+    /**
+     * Teste de conectividade robusto
+     */
+    public function testConnection() {
+        try {
+            $this->log('Iniciando teste de conectividade');
+            
+            // Verificar formato da API Key primeiro
+            $apiKeyValidation = $this->validateApiKeyFormat($this->apiKey);
+            if (!$apiKeyValidation['valid']) {
+                return [
+                    'status' => false,
+                    'message' => 'API Key inválida: ' . $apiKeyValidation['reason'],
+                    'debug_info' => [
+                        'api_key_length' => strlen($this->apiKey),
+                        'api_key_preview' => substr($this->apiKey, 0, 10) . '...',
+                        'validation' => $apiKeyValidation
+                    ]
+                ];
+            }
+            
+            // Tentar uma requisição simples para listar cobranças
+            $response = $this->makeRequest('GET', '/charge?limit=1');
+            
+            if ($response['success']) {
+                return [
+                    'status' => true,
+                    'message' => 'Conexão com OpenPix estabelecida com sucesso!',
+                    'response_time' => isset($response['response_time']) ? round($response['response_time'] * 1000, 2) . 'ms' : null,
+                    'attempts' => $response['attempts'] ?? 1,
+                    'api_key_validation' => $apiKeyValidation
+                ];
+            } else {
+                // Debug detalhado do erro
+                $debugInfo = [
+                    'http_code' => $response['http_code'] ?? 'N/A',
+                    'error_code' => $response['error_code'] ?? 'N/A',
+                    'raw_response' => $response['raw_response'] ?? 'N/A',
+                    'attempts' => $response['attempts'] ?? 1,
+                    'api_key_validation' => $apiKeyValidation
+                ];
+                
+                $this->log('Erro no teste de conectividade', $debugInfo);
+                
+                return [
+                    'status' => false,
+                    'message' => 'Erro na conexão: ' . $response['message'],
+                    'debug_info' => $debugInfo
+                ];
+            }
+        } catch (Exception $e) {
+            $this->log('Exceção no teste de conectividade', ['error' => $e->getMessage()]);
+            return [
+                'status' => false,
+                'message' => 'Erro na conexão: ' . $e->getMessage(),
+                'debug_info' => [
+                    'exception' => get_class($e),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine()
+                ]
+            ];
+        }
+    }
+    
+    /**
+     * Criar uma cobrança PIX com validações aprimoradas
      */
     public function createCharge($data) {
         try {
+            // Validar API Key antes de prosseguir
+            $apiKeyValidation = $this->validateApiKeyFormat($this->apiKey);
+            if (!$apiKeyValidation['valid']) {
+                return [
+                    'status' => false,
+                    'message' => 'API Key inválida: ' . $apiKeyValidation['reason'],
+                    'error_code' => 'INVALID_API_KEY'
+                ];
+            }
+            
             // Validar dados obrigatórios
             $this->validateChargeData($data);
             
@@ -96,7 +196,11 @@ class OpenPixClient {
                 return [
                     'status' => false,
                     'message' => $response['message'],
-                    'error_code' => $response['error_code'] ?? null
+                    'error_code' => $response['error_code'] ?? null,
+                    'debug_info' => [
+                        'http_code' => $response['http_code'] ?? null,
+                        'raw_response' => $response['raw_response'] ?? null
+                    ]
                 ];
             }
         } catch (Exception $e) {
@@ -132,126 +236,17 @@ class OpenPixClient {
         } else {
             return [
                 'status' => false,
-                'message' => $response['message']
+                'message' => $response['message'],
+                'debug_info' => [
+                    'http_code' => $response['http_code'] ?? null,
+                    'error_code' => $response['error_code'] ?? null
+                ]
             ];
         }
     }
     
     /**
-     * Listar cobranças
-     */
-    public function listCharges($filters = []) {
-        $queryParams = [];
-        
-        if (isset($filters['start_date'])) {
-            $queryParams['start'] = $filters['start_date'];
-        }
-        
-        if (isset($filters['end_date'])) {
-            $queryParams['end'] = $filters['end_date'];
-        }
-        
-        if (isset($filters['status'])) {
-            $queryParams['status'] = $filters['status'];
-        }
-        
-        if (isset($filters['limit'])) {
-            $queryParams['limit'] = $filters['limit'];
-        }
-        
-        if (isset($filters['offset'])) {
-            $queryParams['offset'] = $filters['offset'];
-        }
-        
-        $endpoint = '/charge';
-        if (!empty($queryParams)) {
-            $endpoint .= '?' . http_build_query($queryParams);
-        }
-        
-        return $this->makeRequest('GET', $endpoint);
-    }
-    
-    /**
-     * Criar webhook
-     */
-    public function createWebhook($webhookUrl, $name = 'Klube Cash Webhook') {
-        $payload = [
-            'webhook' => [
-                'name' => $name,
-                'url' => $webhookUrl,
-                'authorization' => 'Bearer ' . $this->generateWebhookToken(),
-                'isActive' => true
-            ]
-        ];
-        
-        return $this->makeRequest('POST', '/webhook', $payload);
-    }
-    
-    /**
-     * Validar webhook recebido
-     */
-    public function validateWebhook($payload, $signature = null) {
-        // OpenPix não usa assinatura por padrão, mas validamos o formato
-        if (!isset($payload['charge']) && !isset($payload['pix'])) {
-            return false;
-        }
-        
-        return true;
-    }
-    
-    /**
-     * Processar evento de webhook
-     */
-    public function processWebhookEvent($payload) {
-        $this->log('Processando evento de webhook', $payload);
-        
-        $result = [
-            'status' => false,
-            'event_type' => null,
-            'charge_id' => null,
-            'transaction_id' => null,
-            'charge_status' => null,
-            'paid_at' => null,
-            'value' => null
-        ];
-        
-        // Verificar se é um evento de cobrança
-        if (isset($payload['charge'])) {
-            $charge = $payload['charge'];
-            
-            $result['status'] = true;
-            $result['event_type'] = 'charge';
-            $result['charge_id'] = $charge['correlationID'];
-            $result['transaction_id'] = $charge['transactionID'] ?? null;
-            $result['charge_status'] = $charge['status'];
-            $result['value'] = $charge['value'] ?? null;
-            
-            if ($charge['status'] === 'COMPLETED' || $charge['status'] === 'CONFIRMED') {
-                $result['paid_at'] = $charge['paidAt'] ?? date('Y-m-d H:i:s');
-            }
-        }
-        
-        // Verificar se é um evento de PIX
-        if (isset($payload['pix'])) {
-            $pix = $payload['pix'];
-            
-            $result['status'] = true;
-            $result['event_type'] = 'pix';
-            $result['transaction_id'] = $pix['transactionID'] ?? null;
-            $result['charge_id'] = $pix['correlationID'] ?? null;
-            $result['value'] = $pix['value'] ?? null;
-            
-            if (isset($pix['charge'])) {
-                $result['charge_status'] = $pix['charge']['status'];
-            }
-        }
-        
-        $this->log('Evento processado', $result);
-        return $result;
-    }
-    
-    /**
-     * Fazer requisição para a API
+     * Fazer requisição para a API com debug melhorado
      */
     private function makeRequest($method, $endpoint, $data = null) {
         $url = $this->baseUrl . $endpoint;
@@ -265,8 +260,12 @@ class OpenPixClient {
         ];
         
         $attempts = 0;
+        $lastError = null;
+        
         while ($attempts < $this->maxRetries) {
             $attempts++;
+            
+            $this->log("Tentativa {$attempts} de {$this->maxRetries}: {$method} {$endpoint}");
             
             $ch = curl_init();
             curl_setopt_array($ch, [
@@ -278,44 +277,66 @@ class OpenPixClient {
                 CURLOPT_SSL_VERIFYPEER => $this->sslVerification,
                 CURLOPT_SSL_VERIFYHOST => $this->sslVerification ? 2 : 0,
                 CURLOPT_FOLLOWLOCATION => false,
-                CURLOPT_MAXREDIRS => 0
+                CURLOPT_MAXREDIRS => 0,
+                CURLOPT_VERBOSE => $this->debug
             ]);
             
             if ($data && in_array($method, ['POST', 'PUT', 'PATCH'])) {
-                curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+                $jsonData = json_encode($data);
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $jsonData);
+                
+                if ($this->debug) {
+                    $this->log("Payload enviado", ['json' => $jsonData, 'data' => $data]);
+                }
             }
             
             $response = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             $error = curl_error($ch);
+            $curlInfo = curl_getinfo($ch);
             $responseTime = microtime(true) - $startTime;
             curl_close($ch);
             
-            // Log da requisição se debug ativo
+            // Log detalhado se debug ativo
             if ($this->debug) {
-                $this->log("API Request: {$method} {$url} (tentativa {$attempts})", [
-                    'data' => $data,
+                $this->log("Resposta detalhada da API (tentativa {$attempts})", [
+                    'url' => $url,
+                    'method' => $method,
                     'http_code' => $httpCode,
                     'response_time' => round($responseTime * 1000, 2) . 'ms',
-                    'response' => $response,
-                    'curl_error' => $error
+                    'response_size' => strlen($response) . ' bytes',
+                    'curl_error' => $error,
+                    'curl_info' => $curlInfo,
+                    'headers_sent' => $headers,
+                    'response_preview' => substr($response, 0, 500) . (strlen($response) > 500 ? '...' : '')
                 ]);
             }
             
             if ($error) {
+                $lastError = "Erro cURL: {$error}";
                 if ($attempts < $this->maxRetries) {
-                    usleep($this->retryDelay * 1000); // Converter para microsegundos
+                    $this->log("Erro cURL, tentando novamente em " . ($this->retryDelay / 1000) . "s", ['error' => $error]);
+                    usleep($this->retryDelay * 1000);
                     continue;
                 }
                 return [
                     'success' => false,
-                    'message' => "Erro de conexão: {$error}",
+                    'message' => $lastError,
                     'error_code' => 'CURL_ERROR',
-                    'attempts' => $attempts
+                    'attempts' => $attempts,
+                    'curl_info' => $curlInfo ?? null
                 ];
             }
             
             $responseData = json_decode($response, true);
+            $jsonError = json_last_error();
+            
+            if ($jsonError !== JSON_ERROR_NONE) {
+                $this->log("Erro ao decodificar JSON", [
+                    'json_error' => json_last_error_msg(),
+                    'response' => $response
+                ]);
+            }
             
             if ($httpCode >= 200 && $httpCode < 300) {
                 return [
@@ -326,7 +347,7 @@ class OpenPixClient {
                     'attempts' => $attempts
                 ];
             } else if ($httpCode >= 500 && $attempts < $this->maxRetries) {
-                // Tentar novamente para erros de servidor
+                $this->log("Erro de servidor (HTTP {$httpCode}), tentando novamente", ['response' => $response]);
                 usleep($this->retryDelay * 1000);
                 continue;
             } else {
@@ -336,6 +357,12 @@ class OpenPixClient {
                     $errorMessage = $responseData['error'];
                 } elseif ($responseData && isset($responseData['message'])) {
                     $errorMessage = $responseData['message'];
+                } elseif ($httpCode === 401) {
+                    $errorMessage = 'API Key inválida ou sem permissão';
+                } elseif ($httpCode === 403) {
+                    $errorMessage = 'Acesso negado - verifique suas permissões';
+                } elseif ($httpCode === 404) {
+                    $errorMessage = 'Endpoint não encontrado';
                 }
                 
                 return [
@@ -344,14 +371,15 @@ class OpenPixClient {
                     'http_code' => $httpCode,
                     'error_code' => $responseData['code'] ?? 'API_ERROR',
                     'raw_response' => $response,
-                    'attempts' => $attempts
+                    'attempts' => $attempts,
+                    'response_data' => $responseData
                 ];
             }
         }
         
         return [
             'success' => false,
-            'message' => 'Esgotadas todas as tentativas de conexão',
+            'message' => $lastError ?? 'Esgotadas todas as tentativas de conexão',
             'attempts' => $attempts
         ];
     }
@@ -441,24 +469,18 @@ class OpenPixClient {
     }
     
     /**
-     * Gerar token para webhook
-     */
-    private function generateWebhookToken() {
-        return hash('sha256', $this->apiKey . time() . rand(1000, 9999));
-    }
-    
-    /**
-     * Log de debug
+     * Log com debug melhorado
      */
     private function log($message, $data = null) {
         if (!defined('LOG_PIX_TRANSACTIONS') || !LOG_PIX_TRANSACTIONS) {
             return;
         }
         
-        $logMessage = date('Y-m-d H:i:s') . " [OpenPix] {$message}";
+        $timestamp = date('Y-m-d H:i:s');
+        $logMessage = "{$timestamp} [OpenPix] {$message}";
         
         if ($data) {
-            $logMessage .= ' | Data: ' . json_encode($data, JSON_UNESCAPED_UNICODE);
+            $logMessage .= ' | Data: ' . json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
         }
         
         error_log($logMessage);
@@ -468,44 +490,35 @@ class OpenPixClient {
             $logFile = LOGS_DIR . '/openpix_' . date('Y-m-d') . '.log';
             file_put_contents($logFile, $logMessage . PHP_EOL, FILE_APPEND | LOCK_EX);
         }
-    }
-    
-    /**
-     * Teste de conectividade
-     */
-    public function testConnection() {
-        try {
-            // Fazer uma requisição simples para testar a conectividade
-            $response = $this->makeRequest('GET', '/charge?limit=1');
-            
-            if ($response['success']) {
-                return [
-                    'status' => true,
-                    'message' => 'Conexão com OpenPix estabelecida com sucesso!',
-                    'response_time' => isset($response['response_time']) ? round($response['response_time'] * 1000, 2) . 'ms' : null,
-                    'attempts' => $response['attempts'] ?? 1
-                ];
-            } else {
-                return [
-                    'status' => false,
-                    'message' => 'Erro na conexão: ' . $response['message'],
-                    'http_code' => $response['http_code'] ?? null,
-                    'attempts' => $response['attempts'] ?? 1
-                ];
-            }
-        } catch (Exception $e) {
-            return [
-                'status' => false,
-                'message' => 'Erro na conexão: ' . $e->getMessage()
-            ];
+        
+        // Se debug ativo, também exibir no console (para desenvolvimento)
+        if ($this->debug && php_sapi_name() === 'cli') {
+            echo $logMessage . PHP_EOL;
         }
     }
     
     /**
-     * Obter informações da conta
+     * Obter informações de status detalhadas
      */
-    public function getAccountInfo() {
-        return $this->makeRequest('GET', '/account');
+    public function getStatusInfo() {
+        $apiKeyValidation = $this->validateApiKeyFormat($this->apiKey);
+        
+        return [
+            'api_key_configured' => !empty($this->apiKey),
+            'api_key_valid' => $apiKeyValidation['valid'],
+            'api_key_validation' => $apiKeyValidation,
+            'api_key_masked' => !empty($this->apiKey) ? substr($this->apiKey, 0, 15) . '...' : 'Não configurada',
+            'base_url' => $this->baseUrl,
+            'timeout' => $this->timeout . 's',
+            'debug_mode' => $this->debug,
+            'ssl_verification' => $this->sslVerification,
+            'max_retries' => $this->maxRetries,
+            'retry_delay' => $this->retryDelay . 'ms',
+            'min_charge_value' => defined('OPENPIX_MIN_CHARGE_VALUE') ? self::formatCurrency(OPENPIX_MIN_CHARGE_VALUE) : 'R$ 1,00',
+            'max_charge_value' => defined('OPENPIX_MAX_CHARGE_VALUE') ? self::formatCurrency(OPENPIX_MAX_CHARGE_VALUE) : 'R$ 1.000.000,00',
+            'pix_expiration' => defined('PIX_EXPIRATION_MINUTES') ? PIX_EXPIRATION_MINUTES . ' minutos' : '30 minutos',
+            'logging_enabled' => defined('LOG_PIX_TRANSACTIONS') ? LOG_PIX_TRANSACTIONS : false
+        ];
     }
     
     /**
@@ -527,97 +540,6 @@ class OpenPixClient {
      */
     public static function toReais($valueInCents) {
         return $valueInCents / 100;
-    }
-    
-    /**
-     * Obter informações de status da configuração
-     */
-    public function getStatusInfo() {
-        return [
-            'api_key_configured' => !empty($this->apiKey),
-            'api_key_masked' => !empty($this->apiKey) ? substr($this->apiKey, 0, 10) . '...' : 'Não configurada',
-            'base_url' => $this->baseUrl,
-            'timeout' => $this->timeout . 's',
-            'debug_mode' => $this->debug,
-            'ssl_verification' => $this->sslVerification,
-            'max_retries' => $this->maxRetries,
-            'retry_delay' => $this->retryDelay . 'ms',
-            'min_charge_value' => defined('OPENPIX_MIN_CHARGE_VALUE') ? self::formatCurrency(OPENPIX_MIN_CHARGE_VALUE) : 'R$ 1,00',
-            'max_charge_value' => defined('OPENPIX_MAX_CHARGE_VALUE') ? self::formatCurrency(OPENPIX_MAX_CHARGE_VALUE) : 'R$ 1.000.000,00',
-            'pix_expiration' => defined('PIX_EXPIRATION_MINUTES') ? PIX_EXPIRATION_MINUTES . ' minutos' : '30 minutos',
-            'logging_enabled' => defined('LOG_PIX_TRANSACTIONS') ? LOG_PIX_TRANSACTIONS : false
-        ];
-    }
-    
-    /**
-     * Validar CPF
-     */
-    public static function validateCPF($cpf) {
-        $cpf = preg_replace('/\D/', '', $cpf);
-        
-        if (strlen($cpf) !== 11) {
-            return false;
-        }
-        
-        // Verificar se todos os dígitos são iguais
-        if (preg_match('/(\d)\1{10}/', $cpf)) {
-            return false;
-        }
-        
-        // Validar dígitos verificadores
-        for ($t = 9; $t < 11; $t++) {
-            for ($d = 0, $c = 0; $c < $t; $c++) {
-                $d += $cpf[$c] * (($t + 1) - $c);
-            }
-            $d = ((10 * $d) % 11) % 10;
-            if ($cpf[$c] != $d) {
-                return false;
-            }
-        }
-        
-        return true;
-    }
-    
-    /**
-     * Validar CNPJ
-     */
-    public static function validateCNPJ($cnpj) {
-        $cnpj = preg_replace('/\D/', '', $cnpj);
-        
-        if (strlen($cnpj) !== 14) {
-            return false;
-        }
-        
-        // Verificar se todos os dígitos são iguais
-        if (preg_match('/(\d)\1{13}/', $cnpj)) {
-            return false;
-        }
-        
-        // Validar primeiro dígito verificador
-        $soma = 0;
-        $peso = 2;
-        for ($i = 11; $i >= 0; $i--) {
-            $soma += $cnpj[$i] * $peso;
-            $peso = ($peso == 9) ? 2 : $peso + 1;
-        }
-        $resto = $soma % 11;
-        $dv1 = ($resto < 2) ? 0 : 11 - $resto;
-        
-        if ($cnpj[12] != $dv1) {
-            return false;
-        }
-        
-        // Validar segundo dígito verificador
-        $soma = 0;
-        $peso = 2;
-        for ($i = 12; $i >= 0; $i--) {
-            $soma += $cnpj[$i] * $peso;
-            $peso = ($peso == 9) ? 2 : $peso + 1;
-        }
-        $resto = $soma % 11;
-        $dv2 = ($resto < 2) ? 0 : 11 - $resto;
-        
-        return $cnpj[13] == $dv2;
     }
 }
 ?>
