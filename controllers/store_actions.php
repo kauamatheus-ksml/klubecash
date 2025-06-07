@@ -26,7 +26,7 @@ try {
     if (!AuthController::isAuthenticated() || !AuthController::isStore()) {
         error_log('STORE_ACTIONS: Usuário não autenticado ou não é loja');
         http_response_code(403);
-        echo json_encode(['status' => false, 'message' => 'Acesso negado.']);
+        echo json_encode(['status' => false, 'message' => 'Acesso negado. Esta área é exclusiva para lojas parceiras.']);
         exit;
     }
 
@@ -45,7 +45,9 @@ try {
     // Processar a ação
     switch ($action) {
         case 'payment_form':
-            // Retornar dados para o formulário de pagamento PIX
+            // Processar formulário de pagamento PIX
+            error_log('STORE_ACTIONS: Processando payment_form');
+            
             $lojaId = isset($_GET['loja_id']) ? intval($_GET['loja_id']) : 0;
             $transacoes = isset($_POST['transacoes']) ? $_POST['transacoes'] : [];
             

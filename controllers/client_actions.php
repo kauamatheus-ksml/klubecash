@@ -71,6 +71,17 @@ try {
             $result = ClientController::simulateBalanceUse($userId, $lojaId, $valor);
             echo json_encode($result);
             break;
+
+        case 'payment_form':
+            // Esta ação não deveria ser chamada por clientes
+            // Redirecionar para a área correta ou retornar erro apropriado
+            error_log('CLIENT_ACTIONS: payment_form chamada incorretamente por cliente');
+            echo json_encode([
+                'status' => false, 
+                'message' => 'Esta ação é exclusiva para lojas parceiras. Se você é uma loja, acesse a área de lojas.',
+                'redirect' => STORE_DASHBOARD_URL
+            ]);
+            break;
             
         default:
             error_log('CLIENT_ACTIONS: Ação não reconhecida: ' . $action);
