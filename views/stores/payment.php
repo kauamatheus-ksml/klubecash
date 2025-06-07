@@ -1,512 +1,342 @@
 <?php
 // views/stores/payment.php
-// Incluir arquivos necessários
+
 require_once '../../config/database.php';
 require_once '../../config/constants.php';
 require_once '../../controllers/AuthController.php';
-require_once '../../controllers/TransactionController.php';
-require_once '../../models/CashbackBalance.php';
 
-// Iniciar sessão
-session_start();
-
-// Verificar se o usuário está logado e é uma loja
-if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION['user_type'] !== 'loja') {
-    header("Location: " . LOGIN_URL . "?error=acesso_restrito");
+// Verificar autenticação
+AuthController::checkAuth();
+if ($_SESSION['user_type'] !== 'loja') {
+    header('Location: ' . SITE_URL . '/login');
     exit;
 }
 
-// Obter ID do usuário logado
-$userId = $_SESSION['user_id'];
+$paymentId = $_GET['id'] ?? 0;
 
-// Obter dados da loja associada ao usuário
+if (!$paymentId) {
+    header('Location: ' . SITE_URL . '/store/transacoes-pendentes');
+    exit;
+}
+
 $db = Database::getConnection();
-$storeQuery = $db->prepare("SELECT id, nome_fantasia FROM lojas WHERE usuario_id = :usuario_id");
-$storeQuery->bindParam(':usuario_id', $userId);
-$storeQuery->execute();
 
-// Verificar se o usuário tem uma loja associada
-if ($storeQuery->rowCount() == 0) {
-    header('Location: ' . LOGIN_URL . '?error=' . urlencode('Sua conta não está associada a nenhuma loja. Entre em contato com o suporte.'));
+// Buscar dados do pagamento
+$stmt = $db->prepare("
+    SELECT p.*, l.nome_fantasia 
+    FROM pagamentos_comissao p
+    JOIN lojas l ON p.loja_id = l.id
+    WHERE p.id = ? AND l.usuario_id = ?
+");
+$stmt->execute([$paymentId, $_SESSION['user_id']]);
+$payment = $stmt->fetch(PDO::FETCH_ASSOC);
+
+if (!$payment) {
+    header('Location: ' . SITE_URL . '/store/transacoes-pendentes');
     exit;
 }
 
-// Obter os dados da loja
-$store = $storeQuery->fetch(PDO::FETCH_ASSOC);
-$storeId = $store['id'];
-$storeName = $store['nome_fantasia'];
+// Buscar transações do pagamento
+$stmtTrans = $db->prepare("
+    SELECT t.*, pt.transacao_id
+    FROM pagamento_transacoes pt
+    JOIN transacoes_cashback t ON pt.transacao_id = t.id
+    WHERE pt.pagamento_id = ?
+");
+$stmtTrans->execute([$paymentId]);
+$transactions = $stmtTrans->fetchAll(PDO::FETCH_ASSOC);
 
-// Verificar se viemos da página de comissões pendentes
-$selectedTransactions = [];
-$totalValue = 0;
-$totalOriginalValue = 0;
-$totalBalanceUsed = 0;
-$error = '';
-$success = '';
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['action']) && $_POST['action'] === 'payment_form') {
-        // Receber transações selecionadas da página anterior
-        if (isset($_POST['transacoes']) && is_array($_POST['transacoes'])) {
-            $selectedTransactions = $_POST['transacoes'];
-            
-            // Buscar dados das transações selecionadas com informações de saldo
-            if (!empty($selectedTransactions)) {
-                $placeholders = implode(',', array_fill(0, count($selectedTransactions), '?'));
-                $stmt = $db->prepare("
-                    SELECT 
-                        t.*, 
-                        u.nome as cliente_nome,
-                        COALESCE(
-                            (SELECT SUM(cm.valor) 
-                             FROM cashback_movimentacoes cm 
-                             WHERE cm.usuario_id = t.usuario_id 
-                             AND cm.loja_id = t.loja_id 
-                             AND cm.tipo_operacao = 'uso'
-                             AND cm.transacao_uso_id = t.id), 0
-                        ) as saldo_usado
-                    FROM transacoes_cashback t
-                    JOIN usuarios u ON t.usuario_id = u.id
-                    WHERE t.id IN ($placeholders) AND t.loja_id = ? AND t.status = 'pendente'
-                ");
-                
-                $params = array_merge($selectedTransactions, [$storeId]);
-                $stmt->execute($params);
-                $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
-                
-                foreach ($transactions as $transaction) {
-                    $saldoUsado = $transaction['saldo_usado'] ?? 0;
-                    $valorOriginal = $transaction['valor_total'];
-                    $valorCobrado = $valorOriginal - $saldoUsado;
-                    
-                    $totalOriginalValue += $valorOriginal;
-                    $totalBalanceUsed += $saldoUsado;
-                    $totalValue += $transaction['valor_cashback']; // Comissão a ser paga
-                }
-            }
-        } else {
-            $error = 'Nenhuma transação selecionada.';
-        }
-    } elseif (isset($_POST['action']) && $_POST['action'] === 'process_payment') {
-        // Processar o pagamento
-        $transactionIds = $_POST['transaction_ids'] ?? '';
-        $metodoPagamento = $_POST['metodo_pagamento'] ?? '';
-        $numeroReferencia = $_POST['numero_referencia'] ?? '';
-        $observacao = $_POST['observacao'] ?? '';
-        $valorTotal = floatval($_POST['valor_total'] ?? 0);
-        
-        if (empty($transactionIds) || empty($metodoPagamento) || $valorTotal <= 0) {
-            $error = 'Dados obrigatórios não informados.';
-        } else {
-            // Upload do comprovante
-            $comprovante = '';
-            if (isset($_FILES['comprovante']) && $_FILES['comprovante']['error'] === UPLOAD_ERR_OK) {
-                $uploadDir = '../../uploads/comprovantes/';
-                if (!file_exists($uploadDir)) {
-                    mkdir($uploadDir, 0755, true);
-                }
-                
-                $fileInfo = pathinfo($_FILES['comprovante']['name']);
-                $extension = strtolower($fileInfo['extension']);
-                
-                if (in_array($extension, ['jpg', 'jpeg', 'png', 'pdf'])) {
-                    $comprovante = 'comprovante_' . $storeId . '_' . time() . '.' . $extension;
-                    if (move_uploaded_file($_FILES['comprovante']['tmp_name'], $uploadDir . $comprovante)) {
-                        // Upload realizado com sucesso
-                    } else {
-                        $error = 'Erro ao fazer upload do comprovante.';
-                    }
-                }
-            }
-            
-            if (empty($error)) {
-                // Preparar dados do pagamento
-                $paymentData = [
-                    'loja_id' => $storeId,
-                    'transacoes' => explode(',', $transactionIds),
-                    'valor_total' => $valorTotal,
-                    'metodo_pagamento' => $metodoPagamento,
-                    'numero_referencia' => $numeroReferencia,
-                    'comprovante' => $comprovante,
-                    'observacao' => $observacao
-                ];
-                
-                // Registrar pagamento
-                $result = TransactionController::registerPayment($paymentData);
-                
-                if ($result['status']) {
-                    $success = $result['message'];
-                    // Limpar dados da sessão
-                    $selectedTransactions = [];
-                    $totalValue = 0;
-                    $totalOriginalValue = 0;
-                    $totalBalanceUsed = 0;
-                } else {
-                    $error = $result['message'];
-                }
-            }
-        }
-    }
-}
-
-// Se não temos transações selecionadas, redirecionar
-if (empty($selectedTransactions) && !$success && !$error) {
-    header('Location: ' . STORE_PENDING_TRANSACTIONS_URL);
-    exit;
-}
-
-// Buscar dados das transações para exibir com informações de saldo
-$transactions = [];
-if (!empty($selectedTransactions)) {
-    $placeholders = implode(',', array_fill(0, count($selectedTransactions), '?'));
-    $stmt = $db->prepare("
-        SELECT 
-            t.*, 
-            u.nome as cliente_nome,
-            COALESCE(
-                (SELECT SUM(cm.valor) 
-                 FROM cashback_movimentacoes cm 
-                 WHERE cm.usuario_id = t.usuario_id 
-                 AND cm.loja_id = t.loja_id 
-                 AND cm.tipo_operacao = 'uso'
-                 AND cm.transacao_uso_id = t.id), 0
-            ) as saldo_usado
-        FROM transacoes_cashback t
-        JOIN usuarios u ON t.usuario_id = u.id
-        WHERE t.id IN ($placeholders) AND t.loja_id = ?
-    ");
-    
-    $params = array_merge($selectedTransactions, [$storeId]);
-    $stmt->execute($params);
-    $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    
-    // Recalcular totais
-    $totalValue = 0;
-    $totalOriginalValue = 0;
-    $totalBalanceUsed = 0;
-    foreach ($transactions as $transaction) {
-        $saldoUsado = $transaction['saldo_usado'] ?? 0;
-        $totalOriginalValue += $transaction['valor_total'];
-        $totalBalanceUsed += $saldoUsado;
-        $totalValue += $transaction['valor_cashback'];
-    }
-}
-
-$activeMenu = 'payment';
+$pageTitle = 'Pagamento de Comissão';
+require_once '../components/header.php';
 ?>
 
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
-    <title>Realizar Pagamento - Klube Cash</title>
-    <link rel="stylesheet" href="../../assets/css/views/stores/payment.css">
-</head>
-<body>
-    <?php include_once '../components/sidebar-store.php'; ?>
-    
-    <div class="main-content" id="mainContent">
-        <div class="dashboard-header">
-            <h1>Realizar Pagamento</h1>
-            <p class="subtitle">Pague as comissões devidas para liberar o cashback aos seus clientes</p>
-        </div>
-        
-        <?php if (!empty($success)): ?>
-            <div class="alert success">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
-                </svg>
-                <?php echo htmlspecialchars($success); ?>
-                <div style="margin-left: auto;">
-                    <a href="<?php echo STORE_PAYMENT_HISTORY_URL; ?>" class="btn btn-secondary">Ver Histórico</a>
-                </div>
-            </div>
-        <?php endif; ?>
-        
-        <?php if (!empty($error)): ?>
-            <div class="alert error">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <line x1="12" y1="8" x2="12" y2="12"></line>
-                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                </svg>
-                <?php echo htmlspecialchars($error); ?>
-            </div>
-        <?php endif; ?>
-        
-        <?php if (!empty($transactions)): ?>
-            <div class="card">
-                <div class="card-header">
-                    <h2 class="card-title">Transações Selecionadas</h2>
-                </div>
-                
-                <div class="table-responsive">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Código</th>
-                                <th>Cliente</th>
-                                <th>Data</th>
-                                <th>Valor Original</th>
-                                <th>Saldo Usado</th>
-                                <th>Valor Cobrado</th>
-                                <th>Comissão</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($transactions as $transaction): ?>
-                                <?php 
-                                $saldoUsado = $transaction['saldo_usado'] ?? 0;
-                                $valorOriginal = $transaction['valor_total'];
-                                $valorCobrado = $valorOriginal - $saldoUsado;
-                                ?>
-                                <tr>
-                                    <td><?php echo htmlspecialchars($transaction['codigo_transacao'] ?? 'N/A'); ?></td>
-                                    <td>
-                                        <?php echo htmlspecialchars($transaction['cliente_nome']); ?>
-                                        <?php if ($saldoUsado > 0): ?>
-                                            <span class="balance-indicator" title="Cliente usou saldo">💰</span>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td><?php echo date('d/m/Y H:i', strtotime($transaction['data_transacao'])); ?></td>
-                                    <td>R$ <?php echo number_format($valorOriginal, 2, ',', '.'); ?></td>
-                                    <td>
-                                        <?php if ($saldoUsado > 0): ?>
-                                            <span class="saldo-usado">R$ <?php echo number_format($saldoUsado, 2, ',', '.'); ?></span>
-                                        <?php else: ?>
-                                            <span class="sem-saldo">-</span>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td>
-                                        <strong>R$ <?php echo number_format($valorCobrado, 2, ',', '.'); ?></strong>
-                                        <?php if ($valorCobrado < $valorOriginal): ?>
-                                            <small class="desconto">(com desconto)</small>
-                                        <?php endif; ?>
-                                    </td>
-                                    <td>R$ <?php echo number_format($transaction['valor_cashback'], 2, ',', '.'); ?></td>
-                                </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-                
-                <div class="payment-summary">
-                    <div class="summary-item">
-                        <span>Transações selecionadas:</span>
-                        <span><?php echo count($transactions); ?></span>
-                    </div>
-                    <div class="summary-item">
-                        <span>Valor total das vendas:</span>
-                        <span class="original-value">R$ <?php echo number_format($totalOriginalValue, 2, ',', '.'); ?></span>
-                    </div>
-                    <div class="summary-item">
-                        <span>Total saldo usado pelos clientes:</span>
-                        <span class="balance-used">R$ <?php echo number_format($totalBalanceUsed, 2, ',', '.'); ?></span>
-                    </div>
-                    <div class="summary-item">
-                        <span>Valor efetivamente cobrado:</span>
-                        <span class="charged-value">R$ <?php echo number_format($totalOriginalValue - $totalBalanceUsed, 2, ',', '.'); ?></span>
-                    </div>
-                    <div class="summary-item total">
-                        <span>Valor total a pagar ao Klube Cash:</span>
-                        <span>R$ <?php echo number_format($totalValue, 2, ',', '.'); ?></span>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="card">
-                <div class="card-header">
-                    <h2 class="card-title">Dados do Pagamento</h2>
-                </div>
-                
-                <form method="POST" action="" enctype="multipart/form-data">
-                    <input type="hidden" name="action" value="process_payment">
-                    <input type="hidden" name="transaction_ids" value="<?php echo implode(',', $selectedTransactions); ?>">
-                    <input type="hidden" name="valor_total" value="<?php echo $totalValue; ?>">
-                    
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="metodo_pagamento">Método de Pagamento *</label>
-                            <select id="metodo_pagamento" name="metodo_pagamento" required>
-                                <option value="">Selecione o método</option>
-                                <option value="pix">PIX</option>
-                                <option value="transferencia">Transferência Bancária</option>
-                                <option value="ted">TED</option>
-                                <option value="boleto">Boleto</option>
-                            </select>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="numero_referencia">Número de Referência</label>
-                            <input type="text" id="numero_referencia" name="numero_referencia" 
-                                   placeholder="Número da transação, ID do PIX, etc.">
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="comprovante">Comprovante de Pagamento *</label>
-                        <input type="file" id="comprovante" name="comprovante" accept="image/*,.pdf" required>
-                        <small style="display: block; margin-top: 0.5rem; color: var(--medium-gray);">
-                            Formatos aceitos: JPG, PNG, PDF (máx. 5MB)
-                        </small>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="observacao">Observações</label>
-                        <textarea id="observacao" name="observacao" rows="3" 
-                                  placeholder="Informações adicionais sobre o pagamento..."></textarea>
-                    </div>
-                    
-                    <div class="form-actions">
-                        <button type="submit" class="btn btn-primary">Confirmar Pagamento</button>
-                        <a href="<?php echo STORE_PENDING_TRANSACTIONS_URL; ?>" class="btn btn-secondary">Voltar</a>
-                    </div>
-                </form>
-            </div>
-            
-            
-            <div class="card info-card">
-                <div class="card-header dropdown-header" onclick="toggleDropdown('payment-info')">
-                    <h2 class="card-title">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="info-icon">
-                            <circle cx="12" cy="12" r="10"></circle>
-                            <line x1="12" y1="16" x2="12" y2="12"></line>
-                            <line x1="12" y1="8" x2="12.01" y2="8"></line>
-                        </svg>
-                        Entenda seu Pagamento
-                    </h2>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="dropdown-arrow" id="payment-info-arrow">
-                        <polyline points="6 9 12 15 18 9"></polyline>
-                    </svg>
-                </div>
-                
-                <div class="dropdown-content" id="payment-info-content" style="display: none;">
-                    <div class="info-content">
-                        <div class="info-section">
-                            <h3>📊 Como são calculadas as comissões:</h3>
-                            <ul>
-                                <li><strong>Valor original das vendas:</strong> Total das vendas registradas (R$ <?php echo number_format($totalOriginalValue, 2, ',', '.'); ?>)</li>
-                                <li><strong>Saldo usado pelos clientes:</strong> Cashback usado como desconto (R$ <?php echo number_format($totalBalanceUsed, 2, ',', '.'); ?>)</li>
-                                <li><strong>Valor efetivamente cobrado:</strong> O que realmente foi pago pelos clientes (R$ <?php echo number_format($totalOriginalValue - $totalBalanceUsed, 2, ',', '.'); ?>)</li>
-                                <li><strong>Comissão devida:</strong> 10% sobre o valor efetivamente cobrado (R$ <?php echo number_format($totalValue, 2, ',', '.'); ?>)</li>
-                            </ul>
-                        </div>
-                        
-                        <div class="info-section">
-                            <h3>💰 Sobre o uso de saldo pelos clientes:</h3>
-                            <ul>
-                                <li>Quando um cliente usa seu saldo de cashback, ele recebe desconto na compra</li>
-                                <li>A comissão é calculada apenas sobre o valor que o cliente efetivamente pagou</li>
-                                <li>Isso é justo para você, pois você paga comissão apenas sobre o que realmente recebeu</li>
-                                <li>O cliente ainda ganha cashback normal sobre a nova compra (5% do valor pago)</li>
-                                <li><strong>Importante:</strong> O saldo do cliente só pode ser usado na sua loja</li>
-                            </ul>
-                        </div>
-                        
-                        <div class="info-section">
-                            <h3>🔄 Distribuição da sua comissão de 10%:</h3>
-                            <ul>
-                                <li><strong>5% para o cliente:</strong> Vira cashback para usar na sua loja</li>
-                                <li><strong>5% para o Klube Cash:</strong> Nossa receita pela plataforma</li>
-                                <li><strong>0% para sua loja:</strong> Você não recebe cashback</li>
-                            </ul>
-                        </div>
-                        
-                        <div class="info-section">
-                            <h3>🔄 Processo após o pagamento:</h3>
-                            <ol>
-                                <li>Sua confirmação de pagamento será analisada em até 24 horas</li>
-                                <li>Após aprovação, o cashback será liberado automaticamente para os clientes</li>
-                                <li>Os clientes poderão usar o cashback apenas na sua loja</li>
-                                <li>Em caso de rejeição, você receberá notificação e poderá enviar novo comprovante</li>
-                                <li>Mantenha o comprovante original até a confirmação da aprovação</li>
-                            </ol>
-                        </div>
-                    </div>
-                </div>
+<div class="container-fluid">
+    <div class="row">
+        <!-- Sidebar -->
+        <?php require_once '../components/sidebar.php'; ?>
+
+        <!-- Main content -->
+        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+            <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                <h1 class="h2">Pagamento de Comissão #<?php echo $paymentId; ?></h1>
+                <a href="<?php echo SITE_URL; ?>/store/transacoes-pendentes" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i> Voltar
+                </a>
             </div>
 
+            <?php if ($payment['status'] === 'pendente'): ?>
+                <!-- Área de Pagamento PIX -->
+                <div class="row">
+                    <div class="col-md-8">
+                        <div class="card">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0">
+                                    <i class="bi bi-qr-code"></i> Pagamento via PIX
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="pix-area" class="text-center">
+                                    <div class="spinner-border text-primary mb-3" role="status">
+                                        <span class="visually-hidden">Gerando PIX...</span>
+                                    </div>
+                                    <p>Gerando código PIX...</p>
+                                </div>
+                                
+                                <div id="pix-info" style="display: none;">
+                                    <div class="row">
+                                        <div class="col-md-6 text-center">
+                                            <h6>QR Code PIX</h6>
+                                            <div id="qr-code-image" class="mb-3"></div>
+                                            <button class="btn btn-sm btn-outline-primary" onclick="copyPixCode()">
+                                                <i class="bi bi-clipboard"></i> Copiar código PIX
+                                            </button>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <h6>Instruções de Pagamento</h6>
+                                            <ol class="text-start">
+                                                <li>Abra o app do seu banco</li>
+                                                <li>Escolha a opção PIX</li>
+                                                <li>Escaneie o QR Code ou copie o código</li>
+                                                <li>Confirme o pagamento de <strong>R$ <?php echo number_format($payment['valor_total'], 2, ',', '.'); ?></strong></li>
+                                                <li>Aguarde a confirmação automática</li>
+                                            </ol>
+                                            
+                                            <div class="alert alert-info mt-3">
+                                                <i class="bi bi-info-circle"></i>
+                                                O pagamento será confirmado automaticamente em alguns segundos após a transação.
+                                            </div>
+                                            
+                                            <div id="pix-expiration" class="alert alert-warning mt-3" style="display: none;">
+                                                <i class="bi bi-clock"></i>
+                                                <span id="expiration-text"></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Código PIX para cópia -->
+                                    <div class="mt-4">
+                                        <label class="form-label">Código PIX Copia e Cola:</label>
+                                        <div class="input-group">
+                                            <input type="text" id="pix-code" class="form-control" readonly>
+                                            <button class="btn btn-primary" onclick="copyPixCode()">
+                                                <i class="bi bi-clipboard"></i> Copiar
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Status do pagamento -->
+                                <div id="payment-status" class="mt-4" style="display: none;">
+                                    <div class="alert alert-success">
+                                        <h5><i class="bi bi-check-circle"></i> Pagamento Confirmado!</h5>
+                                        <p>Seu pagamento foi processado com sucesso. O cashback será liberado para os clientes.</p>
+                                        <a href="<?php echo SITE_URL; ?>/store/historico-pagamentos" class="btn btn-success">
+                                            Ver Histórico de Pagamentos
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
-        <?php endif; ?>
+                    <div class="col-md-4">
+                        <!-- Resumo do Pagamento -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">Resumo do Pagamento</h5>
+                            </div>
+                            <div class="card-body">
+                                <table class="table table-sm">
+                                    <tr>
+                                        <td>Número de transações:</td>
+                                        <td class="text-end"><strong><?php echo count($transactions); ?></strong></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Valor total das vendas:</td>
+                                        <td class="text-end">
+                                            R$ <?php 
+                                            $totalVendas = array_sum(array_column($transactions, 'valor_total'));
+                                            echo number_format($totalVendas, 2, ',', '.'); 
+                                            ?>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>Comissão (10%):</td>
+                                        <td class="text-end">
+                                            <strong class="text-danger">
+                                                R$ <?php echo number_format($payment['valor_total'], 2, ',', '.'); ?>
+                                            </strong>
+                                        </td>
+                                    </tr>
+                                </table>
+                                
+                                <hr>
+                                
+                                <h6>Transações incluídas:</h6>
+                                <div class="small" style="max-height: 200px; overflow-y: auto;">
+                                    <?php foreach ($transactions as $trans): ?>
+                                        <div class="mb-2 p-2 border rounded">
+                                            <div>ID: #<?php echo $trans['id']; ?></div>
+                                            <div>Valor: R$ <?php echo number_format($trans['valor_total'], 2, ',', '.'); ?></div>
+                                            <div>Data: <?php echo date('d/m/Y', strtotime($trans['data_transacao'])); ?></div>
+                                        </div>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            <?php elseif ($payment['status'] === 'aprovado'): ?>
+                <!-- Pagamento já aprovado -->
+                <div class="alert alert-success">
+                    <h4><i class="bi bi-check-circle"></i> Pagamento Aprovado</h4>
+                    <p>Este pagamento já foi processado e aprovado em <?php echo date('d/m/Y H:i', strtotime($payment['data_aprovacao'])); ?></p>
+                    <a href="<?php echo SITE_URL; ?>/store/historico-pagamentos" class="btn btn-primary">
+                        Ver Histórico de Pagamentos
+                    </a>
+                </div>
+            <?php else: ?>
+                <!-- Outros status -->
+                <div class="alert alert-warning">
+                    <h4><i class="bi bi-exclamation-triangle"></i> Status: <?php echo ucfirst($payment['status']); ?></h4>
+                    <p>Entre em contato com o suporte se tiver dúvidas sobre este pagamento.</p>
+                </div>
+            <?php endif; ?>
+        </main>
     </div>
-    
-    <script>
-        // Função para controlar dropdown
-        function toggleDropdown(dropdownId) {
-            const content = document.getElementById(dropdownId + '-content');
-            const arrow = document.getElementById(dropdownId + '-arrow');
-            
-            if (content.style.display === 'none' || content.style.display === '') {
-                content.style.display = 'block';
-                arrow.style.transform = 'rotate(180deg)';
-            } else {
-                content.style.display = 'none';
-                arrow.style.transform = 'rotate(0deg)';
-            }
+</div>
+
+<script>
+// Variáveis globais
+let pixChargeId = null;
+let checkStatusInterval = null;
+
+// Inicializar ao carregar a página
+document.addEventListener('DOMContentLoaded', function() {
+    <?php if ($payment['status'] === 'pendente'): ?>
+        generatePixPayment();
+    <?php endif; ?>
+});
+
+// Gerar pagamento PIX
+function generatePixPayment() {
+    fetch('<?php echo SITE_URL; ?>/api/store-payment?action=create_pix', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'payment_id=<?php echo $paymentId; ?>'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status) {
+            displayPixInfo(data.data);
+            startStatusCheck(data.data.charge_id);
+        } else {
+            showError(data.message || 'Erro ao gerar PIX');
         }
-        document.addEventListener('DOMContentLoaded', function() {
-            // Validação do formulário
-            const form = document.querySelector('form[method="POST"]');
-            const comprovanteInput = document.getElementById('comprovante');
-            
-            if (form) {
-                form.addEventListener('submit', function(e) {
-                    // Validar arquivo
-                    if (comprovanteInput && comprovanteInput.files.length > 0) {
-                        const file = comprovanteInput.files[0];
-                        const maxSize = 5 * 1024 * 1024; // 5MB
-                        
-                        if (file.size > maxSize) {
-                            e.preventDefault();
-                            alert('O arquivo do comprovante é muito grande. Tamanho máximo: 5MB');
-                            return;
-                        }
-                        
-                        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
-                        if (!allowedTypes.includes(file.type)) {
-                            e.preventDefault();
-                            alert('Tipo de arquivo não permitido. Use apenas JPG, PNG ou PDF');
-                            return;
-                        }
-                    }
-                });
-            }
-            
-            // Preview do arquivo selecionado
-            if (comprovanteInput) {
-                comprovanteInput.addEventListener('change', function() {
-                    const file = this.files[0];
-                    if (file) {
-                        const fileName = file.name;
-                        const fileSize = (file.size / 1024 / 1024).toFixed(2) + ' MB';
-                        
-                        // Criar ou atualizar preview
-                        let preview = document.getElementById('file-preview');
-                        if (!preview) {
-                            preview = document.createElement('div');
-                            preview.id = 'file-preview';
-                            preview.style.marginTop = '10px';
-                            preview.style.padding = '10px';
-                            preview.style.backgroundColor = '#f8f9fa';
-                            preview.style.borderRadius = '5px';
-                            preview.style.fontSize = '14px';
-                            this.parentNode.appendChild(preview);
-                        }
-                        
-                        preview.innerHTML = `
-                            <strong>Arquivo selecionado:</strong><br>
-                            📄 ${fileName}<br>
-                            📏 ${fileSize}
-                        `;
-                    }
-                });
-            }
-        });
-    </script>
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        showError('Erro ao processar requisição');
+    });
+}
+
+// Exibir informações do PIX
+function displayPixInfo(pixData) {
+    document.getElementById('pix-area').style.display = 'none';
+    document.getElementById('pix-info').style.display = 'block';
     
+    // QR Code
+    document.getElementById('qr-code-image').innerHTML = 
+        `<img src="${pixData.qr_code_image}" alt="QR Code PIX" class="img-fluid" style="max-width: 300px;">`;
     
-</body>
-</html>
+    // Código copia e cola
+    document.getElementById('pix-code').value = pixData.qr_code;
+    
+    // Expiração
+    if (pixData.expires_at) {
+        const expirationDate = new Date(pixData.expires_at);
+        document.getElementById('pix-expiration').style.display = 'block';
+        document.getElementById('expiration-text').textContent = 
+            `Este código expira em ${expirationDate.toLocaleString('pt-BR')}`;
+    }
+    
+    pixChargeId = pixData.charge_id;
+}
+
+// Copiar código PIX
+function copyPixCode() {
+    const pixCode = document.getElementById('pix-code');
+    pixCode.select();
+    pixCode.setSelectionRange(0, 99999);
+    
+    navigator.clipboard.writeText(pixCode.value).then(() => {
+        // Feedback visual
+        const btn = event.target.closest('button');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="bi bi-check"></i> Copiado!';
+        btn.classList.add('btn-success');
+        
+        setTimeout(() => {
+            btn.innerHTML = originalText;
+            btn.classList.remove('btn-success');
+        }, 2000);
+    });
+}
+
+// Verificar status do pagamento
+function startStatusCheck(chargeId) {
+    // Verificar a cada 3 segundos
+    checkStatusInterval = setInterval(() => {
+        checkPaymentStatus(chargeId);
+    }, 3000);
+    
+    // Parar após 10 minutos
+    setTimeout(() => {
+        if (checkStatusInterval) {
+            clearInterval(checkStatusInterval);
+        }
+    }, 600000);
+}
+
+function checkPaymentStatus(chargeId) {
+    fetch(`<?php echo SITE_URL; ?>/api/store-payment?action=check_status&charge_id=${chargeId}`)
+    .then(response => response.json())
+    .then(data => {
+        if (data.status && data.paid) {
+            // Pagamento confirmado!
+            clearInterval(checkStatusInterval);
+            showPaymentSuccess();
+        }
+    })
+    .catch(error => {
+        console.error('Erro ao verificar status:', error);
+    });
+}
+
+// Exibir sucesso do pagamento
+function showPaymentSuccess() {
+    document.getElementById('pix-info').style.display = 'none';
+    document.getElementById('payment-status').style.display = 'block';
+    
+    // Recarregar a página após 5 segundos
+    setTimeout(() => {
+        window.location.reload();
+    }, 5000);
+}
+
+// Exibir erro
+function showError(message) {
+    document.getElementById('pix-area').innerHTML = `
+        <div class="alert alert-danger">
+            <i class="bi bi-exclamation-circle"></i> ${message}
+        </div>
+        <button class="btn btn-primary" onclick="location.reload()">
+            <i class="bi bi-arrow-clockwise"></i> Tentar Novamente
+        </button>
+    `;
+}
+</script>
+
+<?php require_once '../components/footer.php'; ?>

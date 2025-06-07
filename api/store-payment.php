@@ -1,168 +1,285 @@
 <?php
-/**
- * API específica para pagamentos da loja
- * Captura todas as chamadas relacionadas a pagamentos
- */
+// api/store-payment.php
 
-header('Content-Type: application/json; charset=UTF-8');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
-
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
-    exit;
-}
-
-session_start();
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../config/constants.php';
+require_once __DIR__ . '/../controllers/AuthController.php';
+require_once __DIR__ . '/../controllers/TransactionController.php';
+require_once __DIR__ . '/../utils/Logger.php';
 
-// Verificar se usuário está logado
-if (!isset($_SESSION['user_id'])) {
+// Verificar autenticação
+session_start();
+if (!isset($_SESSION['user_id']) || $_SESSION['user_type'] !== 'loja') {
     http_response_code(401);
-    echo json_encode(['status' => false, 'message' => 'Usuário não autenticado']);
+    echo json_encode(['status' => false, 'message' => 'Acesso não autorizado']);
     exit;
 }
 
+$action = $_GET['action'] ?? $_POST['action'] ?? '';
 $userId = $_SESSION['user_id'];
-$userType = $_SESSION['user_type'];
 
-// Verificar se é loja
-if ($userType !== 'loja') {
-    http_response_code(403);
-    echo json_encode(['status' => false, 'message' => 'Acesso negado']);
-    exit;
-}
+// Debug
+Logger::log('store_payment', "Ação recebida: {$action}", 'INFO');
 
-// Capturar ação
-$action = $_POST['action'] ?? $_GET['action'] ?? '';
-
-// Log para debug
-error_log("API store-payment recebeu action: " . $action);
-error_log("POST data: " . json_encode($_POST));
-
-try {
-    switch ($action) {
-        case 'payment_form':
-        case 'process_payment_form':
-        case 'redirect_to_payment':
-            handlePaymentFormRedirect();
-            break;
-            
-        case 'create_payment':
-        case 'create_commission_payment':
-            handleCreatePayment();
-            break;
-            
-        case 'process_selected':
-        case 'process_selected_payments':
-            handleProcessSelected();
-            break;
-            
-        default:
-            // Se chegou aqui com action desconhecida, vamos tentar processar como pagamento
-            if (!empty($_POST['transaction_ids']) || !empty($_POST['selected_transactions'])) {
-                handlePaymentFormRedirect();
-            } else {
-                http_response_code(400);
-                echo json_encode([
-                    'status' => false, 
-                    'message' => 'Ação não reconhecida: ' . $action,
-                    'debug' => [
-                        'received_action' => $action,
-                        'post_data' => $_POST,
-                        'get_data' => $_GET
-                    ]
-                ]);
-            }
-            break;
-    }
-} catch (Exception $e) {
-    error_log('Erro na API store-payment: ' . $e->getMessage());
-    http_response_code(500);
-    echo json_encode(['status' => false, 'message' => 'Erro interno: ' . $e->getMessage()]);
+switch ($action) {
+    case 'process':
+        handleProcessPayment();
+        break;
+        
+    case 'process_selected':
+        handleProcessSelected();
+        break;
+        
+    case 'payment_form':
+        handlePaymentForm();
+        break;
+        
+    case 'create_pix':
+        handleCreatePix();
+        break;
+        
+    case 'check_status':
+        handleCheckStatus();
+        break;
+        
+    default:
+        echo json_encode(['status' => false, 'message' => 'Ação não reconhecida: ' . $action]);
 }
 
 /**
- * Redirecionar para formulário de pagamento
+ * Exibir formulário de pagamento
  */
-function handlePaymentFormRedirect() {
-    global $userId;
-    
-    // Capturar IDs das transações de diferentes formas possíveis
-    $transactionIds = [];
-    
-    if (!empty($_POST['transaction_ids'])) {
-        if (is_array($_POST['transaction_ids'])) {
-            $transactionIds = $_POST['transaction_ids'];
-        } else {
-            $transactionIds = [$_POST['transaction_ids']];
-        }
-    } elseif (!empty($_POST['selected_transactions'])) {
-        if (is_array($_POST['selected_transactions'])) {
-            $transactionIds = $_POST['selected_transactions'];
-        } else {
-            $transactionIds = [$_POST['selected_transactions']];
-        }
-    } elseif (!empty($_GET['transaction_ids'])) {
-        $transactionIds = explode(',', $_GET['transaction_ids']);
-    }
-    
-    // Filtrar valores vazios
-    $transactionIds = array_filter($transactionIds);
-    
-    if (empty($transactionIds)) {
-        echo json_encode(['status' => false, 'message' => 'Nenhuma transação selecionada']);
-        return;
-    }
-    
-    // Validar que as transações pertencem à loja
-    if (!validateTransactions($transactionIds, $userId)) {
-        echo json_encode(['status' => false, 'message' => 'Transações inválidas ou não autorizadas']);
-        return;
-    }
-    
-    // Criar URL de redirecionamento
-    $redirectUrl = SITE_URL . '/loja/formulario-pagamento?transactions=' . implode(',', $transactionIds);
-    
-    echo json_encode([
-        'status' => true,
-        'message' => 'Redirecionando para formulário de pagamento',
-        'redirect_url' => $redirectUrl,
-        'transaction_count' => count($transactionIds)
-    ]);
-}
-
-/**
- * Criar pagamento diretamente
- */
-function handleCreatePayment() {
+function handlePaymentForm() {
     global $userId;
     
     $transactionIds = $_POST['transaction_ids'] ?? [];
-    $paymentMethod = $_POST['payment_method'] ?? 'pix_openpix';
     
     if (empty($transactionIds)) {
         echo json_encode(['status' => false, 'message' => 'Nenhuma transação selecionada']);
         return;
     }
     
-    if (!is_array($transactionIds)) {
-        $transactionIds = [$transactionIds];
-    }
-    
     try {
-        $paymentId = createCommissionPayment($transactionIds, $userId, $paymentMethod);
+        $db = Database::getConnection();
+        
+        // Buscar dados da loja
+        $stmtLoja = $db->prepare("SELECT * FROM lojas WHERE usuario_id = ?");
+        $stmtLoja->execute([$userId]);
+        $loja = $stmtLoja->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$loja) {
+            throw new Exception('Loja não encontrada');
+        }
+        
+        // Buscar transações selecionadas
+        $placeholders = str_repeat('?,', count($transactionIds) - 1) . '?';
+        $stmt = $db->prepare("
+            SELECT 
+                t.*,
+                tc.valor_admin
+            FROM transacoes_cashback t
+            LEFT JOIN transacoes_comissao tc ON tc.transacao_id = t.id AND tc.tipo = 'admin'
+            WHERE t.id IN ($placeholders) 
+            AND t.loja_id = ?
+            AND t.status IN ('pendente', 'pagamento_pendente')
+        ");
+        
+        $params = array_merge($transactionIds, [$loja['id']]);
+        $stmt->execute($params);
+        $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        if (empty($transactions)) {
+            throw new Exception('Nenhuma transação válida encontrada');
+        }
+        
+        // Calcular valor total
+        $valorTotal = 0;
+        foreach ($transactions as $transaction) {
+            $valorTotal += $transaction['valor_admin'] ?? ($transaction['valor_total'] * 0.10);
+        }
+        
+        // Criar pagamento
+        $stmtPagamento = $db->prepare("
+            INSERT INTO pagamentos_comissao (
+                loja_id, 
+                valor_total, 
+                data_criacao, 
+                status,
+                metodo_pagamento
+            ) VALUES (?, ?, NOW(), 'pendente', 'pix_openpix')
+        ");
+        $stmtPagamento->execute([$loja['id'], $valorTotal]);
+        $paymentId = $db->lastInsertId();
+        
+        // Associar transações ao pagamento
+        $stmtAssoc = $db->prepare("
+            INSERT INTO pagamento_transacoes (pagamento_id, transacao_id) 
+            VALUES (?, ?)
+        ");
+        
+        foreach ($transactionIds as $transactionId) {
+            $stmtAssoc->execute([$paymentId, $transactionId]);
+        }
+        
+        // Atualizar status das transações
+        $stmtUpdate = $db->prepare("
+            UPDATE transacoes_cashback 
+            SET status = 'pagamento_pendente' 
+            WHERE id IN ($placeholders)
+        ");
+        $stmtUpdate->execute($transactionIds);
         
         echo json_encode([
             'status' => true,
-            'message' => 'Pagamento criado com sucesso',
-            'data' => [
-                'payment_id' => $paymentId,
-                'redirect_url' => SITE_URL . '/loja/pagamento-pix?payment_id=' . $paymentId
-            ]
+            'payment_id' => $paymentId,
+            'valor_total' => $valorTotal,
+            'quantidade_transacoes' => count($transactions),
+            'redirect_url' => SITE_URL . '/store/pagamento?id=' . $paymentId
         ]);
+        
+    } catch (Exception $e) {
+        Logger::log('store_payment', 'Erro em handlePaymentForm: ' . $e->getMessage(), 'ERROR');
+        echo json_encode(['status' => false, 'message' => $e->getMessage()]);
+    }
+}
+
+/**
+ * Criar cobrança PIX via OpenPix
+ */
+function handleCreatePix() {
+    global $userId;
+    
+    $paymentId = $_POST['payment_id'] ?? 0;
+    
+    if (!$paymentId) {
+        echo json_encode(['status' => false, 'message' => 'ID do pagamento não informado']);
+        return;
+    }
+    
+    try {
+        $db = Database::getConnection();
+        
+        // Buscar pagamento
+        $stmt = $db->prepare("
+            SELECT p.*, l.nome_fantasia, l.cnpj, l.email, l.telefone 
+            FROM pagamentos_comissao p
+            JOIN lojas l ON p.loja_id = l.id
+            WHERE p.id = ? AND l.usuario_id = ? AND p.status = 'pendente'
+        ");
+        $stmt->execute([$paymentId, $userId]);
+        $payment = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$payment) {
+            throw new Exception('Pagamento não encontrado ou já processado');
+        }
+        
+        // Criar cobrança na OpenPix
+        $chargeData = [
+            'value' => (int)($payment['valor_total'] * 100), // Valor em centavos
+            'comment' => "Comissão Klube Cash - Pagamento #{$payment['id']}",
+            'correlationID' => "payment_{$payment['id']}_" . time(),
+            'additionalInfo' => [
+                [
+                    'key' => 'payment_id',
+                    'value' => (string)$payment['id']
+                ],
+                [
+                    'key' => 'loja',
+                    'value' => $payment['nome_fantasia']
+                ]
+            ]
+        ];
+        
+        // Fazer requisição para OpenPix
+        $response = makeOpenPixRequest('POST', '/charge', $chargeData);
+        
+        if (isset($response['charge'])) {
+            $charge = $response['charge'];
+            
+            // Salvar dados do PIX no banco
+            $updateStmt = $db->prepare("
+                UPDATE pagamentos_comissao 
+                SET 
+                    pix_charge_id = ?,
+                    pix_correlation_id = ?,
+                    pix_qr_code = ?,
+                    pix_qr_code_image = ?,
+                    pix_expires_at = ?,
+                    data_atualizacao = NOW()
+                WHERE id = ?
+            ");
+            
+            $expiresAt = isset($charge['expiresDate']) ? 
+                date('Y-m-d H:i:s', strtotime($charge['expiresDate'])) : 
+                date('Y-m-d H:i:s', strtotime('+24 hours'));
+            
+            $updateStmt->execute([
+                $charge['id'],
+                $charge['correlationID'],
+                $charge['brCode'],
+                $charge['qrCodeImage'],
+                $expiresAt,
+                $payment['id']
+            ]);
+            
+            echo json_encode([
+                'status' => true,
+                'data' => [
+                    'charge_id' => $charge['id'],
+                    'qr_code' => $charge['brCode'],
+                    'qr_code_image' => $charge['qrCodeImage'],
+                    'expires_at' => $expiresAt,
+                    'value' => $payment['valor_total']
+                ]
+            ]);
+        } else {
+            throw new Exception('Erro ao criar cobrança PIX');
+        }
+        
+    } catch (Exception $e) {
+        Logger::log('store_payment', 'Erro ao criar PIX: ' . $e->getMessage(), 'ERROR');
+        echo json_encode(['status' => false, 'message' => $e->getMessage()]);
+    }
+}
+
+/**
+ * Verificar status do pagamento
+ */
+function handleCheckStatus() {
+    $chargeId = $_GET['charge_id'] ?? '';
+    
+    if (empty($chargeId)) {
+        echo json_encode(['status' => false, 'message' => 'ID da cobrança não informado']);
+        return;
+    }
+    
+    try {
+        // Verificar status na OpenPix
+        $response = makeOpenPixRequest('GET', "/charge/{$chargeId}");
+        
+        if (isset($response['charge'])) {
+            $charge = $response['charge'];
+            $isPaid = $charge['status'] === 'COMPLETED';
+            
+            // Se pago, atualizar no banco
+            if ($isPaid) {
+                $db = Database::getConnection();
+                $stmt = $db->prepare("
+                    UPDATE pagamentos_comissao 
+                    SET status = 'pago', pix_paid_at = NOW() 
+                    WHERE pix_charge_id = ? AND status = 'pendente'
+                ");
+                $stmt->execute([$chargeId]);
+            }
+            
+            echo json_encode([
+                'status' => true,
+                'paid' => $isPaid,
+                'charge_status' => $charge['status']
+            ]);
+        } else {
+            throw new Exception('Cobrança não encontrada');
+        }
         
     } catch (Exception $e) {
         echo json_encode(['status' => false, 'message' => $e->getMessage()]);
@@ -170,7 +287,53 @@ function handleCreatePayment() {
 }
 
 /**
- * Processar transações selecionadas (criar pagamento e redirecionar para PIX)
+ * Fazer requisição para API da OpenPix
+ */
+function makeOpenPixRequest($method, $endpoint, $data = null) {
+    $baseUrl = OPENPIX_BASE_URL;
+    $url = $baseUrl . $endpoint;
+    
+    $headers = [
+        'Authorization: ' . OPENPIX_API_KEY,
+        'Content-Type: application/json',
+        'Accept: application/json'
+    ];
+    
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+    
+    if ($method === 'POST') {
+        curl_setopt($ch, CURLOPT_POST, true);
+        if ($data) {
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+        }
+    }
+    
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $error = curl_error($ch);
+    curl_close($ch);
+    
+    if ($error) {
+        throw new Exception('Erro na requisição: ' . $error);
+    }
+    
+    $result = json_decode($response, true);
+    
+    if ($httpCode >= 400) {
+        $errorMessage = $result['error'] ?? 'Erro na API OpenPix';
+        throw new Exception($errorMessage);
+    }
+    
+    return $result;
+}
+
+/**
+ * Processar transações selecionadas (compatibilidade)
  */
 function handleProcessSelected() {
     global $userId;
@@ -182,140 +345,8 @@ function handleProcessSelected() {
         return;
     }
     
-    if (!is_array($transactionIds)) {
-        $transactionIds = [$transactionIds];
-    }
-    
-    try {
-        $paymentId = createCommissionPayment($transactionIds, $userId);
-        
-        echo json_encode([
-            'status' => true,
-            'message' => 'Redirecionando para pagamento PIX',
-            'redirect_url' => SITE_URL . '/loja/pagamento-pix?payment_id=' . $paymentId
-        ]);
-        
-    } catch (Exception $e) {
-        echo json_encode(['status' => false, 'message' => $e->getMessage()]);
-    }
-}
-
-/**
- * Validar se as transações pertencem à loja
- */
-function validateTransactions($transactionIds, $userId) {
-    try {
-        $db = Database::getConnection();
-        
-        $placeholders = str_repeat('?,', count($transactionIds) - 1) . '?';
-        $stmt = $db->prepare("
-            SELECT COUNT(*) as count
-            FROM transacoes_cashback t
-            JOIN lojas l ON t.loja_id = l.id
-            WHERE t.id IN ($placeholders) 
-            AND l.usuario_id = ?
-            AND t.status IN ('pendente', 'pagamento_pendente')
-        ");
-        
-        $params = array_merge($transactionIds, [$userId]);
-        $stmt->execute($params);
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        return $result['count'] == count($transactionIds);
-        
-    } catch (Exception $e) {
-        error_log('Erro ao validar transações: ' . $e->getMessage());
-        return false;
-    }
-}
-
-/**
- * Criar pagamento de comissão
- */
-function createCommissionPayment($transactionIds, $userId, $paymentMethod = 'pix_openpix') {
-    $db = Database::getConnection();
-    
-    try {
-        $db->beginTransaction();
-        
-        // Buscar dados da loja
-        $stmtLoja = $db->prepare("SELECT * FROM lojas WHERE usuario_id = ?");
-        $stmtLoja->execute([$userId]);
-        $loja = $stmtLoja->fetch(PDO::FETCH_ASSOC);
-        
-        if (!$loja) {
-            throw new Exception('Loja não encontrada');
-        }
-        
-        // Buscar transações válidas
-        $placeholders = str_repeat('?,', count($transactionIds) - 1) . '?';
-        $stmt = $db->prepare("
-            SELECT * FROM transacoes_cashback 
-            WHERE id IN ($placeholders) 
-            AND loja_id = ? 
-            AND status IN ('pendente', 'pagamento_pendente')
-        ");
-        
-        $params = array_merge($transactionIds, [$loja['id']]);
-        $stmt->execute($params);
-        $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        if (empty($transactions)) {
-            throw new Exception('Nenhuma transação válida encontrada para pagamento');
-        }
-        
-        // Calcular valor total da comissão
-        $valorTotal = 0;
-        foreach ($transactions as $transaction) {
-            $valorTotal += $transaction['valor_total'] * 0.10; // 10% de comissão
-        }
-        
-        // Criar registro de pagamento
-        $stmtPayment = $db->prepare("
-            INSERT INTO pagamentos_comissao 
-            (loja_id, valor_total, metodo_pagamento, status, data_criacao) 
-            VALUES (?, ?, ?, 'pendente', NOW())
-        ");
-        
-        $stmtPayment->execute([$loja['id'], $valorTotal, $paymentMethod]);
-        $paymentId = $db->lastInsertId();
-        
-        // Vincular transações ao pagamento
-        foreach ($transactions as $transaction) {
-            $comissaoValor = $transaction['valor_total'] * 0.10;
-            
-            // Verificar se a tabela transacoes_comissao existe
-            $checkTable = $db->query("SHOW TABLES LIKE 'transacoes_comissao'")->fetch();
-            
-            if ($checkTable) {
-                $stmtComissao = $db->prepare("
-                    INSERT INTO transacoes_comissao 
-                    (transacao_id, pagamento_id, valor_comissao, tipo, status) 
-                    VALUES (?, ?, ?, 'admin', 'pendente')
-                ");
-                
-                $stmtComissao->execute([$transaction['id'], $paymentId, $comissaoValor]);
-            }
-            
-            // Atualizar status da transação
-            $stmtUpdate = $db->prepare("
-                UPDATE transacoes_cashback 
-                SET status = 'pagamento_pendente' 
-                WHERE id = ?
-            ");
-            $stmtUpdate->execute([$transaction['id']]);
-        }
-        
-        $db->commit();
-        
-        error_log("Pagamento criado com sucesso - ID: {$paymentId}, Valor: {$valorTotal}");
-        
-        return $paymentId;
-        
-    } catch (Exception $e) {
-        $db->rollBack();
-        error_log('Erro ao criar pagamento: ' . $e->getMessage());
-        throw $e;
-    }
+    // Redirecionar para payment_form
+    $_POST['transaction_ids'] = $transactionIds;
+    handlePaymentForm();
 }
 ?>

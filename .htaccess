@@ -238,7 +238,20 @@ RewriteRule ^api/transactions/?$ api/transactions.php [L,QSA]
 RewriteRule ^auth/google/auth/?$ auth/google/auth.php [L]
 RewriteRule ^auth/google/register/?$ auth/google/register.php [L]
 RewriteRule ^auth/google/callback/?$ auth/google/callback.php [L]
+# Rotas para pagamento com OpenPix
 
+// Configurações OpenPix (adicionar se não existir)
+if (!defined('OPENPIX_API_KEY')) {
+    define('OPENPIX_API_KEY', 'Q2xpZW50X0lkXzIzOTVjYmMzLWYyOGItNGJmYi04MWE3LWNkZWIzYzJkYTI4ZTpDbGllbnRfU2VjcmV0X3JYOFRxM016ZWdoNUY5YnVnempJeHl1VlBsRkg2QkNubm0yRFFzUWxQU1E9');
+}
+
+if (!defined('OPENPIX_BASE_URL')) {
+    define('OPENPIX_BASE_URL', 'https://api.openpix.com.br/api/v1');
+}
+
+if (!defined('OPENPIX_WEBHOOK_URL')) {
+    define('OPENPIX_WEBHOOK_URL', SITE_URL . '/api/openpix?action=webhook');
+}
 
 # .htaccess - ADICIONE ESTA LINHA NA SEÇÃO DE AUTENTICAÇÃO
 

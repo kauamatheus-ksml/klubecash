@@ -345,3 +345,64 @@ function showNotification(message, type = 'info') {
 }
 
 console.log('Store.js carregado com interceptação completa');
+// Função para processar pagamentos selecionados com OpenPix
+function processSelectedPayments() {
+    const checkboxes = document.querySelectorAll('input[name="transaction_ids[]"]:checked');
+    const selectedIds = Array.from(checkboxes).map(cb => cb.value);
+    
+    if (selectedIds.length === 0) {
+        showAlert('warning', 'Por favor, selecione pelo menos uma transação para pagar.');
+        return;
+    }
+    
+    // Mostrar loading
+    const btn = event.target;
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="spinner-border spinner-border-sm me-2"></i>Processando...';
+    
+    // Enviar requisição
+    fetch(`${SITE_URL}/api/store-payment?action=payment_form`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `transaction_ids=${selectedIds.join(',')}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status) {
+            // Redirecionar para página de pagamento
+            window.location.href = data.redirect_url;
+        } else {
+            showAlert('danger', data.message || 'Erro ao processar pagamento');
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        showAlert('danger', 'Erro ao processar requisição');
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    });
+}
+
+// Função auxiliar para mostrar alertas
+function showAlert(type, message) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    // Inserir alerta no topo da página
+    const container = document.querySelector('.container-fluid main');
+    container.insertBefore(alertDiv, container.firstChild);
+    
+    // Auto-remover após 5 segundos
+    setTimeout(() => {
+        alertDiv.remove();
+    }, 5000);
+}
