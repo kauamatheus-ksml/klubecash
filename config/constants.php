@@ -76,6 +76,8 @@ define('OPENPIX_MAX_RETRIES', 3); // 🆕 Máximo de tentativas
 define('OPENPIX_RETRY_DELAY', 1000); // 🆕 Delay entre tentativas (ms)
 
 
+
+
 // === MENSAGENS DE VALIDAÇÃO ===
 define('MSG_CPF_REQUIRED', 'CPF é obrigatório para completar seu perfil');
 define('MSG_CPF_INVALID', 'CPF informado é inválido');
