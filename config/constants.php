@@ -7,7 +7,7 @@ define('SMTP_HOST', 'smtp.hostinger.com');
 define('SMTP_PORT', 465);
 define('SMTP_USERNAME', 'klubecash@klubecash.com');
 define('SMTP_PASSWORD', 'Aaku_2004@');
-define('SMTP_FROM_EMAIL', 'noreply@klubecash.com');
+define('SMTP_FROM_EMAIL', 'klubecash@klubecash.com');
 define('SMTP_FROM_NAME', 'Klube Cash');
 define('SMTP_ENCRYPTION', 'ssl');
 
@@ -163,7 +163,7 @@ if (!defined('SMTP_HOST')) {
     define('SMTP_PORT', 465);
     define('SMTP_USERNAME', 'klubecash@klubecash.com');
     define('SMTP_PASSWORD', 'Aaku_2004@');
-    define('SMTP_FROM_EMAIL', 'noreply@klubecash.com');
+    define('SMTP_FROM_EMAIL', 'klubecash@klubecash.com');
     define('SMTP_FROM_NAME', 'Klube Cash');
     define('SMTP_ENCRYPTION', 'ssl');
 }
