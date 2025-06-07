@@ -164,22 +164,51 @@ function showMessage(message, type = 'success') {
 }
 
 /**
- * Exibe loading overlay
+ * Função auxiliar para mostrar loading
  */
 function showLoading() {
-    const overlay = document.getElementById('loadingOverlay');
-    if (overlay) {
-        overlay.style.display = 'flex';
+    // Criar ou mostrar indicador de loading
+    let loadingEl = document.getElementById('globalLoading');
+    if (!loadingEl) {
+        loadingEl = document.createElement('div');
+        loadingEl.id = 'globalLoading';
+        loadingEl.innerHTML = `
+            <div style="
+                position: fixed; 
+                top: 0; 
+                left: 0; 
+                width: 100%; 
+                height: 100%; 
+                background: rgba(0,0,0,0.5); 
+                display: flex; 
+                justify-content: center; 
+                align-items: center; 
+                z-index: 9999;
+            ">
+                <div style="
+                    background: white; 
+                    padding: 20px; 
+                    border-radius: 8px; 
+                    text-align: center;
+                ">
+                    <i class="fas fa-spinner fa-spin" style="font-size: 24px; margin-bottom: 10px;"></i>
+                    <div>Processando...</div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(loadingEl);
+    } else {
+        loadingEl.style.display = 'block';
     }
 }
 
 /**
- * Esconde loading overlay
+ * Função auxiliar para esconder loading
  */
 function hideLoading() {
-    const overlay = document.getElementById('loadingOverlay');
-    if (overlay) {
-        overlay.style.display = 'none';
+    const loadingEl = document.getElementById('globalLoading');
+    if (loadingEl) {
+        loadingEl.style.display = 'none';
     }
 }
 
@@ -606,44 +635,90 @@ function hideViewUserModal() {
 }
 
 /**
- * Altera status do usuário - VERSÃO CORRIGIDA
+ * Altera status do usuário - VERSÃO COMPLETAMENTE CORRIGIDA
  */
 function changeUserStatus(userId, newStatus, userName) {
-    if (!userId || !newStatus) return;
+    // Validar parâmetros de entrada
+    if (!userId || !newStatus) {
+        console.error('Parâmetros inválidos:', {userId, newStatus, userName});
+        showMessage('Erro: Parâmetros inválidos para alteração de status', 'error');
+        return;
+    }
     
+    // Definir texto da ação baseado no status
     const actionText = newStatus === 'ativo' ? 'ativar' : 
                       newStatus === 'inativo' ? 'desativar' : 'bloquear';
     
+    // Confirmar ação com o usuário
     if (!confirm(`Tem certeza que deseja ${actionText} o usuário "${userName}"?`)) {
         return;
     }
     
+    // Mostrar indicador de carregamento
     showLoading();
     
-    // CORREÇÃO AQUI - caminho relativo correto
+    // Log para debug
+    console.log('Enviando requisição para alterar status:', {
+        userId: userId,
+        newStatus: newStatus,
+        userName: userName,
+        action: actionText
+    });
+    
+    // Preparar dados para envio
+    const formData = new URLSearchParams();
+    formData.append('action', 'update_user_status');
+    formData.append('user_id', userId);
+    formData.append('status', newStatus);
+    
+    // Fazer requisição AJAX
     fetch('../../controllers/AdminController.php', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
+            'X-Requested-With': 'XMLHttpRequest'
         },
-        body: `action=update_user_status&user_id=${userId}&status=${newStatus}`
+        body: formData.toString()
     })
-    .then(response => response.json())
+    .then(response => {
+        console.log('Resposta do servidor:', response);
+        
+        // Verificar se a resposta é válida
+        if (!response.ok) {
+            throw new Error(`Erro HTTP: ${response.status} - ${response.statusText}`);
+        }
+        
+        // Verificar se a resposta é JSON
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            throw new Error('Resposta não é JSON válido');
+        }
+        
+        return response.json();
+    })
     .then(data => {
+        console.log('Dados recebidos:', data);
         hideLoading();
         
-        if (data.status) {
-            showMessage(`Usuário ${actionText} com sucesso!`);
+        // Verificar se a operação foi bem-sucedida
+        if (data && data.status === true) {
+            showMessage(`Usuário ${actionText} com sucesso!`, 'success');
+            
+            // Recarregar a página após um pequeno delay
             setTimeout(() => {
-                location.reload();
-            }, 1000);
+                window.location.reload();
+            }, 1500);
         } else {
-            showMessage(data.message || `Erro ao ${actionText} usuário`, 'error');
+            // Mostrar mensagem de erro específica
+            const errorMessage = data && data.message ? data.message : `Erro ao ${actionText} usuário`;
+            showMessage(errorMessage, 'error');
         }
     })
     .catch(error => {
+        console.error('Erro na requisição:', error);
         hideLoading();
-        console.error('Erro:', error);
+        
+        // Mostrar erro detalhado ao usuário
         showMessage(`Erro ao processar a solicitação: ${error.message}`, 'error');
     });
 }

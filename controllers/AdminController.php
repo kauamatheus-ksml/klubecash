@@ -966,37 +966,57 @@ public static function updateUser($userId, $data) {
 }
     public static function updateUserStatus($userId, $status) {
         try {
+            // Log para debug
+            error_log("updateUserStatus chamado - UserID: $userId, Status: $status");
+            
             // Verificar se é um administrador
             if (!self::validateAdmin()) {
+                error_log("Acesso negado - não é admin");
                 return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
             }
             
+            // Validar parâmetros
+            if (!$userId || !is_numeric($userId)) {
+                error_log("ID do usuário inválido: $userId");
+                return ['status' => false, 'message' => 'ID do usuário inválido.'];
+            }
+            
             // Validar status
-            $validStatus = [USER_ACTIVE, 'inativo', 'bloqueado'];
+            $validStatus = [USER_ACTIVE, USER_INACTIVE, USER_BLOCKED];
             if (!in_array($status, $validStatus)) {
+                error_log("Status inválido: $status");
                 return ['status' => false, 'message' => 'Status inválido.'];
             }
             
             $db = Database::getConnection();
             
             // Verificar se o usuário existe
-            $checkStmt = $db->prepare("SELECT id FROM usuarios WHERE id = :user_id");
-            $checkStmt->bindParam(':user_id', $userId);
+            $checkStmt = $db->prepare("SELECT id, nome, status FROM usuarios WHERE id = :user_id");
+            $checkStmt->bindParam(':user_id', $userId, PDO::PARAM_INT);
             $checkStmt->execute();
+            $user = $checkStmt->fetch(PDO::FETCH_ASSOC);
             
-            if ($checkStmt->rowCount() == 0) {
+            if (!$user) {
+                error_log("Usuário não encontrado: $userId");
                 return ['status' => false, 'message' => 'Usuário não encontrado.'];
+            }
+            
+            // Verificar se o status já é o mesmo
+            if ($user['status'] === $status) {
+                return ['status' => true, 'message' => 'Status já atualizado.'];
             }
             
             // Atualizar status
             $updateStmt = $db->prepare("UPDATE usuarios SET status = :status WHERE id = :user_id");
-            $updateStmt->bindParam(':status', $status);
-            $updateStmt->bindParam(':user_id', $userId);
+            $updateStmt->bindParam(':status', $status, PDO::PARAM_STR);
+            $updateStmt->bindParam(':user_id', $userId, PDO::PARAM_INT);
             $success = $updateStmt->execute();
             
-            if ($success) {
+            if ($success && $updateStmt->rowCount() > 0) {
+                error_log("Status atualizado com sucesso - UserID: $userId, Status: $status");
                 return ['status' => true, 'message' => 'Status do usuário atualizado com sucesso.'];
             } else {
+                error_log("Falha ao atualizar status - UserID: $userId, Status: $status");
                 return ['status' => false, 'message' => 'Falha ao atualizar status do usuário.'];
             }
             
@@ -3505,11 +3525,29 @@ if (basename($_SERVER['PHP_SELF']) === 'AdminController.php') {
             exit; // Garantir que nada mais seja executado
             break;   
         case 'update_user_status':
+            // Garantir que a resposta seja JSON
+            header('Content-Type: application/json; charset=UTF-8');
+            
+            // Log para debug
+            error_log('Ação update_user_status recebida');
+            error_log('POST data: ' . print_r($_POST, true));
+            
             $userId = isset($_POST['user_id']) ? intval($_POST['user_id']) : 0;
             $status = $_POST['status'] ?? '';
+            
+            if (!$userId) {
+                echo json_encode(['status' => false, 'message' => 'ID do usuário não fornecido']);
+                exit;
+            }
+            
+            if (empty($status)) {
+                echo json_encode(['status' => false, 'message' => 'Status não fornecido']);
+                exit;
+            }
+            
             $result = AdminController::updateUserStatus($userId, $status);
             echo json_encode($result);
-            break;
+            exit; 
         case 'update_user':
             $userId = isset($_POST['user_id']) ? intval($_POST['user_id']) : 0;
             $result = AdminController::updateUser($userId, $_POST);
