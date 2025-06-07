@@ -136,6 +136,7 @@ define('STORE_PAYMENT_URL', SITE_URL . '/store/pagamento');
 define('STORE_PAYMENT_HISTORY_URL', SITE_URL . '/store/historico-pagamentos');
 define('STORE_PROFILE_URL', SITE_URL . '/store/perfil');
 define('STORE_PAYMENT_PIX_URL', SITE_URL . '/store/pagamento-pix');
+define('STORE_ACTIONS_URL', SITE_URL . '/store/actions');
 
 // === CONFIGURAÇÕES DE ASSETS ===
 define('ASSETS_VERSION', '2.1.0'); // Para cache busting
