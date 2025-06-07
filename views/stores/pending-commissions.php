@@ -381,6 +381,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const transactionCheckboxes = document.querySelectorAll('.transaction-checkbox');
     const paySelectedBtn = document.getElementById('paySelectedBtn');
     const payPixBtn = document.getElementById('payPixBtn');
+    const paymentForm = document.getElementById('paymentForm');
     const paymentSummary = document.getElementById('paymentSummary');
     
     // Função para formatar valores como moeda
@@ -461,14 +462,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Evento para botão de pagamento normal
     if (paySelectedBtn) {
         paySelectedBtn.addEventListener('click', function() {
-            const selected = getSelectedTransactions();
-            if (selected.length === 0) {
-                alert('Selecione pelo menos uma transação');
-                return;
-            }
-            
-            if (confirm(`Confirma o pagamento de ${selected.length} transação(ões)?`)) {
-                processPayment('payment_form', selected);
+            if (document.querySelectorAll('.transaction-checkbox:checked').length > 0) {
+                paymentForm.submit();
             }
         });
     }
@@ -476,116 +471,49 @@ document.addEventListener('DOMContentLoaded', function() {
     // Evento para botão PIX
     if (payPixBtn) {
         payPixBtn.addEventListener('click', function() {
-            const selected = getSelectedTransactions();
-            if (selected.length === 0) {
-                alert('Selecione pelo menos uma transação');
-                return;
-            }
-            
-            if (confirm(`Confirma o pagamento via PIX de ${selected.length} transação(ões)?`)) {
-                processPayment('create_pix_payment', selected);
+            const selected = document.querySelectorAll('.transaction-checkbox:checked');
+            if (selected.length > 0) {
+                createPixPayment();
             }
         });
     }
-    
-    function getSelectedTransactions() {
-        return Array.from(document.querySelectorAll('.transaction-checkbox:checked'))
-                   .map(checkbox => checkbox.value);
-    }
-    
-    function processPayment(action, transactionIds) {
-        const formData = new FormData();
-        formData.append('action', action);
-        transactionIds.forEach(id => {
-            formData.append('transaction_ids[]', id);
+
+    // Função para criar pagamento PIX
+    async function createPixPayment() {
+        // Calcular valor total das comissões selecionadas
+        const selectedCheckboxes = document.querySelectorAll('.transaction-checkbox:checked');
+        let totalCommission = 0;
+        
+        selectedCheckboxes.forEach(checkbox => {
+            totalCommission += parseFloat(checkbox.getAttribute('data-value'));
         });
-        
-        // Mostrar loading
-        showLoading('Processando pagamento...');
-        
-        fetch('<?php echo STORE_ACTIONS_URL; ?>', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            hideLoading();
+
+        if (totalCommission <= 0) {
+            alert('Selecione pelo menos uma transação');
+            return;
+        }
+
+        const formData = new FormData(paymentForm);
+        formData.append('metodo_pagamento', 'pix_mercadopago');
+        formData.append('valor_total', totalCommission.toFixed(2));
+
+        try {
+            const response = await fetch('../../api/store-payment.php', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
             
-            if (data.status) {
-                if (data.redirect_url) {
-                    window.location.href = data.redirect_url;
-                } else if (data.data && data.data.pix_data) {
-                    // Exibir dados do PIX diretamente
-                    displayPixData(data.data.pix_data);
-                } else {
-                    alert('✅ ' + data.message);
-                    window.location.reload();
-                }
+            if (result.status) {
+                window.location.href = `../../store/pagamento-pix?payment_id=${result.data.payment_id}`;
             } else {
-                alert('❌ Erro: ' + data.message);
+                alert('Erro: ' + result.message);
             }
-        })
-        .catch(error => {
-            hideLoading();
-            console.error('Erro:', error);
-            alert('❌ Erro na comunicação. Tente novamente.');
-        });
-    }
-    
-    function showLoading(message) {
-        // Criar overlay de loading
-        const loadingOverlay = document.createElement('div');
-        loadingOverlay.id = 'loadingOverlay';
-        loadingOverlay.style.cssText = `
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-            background: rgba(0,0,0,0.7); display: flex; align-items: center; 
-            justify-content: center; z-index: 9999; color: white; font-size: 18px;
-        `;
-        loadingOverlay.innerHTML = `
-            <div style="text-align: center;">
-                <div style="margin-bottom: 20px;">⏳</div>
-                <div>${message}</div>
-            </div>
-        `;
-        document.body.appendChild(loadingOverlay);
-    }
-    
-    function hideLoading() {
-        const overlay = document.getElementById('loadingOverlay');
-        if (overlay) overlay.remove();
-    }
-    
-    function displayPixData(pixData) {
-        // Criar modal com dados PIX
-        const modal = document.createElement('div');
-        modal.style.cssText = `
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-            background: rgba(0,0,0,0.8); display: flex; align-items: center; 
-            justify-content: center; z-index: 10000;
-        `;
-        
-        modal.innerHTML = `
-            <div style="background: white; padding: 30px; border-radius: 10px; max-width: 500px; text-align: center;">
-                <h3>🏦 Pagamento PIX Gerado</h3>
-                <p>Use o QR Code ou copie o código PIX abaixo:</p>
-                <div style="margin: 20px 0;">
-                    ${pixData.qr_code_image ? `<img src="${pixData.qr_code_image}" style="max-width: 200px;">` : ''}
-                </div>
-                <div style="margin: 20px 0;">
-                    <textarea readonly style="width: 100%; height: 100px; font-family: monospace; font-size: 12px;">${pixData.qr_code}</textarea>
-                </div>
-                <button onclick="navigator.clipboard.writeText('${pixData.qr_code}').then(() => alert('Código PIX copiado!'))" 
-                        style="margin: 10px; padding: 10px 20px; background: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer;">
-                    📋 Copiar Código PIX
-                </button>
-                <button onclick="this.closest('div').parentNode.remove()" 
-                        style="margin: 10px; padding: 10px 20px; background: #f44336; color: white; border: none; border-radius: 5px; cursor: pointer;">
-                    ❌ Fechar
-                </button>
-            </div>
-        `;
-        
-        document.body.appendChild(modal);
+        } catch (error) {
+            console.error('Erro na requisição:', error);
+            alert('Erro de conexão: ' + error.message);
+        }
     }
     
     // Inicializar resumo
