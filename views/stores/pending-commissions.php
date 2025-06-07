@@ -378,192 +378,165 @@ if ($result['status'] && isset($result['data']['totais'])) {
     <script>
 document.addEventListener('DOMContentLoaded', function() {
     const selectAllCheckbox = document.getElementById('selectAll');
-    const transactionCheckboxes = document.querySelectorAll('.transaction-checkbox');
+    const transactionCheckboxes = document.querySelectorAll('input[name="transaction_ids[]"]');
     const paySelectedBtn = document.getElementById('paySelectedBtn');
     const payPixBtn = document.getElementById('payPixBtn');
-    const paymentForm = document.getElementById('paymentForm');
-    const paymentSummary = document.getElementById('paymentSummary');
     
-    // Função para formatar valores como moeda
-    function formatCurrency(value) {
-        return value.toLocaleString('pt-BR', {
-            style: 'currency',
-            currency: 'BRL',
-            minimumFractionDigits: 2
-        });
-    }
-    
-    // Função para atualizar resumo de pagamento
-    function updatePaymentSummary() {
-        const selectedCheckboxes = document.querySelectorAll('.transaction-checkbox:checked');
-        const selectedCount = selectedCheckboxes.length;
-        let totalCommission = 0;
-        let totalSalesValue = 0;
-        let totalBalanceUsed = 0;
-        
-        selectedCheckboxes.forEach(checkbox => {
-            const commission = parseFloat(checkbox.getAttribute('data-value'));
-            totalCommission += commission;
-            
-            const row = checkbox.closest('tr');
-            const cells = row.querySelectorAll('td');
-            
-            // Valor original da venda (coluna 4)
-            const originalValueText = cells[4].textContent.replace('R$ ', '').replace(/\./g, '').replace(',', '.');
-            const originalValue = parseFloat(originalValueText);
-            
-            // Saldo usado (coluna 5)
-            const balanceUsedElement = cells[5].querySelector('.saldo-usado');
-            const balanceUsed = balanceUsedElement ? 
-                parseFloat(balanceUsedElement.textContent.replace('R$ ', '').replace(/\./g, '').replace(',', '.')) : 0;
-            
-            totalSalesValue += originalValue;
-            totalBalanceUsed += balanceUsed;
-        });
-        
-        document.getElementById('selectedCount').textContent = selectedCount;
-        document.getElementById('totalSalesValue').textContent = formatCurrency(totalSalesValue);
-        document.getElementById('totalBalanceUsed').textContent = formatCurrency(totalBalanceUsed);
-        document.getElementById('totalCommissionValue').textContent = formatCurrency(totalCommission);
-        
-        // Habilitar/desabilitar botões de pagamento
-        if (paySelectedBtn) paySelectedBtn.disabled = selectedCount === 0;
-        if (payPixBtn) payPixBtn.disabled = selectedCount === 0;
-        
-        // Mostrar/esconder resumo de pagamento
-        if (selectedCount > 0) {
-            paymentSummary.style.display = 'block';
-        } else {
-            paymentSummary.style.display = 'none';
-        }
-    }
-    
-    // Evento para selecionar/deselecionar todos
+    // Selecionar/desselecionar todos
     if (selectAllCheckbox) {
         selectAllCheckbox.addEventListener('change', function() {
             transactionCheckboxes.forEach(checkbox => {
-                checkbox.checked = selectAllCheckbox.checked;
+                checkbox.checked = this.checked;
             });
-            updatePaymentSummary();
+            updateButtons();
         });
     }
     
-    // Eventos para checkboxes individuais
+    // Atualizar estado dos botões
     transactionCheckboxes.forEach(checkbox => {
-        checkbox.addEventListener('change', function() {
-            const allChecked = Array.from(transactionCheckboxes).every(cb => cb.checked);
-            if (selectAllCheckbox) {
-                selectAllCheckbox.checked = allChecked;
-            }
-            updatePaymentSummary();
-        });
+        checkbox.addEventListener('change', updateButtons);
     });
     
-    // Evento para botão de pagamento normal
+    function updateButtons() {
+        const selectedCount = document.querySelectorAll('input[name="transaction_ids[]"]:checked').length;
+        
+        if (paySelectedBtn) paySelectedBtn.disabled = selectedCount === 0;
+        if (payPixBtn) payPixBtn.disabled = selectedCount === 0;
+    }
+    
+    // Botão Pagar Selecionadas (formulário tradicional)
     if (paySelectedBtn) {
         paySelectedBtn.addEventListener('click', function() {
-            if (document.querySelectorAll('.transaction-checkbox:checked').length > 0) {
-                paymentForm.submit();
+            const selected = getSelectedTransactions();
+            if (selected.length === 0) {
+                alert('Selecione pelo menos uma transação');
+                return;
+            }
+            
+            if (confirm(`Confirma o pagamento de ${selected.length} transação(ões)?`)) {
+                processPayment('payment_form', selected);
             }
         });
     }
     
-    // Evento para botão PIX
+    // Botão Pagar via PIX (direto para PIX)
     if (payPixBtn) {
         payPixBtn.addEventListener('click', function() {
-            const selected = document.querySelectorAll('.transaction-checkbox:checked');
-            if (selected.length > 0) {
-                createPixPayment();
+            const selected = getSelectedTransactions();
+            if (selected.length === 0) {
+                alert('Selecione pelo menos uma transação');
+                return;
             }
-        });
-    }
-
-    // Função para criar pagamento PIX
-    async function createPixPayment() {
-        // Calcular valor total das comissões selecionadas
-        const selectedCheckboxes = document.querySelectorAll('.transaction-checkbox:checked');
-        let totalCommission = 0;
-        
-        selectedCheckboxes.forEach(checkbox => {
-            totalCommission += parseFloat(checkbox.getAttribute('data-value'));
-        });
-
-        if (totalCommission <= 0) {
-            alert('Selecione pelo menos uma transação');
-            return;
-        }
-
-        const formData = new FormData(paymentForm);
-        formData.append('metodo_pagamento', 'pix_mercadopago');
-        formData.append('valor_total', totalCommission.toFixed(2));
-
-        try {
-            const response = await fetch('../../api/store-payment.php', {
-                method: 'POST',
-                body: formData
-            });
-
-            const result = await response.json();
             
-            if (result.status) {
-                window.location.href = `../../store/pagamento-pix?payment_id=${result.data.payment_id}`;
-            } else {
-                alert('Erro: ' + result.message);
+            if (confirm(`Confirma o pagamento via PIX de ${selected.length} transação(ões)?`)) {
+                processPayment('create_pix_payment', selected);
             }
-        } catch (error) {
-            console.error('Erro na requisição:', error);
-            alert('Erro de conexão: ' + error.message);
-        }
+        });
     }
     
-    // Inicializar resumo
-    updatePaymentSummary();
-    
-    // Restaurar estado do dropdown
-    const savedState = localStorage.getItem('pendingCommissionsInfoOpen');
-    const content = document.getElementById('infoSectionContent');
-    const icon = document.getElementById('infoDropdownIcon');
-    const card = content ? content.closest('.collapsible-card') : null;
-    
-    if (savedState === 'true' && content && icon && card) {
-        content.style.display = 'block';
-        icon.classList.add('open');
-        card.classList.add('expanded');
+    function getSelectedTransactions() {
+        return Array.from(document.querySelectorAll('input[name="transaction_ids[]"]:checked'))
+                   .map(checkbox => checkbox.value);
     }
+    
+    function processPayment(action, transactionIds) {
+        const formData = new FormData();
+        formData.append('action', action);
+        transactionIds.forEach(id => {
+            formData.append('transaction_ids[]', id);
+        });
+        
+        // Mostrar loading
+        showLoading('Processando pagamento...');
+        
+        fetch('<?php echo STORE_ACTIONS_URL; ?>', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            hideLoading();
+            
+            if (data.status) {
+                if (data.redirect_url) {
+                    window.location.href = data.redirect_url;
+                } else if (data.data && data.data.pix_data) {
+                    // Exibir dados do PIX diretamente
+                    displayPixData(data.data.pix_data);
+                } else {
+                    alert('✅ ' + data.message);
+                    window.location.reload();
+                }
+            } else {
+                alert('❌ Erro: ' + data.message);
+            }
+        })
+        .catch(error => {
+            hideLoading();
+            console.error('Erro:', error);
+            alert('❌ Erro na comunicação. Tente novamente.');
+        });
+    }
+    
+    function showLoading(message) {
+        // Criar overlay de loading
+        const loadingOverlay = document.createElement('div');
+        loadingOverlay.id = 'loadingOverlay';
+        loadingOverlay.style.cssText = `
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(0,0,0,0.7); display: flex; align-items: center; 
+            justify-content: center; z-index: 9999; color: white; font-size: 18px;
+        `;
+        loadingOverlay.innerHTML = `
+            <div style="text-align: center;">
+                <div style="margin-bottom: 20px;">⏳</div>
+                <div>${message}</div>
+            </div>
+        `;
+        document.body.appendChild(loadingOverlay);
+    }
+    
+    function hideLoading() {
+        const overlay = document.getElementById('loadingOverlay');
+        if (overlay) overlay.remove();
+    }
+    
+    function displayPixData(pixData) {
+        // Criar modal com dados PIX
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(0,0,0,0.8); display: flex; align-items: center; 
+            justify-content: center; z-index: 10000;
+        `;
+        
+        modal.innerHTML = `
+            <div style="background: white; padding: 30px; border-radius: 10px; max-width: 500px; text-align: center;">
+                <h3>🏦 Pagamento PIX Gerado</h3>
+                <p>Use o QR Code ou copie o código PIX abaixo:</p>
+                <div style="margin: 20px 0;">
+                    ${pixData.qr_code_image ? `<img src="${pixData.qr_code_image}" style="max-width: 200px;">` : ''}
+                </div>
+                <div style="margin: 20px 0;">
+                    <textarea readonly style="width: 100%; height: 100px; font-family: monospace; font-size: 12px;">${pixData.qr_code}</textarea>
+                </div>
+                <button onclick="navigator.clipboard.writeText('${pixData.qr_code}').then(() => alert('Código PIX copiado!'))" 
+                        style="margin: 10px; padding: 10px 20px; background: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                    📋 Copiar Código PIX
+                </button>
+                <button onclick="this.closest('div').parentNode.remove()" 
+                        style="margin: 10px; padding: 10px 20px; background: #f44336; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                    ❌ Fechar
+                </button>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+    }
+    
+    // Inicializar estado dos botões
+    updateButtons();
 });
-
-// Função para controlar o dropdown de informações
-function toggleInfoSection() {
-    const content = document.getElementById('infoSectionContent');
-    const icon = document.getElementById('infoDropdownIcon');
-    const card = content.closest('.collapsible-card');
-    
-    if (content.style.display === 'none' || content.style.display === '') {
-        content.style.display = 'block';
-        content.classList.add('opening');
-        content.classList.remove('closing');
-        icon.classList.add('open');
-        card.classList.add('expanded');
-        
-        setTimeout(() => {
-            content.classList.remove('opening');
-        }, 400);
-        
-        localStorage.setItem('pendingCommissionsInfoOpen', 'true');
-    } else {
-        content.classList.add('closing');
-        content.classList.remove('opening');
-        icon.classList.remove('open');
-        card.classList.remove('expanded');
-        
-        setTimeout(() => {
-            content.style.display = 'none';
-            content.classList.remove('closing');
-        }, 400);
-        
-        localStorage.setItem('pendingCommissionsInfoOpen', 'false');
-    }
-}
 </script>
     
     <style>
