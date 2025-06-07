@@ -30,27 +30,6 @@ function initializeUserManagement() {
     
     // Configurar máscaras de input
     setupInputMasks();
-    
-    // Inicializar sistema de mensagens
-    createMessageContainer();
-}
-
-/**
- * Cria container de mensagens se não existir
- */
-function createMessageContainer() {
-    if (!document.getElementById('messageContainer')) {
-        const container = document.createElement('div');
-        container.id = 'messageContainer';
-        container.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 10000;
-            width: 350px;
-        `;
-        document.body.appendChild(container);
-    }
 }
 
 /**
@@ -157,76 +136,38 @@ function clearFilters() {
 }
 
 /**
- * Exibe mensagem para o usuário - VERSÃO CORRIGIDA E ROBUSTA
+ * Exibe mensagem para o usuário
  */
 function showMessage(message, type = 'success') {
-    // Garantir que o container existe
-    createMessageContainer();
-    
     const messageContainer = document.getElementById('messageContainer');
-    if (!messageContainer) {
-        // Fallback para alert se não conseguir criar o container
-        alert(message);
-        return;
-    }
+    if (!messageContainer) return;
     
-    // Mapear tipos para classes do Bootstrap
-    const alertClassMap = {
-        'success': 'alert-success',
-        'error': 'alert-danger',
-        'warning': 'alert-warning',
-        'info': 'alert-info'
-    };
+    const alertClass = `alert-${type}`;
+    const iconClass = type === 'success' ? 'fa-check-circle' : 
+                     type === 'error' ? 'fa-exclamation-triangle' : 
+                     type === 'warning' ? 'fa-exclamation-triangle' : 'fa-info-circle';
     
-    const alertClass = alertClassMap[type] || 'alert-info';
-    
-    // Mapear tipos para ícones
-    const iconMap = {
-        'success': 'fa-check-circle',
-        'error': 'fa-exclamation-triangle',
-        'warning': 'fa-exclamation-triangle',
-        'info': 'fa-info-circle'
-    };
-    
-    const iconClass = iconMap[type] || 'fa-info-circle';
-    
-    // Criar elemento de mensagem
-    const messageElement = document.createElement('div');
-    messageElement.className = `alert ${alertClass} alert-dismissible fade show`;
-    messageElement.style.cssText = `
-        margin-bottom: 10px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        border: none;
-        border-radius: 8px;
-        animation: slideInRight 0.3s ease-out;
+    messageContainer.innerHTML = `
+        <div class="alert ${alertClass}">
+            <i class="fas ${iconClass}"></i>
+            ${message}
+        </div>
     `;
-    
-    messageElement.innerHTML = `
-        <i class="fas ${iconClass} me-2"></i>
-        <strong>${type === 'error' ? 'Erro!' : type === 'success' ? 'Sucesso!' : type === 'warning' ? 'Atenção!' : 'Info:'}</strong>
-        ${message}
-        <button type="button" class="btn-close" onclick="this.parentElement.remove()" aria-label="Close"></button>
-    `;
-    
-    // Adicionar ao container
-    messageContainer.appendChild(messageElement);
     
     // Rolar para a mensagem
-    messageElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    messageContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     
-    // Remover automaticamente após 5 segundos
+    // Remover mensagem após 5 segundos
     setTimeout(() => {
-        if (messageElement.parentElement) {
-            messageElement.style.animation = 'slideOutRight 0.3s ease-in';
-            setTimeout(() => messageElement.remove(), 300);
-        }
+        messageContainer.innerHTML = '';
     }, 5000);
 }
 
 /**
- * Função auxiliar para mostrar loading - VERSÃO APRIMORADA
+ * Função auxiliar para mostrar loading
  */
-function showLoading(message = 'Processando...') {
+function showLoading() {
+    // Criar ou mostrar indicador de loading
     let loadingEl = document.getElementById('globalLoading');
     if (!loadingEl) {
         loadingEl = document.createElement('div');
@@ -238,64 +179,26 @@ function showLoading(message = 'Processando...') {
                 left: 0; 
                 width: 100%; 
                 height: 100%; 
-                background: rgba(0,0,0,0.6); 
+                background: rgba(0,0,0,0.5); 
                 display: flex; 
                 justify-content: center; 
                 align-items: center; 
                 z-index: 9999;
-                backdrop-filter: blur(2px);
             ">
                 <div style="
                     background: white; 
-                    padding: 30px 40px; 
-                    border-radius: 12px; 
+                    padding: 20px; 
+                    border-radius: 8px; 
                     text-align: center;
-                    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-                    min-width: 200px;
                 ">
-                    <div style="
-                        width: 40px;
-                        height: 40px;
-                        border: 4px solid #f3f3f3;
-                        border-top: 4px solid #FF7A00;
-                        border-radius: 50%;
-                        animation: spin 1s linear infinite;
-                        margin: 0 auto 15px;
-                    "></div>
-                    <div style="
-                        color: #333;
-                        font-size: 16px;
-                        font-weight: 500;
-                    ">${message}</div>
+                    <i class="fas fa-spinner fa-spin" style="font-size: 24px; margin-bottom: 10px;"></i>
+                    <div>Processando...</div>
                 </div>
             </div>
         `;
         document.body.appendChild(loadingEl);
-        
-        // Adicionar CSS para animação
-        if (!document.getElementById('loadingStyles')) {
-            const style = document.createElement('style');
-            style.id = 'loadingStyles';
-            style.textContent = `
-                @keyframes spin {
-                    0% { transform: rotate(0deg); }
-                    100% { transform: rotate(360deg); }
-                }
-                @keyframes slideInRight {
-                    from { transform: translateX(100%); opacity: 0; }
-                    to { transform: translateX(0); opacity: 1; }
-                }
-                @keyframes slideOutRight {
-                    from { transform: translateX(0); opacity: 1; }
-                    to { transform: translateX(100%); opacity: 0; }
-                }
-            `;
-            document.head.appendChild(style);
-        }
     } else {
-        loadingEl.style.display = 'flex';
-        const messageEl = loadingEl.querySelector('div:last-child');
-        if (messageEl) messageEl.textContent = message;
+        loadingEl.style.display = 'block';
     }
 }
 
@@ -310,56 +213,17 @@ function hideLoading() {
 }
 
 /**
- * Função utilitária para fazer requisições AJAX - VERSÃO ROBUSTA
- */
-async function makeRequest(url, data, method = 'POST') {
-    try {
-        console.log(`Fazendo requisição ${method} para:`, url);
-        console.log('Dados enviados:', data);
-        
-        const response = await fetch(url, {
-            method: method,
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'X-Requested-With': 'XMLHttpRequest'
-            },
-            body: data instanceof URLSearchParams ? data.toString() : data
-        });
-        
-        console.log('Resposta recebida:', response);
-        
-        // Verificar se a resposta é válida
-        if (!response.ok) {
-            throw new Error(`Erro HTTP: ${response.status} - ${response.statusText}`);
-        }
-        
-        // Verificar se a resposta é JSON
-        const contentType = response.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-            // Tentar ler como texto para debug
-            const text = await response.text();
-            console.error('Resposta não-JSON recebida:', text);
-            throw new Error('Resposta do servidor não é JSON válido');
-        }
-        
-        const jsonData = await response.json();
-        console.log('Dados JSON recebidos:', jsonData);
-        
-        return jsonData;
-    } catch (error) {
-        console.error('Erro na requisição:', error);
-        throw error;
-    }
-}
-
-/**
- * Carrega lojas disponíveis para vinculação - VERSÃO CORRIGIDA
+ * Carrega lojas disponíveis para vinculação
  */
 function loadAvailableStores() {
-    const formData = new URLSearchParams();
-    formData.append('action', 'get_available_stores');
-    
-    makeRequest('../../controllers/AdminController.php', formData)
+    fetch('/controllers/AdminController.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'action=get_available_stores'
+    })
+    .then(response => response.json())
     .then(data => {
         if (data.status && data.data) {
             availableStores = data.data;
@@ -372,7 +236,6 @@ function loadAvailableStores() {
     .catch(error => {
         console.error('Erro ao carregar lojas:', error);
         availableStores = [];
-        showMessage('Erro ao carregar lojas disponíveis: ' + error.message, 'error');
     });
 }
 
@@ -423,7 +286,7 @@ function handleUserTypeChange(type) {
 }
 
 /**
- * Manipula mudança na seleção de loja - VERSÃO CORRIGIDA
+ * Manipula mudança na seleção de loja
  */
 function handleStoreEmailChange(email) {
     if (!email) {
@@ -431,11 +294,15 @@ function handleStoreEmailChange(email) {
         return;
     }
     
-    const formData = new URLSearchParams();
-    formData.append('action', 'get_store_by_email');
-    formData.append('email', email);
-    
-    makeRequest('../../controllers/AdminController.php', formData)
+    // Buscar dados da loja selecionada
+    fetch('/controllers/AdminController.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `action=get_store_by_email&email=${encodeURIComponent(email)}`
+    })
+    .then(response => response.json())
     .then(data => {
         if (data.status && data.data) {
             fillStoreFields(data.data);
@@ -565,15 +432,11 @@ function hideUserModal() {
         modal.classList.remove('show');
     }
 }
-
 /**
- * Edita usuário - VERSÃO COMPLETAMENTE CORRIGIDA
+ * Edita usuário - VERSÃO CORRIGIDA
  */
 function editUser(userId) {
-    if (!userId) {
-        showMessage('ID do usuário não fornecido', 'error');
-        return;
-    }
+    if (!userId) return;
     
     currentUserId = userId;
     isEditMode = true;
@@ -585,10 +448,7 @@ function editUser(userId) {
     const passwordField = document.getElementById('userPassword');
     const passwordHelp = document.getElementById('passwordHelp');
     
-    if (!modal) {
-        showMessage('Modal de usuário não encontrado', 'error');
-        return;
-    }
+    if (!modal) return;
     
     // Configurar modal para edição
     if (title) title.innerHTML = '<i class="fas fa-user-edit"></i> Editar Usuário';
@@ -605,14 +465,22 @@ function editUser(userId) {
     // Mostrar modal
     modal.classList.add('show');
     
-    // Carregar dados do usuário
-    showLoading('Carregando dados do usuário...');
+    // Carregar dados do usuário - CORREÇÃO AQUI
+    showLoading();
     
-    const formData = new URLSearchParams();
-    formData.append('action', 'getUserDetails');
-    formData.append('user_id', userId);
-    
-    makeRequest('../../controllers/AdminController.php', formData)
+    fetch('../../controllers/AdminController.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `action=getUserDetails&user_id=${userId}`
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Erro na requisição: ' + response.status);
+        }
+        return response.json();
+    })
     .then(data => {
         hideLoading();
         
@@ -625,6 +493,7 @@ function editUser(userId) {
     })
     .catch(error => {
         hideLoading();
+        console.error('Erro:', error);
         hideUserModal();
         showMessage('Erro ao carregar dados do usuário: ' + error.message, 'error');
     });
@@ -634,48 +503,43 @@ function editUser(userId) {
  * Preenche o formulário com dados do usuário
  */
 function fillUserForm(userData) {
-    const userIdField = document.getElementById('userId');
-    const userNameField = document.getElementById('userName');
-    const userEmailField = document.getElementById('userEmail');
-    const userTypeField = document.getElementById('userType');
-    const userStatusField = document.getElementById('userStatus');
-    const userPhoneField = document.getElementById('userPhone');
-    const userPasswordField = document.getElementById('userPassword');
+    document.getElementById('userId').value = userData.id;
+    document.getElementById('userName').value = userData.nome;
+    document.getElementById('userEmail').value = userData.email;
+    document.getElementById('userType').value = userData.tipo;
+    document.getElementById('userStatus').value = userData.status;
     
-    if (userIdField) userIdField.value = userData.id;
-    if (userNameField) userNameField.value = userData.nome;
-    if (userEmailField) userEmailField.value = userData.email;
-    if (userTypeField) userTypeField.value = userData.tipo;
-    if (userStatusField) userStatusField.value = userData.status;
-    if (userPhoneField && userData.telefone) userPhoneField.value = userData.telefone;
-    if (userPasswordField) userPasswordField.value = ''; // Sempre limpar senha
+    if (userData.telefone) {
+        document.getElementById('userPhone').value = userData.telefone;
+    }
+    
+    // Limpar campo de senha
+    document.getElementById('userPassword').value = '';
 }
 
 /**
  * Visualiza detalhes do usuário - VERSÃO CORRIGIDA
  */
 function viewUser(userId) {
-    if (!userId) {
-        showMessage('ID do usuário não fornecido', 'error');
-        return;
-    }
+    if (!userId) return;
     
     const modal = document.getElementById('viewUserModal');
     const content = document.getElementById('userViewContent');
     
-    if (!modal || !content) {
-        showMessage('Modal de visualização não encontrado', 'error');
-        return;
-    }
+    if (!modal || !content) return;
     
     modal.classList.add('show');
-    content.innerHTML = '<div class="text-center p-4"><i class="fas fa-spinner fa-spin fa-2x"></i><br><br>Carregando...</div>';
+    content.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin"></i> Carregando...</div>';
     
-    const formData = new URLSearchParams();
-    formData.append('action', 'getUserDetails');
-    formData.append('user_id', userId);
-    
-    makeRequest('../../controllers/AdminController.php', formData)
+    // CORREÇÃO AQUI - caminho relativo correto
+    fetch('../../controllers/AdminController.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `action=getUserDetails&user_id=${userId}`
+    })
+    .then(response => response.json())
     .then(data => {
         if (data.status && data.data && data.data.usuario) {
             displayUserDetails(data.data.usuario);
@@ -771,29 +635,13 @@ function hideViewUserModal() {
 }
 
 /**
- * Altera status do usuário - VERSÃO COMPLETAMENTE CORRIGIDA E ROBUSTA
+ * Altera status do usuário - VERSÃO COMPLETAMENTE CORRIGIDA
  */
 function changeUserStatus(userId, newStatus, userName) {
-    // Validação rigorosa de parâmetros
-    if (!userId || !newStatus || !userName) {
+    // Validar parâmetros de entrada
+    if (!userId || !newStatus) {
         console.error('Parâmetros inválidos:', {userId, newStatus, userName});
         showMessage('Erro: Parâmetros inválidos para alteração de status', 'error');
-        return;
-    }
-    
-    // Converter userId para número se necessário
-    const userIdNum = parseInt(userId);
-    if (isNaN(userIdNum) || userIdNum <= 0) {
-        console.error('ID do usuário inválido:', userId);
-        showMessage('Erro: ID do usuário inválido', 'error');
-        return;
-    }
-    
-    // Validar status
-    const validStatuses = ['ativo', 'inativo', 'bloqueado'];
-    if (!validStatuses.includes(newStatus)) {
-        console.error('Status inválido:', newStatus);
-        showMessage('Erro: Status inválido', 'error');
         return;
     }
     
@@ -807,55 +655,68 @@ function changeUserStatus(userId, newStatus, userName) {
     }
     
     // Mostrar indicador de carregamento
-    showLoading(`${actionText.charAt(0).toUpperCase() + actionText.slice(1)}ando usuário...`);
+    showLoading();
     
-    // Log detalhado para debug
-    console.log('=== ALTERAÇÃO DE STATUS DO USUÁRIO ===');
-    console.log('User ID:', userIdNum);
-    console.log('Novo Status:', newStatus);
-    console.log('Nome do Usuário:', userName);
-    console.log('Ação:', actionText);
-    console.log('Timestamp:', new Date().toISOString());
+    // Log para debug
+    console.log('Enviando requisição para alterar status:', {
+        userId: userId,
+        newStatus: newStatus,
+        userName: userName,
+        action: actionText
+    });
     
     // Preparar dados para envio
     const formData = new URLSearchParams();
     formData.append('action', 'update_user_status');
-    formData.append('user_id', userIdNum.toString());
+    formData.append('user_id', userId);
     formData.append('status', newStatus);
     
-    // Log dos dados que serão enviados
-    console.log('Dados a serem enviados:', formData.toString());
-    
-    // Fazer requisição AJAX usando a função utilitária robusta
-    makeRequest('../../controllers/AdminController.php', formData)
-    .then(data => {
-        hideLoading();
+    // Fazer requisição AJAX
+    fetch('../../controllers/AdminController.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: formData.toString()
+    })
+    .then(response => {
+        console.log('Resposta do servidor:', response);
         
-        console.log('=== RESPOSTA DO SERVIDOR ===');
+        // Verificar se a resposta é válida
+        if (!response.ok) {
+            throw new Error(`Erro HTTP: ${response.status} - ${response.statusText}`);
+        }
+        
+        // Verificar se a resposta é JSON
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            throw new Error('Resposta não é JSON válido');
+        }
+        
+        return response.json();
+    })
+    .then(data => {
         console.log('Dados recebidos:', data);
+        hideLoading();
         
         // Verificar se a operação foi bem-sucedida
         if (data && data.status === true) {
-            console.log('✅ Operação bem-sucedida');
             showMessage(`Usuário ${actionText} com sucesso!`, 'success');
             
             // Recarregar a página após um pequeno delay
             setTimeout(() => {
-                console.log('Recarregando página...');
                 window.location.reload();
             }, 1500);
         } else {
-            console.log('❌ Operação falhou');
             // Mostrar mensagem de erro específica
             const errorMessage = data && data.message ? data.message : `Erro ao ${actionText} usuário`;
             showMessage(errorMessage, 'error');
         }
     })
     .catch(error => {
+        console.error('Erro na requisição:', error);
         hideLoading();
-        console.error('=== ERRO NA REQUISIÇÃO ===');
-        console.error('Erro completo:', error);
-        console.error('Stack trace:', error.stack);
         
         // Mostrar erro detalhado ao usuário
         showMessage(`Erro ao processar a solicitação: ${error.message}`, 'error');
@@ -871,12 +732,7 @@ function submitUserForm(event) {
     const form = document.getElementById('userForm');
     const submitBtn = document.getElementById('submitBtn');
     
-    if (!form) {
-        showMessage('Formulário não encontrado', 'error');
-        return;
-    }
-    
-    if (!validateForm(form)) {
+    if (!form || !validateForm(form)) {
         return;
     }
     
@@ -888,15 +744,13 @@ function submitUserForm(event) {
     const senha = formData.get('senha');
     if (!isEditing && (!senha || senha.trim() === '')) {
         showMessage('Senha é obrigatória para criar um novo usuário', 'error');
-        const passwordField = document.getElementById('userPassword');
-        if (passwordField) passwordField.focus();
+        document.getElementById('userPassword').focus();
         return;
     }
     
     if (senha && senha.trim() !== '' && senha.length < 8) {
         showMessage('A senha deve ter no mínimo 8 caracteres', 'error');
-        const passwordField = document.getElementById('userPassword');
-        if (passwordField) passwordField.focus();
+        document.getElementById('userPassword').focus();
         return;
     }
     
@@ -927,24 +781,28 @@ function submitUserForm(event) {
         }
     }
     
-    showLoading(isEditing ? 'Atualizando usuário...' : 'Criando usuário...');
-    
-    makeRequest('../../controllers/AdminController.php', submitData)
+    // CORREÇÃO AQUI - caminho relativo correto
+    fetch('../../controllers/AdminController.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: submitData.toString()
+    })
+    .then(response => response.json())
     .then(data => {
-        hideLoading();
-        
         if (data.status) {
-            showMessage(data.message || (isEditing ? 'Usuário atualizado com sucesso!' : 'Usuário criado com sucesso!'), 'success');
+            showMessage(data.message || (isEditing ? 'Usuário atualizado com sucesso!' : 'Usuário criado com sucesso!'));
             hideUserModal();
             setTimeout(() => {
-                window.location.reload();
+                location.reload();
             }, 1000);
         } else {
             showMessage(data.message || 'Erro ao processar dados do usuário', 'error');
         }
     })
     .catch(error => {
-        hideLoading();
+        console.error('Erro:', error);
         showMessage('Erro ao processar a solicitação: ' + error.message, 'error');
     })
     .finally(() => {
@@ -980,8 +838,6 @@ function validateForm(form) {
         emailField.classList.add('error');
         showMessage('Por favor, insira um email válido', 'error');
         isValid = false;
-    } else if (emailField) {
-        emailField.classList.remove('error');
     }
     
     return isValid;
@@ -1000,16 +856,14 @@ function isValidEmail(email) {
  */
 function togglePassword(fieldId) {
     const field = document.getElementById(fieldId);
-    if (!field) return;
-    
     const toggleBtn = field.nextElementSibling;
     
     if (field.type === 'password') {
         field.type = 'text';
-        if (toggleBtn) toggleBtn.innerHTML = '<i class="fas fa-eye-slash"></i>';
+        toggleBtn.innerHTML = '<i class="fas fa-eye-slash"></i>';
     } else {
         field.type = 'password';
-        if (toggleBtn) toggleBtn.innerHTML = '<i class="fas fa-eye"></i>';
+        toggleBtn.innerHTML = '<i class="fas fa-eye"></i>';
     }
 }
 
@@ -1018,8 +872,6 @@ function togglePassword(fieldId) {
  */
 function toggleSelectAll() {
     const selectAll = document.getElementById('selectAll');
-    if (!selectAll) return;
-    
     const checkboxes = document.querySelectorAll('.user-checkbox');
     
     selectedUsers = [];
@@ -1041,16 +893,12 @@ function toggleSelectAll() {
  * Alterna seleção de usuário individual
  */
 function toggleUserSelection(checkbox, userId) {
-    if (!checkbox) return;
-    
-    const userIdNum = parseInt(userId);
-    
     if (checkbox.checked) {
-        if (!selectedUsers.includes(userIdNum)) {
-            selectedUsers.push(userIdNum);
+        if (!selectedUsers.includes(userId)) {
+            selectedUsers.push(userId);
         }
     } else {
-        selectedUsers = selectedUsers.filter(id => id !== userIdNum);
+        selectedUsers = selectedUsers.filter(id => id !== userId);
         const selectAllCheckbox = document.getElementById('selectAll');
         if (selectAllCheckbox) {
             selectAllCheckbox.checked = false;
@@ -1079,13 +927,10 @@ function updateBulkActionBar() {
 }
 
 /**
- * Executa ação em massa - VERSÃO CORRIGIDA
+ * Executa ação em massa
  */
 function bulkAction(status) {
-    if (selectedUsers.length === 0) {
-        showMessage('Nenhum usuário selecionado', 'warning');
-        return;
-    }
+    if (selectedUsers.length === 0) return;
     
     const actionText = status === 'ativo' ? 'ativar' : 
                       status === 'inativo' ? 'desativar' : 'bloquear';
@@ -1099,39 +944,37 @@ function bulkAction(status) {
         bulkActionBar.innerHTML = `<div class="bulk-info">Processando ${selectedUsers.length} usuários...</div>`;
     }
     
-    showLoading(`Processando ${selectedUsers.length} usuários...`);
-    
     let processed = 0;
     let successful = 0;
     
     const processUser = (userId) => {
-        const formData = new URLSearchParams();
-        formData.append('action', 'update_user_status');
-        formData.append('user_id', userId.toString());
-        formData.append('status', status);
-        
-        return makeRequest('../../controllers/AdminController.php', formData)
+        return fetch('/controllers/AdminController.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `action=update_user_status&user_id=${userId}&status=${status}`
+        })
+        .then(response => response.json())
         .then(data => {
             processed++;
             if (data.status) successful++;
             
             if (processed === selectedUsers.length) {
-                hideLoading();
                 const successMessage = `${successful} usuários foram ${actionText === 'ativar' ? 'ativados' : actionText === 'desativar' ? 'desativados' : 'bloqueados'} com sucesso!`;
-                showMessage(successMessage, 'success');
+                showMessage(successMessage);
                 setTimeout(() => {
-                    window.location.reload();
+                    location.reload();
                 }, 1500);
             }
         })
         .catch(() => {
             processed++;
             if (processed === selectedUsers.length) {
-                hideLoading();
                 const successMessage = `${successful} usuários foram processados com sucesso!`;
-                showMessage(successMessage, 'success');
+                showMessage(successMessage);
                 setTimeout(() => {
-                    window.location.reload();
+                    location.reload();
                 }, 1500);
             }
         });
@@ -1148,12 +991,12 @@ function exportUsers() {
     showMessage('Função de exportação será implementada em breve', 'info');
 }
 
-// Adicionar estilos CSS necessários
+// Adicionar estilos CSS para campos com erro
 const style = document.createElement('style');
 style.textContent = `
     .form-control.error,
     .form-select.error {
-        border-color: var(--danger-color, #dc3545) !important;
+        border-color: var(--danger-color) !important;
         box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.1) !important;
     }
     
@@ -1174,24 +1017,24 @@ style.textContent = `
         width: 60px;
         height: 60px;
         border-radius: 50%;
-        background: var(--primary-light, #FFF3E6);
+        background: var(--primary-light);
         display: flex;
         align-items: center;
         justify-content: center;
-        color: var(--primary-color, #FF7A00);
+        color: var(--primary-color);
         font-size: 1.5rem;
     }
     
     .user-basic-info h4 {
         margin: 0 0 0.25rem 0;
-        color: var(--dark-gray, #333);
+        color: var(--dark-gray);
         font-size: 1.25rem;
         font-weight: 600;
     }
     
     .user-basic-info p {
         margin: 0;
-        color: var(--medium-gray, #666);
+        color: var(--medium-gray);
         font-size: 0.875rem;
     }
     
@@ -1214,56 +1057,13 @@ style.textContent = `
     
     .detail-item label {
         font-weight: 600;
-        color: var(--dark-gray, #333);
+        color: var(--dark-gray);
         margin: 0;
     }
     
     .detail-item span {
-        color: var(--medium-gray, #666);
+        color: var(--medium-gray);
         text-align: right;
-    }
-    
-    .badge {
-        padding: 0.25em 0.5em;
-        font-size: 0.75em;
-        border-radius: 0.25rem;
-    }
-    
-    .badge-success {
-        background-color: #d4edda;
-        color: #155724;
-    }
-    
-    .badge-warning {
-        background-color: #fff3cd;
-        color: #856404;
-    }
-    
-    .badge-danger {
-        background-color: #f8d7da;
-        color: #721c24;
-    }
-    
-    .type-badge {
-        padding: 0.25em 0.5em;
-        border-radius: 0.25rem;
-        font-size: 0.75em;
-        font-weight: 500;
-    }
-    
-    .type-cliente {
-        background-color: #e7f3ff;
-        color: #0056b3;
-    }
-    
-    .type-loja {
-        background-color: #e6f7e6;
-        color: #0d5e0d;
-    }
-    
-    .type-admin {
-        background-color: #fff0e6;
-        color: #b8540d;
     }
 `;
 document.head.appendChild(style);
