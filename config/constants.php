@@ -65,7 +65,7 @@ define('CPF_REQUIRED', true); // Novo: Indica se CPF é obrigatório
 
 // === 🆕 OPENPIX CONFIGURAÇÕES COMPLETAS ===
 // ATENÇÃO: Substitua pela sua API Key real do OpenPix
-define('OPENPIX_API_KEY', 'Q2xpZW50X0lkXzY3MmFhZjVlLTEyZWYtNGI3YS04ZGQ1LTVkYTcyNzU4ZjczOTpDbGllbnRfU2VjcmV0X1hYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWA==');
+define('OPENPIX_API_KEY', 'Q2xpZW50X0lkXzIzOTVjYmMzLWYyOGItNGJmYi04MWE3LWNkZWIzYzJkYTI4ZTpDbGllbnRfU2VjcmV0X3JYOFRxM016ZWdoNUY5YnVnempJeHl1VlBsRkg2QkNubm0yRFFzUWxQU1E9');
 define('OPENPIX_WEBHOOK_URL', SITE_URL . '/api/openpix?action=webhook');
 define('OPENPIX_BASE_URL', 'https://api.openpix.com.br/api/v1');
 define('OPENPIX_TIMEOUT', 30);
