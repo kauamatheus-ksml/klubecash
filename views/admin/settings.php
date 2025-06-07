@@ -314,6 +314,11 @@ try {
     <link rel="stylesheet" href="../../assets/css/views/admin/settings.css">
     <link rel="stylesheet" href="../../assets/css/layout-fix.css">
     <style>
+        .btn-sm {
+            padding: 5px 10px;
+            font-size: 12px;
+            margin: 2px;
+        }
         /* Estilos específicos para 2FA */
         .status-info {
             display: flex;
@@ -521,25 +526,30 @@ try {
                             <button type="submit" class="btn btn-primary">Salvar Configurações de 2FA</button>
                         </div>
 
-                        <div class="btn-group" style="margin-top: 15px;">
-                            <h4>🔧 Diagnósticos Básicos</h4>
-                            <button type="button" class="btn btn-outline-info" onclick="pingEndpoint()">🏓 Ping</button>
-                            <button type="button" class="btn btn-outline-secondary" onclick="checkEmailConfig()">⚙️ Config</button>
+                        <div class="card" style="margin-top: 20px; border: 1px solid #ddd; padding: 15px;">
+                            <h4>🔧 Diagnósticos do Sistema de Email</h4>
+                            
+                            <div style="margin: 10px 0;">
+                                <strong>1. Verificações Básicas:</strong><br>
+                                <button type="button" class="btn btn-outline-info btn-sm" onclick="makeEmailTestRequest('ping', event.target)">🏓 Ping</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="makeEmailTestRequest('check_config', event.target)">⚙️ Configurações</button>
+                                <button type="button" class="btn btn-outline-primary btn-sm" onclick="makeEmailTestRequest('test_phpmailer_load', event.target)">📦 Carregar PHPMailer</button>
+                            </div>
+                            
+                            <div style="margin: 10px 0;">
+                                <strong>2. Testes de Conexão:</strong><br>
+                                <button type="button" class="btn btn-warning btn-sm" onclick="makeEmailTestRequest('test_smtp_basic', event.target)">🔗 Testar SMTP</button>
+                            </div>
+                            
+                            <div style="margin: 10px 0;">
+                                <strong>3. Testes de Envio:</strong><br>
+                                <button type="button" class="btn btn-success btn-sm" onclick="makeEmailTestRequest('send_test_basic', event.target)">📧 Enviar Email</button>
+                            </div>
+                            
+                            <div style="margin: 10px 0; padding: 10px; background: #f8f9fa; border-radius: 5px;">
+                                <small><strong>💡 Ordem recomendada:</strong> Teste primeiro o Ping, depois Configurações, depois Carregar PHPMailer, depois Testar SMTP e finalmente Enviar Email.</small>
+                            </div>
                         </div>
-
-                        <div class="btn-group" style="margin-top: 10px;">
-                            <h4>🔍 Testes Manuais (PHPMailer direto)</h4>
-                            <button type="button" class="btn btn-warning" onclick="testSMTPManual()">🔗 SMTP Manual</button>
-                            <button type="button" class="btn btn-warning" onclick="sendEmailManual()">📧 Email Manual</button>
-                        </div>
-
-                        <div class="btn-group" style="margin-top: 10px;">
-                            <h4>📨 Testes via Classe Email</h4>
-                            <button type="button" class="btn btn-secondary" onclick="testEmailConnection()">🔗 SMTP Classe</button>
-                            <button type="button" class="btn btn-info" onclick="sendTestEmail()">📧 Email Classe</button>
-                            <button type="button" class="btn btn-secondary" onclick="test2FAEmail()">🔐 2FA Classe</button>
-                        </div>
-                    </div>
                 </div>
             </form>
             
