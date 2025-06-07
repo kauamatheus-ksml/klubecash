@@ -170,7 +170,9 @@ if ($result['status'] && isset($result['data']['totais'])) {
                     <div class="card-title">Transações Pendentes de Pagamento</div>
                     <?php if ($totalTransacoes > 0): ?>
                     <div style="display: flex; gap: 1rem;">
-                        <button id="paySelectedBtn" class="btn btn-primary" disabled>Pagar Selecionadas</button>
+                        <button type="button" class="btn btn-success" onclick="processSelectedPayments()" id="btnPagarSelecionadas">
+                            <i class="bi bi-credit-card"></i> Pagar Selecionadas
+                        </button>
                         <button id="payPixBtn" class="btn btn-success" disabled>Pagar via PIX</button>
                     </div>
                     <?php endif; ?>
@@ -565,7 +567,85 @@ function toggleInfoSection() {
     }
 }
 </script>
+    <script>
+// Variável global para URL do site
+const SITE_URL = '<?php echo SITE_URL; ?>';
+
+// Função para processar pagamentos selecionados
+function processSelectedPayments() {
+    // Obter todas as checkboxes marcadas
+    const checkboxes = document.querySelectorAll('input[name="transaction_ids[]"]:checked');
+    const selectedIds = [];
     
+    // Coletar IDs selecionados
+    checkboxes.forEach(function(checkbox) {
+        selectedIds.push(checkbox.value);
+    });
+    
+    // Verificar se há transações selecionadas
+    if (selectedIds.length === 0) {
+        alert('Por favor, selecione pelo menos uma transação para pagar.');
+        return;
+    }
+    
+    // Mostrar loading no botão
+    const btn = document.getElementById('btnPagarSelecionadas');
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Processando...';
+    
+    // Criar FormData para envio correto
+    const formData = new FormData();
+    formData.append('action', 'payment_form');
+    
+    // Adicionar cada ID separadamente
+    selectedIds.forEach(function(id) {
+        formData.append('transaction_ids[]', id);
+    });
+    
+    // Enviar requisição
+    fetch(SITE_URL + '/api/store-payment', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => {
+        // Verificar se a resposta é JSON válido
+        return response.text().then(text => {
+            try {
+                return JSON.parse(text);
+            } catch (e) {
+                console.error('Resposta não é JSON válido:', text);
+                throw new Error('Resposta inválida do servidor');
+            }
+        });
+    })
+    .then(data => {
+        if (data.status === true) {
+            // Sucesso - redirecionar para página de pagamento
+            window.location.href = data.redirect_url;
+        } else {
+            // Erro - mostrar mensagem
+            alert(data.message || 'Erro ao processar pagamento');
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    })
+    .catch(error => {
+        console.error('Erro:', error);
+        alert('Erro ao processar requisição. Por favor, tente novamente.');
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    });
+}
+
+// Função para selecionar/desselecionar todas as transações
+function toggleAllTransactions(source) {
+    const checkboxes = document.querySelectorAll('input[name="transaction_ids[]"]');
+    checkboxes.forEach(function(checkbox) {
+        checkbox.checked = source.checked;
+    });
+}
+</script>
     <style>
         /* Estilos adicionais para saldo usado */
         .balance-used-badge {
