@@ -124,4 +124,33 @@ async function testAPI(action) {
         const response = await fetch('/api/email-test.php', {
             method: 'POST',
             headers: {
-                'Co
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `action=${encodeURIComponent(action)}`
+        });
+        
+        const data = await response.json();
+        
+        const statusClass = data.status ? 'success' : 'error';
+        const statusIcon = data.status ? '✅' : '❌';
+        
+        resultsDiv.innerHTML = `
+            <div class="card ${statusClass}">
+                <h3>${statusIcon} Resultado do Teste: ${action}</h3>
+                <p><strong>Status:</strong> ${data.status ? 'SUCESSO' : 'FALHA'}</p>
+                <p><strong>Mensagem:</strong> ${data.message}</p>
+                <p><strong>Timestamp:</strong> ${data.timestamp}</p>
+                ${data.data ? `<pre>Dados: ${JSON.stringify(data.data, null, 2)}</pre>` : ''}
+            </div>
+        `;
+        
+    } catch (error) {
+        resultsDiv.innerHTML = `
+            <div class="card error">
+                <h3>❌ Erro na Requisição</h3>
+                <p><strong>Erro:</strong> ${error.message}</p>
+            </div>
+        `;
+    }
+}
+</script>
