@@ -82,8 +82,8 @@ define('MP_TIMEOUT', 30); // Timeout em segundos
 define('MP_USER_AGENT', 'KlubeCash/2.1 (Mercado Pago Integration Optimized)');
 
 // === URLs MERCADO PAGO ===
-define('MP_CREATE_PAYMENT_URL', SITE_URL . '/api/mercadopago?action=create_payment');
-define('MP_CHECK_STATUS_URL', SITE_URL . '/api/mercadopago?action=status');
+define('MP_CREATE_PAYMENT_URL', SITE_URL . '/api/mercadopago.php?action=create_payment');
+define('MP_CHECK_STATUS_URL', SITE_URL . '/api/mercadopago.php?action=status');
 define('MP_BASE_URL', 'https://api.mercadopago.com');
 
 // === CONFIGURAÇÕES DE QUALIDADE MP ===
@@ -136,8 +136,9 @@ define('STORE_PAYMENT_URL', SITE_URL . '/store/pagamento');
 define('STORE_PAYMENT_HISTORY_URL', SITE_URL . '/store/historico-pagamentos');
 define('STORE_PROFILE_URL', SITE_URL . '/store/perfil');
 define('STORE_PAYMENT_PIX_URL', SITE_URL . '/store/pagamento-pix');
-define('STORE_ACTIONS_URL', SITE_URL . '/store/actions');
-
+// === CONTROLADORES ===
+define('STORE_CONTROLLER_URL', SITE_URL . '/controllers/StoreController.php');
+define('TRANSACTION_CONTROLLER_URL', SITE_URL . '/controllers/TransactionController.php');
 // === CONFIGURAÇÕES DE ASSETS ===
 define('ASSETS_VERSION', '2.1.0'); // Para cache busting
 define('CDN_URL', SITE_URL); // Para futuros CDNs
@@ -176,7 +177,8 @@ if (!defined('ENVIRONMENT')) {
 }
 
 // === EXPORTAÇÕES ===
-define('EXPORTS_DIR', ROOT_DIR . '/exports');
+define('EXPORTS_DIR', ROOT_DIR . '/exports/');
+define('UPLOADS_DIR', ROOT_DIR . '/uploads/');
 
 // === CONFIGURAÇÕES DE SESSÃO SEGURA ===
 if (session_status() === PHP_SESSION_NONE) {
