@@ -383,6 +383,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const payPixBtn = document.getElementById('payPixBtn');
     const paymentSummary = document.getElementById('paymentSummary');
     
+    console.log('Elementos encontrados:', {
+        selectAll: !!selectAllCheckbox,
+        checkboxes: transactionCheckboxes.length,
+        paySelectedBtn: !!paySelectedBtn,
+        payPixBtn: !!payPixBtn,
+        paymentSummary: !!paymentSummary
+    });
+    
     // Função para formatar valores como moeda
     function formatCurrency(value) {
         return value.toLocaleString('pt-BR', {
@@ -400,67 +408,97 @@ document.addEventListener('DOMContentLoaded', function() {
         let totalSalesValue = 0;
         let totalBalanceUsed = 0;
         
+        console.log('Transações selecionadas:', selectedCount);
+        
         selectedCheckboxes.forEach(checkbox => {
-            const commission = parseFloat(checkbox.getAttribute('data-value'));
+            const commission = parseFloat(checkbox.getAttribute('data-value') || '0');
             totalCommission += commission;
             
             const row = checkbox.closest('tr');
-            const cells = row.querySelectorAll('td');
-            
-            // Valor original da venda (coluna 4)
-            const originalValueText = cells[4].textContent.replace('R$ ', '').replace(/\./g, '').replace(',', '.');
-            const originalValue = parseFloat(originalValueText);
-            
-            // Saldo usado (coluna 5)
-            const balanceUsedElement = cells[5].querySelector('.saldo-usado');
-            const balanceUsed = balanceUsedElement ? 
-                parseFloat(balanceUsedElement.textContent.replace('R$ ', '').replace(/\./g, '').replace(',', '.')) : 0;
-            
-            totalSalesValue += originalValue;
-            totalBalanceUsed += balanceUsed;
+            if (row) {
+                const cells = row.querySelectorAll('td');
+                
+                // Valor original da venda (coluna 4 - índice 4)
+                if (cells[4]) {
+                    const originalValueText = cells[4].textContent.replace('R$ ', '').replace(/\./g, '').replace(',', '.');
+                    const originalValue = parseFloat(originalValueText) || 0;
+                    totalSalesValue += originalValue;
+                }
+                
+                // Saldo usado (coluna 5 - índice 5)
+                if (cells[5]) {
+                    const balanceUsedElement = cells[5].querySelector('.saldo-usado');
+                    if (balanceUsedElement) {
+                        const balanceUsed = parseFloat(balanceUsedElement.textContent.replace('R$ ', '').replace(/\./g, '').replace(',', '.')) || 0;
+                        totalBalanceUsed += balanceUsed;
+                    }
+                }
+            }
         });
         
-        document.getElementById('selectedCount').textContent = selectedCount;
-        document.getElementById('totalSalesValue').textContent = formatCurrency(totalSalesValue);
-        document.getElementById('totalBalanceUsed').textContent = formatCurrency(totalBalanceUsed);
-        document.getElementById('totalCommissionValue').textContent = formatCurrency(totalCommission);
+        // Atualizar resumo se elementos existem
+        const selectedCountElement = document.getElementById('selectedCount');
+        const totalSalesValueElement = document.getElementById('totalSalesValue');
+        const totalBalanceUsedElement = document.getElementById('totalBalanceUsed');
+        const totalCommissionValueElement = document.getElementById('totalCommissionValue');
+        
+        if (selectedCountElement) selectedCountElement.textContent = selectedCount;
+        if (totalSalesValueElement) totalSalesValueElement.textContent = formatCurrency(totalSalesValue);
+        if (totalBalanceUsedElement) totalBalanceUsedElement.textContent = formatCurrency(totalBalanceUsed);
+        if (totalCommissionValueElement) totalCommissionValueElement.textContent = formatCurrency(totalCommission);
         
         // Habilitar/desabilitar botões de pagamento
-        if (paySelectedBtn) paySelectedBtn.disabled = selectedCount === 0;
-        if (payPixBtn) payPixBtn.disabled = selectedCount === 0;
+        const shouldEnable = selectedCount > 0;
+        if (paySelectedBtn) {
+            paySelectedBtn.disabled = !shouldEnable;
+            console.log('Botão Pagar Selecionadas:', shouldEnable ? 'habilitado' : 'desabilitado');
+        }
+        if (payPixBtn) {
+            payPixBtn.disabled = !shouldEnable;
+            console.log('Botão PIX:', shouldEnable ? 'habilitado' : 'desabilitado');
+        }
         
         // Mostrar/esconder resumo de pagamento
-        if (selectedCount > 0) {
-            paymentSummary.style.display = 'block';
-        } else {
-            paymentSummary.style.display = 'none';
+        if (paymentSummary) {
+            paymentSummary.style.display = selectedCount > 0 ? 'block' : 'none';
         }
     }
     
     // Evento para selecionar/deselecionar todos
     if (selectAllCheckbox) {
         selectAllCheckbox.addEventListener('change', function() {
+            console.log('Select All clicado:', this.checked);
             transactionCheckboxes.forEach(checkbox => {
-                checkbox.checked = selectAllCheckbox.checked;
+                checkbox.checked = this.checked;
             });
             updatePaymentSummary();
         });
     }
     
     // Eventos para checkboxes individuais
-    transactionCheckboxes.forEach(checkbox => {
+    transactionCheckboxes.forEach((checkbox, index) => {
         checkbox.addEventListener('change', function() {
+            console.log(`Checkbox ${index} alterado:`, this.checked);
+            
+            // Verificar se todos estão marcados para atualizar o selectAll
             const allChecked = Array.from(transactionCheckboxes).every(cb => cb.checked);
+            const anyChecked = Array.from(transactionCheckboxes).some(cb => cb.checked);
+            
             if (selectAllCheckbox) {
                 selectAllCheckbox.checked = allChecked;
+                selectAllCheckbox.indeterminate = anyChecked && !allChecked;
             }
+            
             updatePaymentSummary();
         });
     });
     
     // Evento para botão de pagamento normal
     if (paySelectedBtn) {
-        paySelectedBtn.addEventListener('click', function() {
+        paySelectedBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            console.log('Botão Pagar Selecionadas clicado');
+            
             const selected = getSelectedTransactions();
             if (selected.length === 0) {
                 alert('Selecione pelo menos uma transação');
@@ -475,7 +513,10 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Evento para botão PIX
     if (payPixBtn) {
-        payPixBtn.addEventListener('click', function() {
+        payPixBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            console.log('Botão PIX clicado');
+            
             const selected = getSelectedTransactions();
             if (selected.length === 0) {
                 alert('Selecione pelo menos uma transação');
@@ -500,6 +541,8 @@ document.addEventListener('DOMContentLoaded', function() {
             formData.append('transaction_ids[]', id);
         });
         
+        console.log('Processando pagamento:', action, transactionIds);
+        
         // Mostrar loading
         showLoading('Processando pagamento...');
         
@@ -507,15 +550,19 @@ document.addEventListener('DOMContentLoaded', function() {
             method: 'POST',
             body: formData
         })
-        .then(response => response.json())
+        .then(response => {
+            console.log('Response status:', response.status);
+            return response.json();
+        })
         .then(data => {
+            console.log('Response data:', data);
             hideLoading();
             
             if (data.status) {
                 if (data.redirect_url) {
+                    console.log('Redirecionando para:', data.redirect_url);
                     window.location.href = data.redirect_url;
                 } else if (data.data && data.data.pix_data) {
-                    // Exibir dados do PIX diretamente
                     displayPixData(data.data.pix_data);
                 } else {
                     alert('✅ ' + data.message);
@@ -527,13 +574,12 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .catch(error => {
             hideLoading();
-            console.error('Erro:', error);
+            console.error('Erro na requisição:', error);
             alert('❌ Erro na comunicação. Tente novamente.');
         });
     }
     
     function showLoading(message) {
-        // Criar overlay de loading
         const loadingOverlay = document.createElement('div');
         loadingOverlay.id = 'loadingOverlay';
         loadingOverlay.style.cssText = `
@@ -556,7 +602,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function displayPixData(pixData) {
-        // Criar modal com dados PIX
         const modal = document.createElement('div');
         modal.style.cssText = `
             position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
@@ -588,8 +633,18 @@ document.addEventListener('DOMContentLoaded', function() {
         document.body.appendChild(modal);
     }
     
-    // Inicializar resumo
-    updatePaymentSummary();
+    // Forçar habilitação inicial dos botões para teste
+    setTimeout(() => {
+        console.log('Executando inicialização...');
+        updatePaymentSummary();
+        
+        // Se não há transações, habilitar botões mesmo assim para teste
+        if (transactionCheckboxes.length === 0) {
+            if (paySelectedBtn) paySelectedBtn.disabled = false;
+            if (payPixBtn) payPixBtn.disabled = false;
+            console.log('Nenhuma transação encontrada - botões habilitados para teste');
+        }
+    }, 100);
     
     // Restaurar estado do dropdown
     const savedState = localStorage.getItem('pendingCommissionsInfoOpen');
@@ -603,39 +658,6 @@ document.addEventListener('DOMContentLoaded', function() {
         card.classList.add('expanded');
     }
 });
-
-// Função para controlar o dropdown de informações
-function toggleInfoSection() {
-    const content = document.getElementById('infoSectionContent');
-    const icon = document.getElementById('infoDropdownIcon');
-    const card = content.closest('.collapsible-card');
-    
-    if (content.style.display === 'none' || content.style.display === '') {
-        content.style.display = 'block';
-        content.classList.add('opening');
-        content.classList.remove('closing');
-        icon.classList.add('open');
-        card.classList.add('expanded');
-        
-        setTimeout(() => {
-            content.classList.remove('opening');
-        }, 400);
-        
-        localStorage.setItem('pendingCommissionsInfoOpen', 'true');
-    } else {
-        content.classList.add('closing');
-        content.classList.remove('opening');
-        icon.classList.remove('open');
-        card.classList.remove('expanded');
-        
-        setTimeout(() => {
-            content.style.display = 'none';
-            content.classList.remove('closing');
-        }, 400);
-        
-        localStorage.setItem('pendingCommissionsInfoOpen', 'false');
-    }
-}
 </script>
     
     <style>
