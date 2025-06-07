@@ -1,8 +1,9 @@
 <?php
 // test-email-endpoint.php - VERSÃO ULTRA ROBUSTA
 // Capturar QUALQUER output indesejado
-ob_start();
-
+ob_start();use PHPMailer\PHPMailer\PHPMailer;
+            use PHPMailer\PHPMailer\SMTP;
+            use PHPMailer\PHPMailer\Exception;
 // Configurar tratamento de erros
 error_reporting(E_ALL);
 ini_set('display_errors', 0);
@@ -183,9 +184,7 @@ try {
             require_once 'libs/PHPMailer/src/SMTP.php';
             require_once 'libs/PHPMailer/src/Exception.php';
             
-            use PHPMailer\PHPMailer\PHPMailer;
-            use PHPMailer\PHPMailer\SMTP;
-            use PHPMailer\PHPMailer\Exception;
+            
             
             try {
                 $mail = new PHPMailer(true);
@@ -245,9 +244,7 @@ try {
             require_once 'libs/PHPMailer/src/SMTP.php';
             require_once 'libs/PHPMailer/src/Exception.php';
             
-            use PHPMailer\PHPMailer\PHPMailer;
-            use PHPMailer\PHPMailer\SMTP;
-            use PHPMailer\PHPMailer\Exception;
+            
             
             try {
                 $mail = new PHPMailer(true);
