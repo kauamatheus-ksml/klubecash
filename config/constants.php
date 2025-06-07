@@ -217,7 +217,13 @@ define('LOG_MP_RESPONSES', true); // Log de todas as respostas MP
 define('LOG_WEBHOOK_EVENTS', true); // Log de eventos de webhook
 define('LOG_QUALITY_METRICS', true); // Log de métricas de qualidade
 
-
+// === MÉTODOS DE PAGAMENTO ===
+define('PAYMENT_METHOD_PIX', 'pix');
+define('PAYMENT_METHOD_PIX_MP', 'pix_mercadopago');
+define('PAYMENT_METHOD_TRANSFER', 'transferencia');
+define('PAYMENT_METHOD_BOLETO', 'boleto');
+define('PAYMENT_METHOD_CARD', 'cartao');
+define('PAYMENT_METHOD_OTHER', 'outro');
 
 // === MERCADO PAGO SDK CONFIGURATION ===
 define('MP_SDK_VERSION', 'v2');

@@ -138,7 +138,6 @@ RewriteRule ^(.*)$ index.php [L]
     AddOutputFilterByType DEFLATE text/html
     AddOutputFilterByType DEFLATE text/xml
     AddOutputFilterByType DEFLATE text/css
-    AddOutputFilterByType DEFLATE text/javascript
     AddOutputFilterByType DEFLATE application/xml
     AddOutputFilterByType DEFLATE application/xhtml+xml
     AddOutputFilterByType DEFLATE application/rss+xml
@@ -235,7 +234,13 @@ RewriteRule ^verificar-2fa/?$ views/auth/verify-2fa.php [L]
     Header add Access-Control-Allow-Origin "https://sdk.mercadopago.com"
     Header add Access-Control-Allow-Credentials "true"
 </IfModule>
-
+# === OTIMIZAÇÕES ESPECIAIS PARA MERCADO PAGO ===
+<IfModule mod_headers.c>
+    # Para APIs e webhooks do Mercado Pago
+    Header always set Access-Control-Allow-Origin "*"
+    Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+    Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
+</IfModule>
 # === BLOQUEIO DE ARQUIVOS SENSÍVEIS ===
 <FilesMatch "^(\.htaccess|\.htpasswd|\.git|\.env|config\.php|constants\.php)">
     Order Allow,Deny
@@ -270,7 +275,12 @@ RewriteRule ^verificar-2fa/?$ views/auth/verify-2fa.php [L]
 # === PÁGINAS DE ERRO ===
 ErrorDocument 404 /views/errors/404.php
 ErrorDocument 500 /views/errors/500.php
+# === REGRAS GERAIS ===
+# Forçar barra final em URLs de diretório
+RewriteRule ^([^/]+)$ $1/ [R=301,L]
 
+# Caso nenhuma regra anterior seja satisfeita, redirecionar para a página inicial
+RewriteRule ^.*$ views/public/index.php [QSA,L]
 # === BLOQUEIO DE NAVEGAÇÃO ===
 Options -Indexes
 
