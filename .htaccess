@@ -185,7 +185,12 @@ RewriteRule ^admin/saldo/?$ views/admin/balance.php [L]
 RewriteRule ^admin/comissoes/?$ views/admin/commissions.php [L]
 RewriteRule ^admin/pagamentos/?$ views/admin/payments.php [L]
 RewriteRule ^admin/relatorios/?$ views/admin/reports.php [L]
+# Rotas para formulário de pagamento
+RewriteRule ^loja/formulario-pagamento/?$ views/stores/payment-form.php [L,QSA]
+RewriteRule ^loja/pagamento-comissoes/?$ views/stores/payment-form.php [L,QSA]
 
+# Controlador de pagamentos
+RewriteRule ^controllers/PaymentController/?$ controllers/PaymentController.php [L,QSA]
 # PIX e Mercado Pago (OTIMIZADO)
 RewriteRule ^store/pagamento-pix/?$ views/stores/payment-pix.php [L,QSA]
 RewriteRule ^api/mercadopago/?$ api/mercadopago.php [L,QSA]

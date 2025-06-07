@@ -1,225 +1,192 @@
 /**
- * JavaScript para funcionalidades da área da loja
- * Klube Cash
+ * JavaScript para área da loja - Atualizado com OpenPix
  */
 
+// Configuração global
+window.storeConfig = window.storeConfig || {
+    baseUrl: '',
+    paymentController: '/controllers/PaymentController.php'
+};
+
+// Função para processar pagamento de transações selecionadas
+function processSelectedPayments() {
+    const checkboxes = document.querySelectorAll('input[name="selected_transactions[]"]:checked');
+    
+    if (checkboxes.length === 0) {
+        showNotification('Selecione pelo menos uma transação', 'warning');
+        return;
+    }
+    
+    const transactionIds = Array.from(checkboxes).map(cb => cb.value);
+    
+    // Redirecionar para formulário de pagamento
+    const url = new URL(window.location.origin + '/loja/formulario-pagamento');
+    url.searchParams.set('transactions', transactionIds.join(','));
+    
+    window.location.href = url.toString();
+}
+
+// Função para pagamento via PIX direto
+function processPixPayment() {
+    const checkboxes = document.querySelectorAll('input[name="selected_transactions[]"]:checked');
+    
+    if (checkboxes.length === 0) {
+        showNotification('Selecione pelo menos uma transação', 'warning');
+        return;
+    }
+    
+    const transactionIds = Array.from(checkboxes).map(cb => cb.value);
+    
+    // Criar pagamento e redirecionar para PIX
+    createCommissionPayment(transactionIds, 'pix_openpix');
+}
+
+// Função para criar pagamento de comissão
+async function createCommissionPayment(transactionIds, paymentMethod = 'pix_openpix') {
+    try {
+        showLoading('Criando pagamento...');
+        
+        const formData = new FormData();
+        formData.append('action', 'create_commission_payment');
+        formData.append('payment_method', paymentMethod);
+        
+        transactionIds.forEach(id => {
+            formData.append('transaction_ids[]', id);
+        });
+        
+        const response = await fetch(window.storeConfig.baseUrl + window.storeConfig.paymentController, {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (result.status) {
+            showNotification(result.message, 'success');
+            
+            if (result.data && result.data.redirect_url) {
+                setTimeout(() => {
+                    window.location.href = result.data.redirect_url;
+                }, 1500);
+            }
+        } else {
+            showNotification(result.message || 'Erro ao criar pagamento', 'error');
+        }
+        
+    } catch (error) {
+        console.error('Erro ao criar pagamento:', error);
+        showNotification('Erro de conexão. Tente novamente.', 'error');
+    } finally {
+        hideLoading();
+    }
+}
+
+// Atualizar eventos dos botões
 document.addEventListener('DOMContentLoaded', function() {
-    // Inicializar qualquer funcionalidade específica da loja
-    initModals();
-    initTransactionForms();
-    initBatchUpload();
-    initPaymentForms();
-});
-
-/**
- * Inicializa os modais utilizados na área da loja
- */
-function initModals() {
-    // Processa os modais na página
-    const modals = document.querySelectorAll('.modal');
-    const closeBtns = document.querySelectorAll('.modal .close');
-    
-    // Fechar modais ao clicar no botão fechar
-    closeBtns.forEach(btn => {
-        btn.addEventListener('click', function() {
-            const modal = this.closest('.modal');
-            if (modal) {
-                modal.style.display = 'none';
-            }
-        });
-    });
-    
-    // Fechar modais ao clicar fora deles
-    window.addEventListener('click', function(event) {
-        modals.forEach(modal => {
-            if (event.target == modal) {
-                modal.style.display = 'none';
-            }
-        });
-    });
-}
-
-/**
- * Inicializa os formulários de registro de transação
- */
-function initTransactionForms() {
-    const transactionForm = document.getElementById('transactionForm');
-    if (!transactionForm) return;
-    
-    // Campos do formulário
-    const valorTotal = document.getElementById('valor_total');
-    const emailCliente = document.getElementById('email_cliente');
-    const calcCashback = document.getElementById('calc_cashback');
-    const calcComissao = document.getElementById('calc_comissao');
-    const calcTotal = document.getElementById('calc_total');
-    
-    // Calcular valores de cashback e comissão ao digitar
-    valorTotal?.addEventListener('input', function() {
-        calcularValores(this.value);
-    });
-    
-    // Função para calcular valores
-    function calcularValores(valor) {
-        if (!valor || isNaN(valor) || valor <= 0) {
-            // Limpar calculadora
-            if (calcCashback) calcCashback.textContent = '0,00';
-            if (calcComissao) calcComissao.textContent = '0,00';
-            if (calcTotal) calcTotal.textContent = '0,00';
-            return;
-        }
-        
-        // Converter para número
-        const valorNumerico = parseFloat(valor);
-        
-        // Calcular valores (10% total, 5% cliente, 5% admin)
-        const valorTotal = valorNumerico * 0.1;
-        const valorCashback = valorNumerico * 0.05;
-        const valorComissao = valorNumerico * 0.05;
-        
-        // Atualizar exibição
-        if (calcCashback) calcCashback.textContent = valorCashback.toFixed(2).replace('.', ',');
-        if (calcComissao) calcComissao.textContent = valorComissao.toFixed(2).replace('.', ',');
-        if (calcTotal) calcTotal.textContent = valorTotal.toFixed(2).replace('.', ',');
+    // Botão "Pagar Selecionadas"
+    const pagarSelecionadasBtn = document.querySelector('[onclick*="payment_form"]');
+    if (pagarSelecionadasBtn) {
+        pagarSelecionadasBtn.removeAttribute('onclick');
+        pagarSelecionadasBtn.addEventListener('click', processSelectedPayments);
     }
     
-    // Validação do formulário
-    transactionForm.addEventListener('submit', function(e) {
-        let valid = true;
-        let message = '';
-        
-        // Validar valor
-        if (!valorTotal.value || isNaN(valorTotal.value) || parseFloat(valorTotal.value) <= 0) {
-            valid = false;
-            message = 'Por favor, informe um valor válido para a transação.';
-        }
-        
-        // Validar email
-        if (!emailCliente.value || !validateEmail(emailCliente.value)) {
-            valid = false;
-            message = 'Por favor, informe um email válido do cliente.';
-        }
-        
-        if (!valid) {
-            e.preventDefault();
-            alert(message);
-        }
-    });
-    
-    // Função para validar email
-    function validateEmail(email) {
-        const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        return re.test(String(email).toLowerCase());
+    // Botão "Pagar via PIX"
+    const pagarPixBtn = document.querySelector('button[onclick*="pix"]');
+    if (pagarPixBtn) {
+        pagarPixBtn.removeAttribute('onclick');
+        pagarPixBtn.addEventListener('click', processPixPayment);
     }
-}
-
-/**
- * Inicializa a funcionalidade de upload em lote
- */
-function initBatchUpload() {
-    const batchForm = document.getElementById('batchUploadForm');
-    const fileInput = document.getElementById('batchFile');
-    const preview = document.getElementById('filePreview');
     
-    if (!batchForm || !fileInput) return;
-    
-    // Exibir preview quando arquivo for selecionado
-    fileInput.addEventListener('change', function() {
-        if (!this.files || !this.files[0]) {
-            if (preview) preview.innerHTML = '<p>Nenhum arquivo selecionado</p>';
-            return;
-        }
-        
-        const file = this.files[0];
-        
-        // Verificar tipo de arquivo
-        if (file.type !== 'text/csv' && !file.name.endsWith('.csv')) {
-            if (preview) preview.innerHTML = '<p class="error">Apenas arquivos CSV são permitidos</p>';
-            this.value = '';
-            return;
-        }
-        
-        // Exibir informações do arquivo
-        if (preview) {
-            preview.innerHTML = `
-                <div class="file-info">
-                    <p><strong>Arquivo:</strong> ${file.name}</p>
-                    <p><strong>Tamanho:</strong> ${formatFileSize(file.size)}</p>
-                </div>
-            `;
-        }
-    });
-    
-    // Função para formatar tamanho do arquivo
-    function formatFileSize(bytes) {
-        if (bytes < 1024) return bytes + ' bytes';
-        else if (bytes < 1048576) return (bytes / 1024).toFixed(2) + ' KB';
-        else return (bytes / 1048576).toFixed(2) + ' MB';
-    }
-}
-
-/**
- * Inicializa os formulários de pagamento
- */
-function initPaymentForms() {
-    const paymentForm = document.getElementById('paymentForm');
+    // Checkbox "Selecionar todos"
     const selectAllCheckbox = document.getElementById('selectAll');
-    const transactionCheckboxes = document.querySelectorAll('.transaction-checkbox');
-    const totalElement = document.getElementById('totalAmount');
-    
-    if (!paymentForm) return;
-    
-    // Selecionar/deselecionar todas as transações
     if (selectAllCheckbox) {
         selectAllCheckbox.addEventListener('change', function() {
-            const isChecked = this.checked;
-            transactionCheckboxes.forEach(checkbox => {
-                checkbox.checked = isChecked;
-            });
-            calculateTotal();
+            const checkboxes = document.querySelectorAll('input[name="selected_transactions[]"]');
+            checkboxes.forEach(cb => cb.checked = this.checked);
+            updateSelectedCount();
         });
     }
     
-    // Calcular total ao selecionar/deselecionar
-    transactionCheckboxes.forEach(checkbox => {
-        checkbox.addEventListener('change', calculateTotal);
+    // Checkboxes individuais
+    const transactionCheckboxes = document.querySelectorAll('input[name="selected_transactions[]"]');
+    transactionCheckboxes.forEach(cb => {
+        cb.addEventListener('change', updateSelectedCount);
     });
     
-    // Calcular e exibir total selecionado
-    function calculateTotal() {
-        let total = 0;
-        
-        transactionCheckboxes.forEach(checkbox => {
-            if (checkbox.checked) {
-                const value = parseFloat(checkbox.getAttribute('data-value') || 0);
-                total += value;
+    updateSelectedCount();
+});
+
+// Função para atualizar contador de selecionados
+function updateSelectedCount() {
+    const checkboxes = document.querySelectorAll('input[name="selected_transactions[]"]:checked');
+    const count = checkboxes.length;
+    
+    // Atualizar texto dos botões
+    const pagarSelecionadasBtn = document.querySelector('button[class*="pagar-selecionadas"]');
+    if (pagarSelecionadasBtn) {
+        pagarSelecionadasBtn.textContent = count > 0 
+            ? `Pagar Selecionadas (${count})` 
+            : 'Pagar Selecionadas';
+        pagarSelecionadasBtn.disabled = count === 0;
+    }
+    
+    const pagarPixBtn = document.querySelector('button[class*="pagar-pix"]');
+    if (pagarPixBtn) {
+        pagarPixBtn.disabled = count === 0;
+    }
+}
+
+// Funções utilitárias
+function showLoading(message = 'Carregando...') {
+    // Implementar modal de loading ou usar o existente
+    console.log('Loading:', message);
+}
+
+function hideLoading() {
+    // Esconder modal de loading
+    console.log('Loading hidden');
+}
+
+function showNotification(message, type = 'info') {
+    // Criar notificação toast
+    const notification = document.createElement('div');
+    notification.className = `notification notification-${type}`;
+    notification.textContent = message;
+    
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 12px 24px;
+        border-radius: 8px;
+        color: white;
+        font-weight: 500;
+        z-index: 10000;
+        transform: translateX(400px);
+        transition: transform 0.3s ease;
+    `;
+    
+    const colors = {
+        success: '#10B981',
+        error: '#EF4444', 
+        warning: '#F59E0B',
+        info: '#3B82F6'
+    };
+    
+    notification.style.backgroundColor = colors[type] || colors.info;
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.style.transform = 'translateX(0)';
+    }, 10);
+    
+    setTimeout(() => {
+        notification.style.transform = 'translateX(400px)';
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
             }
-        });
-        
-        if (totalElement) {
-            totalElement.textContent = total.toFixed(2).replace('.', ',');
-        }
-    }
-    
-    // Validação do formulário de pagamento
-    paymentForm.addEventListener('submit', function(e) {
-        // Verificar se pelo menos uma transação foi selecionada
-        let anySelected = false;
-        transactionCheckboxes.forEach(checkbox => {
-            if (checkbox.checked) anySelected = true;
-        });
-        
-        if (!anySelected) {
-            e.preventDefault();
-            alert('Por favor, selecione pelo menos uma transação para pagar.');
-            return;
-        }
-        
-        // Verificar método de pagamento
-        const metodoPagamento = document.querySelector('input[name="metodo_pagamento"]:checked');
-        if (!metodoPagamento) {
-            e.preventDefault();
-            alert('Por favor, selecione um método de pagamento.');
-            return;
-        }
-    });
+        }, 300);
+    }, 5000);
 }
