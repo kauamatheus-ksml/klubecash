@@ -11,6 +11,13 @@ define('SMTP_FROM_EMAIL', 'klubecash@klubecash.com');
 define('SMTP_FROM_NAME', 'Klube Cash');
 define('SMTP_ENCRYPTION', 'ssl');
 
+define('ADMIN_CONTROLLER', 'controllers/AdminController.php');
+define('CLIENT_CONTROLLER', 'controllers/ClientController.php');
+define('STORE_CONTROLLER', 'controllers/StoreController.php');
+define('AUTH_CONTROLLER', 'controllers/AuthController.php');
+
+
+
 // === INFORMAÇÕES DO SISTEMA ===
 define('SYSTEM_NAME', 'Klube Cash');
 define('SYSTEM_VERSION', '2.1.0');
