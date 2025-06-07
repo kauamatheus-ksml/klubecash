@@ -185,6 +185,12 @@ RewriteRule ^admin/saldo/?$ views/admin/balance.php [L]
 RewriteRule ^admin/comissoes/?$ views/admin/commissions.php [L]
 RewriteRule ^admin/pagamentos/?$ views/admin/payments.php [L]
 RewriteRule ^admin/relatorios/?$ views/admin/reports.php [L]
+
+
+# Adicionar estas linhas ao .htaccess existente
+
+# Controlador de ações da loja
+RewriteRule ^controllers/store_actions/?$ controllers/store_actions.php [L,QSA]
 # Rotas para formulário de pagamento
 RewriteRule ^loja/formulario-pagamento/?$ views/stores/payment-form.php [L,QSA]
 RewriteRule ^loja/pagamento-comissoes/?$ views/stores/payment-form.php [L,QSA]

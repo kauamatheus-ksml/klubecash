@@ -1,103 +1,204 @@
 /**
- * JavaScript para área da loja - Atualizado com OpenPix
+ * JavaScript para área da loja - Versão definitiva
  */
 
 // Configuração global
-window.storeConfig = window.storeConfig || {
-    baseUrl: '',
-    paymentController: '/controllers/PaymentController.php'
+window.storeConfig = {
+    baseUrl: window.location.origin,
+    apiUrl: '/api/store-payment.php'
 };
 
-// Função para processar pagamento de transações selecionadas
-function processSelectedPayments() {
-    const checkboxes = document.querySelectorAll('input[name="selected_transactions[]"]:checked');
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Inicializando área da loja...');
+    initializeStoreArea();
+});
+
+function initializeStoreArea() {
+    // Interceptar TODOS os formulários e botões que possam chamar payment_form
+    interceptAllPaymentActions();
+    setupCheckboxes();
+    updateSelectedCount();
+}
+
+function interceptAllPaymentActions() {
+    // Interceptar todos os formulários
+    const forms = document.querySelectorAll('form');
+    forms.forEach(form => {
+        form.addEventListener('submit', function(e) {
+            const actionInput = form.querySelector('input[name="action"]');
+            if (actionInput && actionInput.value === 'payment_form') {
+                e.preventDefault();
+                handlePaymentFormSubmission(form);
+            }
+        });
+    });
     
-    if (checkboxes.length === 0) {
+    // Interceptar todos os botões com onclick
+    const buttons = document.querySelectorAll('button[onclick], .btn[onclick], a[onclick]');
+    buttons.forEach(btn => {
+        const onclick = btn.getAttribute('onclick');
+        if (onclick && onclick.includes('payment_form')) {
+            btn.removeAttribute('onclick');
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                handlePaymentButtonClick();
+            });
+        }
+    });
+    
+    // Procurar por botões específicos pelo texto
+    const allButtons = document.querySelectorAll('button, .btn, input[type="submit"]');
+    allButtons.forEach(btn => {
+        const text = btn.textContent || btn.value || '';
+        if (text.toLowerCase().includes('pagar selecionadas') || 
+            text.toLowerCase().includes('pagar via pix') ||
+            btn.classList.contains('pagar-selecionadas') ||
+            btn.classList.contains('pagar-pix')) {
+            
+            btn.removeAttribute('onclick');
+            btn.onclick = null;
+            
+            // Remover listeners anteriores
+            btn.replaceWith(btn.cloneNode(true));
+            const newBtn = document.querySelector(`[class="${btn.className}"]`) || btn;
+            
+            newBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                handlePaymentButtonClick();
+            });
+        }
+    });
+    
+    // Interceptar AJAX calls que possam estar fazendo a chamada
+    const originalFetch = window.fetch;
+    window.fetch = function(url, options) {
+        if (options && options.body instanceof FormData) {
+            const action = options.body.get('action');
+            if (action === 'payment_form') {
+                console.log('Interceptando chamada fetch com payment_form');
+                return handlePaymentFormAjax(url, options);
+            }
+        }
+        return originalFetch.apply(this, arguments);
+    };
+    
+    // Interceptar jQuery AJAX se estiver disponível
+    if (window.jQuery) {
+        const originalAjax = jQuery.ajax;
+        jQuery.ajax = function(options) {
+            if (options.data && options.data.action === 'payment_form') {
+                console.log('Interceptando chamada jQuery com payment_form');
+                return handlePaymentFormAjax(options.url, {
+                    method: options.type || 'POST',
+                    body: new URLSearchParams(options.data)
+                });
+            }
+            return originalAjax.apply(this, arguments);
+        };
+    }
+}
+
+function handlePaymentFormSubmission(form) {
+    const formData = new FormData(form);
+    const transactionIds = [];
+    
+    // Capturar IDs das transações de diferentes formas
+    if (formData.has('transaction_ids[]')) {
+        formData.getAll('transaction_ids[]').forEach(id => {
+            if (id) transactionIds.push(id);
+        });
+    } else if (formData.has('selected_transactions[]')) {
+        formData.getAll('selected_transactions[]').forEach(id => {
+            if (id) transactionIds.push(id);
+        });
+    } else {
+        // Pegar dos checkboxes marcados
+        const checkboxes = document.querySelectorAll('input[name="selected_transactions[]"]:checked');
+        checkboxes.forEach(cb => transactionIds.push(cb.value));
+    }
+    
+    if (transactionIds.length === 0) {
         showNotification('Selecione pelo menos uma transação', 'warning');
         return;
     }
     
-    const transactionIds = Array.from(checkboxes).map(cb => cb.value);
-    
-    // Redirecionar para formulário de pagamento
-    const url = new URL(window.location.origin + '/loja/formulario-pagamento');
-    url.searchParams.set('transactions', transactionIds.join(','));
-    
-    window.location.href = url.toString();
+    redirectToPaymentForm(transactionIds);
 }
 
-// Função para pagamento via PIX direto
-function processPixPayment() {
-    const checkboxes = document.querySelectorAll('input[name="selected_transactions[]"]:checked');
+function handlePaymentButtonClick() {
+    const selectedIds = getSelectedTransactionIds();
     
-    if (checkboxes.length === 0) {
+    if (selectedIds.length === 0) {
         showNotification('Selecione pelo menos uma transação', 'warning');
         return;
     }
     
-    const transactionIds = Array.from(checkboxes).map(cb => cb.value);
-    
-    // Criar pagamento e redirecionar para PIX
-    createCommissionPayment(transactionIds, 'pix_openpix');
+    redirectToPaymentForm(selectedIds);
 }
 
-// Função para criar pagamento de comissão
-async function createCommissionPayment(transactionIds, paymentMethod = 'pix_openpix') {
+async function handlePaymentFormAjax(url, options) {
+    const selectedIds = getSelectedTransactionIds();
+    
+    if (selectedIds.length === 0) {
+        showNotification('Selecione pelo menos uma transação', 'warning');
+        return Promise.resolve(new Response(JSON.stringify({
+            status: false,
+            message: 'Nenhuma transação selecionada'
+        })));
+    }
+    
+    return redirectToPaymentFormAjax(selectedIds);
+}
+
+function redirectToPaymentForm(transactionIds) {
+    const url = `${window.storeConfig.baseUrl}/loja/formulario-pagamento?transactions=${transactionIds.join(',')}`;
+    console.log('Redirecionando para:', url);
+    window.location.href = url;
+}
+
+async function redirectToPaymentFormAjax(transactionIds) {
     try {
-        showLoading('Criando pagamento...');
+        showLoading('Preparando pagamento...');
         
         const formData = new FormData();
-        formData.append('action', 'create_commission_payment');
-        formData.append('payment_method', paymentMethod);
-        
+        formData.append('action', 'payment_form');
         transactionIds.forEach(id => {
             formData.append('transaction_ids[]', id);
         });
         
-        const response = await fetch(window.storeConfig.baseUrl + window.storeConfig.paymentController, {
+        const response = await fetch(window.storeConfig.apiUrl, {
             method: 'POST',
             body: formData
         });
         
         const result = await response.json();
         
-        if (result.status) {
-            showNotification(result.message, 'success');
-            
-            if (result.data && result.data.redirect_url) {
-                setTimeout(() => {
-                    window.location.href = result.data.redirect_url;
-                }, 1500);
-            }
+        if (result.status && result.redirect_url) {
+            showNotification('Redirecionando...', 'success');
+            setTimeout(() => {
+                window.location.href = result.redirect_url;
+            }, 1000);
         } else {
-            showNotification(result.message || 'Erro ao criar pagamento', 'error');
+            showNotification(result.message || 'Erro ao processar', 'error');
         }
         
+        return new Response(JSON.stringify(result));
+        
     } catch (error) {
-        console.error('Erro ao criar pagamento:', error);
-        showNotification('Erro de conexão. Tente novamente.', 'error');
+        console.error('Erro:', error);
+        showNotification('Erro de conexão', 'error');
+        return Promise.resolve(new Response(JSON.stringify({
+            status: false,
+            message: 'Erro de conexão'
+        })));
     } finally {
         hideLoading();
     }
 }
 
-// Atualizar eventos dos botões
-document.addEventListener('DOMContentLoaded', function() {
-    // Botão "Pagar Selecionadas"
-    const pagarSelecionadasBtn = document.querySelector('[onclick*="payment_form"]');
-    if (pagarSelecionadasBtn) {
-        pagarSelecionadasBtn.removeAttribute('onclick');
-        pagarSelecionadasBtn.addEventListener('click', processSelectedPayments);
-    }
-    
-    // Botão "Pagar via PIX"
-    const pagarPixBtn = document.querySelector('button[onclick*="pix"]');
-    if (pagarPixBtn) {
-        pagarPixBtn.removeAttribute('onclick');
-        pagarPixBtn.addEventListener('click', processPixPayment);
-    }
-    
-    // Checkbox "Selecionar todos"
+function setupCheckboxes() {
     const selectAllCheckbox = document.getElementById('selectAll');
     if (selectAllCheckbox) {
         selectAllCheckbox.addEventListener('change', function() {
@@ -107,73 +208,125 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Checkboxes individuais
     const transactionCheckboxes = document.querySelectorAll('input[name="selected_transactions[]"]');
     transactionCheckboxes.forEach(cb => {
         cb.addEventListener('change', updateSelectedCount);
     });
-    
-    updateSelectedCount();
-});
-
-// Função para atualizar contador de selecionados
-function updateSelectedCount() {
-    const checkboxes = document.querySelectorAll('input[name="selected_transactions[]"]:checked');
-    const count = checkboxes.length;
-    
-    // Atualizar texto dos botões
-    const pagarSelecionadasBtn = document.querySelector('button[class*="pagar-selecionadas"]');
-    if (pagarSelecionadasBtn) {
-        pagarSelecionadasBtn.textContent = count > 0 
-            ? `Pagar Selecionadas (${count})` 
-            : 'Pagar Selecionadas';
-        pagarSelecionadasBtn.disabled = count === 0;
-    }
-    
-    const pagarPixBtn = document.querySelector('button[class*="pagar-pix"]');
-    if (pagarPixBtn) {
-        pagarPixBtn.disabled = count === 0;
-    }
 }
 
-// Funções utilitárias
+function getSelectedTransactionIds() {
+    const checkboxes = document.querySelectorAll('input[name="selected_transactions[]"]:checked');
+    return Array.from(checkboxes).map(cb => cb.value).filter(id => id);
+}
+
+function updateSelectedCount() {
+    const selectedCount = getSelectedTransactionIds().length;
+    
+    // Atualizar todos os botões relacionados a pagamento
+    const paymentButtons = document.querySelectorAll('button, .btn, input[type="submit"]');
+    paymentButtons.forEach(btn => {
+        const text = btn.textContent || btn.value || '';
+        if (text.toLowerCase().includes('pagar')) {
+            btn.disabled = selectedCount === 0;
+            
+            if (text.toLowerCase().includes('selecionadas')) {
+                const baseText = text.replace(/\(\d+\)/, '').trim();
+                btn.textContent = selectedCount > 0 ? `${baseText} (${selectedCount})` : baseText;
+            }
+        }
+    });
+}
+
 function showLoading(message = 'Carregando...') {
-    // Implementar modal de loading ou usar o existente
-    console.log('Loading:', message);
+    let modal = document.getElementById('loadingModal');
+    
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'loadingModal';
+        modal.innerHTML = `
+            <div style="
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.5);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 10000;
+            ">
+                <div style="
+                    background: white;
+                    padding: 30px;
+                    border-radius: 8px;
+                    text-align: center;
+                ">
+                    <div style="
+                        width: 40px;
+                        height: 40px;
+                        border: 4px solid #f3f3f3;
+                        border-top: 4px solid #FF7A00;
+                        border-radius: 50%;
+                        animation: spin 1s linear infinite;
+                        margin: 0 auto 16px;
+                    "></div>
+                    <p>${message}</p>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        // Adicionar CSS da animação se não existir
+        if (!document.getElementById('spinnerCSS')) {
+            const style = document.createElement('style');
+            style.id = 'spinnerCSS';
+            style.textContent = `
+                @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+    }
+    
+    modal.style.display = 'block';
 }
 
 function hideLoading() {
-    // Esconder modal de loading
-    console.log('Loading hidden');
+    const modal = document.getElementById('loadingModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
 }
 
 function showNotification(message, type = 'info') {
-    // Criar notificação toast
     const notification = document.createElement('div');
-    notification.className = `notification notification-${type}`;
-    notification.textContent = message;
-    
     notification.style.cssText = `
         position: fixed;
         top: 20px;
         right: 20px;
-        padding: 12px 24px;
+        padding: 16px 24px;
         border-radius: 8px;
         color: white;
         font-weight: 500;
-        z-index: 10000;
+        z-index: 10001;
         transform: translateX(400px);
         transition: transform 0.3s ease;
+        max-width: 400px;
     `;
     
     const colors = {
         success: '#10B981',
-        error: '#EF4444', 
+        error: '#EF4444',
         warning: '#F59E0B',
         info: '#3B82F6'
     };
     
     notification.style.backgroundColor = colors[type] || colors.info;
+    notification.textContent = message;
     
     document.body.appendChild(notification);
     
@@ -190,3 +343,5 @@ function showNotification(message, type = 'info') {
         }, 300);
     }, 5000);
 }
+
+console.log('Store.js carregado com interceptação completa');
