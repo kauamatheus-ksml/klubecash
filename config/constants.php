@@ -193,8 +193,8 @@ if (!defined('ENVIRONMENT')) {
 }
 
 // === EXPORTAÇÕES ===
-define('EXPORTS_DIR', ROOT_DIR . '/exports/');
-define('UPLOADS_DIR', ROOT_DIR . '/uploads/');
+define('EXPORTS_DIR', ROOT_DIR . '/exports');
+define('UPLOADS_DIR', ROOT_DIR . '/uploads');
 
 // === CONFIGURAÇÕES DE SESSÃO SEGURA ===
 if (session_status() === PHP_SESSION_NONE) {
