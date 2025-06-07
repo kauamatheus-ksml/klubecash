@@ -378,146 +378,192 @@ if ($result['status'] && isset($result['data']['totais'])) {
     <script>
 document.addEventListener('DOMContentLoaded', function() {
     const selectAllCheckbox = document.getElementById('selectAll');
-    const transactionCheckboxes = document.querySelectorAll('input[name="transacoes[]"]'); // Nome correto
+    const transactionCheckboxes = document.querySelectorAll('.transaction-checkbox');
     const paySelectedBtn = document.getElementById('paySelectedBtn');
     const payPixBtn = document.getElementById('payPixBtn');
+    const paymentForm = document.getElementById('paymentForm');
     const paymentSummary = document.getElementById('paymentSummary');
     
-    // Função para atualizar estado dos botões
-    function updateButtons() {
-        const selectedCount = document.querySelectorAll('input[name="transacoes[]"]:checked').length;
+    // Função para formatar valores como moeda
+    function formatCurrency(value) {
+        return value.toLocaleString('pt-BR', {
+            style: 'currency',
+            currency: 'BRL',
+            minimumFractionDigits: 2
+        });
+    }
+    
+    // Função para atualizar resumo de pagamento
+    function updatePaymentSummary() {
+        const selectedCheckboxes = document.querySelectorAll('.transaction-checkbox:checked');
+        const selectedCount = selectedCheckboxes.length;
+        let totalCommission = 0;
+        let totalSalesValue = 0;
+        let totalBalanceUsed = 0;
         
-        // Habilitar botões se houver seleções
+        selectedCheckboxes.forEach(checkbox => {
+            const commission = parseFloat(checkbox.getAttribute('data-value'));
+            totalCommission += commission;
+            
+            const row = checkbox.closest('tr');
+            const cells = row.querySelectorAll('td');
+            
+            // Valor original da venda (coluna 4)
+            const originalValueText = cells[4].textContent.replace('R$ ', '').replace(/\./g, '').replace(',', '.');
+            const originalValue = parseFloat(originalValueText);
+            
+            // Saldo usado (coluna 5)
+            const balanceUsedElement = cells[5].querySelector('.saldo-usado');
+            const balanceUsed = balanceUsedElement ? 
+                parseFloat(balanceUsedElement.textContent.replace('R$ ', '').replace(/\./g, '').replace(',', '.')) : 0;
+            
+            totalSalesValue += originalValue;
+            totalBalanceUsed += balanceUsed;
+        });
+        
+        document.getElementById('selectedCount').textContent = selectedCount;
+        document.getElementById('totalSalesValue').textContent = formatCurrency(totalSalesValue);
+        document.getElementById('totalBalanceUsed').textContent = formatCurrency(totalBalanceUsed);
+        document.getElementById('totalCommissionValue').textContent = formatCurrency(totalCommission);
+        
+        // Habilitar/desabilitar botões de pagamento
         if (paySelectedBtn) paySelectedBtn.disabled = selectedCount === 0;
         if (payPixBtn) payPixBtn.disabled = selectedCount === 0;
         
-        // Atualizar resumo
-        updateSummary(selectedCount);
-        
-        console.log(`${selectedCount} transações selecionadas`);
+        // Mostrar/esconder resumo de pagamento
+        if (selectedCount > 0) {
+            paymentSummary.style.display = 'block';
+        } else {
+            paymentSummary.style.display = 'none';
+        }
     }
     
-    function updateSummary(selectedCount) {
-        const selectedCheckboxes = document.querySelectorAll('input[name="transacoes[]"]:checked');
+    // Evento para selecionar/deselecionar todos
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', function() {
+            transactionCheckboxes.forEach(checkbox => {
+                checkbox.checked = selectAllCheckbox.checked;
+            });
+            updatePaymentSummary();
+        });
+    }
+    
+    // Eventos para checkboxes individuais
+    transactionCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            const allChecked = Array.from(transactionCheckboxes).every(cb => cb.checked);
+            if (selectAllCheckbox) {
+                selectAllCheckbox.checked = allChecked;
+            }
+            updatePaymentSummary();
+        });
+    });
+    
+    // Evento para botão de pagamento normal
+    if (paySelectedBtn) {
+        paySelectedBtn.addEventListener('click', function() {
+            if (document.querySelectorAll('.transaction-checkbox:checked').length > 0) {
+                paymentForm.submit();
+            }
+        });
+    }
+    
+    // Evento para botão PIX
+    if (payPixBtn) {
+        payPixBtn.addEventListener('click', function() {
+            const selected = document.querySelectorAll('.transaction-checkbox:checked');
+            if (selected.length > 0) {
+                createPixPayment();
+            }
+        });
+    }
+
+    // Função para criar pagamento PIX
+    async function createPixPayment() {
+        // Calcular valor total das comissões selecionadas
+        const selectedCheckboxes = document.querySelectorAll('.transaction-checkbox:checked');
         let totalCommission = 0;
         
         selectedCheckboxes.forEach(checkbox => {
-            const value = parseFloat(checkbox.getAttribute('data-value') || '0');
-            totalCommission += value;
+            totalCommission += parseFloat(checkbox.getAttribute('data-value'));
         });
-        
-        // Atualizar elementos do resumo se existirem
-        const elements = {
-            selectedCount: document.getElementById('selectedCount'),
-            totalCommissionValue: document.getElementById('totalCommissionValue')
-        };
-        
-        if (elements.selectedCount) elements.selectedCount.textContent = selectedCount;
-        if (elements.totalCommissionValue) {
-            elements.totalCommissionValue.textContent = totalCommission.toLocaleString('pt-BR', {
-                style: 'currency',
-                currency: 'BRL'
+
+        if (totalCommission <= 0) {
+            alert('Selecione pelo menos uma transação');
+            return;
+        }
+
+        const formData = new FormData(paymentForm);
+        formData.append('metodo_pagamento', 'pix_mercadopago');
+        formData.append('valor_total', totalCommission.toFixed(2));
+
+        try {
+            const response = await fetch('../../api/store-payment.php', {
+                method: 'POST',
+                body: formData
             });
-        }
-        
-        // Mostrar/ocultar resumo
-        if (paymentSummary) {
-            paymentSummary.style.display = selectedCount > 0 ? 'block' : 'none';
-        }
-    }
-    
-    // Select All
-    if (selectAllCheckbox) {
-        selectAllCheckbox.addEventListener('change', function() {
-            transactionCheckboxes.forEach(cb => cb.checked = this.checked);
-            updateButtons();
-        });
-    }
-    
-    // Checkboxes individuais
-    transactionCheckboxes.forEach(checkbox => {
-        checkbox.addEventListener('change', updateButtons);
-    });
-    
-    // Botão Pagar Selecionadas
-    if (paySelectedBtn) {
-        paySelectedBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            const selected = getSelected();
-            if (selected.length === 0) {
-                alert('Selecione pelo menos uma transação');
-                return;
-            }
+
+            const result = await response.json();
             
-            if (confirm(`Processar pagamento de ${selected.length} transação(ões)?`)) {
-                processPayment('payment_form', selected);
-            }
-        });
-    }
-    
-    // Botão PIX
-    if (payPixBtn) {
-        payPixBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            const selected = getSelected();
-            if (selected.length === 0) {
-                alert('Selecione pelo menos uma transação');
-                return;
-            }
-            
-            if (confirm(`Criar pagamento PIX para ${selected.length} transação(ões)?`)) {
-                processPayment('create_pix_payment', selected);
-            }
-        });
-    }
-    
-    function getSelected() {
-        return Array.from(document.querySelectorAll('input[name="transacoes[]"]:checked'))
-                   .map(cb => cb.value);
-    }
-    
-    function processPayment(action, transactionIds) {
-        const formData = new FormData();
-        formData.append('action', action);
-        transactionIds.forEach(id => formData.append('transaction_ids[]', id));
-        
-        showLoading();
-        
-        fetch('<?php echo STORE_ACTIONS_URL; ?>', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            hideLoading();
-            if (data.status && data.redirect_url) {
-                window.location.href = data.redirect_url;
+            if (result.status) {
+                window.location.href = `../../store/pagamento-pix?payment_id=${result.data.payment_id}`;
             } else {
-                alert(data.message || 'Erro desconhecido');
+                alert('Erro: ' + result.message);
             }
-        })
-        .catch(error => {
-            hideLoading();
-            alert('Erro: ' + error.message);
-        });
+        } catch (error) {
+            console.error('Erro na requisição:', error);
+            alert('Erro de conexão: ' + error.message);
+        }
     }
     
-    function showLoading() {
-        const overlay = document.createElement('div');
-        overlay.id = 'loadingOverlay';
-        overlay.style.cssText = `position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:9999;color:white;font-size:18px;`;
-        overlay.innerHTML = '<div>⏳ Processando...</div>';
-        document.body.appendChild(overlay);
-    }
+    // Inicializar resumo
+    updatePaymentSummary();
     
-    function hideLoading() {
-        const overlay = document.getElementById('loadingOverlay');
-        if (overlay) overlay.remove();
-    }
+    // Restaurar estado do dropdown
+    const savedState = localStorage.getItem('pendingCommissionsInfoOpen');
+    const content = document.getElementById('infoSectionContent');
+    const icon = document.getElementById('infoDropdownIcon');
+    const card = content ? content.closest('.collapsible-card') : null;
     
-    // Inicializar
-    updateButtons();
+    if (savedState === 'true' && content && icon && card) {
+        content.style.display = 'block';
+        icon.classList.add('open');
+        card.classList.add('expanded');
+    }
 });
+
+// Função para controlar o dropdown de informações
+function toggleInfoSection() {
+    const content = document.getElementById('infoSectionContent');
+    const icon = document.getElementById('infoDropdownIcon');
+    const card = content.closest('.collapsible-card');
+    
+    if (content.style.display === 'none' || content.style.display === '') {
+        content.style.display = 'block';
+        content.classList.add('opening');
+        content.classList.remove('closing');
+        icon.classList.add('open');
+        card.classList.add('expanded');
+        
+        setTimeout(() => {
+            content.classList.remove('opening');
+        }, 400);
+        
+        localStorage.setItem('pendingCommissionsInfoOpen', 'true');
+    } else {
+        content.classList.add('closing');
+        content.classList.remove('opening');
+        icon.classList.remove('open');
+        card.classList.remove('expanded');
+        
+        setTimeout(() => {
+            content.style.display = 'none';
+            content.classList.remove('closing');
+        }, 400);
+        
+        localStorage.setItem('pendingCommissionsInfoOpen', 'false');
+    }
+}
 </script>
     
     <style>
