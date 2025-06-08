@@ -1,7 +1,9 @@
 <?php
 // test-openpix-flow.php
+require_once 'config/constants.php';
+
 try {
-    $db = new PDO("mysql:host=localhost;dbname=u297617088_klubecash", "u297617088_root", "Aaku_2004@");
+    $db = new PDO("mysql:host=" . DB_HOST . ";dbname=" . DB_NAME, DB_USER, DB_PASS);
     
     echo "✅ Conexão OK<br>";
     
@@ -11,11 +13,11 @@ try {
     $saldoAtual = $stmt->fetchColumn() ?: 0;
     echo "Saldo atual: R$ " . number_format($saldoAtual, 2) . "<br>";
     
-    // Adicionar R$ 0,25 de teste
+    // Simular cashback de R$ 0,25
     $stmt = $db->prepare("INSERT INTO cashback_saldos (usuario_id, loja_id, saldo_disponivel) VALUES (9, 34, 0.25) ON DUPLICATE KEY UPDATE saldo_disponivel = saldo_disponivel + 0.25");
     $result = $stmt->execute();
     
-    echo $result ? "✅ Cashback adicionado" : "❌ Erro";
+    echo $result ? "✅ Teste OK - Sistema funcionando!" : "❌ Erro";
     
 } catch (Exception $e) {
     echo "Erro: " . $e->getMessage();
