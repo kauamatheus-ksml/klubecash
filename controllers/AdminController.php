@@ -447,12 +447,12 @@ public static function getTransactionDetailsWithBalance($transactionId) {
      * @param int $page Página atual
      * @return array Lista de usuários
      */
-    public static function manageUsers($filters = [], $page = 1, $limit = 20) {
+    public static function manageUsers($filters = [], $page = 1) {
         try {
             $db = Database::getConnection();
             
             // Base da query
-            $whereConditions = [];
+            $whereConditions = ['1=1'];
             $params = [];
             
             // Aplicar filtros
@@ -471,30 +471,26 @@ public static function getTransactionDetailsWithBalance($transactionId) {
                 $params[':busca'] = '%' . $filters['busca'] . '%';
             }
             
-            // Construir WHERE clause
-            $whereClause = !empty($whereConditions) ? 'WHERE ' . implode(' AND ', $whereConditions) : '';
+            $whereClause = implode(' AND ', $whereConditions);
             
             // Contar total de registros
-            $countQuery = "SELECT COUNT(*) as total FROM usuarios $whereClause";
-            $countStmt = $db->prepare($countQuery);
+            $countStmt = $db->prepare("SELECT COUNT(*) as total FROM usuarios WHERE $whereClause");
             $countStmt->execute($params);
-            $totalRecords = $countStmt->fetch(PDO::FETCH_ASSOC)['total'];
+            $total = $countStmt->fetch(PDO::FETCH_ASSOC)['total'];
             
-            // Calcular offset para paginação
+            // Calcular offset
+            $limit = ITEMS_PER_PAGE;
             $offset = ($page - 1) * $limit;
             
-            // Query principal com paginação
-            $mainQuery = "
+            // Buscar usuários
+            $stmt = $db->prepare("
                 SELECT id, nome, email, telefone, tipo, status, data_criacao, ultimo_login 
                 FROM usuarios 
-                $whereClause 
+                WHERE $whereClause 
                 ORDER BY data_criacao DESC 
                 LIMIT :limit OFFSET :offset
-            ";
+            ");
             
-            $stmt = $db->prepare($mainQuery);
-            
-            // Bind dos parâmetros
             foreach ($params as $key => $value) {
                 $stmt->bindValue($key, $value);
             }
@@ -502,31 +498,24 @@ public static function getTransactionDetailsWithBalance($transactionId) {
             $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
             
             $stmt->execute();
-            $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            
-            // Formattar datas para exibição
-            foreach ($users as &$user) {
-                $user['data_criacao_formatada'] = date('d/m/Y H:i', strtotime($user['data_criacao']));
-                $user['ultimo_login_formatado'] = $user['ultimo_login'] ? 
-                    date('d/m/Y H:i', strtotime($user['ultimo_login'])) : 'Nunca';
-            }
+            $usuarios = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
             return [
                 'status' => true,
                 'data' => [
-                    'usuarios' => $users,
+                    'usuarios' => $usuarios,
                     'pagination' => [
                         'current_page' => $page,
-                        'total_pages' => ceil($totalRecords / $limit),
-                        'total_records' => $totalRecords,
-                        'limit' => $limit
+                        'total_pages' => ceil($total / $limit),
+                        'total_items' => $total,
+                        'items_per_page' => $limit
                     ]
                 ]
             ];
             
         } catch (PDOException $e) {
-            error_log('Erro ao listar usuários: ' . $e->getMessage());
-            return ['status' => false, 'message' => 'Erro ao carregar usuários.'];
+            error_log('Erro ao buscar usuários: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro interno do servidor'];
         }
     }
     
