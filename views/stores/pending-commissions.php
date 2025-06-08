@@ -1,50 +1,39 @@
 <?php
 // views/stores/pending-commissions.php
-// Definir o menu ativo na sidebar
 $activeMenu = 'pending-commissions';
 
-// Incluir arquivos necessários
 require_once '../../config/database.php';
 require_once '../../config/constants.php';
 require_once '../../controllers/AuthController.php';
 require_once '../../controllers/TransactionController.php';
 require_once '../../models/CashbackBalance.php';
 
-// Iniciar sessão
 session_start();
 
-// Verificar se o usuário está logado e é uma loja
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION['user_type'] !== 'loja') {
-    // Redirecionar para a página de login com mensagem de erro
     header("Location: " . LOGIN_URL . "?error=acesso_restrito");
     exit;
 }
 
-// Obter ID do usuário logado
 $userId = $_SESSION['user_id'];
 
-// Obter dados da loja associada ao usuário
 $db = Database::getConnection();
 $storeQuery = $db->prepare("SELECT id, nome_fantasia FROM lojas WHERE usuario_id = :usuario_id");
 $storeQuery->bindParam(':usuario_id', $userId);
 $storeQuery->execute();
 
-// Verificar se o usuário tem uma loja associada
 if ($storeQuery->rowCount() == 0) {
     header('Location: ' . LOGIN_URL . '?error=' . urlencode('Sua conta não está associada a nenhuma loja. Entre em contato com o suporte.'));
     exit;
 }
 
-// Obter os dados da loja
 $store = $storeQuery->fetch(PDO::FETCH_ASSOC);
 $storeId = $store['id'];
 $storeName = $store['nome_fantasia'];
 
-// Definir parâmetros de paginação e filtros
 $page = isset($_GET['page']) ? intval($_GET['page']) : 1;
 $filters = [];
 
-// Aplicar filtros se fornecidos
 if (isset($_GET['data_inicio']) && !empty($_GET['data_inicio'])) {
     $filters['data_inicio'] = $_GET['data_inicio'];
 }
@@ -58,10 +47,8 @@ if (isset($_GET['valor_max']) && !empty($_GET['valor_max'])) {
     $filters['valor_max'] = floatval($_GET['valor_max']);
 }
 
-// Obter transações pendentes com informações sobre saldo usado
 $result = TransactionController::getPendingTransactionsWithBalance($storeId, $filters, $page);
 
-// Calcular totais
 $totalTransacoes = 0;
 $totalValorVendas = 0;
 $totalValorComissoes = 0;
@@ -72,9 +59,8 @@ if ($result['status'] && isset($result['data']['totais'])) {
     $totalValorVendas = $result['data']['totais']['total_valor_vendas_originais'];
     $totalSaldoUsado = $result['data']['totais']['total_saldo_usado'];
     
-    // CORREÇÃO: Calcular manualmente para garantir 10% sobre valor efetivo
     $valorEfetivo = $totalValorVendas - $totalSaldoUsado;
-    $totalValorComissoes = $valorEfetivo * 0.10; // 10% fixo
+    $totalValorComissoes = $valorEfetivo * 0.10;
 }
 ?>
 
@@ -88,21 +74,17 @@ if ($result['status'] && isset($result['data']['totais'])) {
     
     <link rel="stylesheet" href="../../assets/css/views/stores/pending-commissions.css">
     <link rel="stylesheet" href="../../assets/css/openpix-styles.css">
-    <script src="../../assets/js/openpix-integration.js"></script>
 </head>
 <body>
     <?php include_once '../components/sidebar-store.php'; ?>
     
-    <!-- Conteúdo Principal -->
     <div class="main-content" id="mainContent">
         <div class="dashboard-wrapper">
-            <!-- Cabeçalho -->
             <div class="dashboard-header">
                 <h1>Comissões Pendentes</h1>
                 <p class="subtitle">Gerenciar comissões pendentes de pagamento para <?php echo htmlspecialchars($storeName); ?></p>
             </div>
             
-            <!-- Cards de estatísticas -->
             <div class="stats-container">
                 <div class="stat-card">
                     <div class="stat-card-title">Transações Pendentes</div>
@@ -123,13 +105,11 @@ if ($result['status'] && isset($result['data']['totais'])) {
                 
                 <div class="stat-card">
                     <div class="stat-card-title">Valor Total de Comissões</div>
-                    <!-- CORREÇÃO: Mostrar comissão total (10%) -->
                     <div class="stat-card-value">R$ <?php echo number_format($totalValorComissoes, 2, ',', '.'); ?></div>
                     <div class="stat-card-subtitle">Valor a pagar ao Klube Cash (10%)</div>
                 </div>
             </div>
             
-            <!-- Filtros -->
             <div class="card filter-container">
                 <div class="card-header">
                     <div class="card-title">Filtros</div>
@@ -166,7 +146,6 @@ if ($result['status'] && isset($result['data']['totais'])) {
                 </div>
             </div>
             
-            <!-- Listagem de Transações Pendentes -->
             <div class="card transactions-container">
                 <div class="card-header">
                     <div class="card-title">Transações Pendentes de Pagamento</div>
@@ -174,7 +153,7 @@ if ($result['status'] && isset($result['data']['totais'])) {
                     <div style="display: flex; gap: 1rem;">
                         <button id="paySelectedBtn" class="btn btn-primary" disabled>Pagar Selecionadas</button>
                         <button id="payPixBtn" class="btn btn-success" disabled>Pagar via PIX</button>
-                        <button type="button" class="btn btn-success" id="btnPixOpenpix" style="margin-left: 10px;">
+                        <button type="button" class="btn btn-success" id="btnPixOpenpix">
                             🔥 Pagar via PIX 2
                         </button>
                     </div>
@@ -212,9 +191,8 @@ if ($result['status'] && isset($result['data']['totais'])) {
                                             $saldoUsado = floatval($transaction['saldo_usado'] ?? 0);
                                             $valorCobrado = $valorOriginal - $saldoUsado;
                                             
-                                            // CORREÇÃO: Força recálculo com valores corretos
-                                            $comissaoTotal = $valorCobrado * 0.10;  // 10% sobre valor cobrado
-                                            $cashbackCliente = $valorCobrado * 0.05; // 5% sobre valor cobrado
+                                            $comissaoTotal = $valorCobrado * 0.10;
+                                            $cashbackCliente = $valorCobrado * 0.05;
                                             ?>
                                             <tr>
                                                 <td>
@@ -244,7 +222,6 @@ if ($result['status'] && isset($result['data']['totais'])) {
                                                         <small class="desconto">(com desconto)</small>
                                                     <?php endif; ?>
                                                 </td>
-                                                <!-- CORREÇÃO: Valores recalculados corretamente -->
                                                 <td><strong>R$ <?php echo number_format($comissaoTotal, 2, ',', '.'); ?></strong></td>
                                                 <td>R$ <?php echo number_format($cashbackCliente, 2, ',', '.'); ?></td>
                                             </tr>
@@ -279,7 +256,6 @@ if ($result['status'] && isset($result['data']['totais'])) {
                         </div>
                     </form>
                     
-                    <!-- Paginação -->
                     <?php if ($result['data']['paginacao']['total_paginas'] > 1): ?>
                         <div class="pagination">
                             <div class="pagination-info">
@@ -315,8 +291,6 @@ if ($result['status'] && isset($result['data']['totais'])) {
                 <?php endif; ?>
             </div>
             
-            
-            <!-- Informações sobre Saldo e Comissões (Dropdown Colapsável) -->
             <div class="card info-card collapsible-card">
                 <div class="card-header collapsible-header" onclick="toggleInfoSection()">
                     <div class="card-title">
@@ -380,199 +354,232 @@ if ($result['status'] && isset($result['data']['totais'])) {
         </div>
     </div>
     
+    <script src="../../assets/js/openpix-integration.js"></script>
     <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const selectAllCheckbox = document.getElementById('selectAll');
-    const transactionCheckboxes = document.querySelectorAll('.transaction-checkbox');
-    const paySelectedBtn = document.getElementById('paySelectedBtn');
-    const payPixBtn = document.getElementById('payPixBtn');
-    const paymentForm = document.getElementById('paymentForm');
-    const paymentSummary = document.getElementById('paymentSummary');
-    
-    // Função para formatar valores como moeda
-    function formatCurrency(value) {
-        return value.toLocaleString('pt-BR', {
-            style: 'currency',
-            currency: 'BRL',
-            minimumFractionDigits: 2
-        });
-    }
-    
-    // Função para atualizar resumo de pagamento
-    function updatePaymentSummary() {
-        const selectedCheckboxes = document.querySelectorAll('.transaction-checkbox:checked');
-        const selectedCount = selectedCheckboxes.length;
-        let totalCommission = 0;
-        let totalSalesValue = 0;
-        let totalBalanceUsed = 0;
+    document.addEventListener('DOMContentLoaded', function() {
+        const selectAllCheckbox = document.getElementById('selectAll');
+        const transactionCheckboxes = document.querySelectorAll('.transaction-checkbox');
+        const paySelectedBtn = document.getElementById('paySelectedBtn');
+        const payPixBtn = document.getElementById('payPixBtn');
+        const btnPixOpenpix = document.getElementById('btnPixOpenpix');
+        const paymentForm = document.getElementById('paymentForm');
+        const paymentSummary = document.getElementById('paymentSummary');
         
-        selectedCheckboxes.forEach(checkbox => {
-            const commission = parseFloat(checkbox.getAttribute('data-value'));
-            totalCommission += commission;
-            
-            const row = checkbox.closest('tr');
-            const cells = row.querySelectorAll('td');
-            
-            // Valor original da venda (coluna 4)
-            const originalValueText = cells[4].textContent.replace('R$ ', '').replace(/\./g, '').replace(',', '.');
-            const originalValue = parseFloat(originalValueText);
-            
-            // Saldo usado (coluna 5)
-            const balanceUsedElement = cells[5].querySelector('.saldo-usado');
-            const balanceUsed = balanceUsedElement ? 
-                parseFloat(balanceUsedElement.textContent.replace('R$ ', '').replace(/\./g, '').replace(',', '.')) : 0;
-            
-            totalSalesValue += originalValue;
-            totalBalanceUsed += balanceUsed;
-        });
-        
-        document.getElementById('selectedCount').textContent = selectedCount;
-        document.getElementById('totalSalesValue').textContent = formatCurrency(totalSalesValue);
-        document.getElementById('totalBalanceUsed').textContent = formatCurrency(totalBalanceUsed);
-        document.getElementById('totalCommissionValue').textContent = formatCurrency(totalCommission);
-        
-        // Habilitar/desabilitar botões de pagamento
-        if (paySelectedBtn) paySelectedBtn.disabled = selectedCount === 0;
-        if (payPixBtn) payPixBtn.disabled = selectedCount === 0;
-        
-        // Mostrar/esconder resumo de pagamento
-        if (selectedCount > 0) {
-            paymentSummary.style.display = 'block';
-        } else {
-            paymentSummary.style.display = 'none';
-        }
-    }
-    
-    // Evento para selecionar/deselecionar todos
-    if (selectAllCheckbox) {
-        selectAllCheckbox.addEventListener('change', function() {
-            transactionCheckboxes.forEach(checkbox => {
-                checkbox.checked = selectAllCheckbox.checked;
+        function formatCurrency(value) {
+            return value.toLocaleString('pt-BR', {
+                style: 'currency',
+                currency: 'BRL',
+                minimumFractionDigits: 2
             });
-            updatePaymentSummary();
-        });
-    }
-    
-    // Eventos para checkboxes individuais
-    transactionCheckboxes.forEach(checkbox => {
-        checkbox.addEventListener('change', function() {
-            const allChecked = Array.from(transactionCheckboxes).every(cb => cb.checked);
-            if (selectAllCheckbox) {
-                selectAllCheckbox.checked = allChecked;
-            }
-            updatePaymentSummary();
-        });
-    });
-    
-    // Evento para botão de pagamento normal
-    if (paySelectedBtn) {
-        paySelectedBtn.addEventListener('click', function() {
-            if (document.querySelectorAll('.transaction-checkbox:checked').length > 0) {
-                paymentForm.submit();
-            }
-        });
-    }
-    
-    // Evento para botão PIX
-    if (payPixBtn) {
-        payPixBtn.addEventListener('click', function() {
-            const selected = document.querySelectorAll('.transaction-checkbox:checked');
-            if (selected.length > 0) {
-                createPixPayment();
-            }
-        });
-    }
-
-    // Função para criar pagamento PIX
-    async function createPixPayment() {
-        // Calcular valor total das comissões selecionadas
-        const selectedCheckboxes = document.querySelectorAll('.transaction-checkbox:checked');
-        let totalCommission = 0;
+        }
         
-        selectedCheckboxes.forEach(checkbox => {
-            totalCommission += parseFloat(checkbox.getAttribute('data-value'));
+        function updatePaymentSummary() {
+            const selectedCheckboxes = document.querySelectorAll('.transaction-checkbox:checked');
+            const selectedCount = selectedCheckboxes.length;
+            let totalCommission = 0;
+            let totalSalesValue = 0;
+            let totalBalanceUsed = 0;
+            
+            selectedCheckboxes.forEach(checkbox => {
+                const commission = parseFloat(checkbox.getAttribute('data-value'));
+                totalCommission += commission;
+                
+                const row = checkbox.closest('tr');
+                const cells = row.querySelectorAll('td');
+                
+                const originalValueText = cells[4].textContent.replace('R$ ', '').replace(/\./g, '').replace(',', '.');
+                const originalValue = parseFloat(originalValueText);
+                
+                const balanceUsedElement = cells[5].querySelector('.saldo-usado');
+                const balanceUsed = balanceUsedElement ? 
+                    parseFloat(balanceUsedElement.textContent.replace('R$ ', '').replace(/\./g, '').replace(',', '.')) : 0;
+                
+                totalSalesValue += originalValue;
+                totalBalanceUsed += balanceUsed;
+            });
+            
+            document.getElementById('selectedCount').textContent = selectedCount;
+            document.getElementById('totalSalesValue').textContent = formatCurrency(totalSalesValue);
+            document.getElementById('totalBalanceUsed').textContent = formatCurrency(totalBalanceUsed);
+            document.getElementById('totalCommissionValue').textContent = formatCurrency(totalCommission);
+            
+            if (paySelectedBtn) paySelectedBtn.disabled = selectedCount === 0;
+            if (payPixBtn) payPixBtn.disabled = selectedCount === 0;
+            if (btnPixOpenpix) btnPixOpenpix.disabled = selectedCount === 0;
+            
+            if (selectedCount > 0) {
+                paymentSummary.style.display = 'block';
+            } else {
+                paymentSummary.style.display = 'none';
+            }
+        }
+        
+        if (selectAllCheckbox) {
+            selectAllCheckbox.addEventListener('change', function() {
+                transactionCheckboxes.forEach(checkbox => {
+                    checkbox.checked = selectAllCheckbox.checked;
+                });
+                updatePaymentSummary();
+            });
+        }
+        
+        transactionCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                const allChecked = Array.from(transactionCheckboxes).every(cb => cb.checked);
+                if (selectAllCheckbox) {
+                    selectAllCheckbox.checked = allChecked;
+                }
+                updatePaymentSummary();
+            });
         });
-
-        if (totalCommission <= 0) {
-            alert('Selecione pelo menos uma transação');
-            return;
+        
+        if (paySelectedBtn) {
+            paySelectedBtn.addEventListener('click', function() {
+                if (document.querySelectorAll('.transaction-checkbox:checked').length > 0) {
+                    paymentForm.submit();
+                }
+            });
+        }
+        
+        if (payPixBtn) {
+            payPixBtn.addEventListener('click', function() {
+                const selected = document.querySelectorAll('.transaction-checkbox:checked');
+                if (selected.length > 0) {
+                    createPixPayment();
+                }
+            });
         }
 
-        const formData = new FormData(paymentForm);
-        formData.append('metodo_pagamento', 'pix_mercadopago');
-        formData.append('valor_total', totalCommission.toFixed(2));
+        // OpenPix Button Handler
+        if (btnPixOpenpix) {
+            btnPixOpenpix.addEventListener('click', function() {
+                const selectedCheckboxes = document.querySelectorAll('.transaction-checkbox:checked');
+                
+                if (selectedCheckboxes.length === 0) {
+                    alert('Selecione pelo menos uma transação para pagar');
+                    return;
+                }
+                
+                if (selectedCheckboxes.length > 1) {
+                    alert('OpenPix: Selecione apenas uma transação por vez para pagamento via PIX');
+                    return;
+                }
+                
+                createPaymentAndUseOpenPix();
+            });
+        }
 
-        try {
-            const response = await fetch('../../api/store-payment.php', {
+        async function createPixPayment() {
+            const selectedCheckboxes = document.querySelectorAll('.transaction-checkbox:checked');
+            let totalCommission = 0;
+            
+            selectedCheckboxes.forEach(checkbox => {
+                totalCommission += parseFloat(checkbox.getAttribute('data-value'));
+            });
+
+            if (totalCommission <= 0) {
+                alert('Selecione pelo menos uma transação');
+                return;
+            }
+
+            const formData = new FormData(paymentForm);
+            formData.append('metodo_pagamento', 'pix_mercadopago');
+            formData.append('valor_total', totalCommission.toFixed(2));
+
+            try {
+                const response = await fetch('../../api/store-payment.php', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                
+                if (result.status) {
+                    window.location.href = `../../store/pagamento-pix?payment_id=${result.data.payment_id}`;
+                } else {
+                    alert('Erro: ' + result.message);
+                }
+            } catch (error) {
+                console.error('Erro na requisição:', error);
+                alert('Erro de conexão: ' + error.message);
+            }
+        }
+
+        function createPaymentAndUseOpenPix() {
+            const formData = new FormData();
+            formData.append('action', 'criar_pagamento');
+            formData.append('metodo_pagamento', 'pix_openpix');
+            
+            document.querySelectorAll('.transaction-checkbox:checked').forEach(checkbox => {
+                formData.append('transacoes[]', checkbox.value);
+            });
+            
+            fetch('../../api/payments.php', {
                 method: 'POST',
                 body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status) {
+                    openPixIntegration.createCharge(data.payment_id);
+                } else {
+                    alert('Erro: ' + data.message);
+                }
+            })
+            .catch(error => {
+                alert('Erro de conexão');
+                console.error(error);
             });
+        }
+        
+        updatePaymentSummary();
+        
+        const savedState = localStorage.getItem('pendingCommissionsInfoOpen');
+        const content = document.getElementById('infoSectionContent');
+        const icon = document.getElementById('infoDropdownIcon');
+        const card = content ? content.closest('.collapsible-card') : null;
+        
+        if (savedState === 'true' && content && icon && card) {
+            content.style.display = 'block';
+            icon.classList.add('open');
+            card.classList.add('expanded');
+        }
+    });
 
-            const result = await response.json();
+    function toggleInfoSection() {
+        const content = document.getElementById('infoSectionContent');
+        const icon = document.getElementById('infoDropdownIcon');
+        const card = content.closest('.collapsible-card');
+        
+        if (content.style.display === 'none' || content.style.display === '') {
+            content.style.display = 'block';
+            content.classList.add('opening');
+            content.classList.remove('closing');
+            icon.classList.add('open');
+            card.classList.add('expanded');
             
-            if (result.status) {
-                window.location.href = `../../store/pagamento-pix?payment_id=${result.data.payment_id}`;
-            } else {
-                alert('Erro: ' + result.message);
-            }
-        } catch (error) {
-            console.error('Erro na requisição:', error);
-            alert('Erro de conexão: ' + error.message);
+            setTimeout(() => {
+                content.classList.remove('opening');
+            }, 400);
+            
+            localStorage.setItem('pendingCommissionsInfoOpen', 'true');
+        } else {
+            content.classList.add('closing');
+            content.classList.remove('opening');
+            icon.classList.remove('open');
+            card.classList.remove('expanded');
+            
+            setTimeout(() => {
+                content.style.display = 'none';
+                content.classList.remove('closing');
+            }, 400);
+            
+            localStorage.setItem('pendingCommissionsInfoOpen', 'false');
         }
     }
-    
-    // Inicializar resumo
-    updatePaymentSummary();
-    
-    // Restaurar estado do dropdown
-    const savedState = localStorage.getItem('pendingCommissionsInfoOpen');
-    const content = document.getElementById('infoSectionContent');
-    const icon = document.getElementById('infoDropdownIcon');
-    const card = content ? content.closest('.collapsible-card') : null;
-    
-    if (savedState === 'true' && content && icon && card) {
-        content.style.display = 'block';
-        icon.classList.add('open');
-        card.classList.add('expanded');
-    }
-});
-
-// Função para controlar o dropdown de informações
-function toggleInfoSection() {
-    const content = document.getElementById('infoSectionContent');
-    const icon = document.getElementById('infoDropdownIcon');
-    const card = content.closest('.collapsible-card');
-    
-    if (content.style.display === 'none' || content.style.display === '') {
-        content.style.display = 'block';
-        content.classList.add('opening');
-        content.classList.remove('closing');
-        icon.classList.add('open');
-        card.classList.add('expanded');
-        
-        setTimeout(() => {
-            content.classList.remove('opening');
-        }, 400);
-        
-        localStorage.setItem('pendingCommissionsInfoOpen', 'true');
-    } else {
-        content.classList.add('closing');
-        content.classList.remove('opening');
-        icon.classList.remove('open');
-        card.classList.remove('expanded');
-        
-        setTimeout(() => {
-            content.style.display = 'none';
-            content.classList.remove('closing');
-        }, 400);
-        
-        localStorage.setItem('pendingCommissionsInfoOpen', 'false');
-    }
-}
-</script>
+    </script>
     
     <style>
-        /* Estilos adicionais para saldo usado */
         .balance-used-badge {
             margin-left: 5px;
             font-size: 0.8rem;
@@ -627,7 +634,7 @@ function toggleInfoSection() {
             color: #6c757d;
             margin-top: 5px;
         }
-        /* Estilos para seção colapsável */
+
         .collapsible-card {
             transition: all 0.3s ease;
         }
@@ -713,7 +720,6 @@ function toggleInfoSection() {
             }
         }
 
-        /* Estilo especial para quando está expandido */
         .collapsible-card.expanded {
             border-left: 4px solid var(--primary-color);
         }
@@ -722,7 +728,6 @@ function toggleInfoSection() {
             background-color: var(--primary-light);
         }
 
-        /* Estilos para o conteúdo das informações */
         .info-content {
             padding: 1.5rem;
             color: var(--medium-gray);
@@ -765,7 +770,6 @@ function toggleInfoSection() {
             top: 0;
         }
 
-        /* Ajustes para mobile */
         @media (max-width: 768px) {
             .collapsible-header {
                 padding: 1rem;
@@ -803,7 +807,6 @@ function toggleInfoSection() {
             }
         }
 
-        /* Efeitos visuais adicionais */
         .collapsible-header::after {
             content: '';
             position: absolute;
@@ -820,100 +823,14 @@ function toggleInfoSection() {
             width: 90%;
         }
 
-        /* Destaque para informações importantes */
         .info-section li strong {
             color: var(--primary-color);
             font-weight: 600;
         }
 
-        /* Estilos para ícones nas informações */
         .info-section h4::before {
             margin-right: 8px;
         }
     </style>
-
-
-    <script>
-    document.getElementById('btnPixOpenpix').onclick = function() {
-        const selectedCheckboxes = document.querySelectorAll('input[type="checkbox"]:checked');
-        if (selectedCheckboxes.length !== 1) {
-            alert('Selecione apenas UMA transação para PIX OpenPix');
-            return;
-        }
-        
-        // Pegar o ID da transação selecionada
-        const row = selectedCheckboxes[0].closest('tr');
-        const transactionCode = row.cells[1].textContent.trim(); // KC25060819291781584
-        
-        // Criar pagamento com as transações selecionadas e depois usar OpenPix
-        createPaymentAndUseOpenPix();
-    };
-
-    function createPaymentAndUseOpenPix() {
-        const formData = new FormData();
-        formData.append('action', 'criar_pagamento');
-        formData.append('metodo_pagamento', 'pix_openpix');
-        
-        // Adicionar transações selecionadas
-        document.querySelectorAll('input[type="checkbox"]:checked').forEach(checkbox => {
-            formData.append('transacoes[]', checkbox.value);
-        });
-        
-        fetch('/api/payments', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status) {
-                // Usar OpenPix com o ID do pagamento criado
-                openPixIntegration.createCharge(data.payment_id);
-            } else {
-                alert('Erro: ' + data.message);
-            }
-        })
-        .catch(error => {
-            alert('Erro de conexão');
-            console.error(error);
-        });
-    }
-    </script>
-    <script>
-    // Adicionar função para o botão OpenPix nas transações pendentes
-    function pagarViaOpenPix(paymentIds) {
-        if (!Array.isArray(paymentIds)) {
-            paymentIds = [paymentIds];
-        }
-        
-        if (paymentIds.length === 0) {
-            alert('Selecione pelo menos uma transação para pagar');
-            return;
-        }
-        
-        if (paymentIds.length > 1) {
-            alert('OpenPix: Selecione apenas uma transação por vez para pagamento via PIX');
-            return;
-        }
-        
-        const paymentId = paymentIds[0];
-        openPixIntegration.createCharge(paymentId);
-    }
-
-    // Adicionar botão na interface (onde já existem os outros botões de pagamento)
-    document.addEventListener('DOMContentLoaded', function() {
-        const paymentButtons = document.querySelector('.payment-buttons');
-        if (paymentButtons) {
-            const openPixButton = document.createElement('button');
-            openPixButton.className = 'btn-pix-openpix';
-            openPixButton.innerHTML = '🔥 Pagar via PIX 2';
-            openPixButton.onclick = function() {
-                const selected = getSelectedTransactions();
-                pagarViaOpenPix(selected);
-            };
-            
-            paymentButtons.appendChild(openPixButton);
-        }
-    });
-    </script>
 </body>
 </html>
