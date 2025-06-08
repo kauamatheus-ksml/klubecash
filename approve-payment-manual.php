@@ -1,35 +1,44 @@
 <?php
 // approve-payment-manual.php
 require_once 'config/database.php';
-require_once 'controllers/TransactionController.php';
 
-$paymentId = 1103; // Seu pagamento
-
+$paymentId = 1103;
 $db = Database::getConnection();
 
-// 1. Atualizar status do pagamento
-$updateStmt = $db->prepare("
-    UPDATE pagamentos_comissao 
-    SET status = 'aprovado',
-        openpix_status = 'COMPLETED',
-        observacao_admin = 'PIX OpenPix aprovado manualmente'
-    WHERE id = ?
+// Buscar transações relacionadas ao pagamento pela correlation_id
+$stmt = $db->prepare("
+    SELECT t.* FROM transacoes_cashback t 
+    WHERE t.loja_id = 34 AND t.status = 'pendente'
+    ORDER BY t.id DESC LIMIT 5
 ");
-$result1 = $updateStmt->execute([$paymentId]);
+$stmt->execute();
+$transacoes = $stmt->fetchAll();
 
-echo $result1 ? "✅ Pagamento atualizado<br>" : "❌ Erro ao atualizar pagamento<br>";
+echo "Transações encontradas:<br>";
+foreach ($transacoes as $t) {
+    echo "ID: {$t['id']} - Status: {$t['status']} - Valor: {$t['valor_total']}<br>";
+}
 
-// 2. Aprovar transações usando TransactionController
-$result2 = TransactionController::approvePaymentAutomatically($paymentId, 'PIX OpenPix aprovado manualmente');
+// Aprovar as transações pendentes da loja
+$updateTransactions = $db->prepare("
+    UPDATE transacoes_cashback 
+    SET status = 'aprovado',
+        data_aprovacao = NOW()
+    WHERE loja_id = 34 AND status = 'pendente'
+");
+$result = $updateTransactions->execute();
 
-echo "<pre>";
-print_r($result2);
-echo "</pre>";
+echo $result ? "✅ Transações aprovadas" : "❌ Erro";
 
-// 3. Verificar resultado
-$stmt = $db->prepare("SELECT status FROM pagamentos_comissao WHERE id = ?");
-$stmt->execute([$paymentId]);
-$newStatus = $stmt->fetchColumn();
+// Liberar cashback para clientes
+$cashbackStmt = $db->prepare("
+    INSERT INTO saldos_cashback (usuario_id, loja_id, valor, tipo, origem_transacao_id)
+    SELECT usuario_id, loja_id, valor_cashback, 'cashback', id 
+    FROM transacoes_cashback 
+    WHERE loja_id = 34 AND status = 'aprovado' AND valor_cashback > 0
+    ON DUPLICATE KEY UPDATE valor = valor
+");
+$cashbackStmt->execute();
 
-echo "Status final: $newStatus";
+echo "<br>✅ Cashback liberado!";
 ?>
