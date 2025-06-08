@@ -1,80 +1,63 @@
 <?php
 // api/users.php
+// API para gerenciar usuários do sistema Klube Cash
 
-// Definir cabeçalhos
-header('Content-Type: application/json; charset=utf-8');
+// Configurações iniciais
+header('Content-Type: application/json; charset=UTF-8');
 header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
-// Incluir arquivos necessários
-require_once '../config/database.php';
-require_once '../config/constants.php';
-require_once '../controllers/AuthController.php';
-require_once '../controllers/UserController.php';
-require_once '../utils/Security.php';
-
-// Tratar requisições OPTIONS (CORS)
+// Se for requisição OPTIONS (preflight), encerra a execução
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
-    exit;
+    exit(0);
 }
 
-// Função para validar token JWT (reutilização do código existente)
+// Incluir arquivos necessários
+require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../config/constants.php';
+require_once __DIR__ . '/../controllers/AuthController.php';
+require_once __DIR__ . '/../controllers/AdminController.php';
+require_once __DIR__ . '/../utils/Security.php';
+require_once __DIR__ . '/../utils/Validator.php';
+
+// Função para validar token JWT
 function validateToken() {
+    // Obter token do cabeçalho Authorization
     $headers = getallheaders();
-    $token = $headers['Authorization'] ?? '';
+    $auth = isset($headers['Authorization']) ? $headers['Authorization'] : '';
     
-    if (empty($token)) {
-        // Tentar obter token da sessão como fallback
-        session_start();
-        if (!isset($_SESSION['user_id'])) {
-            http_response_code(401);
-            echo json_encode(['status' => false, 'message' => 'Token não fornecido']);
-            exit;
-        }
-        
-        return [
-            'id' => $_SESSION['user_id'],
-            'tipo' => $_SESSION['user_type']
-        ];
-    }
-    
-    // Remover "Bearer " se presente
-    $token = str_replace('Bearer ', '', $token);
-    
-    try {
-        // Validar token JWT (implementar conforme sua biblioteca JWT)
-        // Por enquanto, usar validação de sessão
-        session_start();
-        if (!isset($_SESSION['user_id'])) {
-            http_response_code(401);
-            echo json_encode(['status' => false, 'message' => 'Token inválido']);
-            exit;
-        }
-        
-        return [
-            'id' => $_SESSION['user_id'],
-            'tipo' => $_SESSION['user_type']
-        ];
-    } catch (Exception $e) {
+    if (empty($auth) || !preg_match('/Bearer\s+(.*)$/i', $auth, $matches)) {
         http_response_code(401);
-        echo json_encode(['status' => false, 'message' => 'Token inválido']);
+        echo json_encode(['status' => false, 'message' => 'Token de autenticação não fornecido']);
         exit;
     }
+    
+    $token = $matches[1];
+    
+    // Validar token (usando uma função de exemplo, você precisará implementar seu próprio validador)
+    $decoded = Security::validateJWT($token);
+    
+    if (!$decoded) {
+        http_response_code(401);
+        echo json_encode(['status' => false, 'message' => 'Token de autenticação inválido ou expirado']);
+        exit;
+    }
+    
+    return $decoded;
 }
 
-// Roteamento baseado no método HTTP
-switch ($_SERVER['REQUEST_METHOD']) {
+// Processar a requisição com base no método HTTP
+$method = $_SERVER['REQUEST_METHOD'];
+
+switch ($method) {
     case 'GET':
         handleGetRequest();
         break;
     case 'POST':
         handlePostRequest();
         break;
-    case 'PUT':
-        handlePutRequest();
-        break;
+    
     case 'DELETE':
         handleDeleteRequest();
         break;
@@ -84,36 +67,24 @@ switch ($_SERVER['REQUEST_METHOD']) {
         break;
 }
 
-// Função para tratar requisições GET (listar ou buscar usuários)
+// Função para tratar requisições GET (consulta de usuários)
 function handleGetRequest() {
     // Validar token
     $userData = validateToken();
     
-    // Verificar se é administrador para listar usuários
+    // Verificar se é administrador (só admins podem listar usuários)
     if ($userData['tipo'] !== USER_TYPE_ADMIN) {
-        // Usuários não-admin só podem ver seus próprios dados
-        $userId = isset($_GET['id']) ? intval($_GET['id']) : null;
-        if (!$userId || $userId !== $userData['id']) {
+        // Se não for admin, só pode ver seu próprio perfil
+        if (isset($_GET['id']) && intval($_GET['id']) === $userData['id']) {
+            $result = ['status' => true, 'data' => ['usuario' => $userData]];
+        } else {
             http_response_code(403);
-            echo json_encode(['status' => false, 'message' => 'Acesso negado']);
+            echo json_encode(['status' => false, 'message' => 'Acesso não autorizado']);
             exit;
         }
-    }
-    
-    // Verificar se é busca por ID específico
-    $userId = isset($_GET['id']) ? intval($_GET['id']) : null;
-    
-    if ($userId) {
-        // Buscar usuário específico
-        $result = UserController::getUserDetails($userId);
     } else {
-        // Listar usuários (apenas para admins)
-        if ($userData['tipo'] !== USER_TYPE_ADMIN) {
-            http_response_code(403);
-            echo json_encode(['status' => false, 'message' => 'Apenas administradores podem listar usuários']);
-            exit;
-        }
-        
+        // É admin, pode ver qualquer usuário
+        $userId = isset($_GET['id']) ? intval($_GET['id']) : null;
         $page = isset($_GET['page']) ? intval($_GET['page']) : 1;
         $filters = [];
         
@@ -122,7 +93,11 @@ function handleGetRequest() {
         if (isset($_GET['status'])) $filters['status'] = $_GET['status'];
         if (isset($_GET['busca'])) $filters['busca'] = $_GET['busca'];
         
-        $result = UserController::listUsers($filters, $page);
+        if ($userId) {
+            $result = AdminController::getUserDetails($userId);
+        } else {
+            $result = AdminController::manageUsers($filters, $page);
+        }
     }
     
     // Retornar resultado
@@ -131,17 +106,16 @@ function handleGetRequest() {
 
 // Função para tratar requisições POST (criar novo usuário)
 function handlePostRequest() {
-    // Validar se é registro público ou criação de admin
+    // Validar token para criar usuários (exceto para registro público)
     $isPublicRegistration = isset($_GET['public']) && $_GET['public'] === 'true';
     
     if (!$isPublicRegistration) {
-        // Validar token para criação de usuários via admin
         $userData = validateToken();
         
-        // Verificar se é administrador
+        // Verificar se é administrador (só admins podem criar usuários via API)
         if ($userData['tipo'] !== USER_TYPE_ADMIN) {
             http_response_code(403);
-            echo json_encode(['status' => false, 'message' => 'Apenas administradores podem criar usuários']);
+            echo json_encode(['status' => false, 'message' => 'Apenas administradores podem criar usuários via API']);
             exit;
         }
     }
@@ -150,77 +124,36 @@ function handlePostRequest() {
     $data = json_decode(file_get_contents('php://input'), true);
     
     // Validar dados básicos
-    if (!$data || !isset($data['nome']) || !isset($data['email'])) {
+    if (!$data || !isset($data['nome']) || !isset($data['email']) || (!$isPublicRegistration && !isset($data['senha']))) {
         http_response_code(400);
-        echo json_encode(['status' => false, 'message' => 'Dados incompletos']);
+        echo json_encode(['status' => false, 'message' => 'Dados incompletos para criar usuário']);
         exit;
     }
     
-    // Definir senha padrão se não fornecida (para criação de admin)
-    if (!isset($data['senha']) || empty($data['senha'])) {
-        if ($isPublicRegistration) {
-            http_response_code(400);
-            echo json_encode(['status' => false, 'message' => 'Senha é obrigatória']);
-            exit;
-        }
-        $data['senha'] = 'senha123'; // Senha padrão para usuários criados pelo admin
-    }
-    
-    // Definir tipo padrão
-    if (!isset($data['tipo'])) {
-        $data['tipo'] = $isPublicRegistration ? USER_TYPE_CLIENT : USER_TYPE_CLIENT;
-    }
-    
-    // Criar usuário
-    $result = UserController::createUser($data);
+    // Registrar novo usuário
+    $result = AuthController::register(
+        $data['nome'],
+        $data['email'],
+        $data['telefone'] ?? '',
+        $data['senha'],
+        $isPublicRegistration ? USER_TYPE_CLIENT : ($data['tipo'] ?? USER_TYPE_CLIENT)
+    );
     
     // Retornar resultado
     echo json_encode($result);
 }
 
-// Função para tratar requisições PUT (atualizar usuário existente)
-function handlePutRequest() {
-    // Validar token
-    $userData = validateToken();
-    
-    // Obter dados do corpo da requisição
-    $data = json_decode(file_get_contents('php://input'), true);
-    
-    // Validar dados básicos
-    if (!$data || !isset($data['userId'])) {
-        http_response_code(400);
-        echo json_encode(['status' => false, 'message' => 'ID do usuário não fornecido']);
-        exit;
-    }
-    
-    $userId = intval($data['userId']);
-    
-    // Verificar permissões
-    if ($userData['tipo'] !== USER_TYPE_ADMIN && $userId !== $userData['id']) {
-        http_response_code(403);
-        echo json_encode(['status' => false, 'message' => 'Você só pode editar seu próprio perfil']);
-        exit;
-    }
-    
-    // Remover userId dos dados para não tentar atualizar no banco
-    unset($data['userId']);
-    
-    // Atualizar usuário
-    $result = UserController::updateUser($userId, $data);
-    
-    // Retornar resultado
-    echo json_encode($result);
-}
 
-// Função para tratar requisições DELETE (excluir usuário)
+
+// Função para tratar requisições DELETE (desativar/remover usuário)
 function handleDeleteRequest() {
     // Validar token
     $userData = validateToken();
     
-    // Apenas administradores podem excluir usuários
+    // Apenas administradores podem desativar/remover usuários
     if ($userData['tipo'] !== USER_TYPE_ADMIN) {
         http_response_code(403);
-        echo json_encode(['status' => false, 'message' => 'Apenas administradores podem excluir usuários']);
+        echo json_encode(['status' => false, 'message' => 'Apenas administradores podem desativar usuários']);
         exit;
     }
     
@@ -233,17 +166,110 @@ function handleDeleteRequest() {
         exit;
     }
     
-    // Não permitir que um administrador exclua a si mesmo
+    // Não permitir que um administrador desative a si mesmo
     if ($userId === $userData['id']) {
         http_response_code(400);
-        echo json_encode(['status' => false, 'message' => 'Você não pode excluir seu próprio usuário']);
+        echo json_encode(['status' => false, 'message' => 'Não é possível desativar seu próprio usuário']);
         exit;
     }
     
-    // Excluir usuário
-    $result = UserController::deleteUser($userId);
+    // Desativar usuário (status = inativo)
+    $result = AdminController::updateUserStatus($userId, 'inativo');
     
     // Retornar resultado
     echo json_encode($result);
 }
-?>
+
+// Rota específica para autenticação e obtenção de token JWT
+if (isset($_GET['action']) && $_GET['action'] === 'login') {
+    // Bypass do fluxo normal para processar login
+    loginUser();
+    exit;
+}
+
+// Função para processar login e gerar token JWT
+function loginUser() {
+    // Verificar se é uma requisição POST
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['status' => false, 'message' => 'Método não permitido para login']);
+        exit;
+    }
+    
+    // Obter dados do corpo da requisição
+    $data = json_decode(file_get_contents('php://input'), true);
+    
+    // Validar dados básicos
+    if (!$data || !isset($data['email']) || !isset($data['senha'])) {
+        http_response_code(400);
+        echo json_encode(['status' => false, 'message' => 'Email e senha são obrigatórios']);
+        exit;
+    }
+    
+    // Autenticar usuário
+    $result = AuthController::login($data['email'], $data['senha']);
+    
+    if ($result['status']) {
+        // Gerar token JWT
+        $token = Security::generateJWT([
+            'id' => $result['user']['id'],
+            'nome' => $result['user']['name'],
+            'tipo' => $result['user']['type'],
+            'exp' => time() + SESSION_LIFETIME // Tempo de expiração
+        ]);
+        
+        $result['token'] = $token;
+    }
+    
+    // Retornar resultado
+    echo json_encode($result);
+}
+
+// Rota específica para recuperação de senha
+if (isset($_GET['action']) && $_GET['action'] === 'recover') {
+    // Bypass do fluxo normal para processar recuperação de senha
+    recoverPassword();
+    exit;
+}
+
+// Função para processar solicitação de recuperação de senha
+function recoverPassword() {
+    // Verificar se é uma requisição POST
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['status' => false, 'message' => 'Método não permitido para recuperação de senha']);
+        exit;
+    }
+    
+    // Obter dados do corpo da requisição
+    $data = json_decode(file_get_contents('php://input'), true);
+    
+    // Validar dados básicos
+    if (!$data || !isset($data['email'])) {
+        http_response_code(400);
+        echo json_encode(['status' => false, 'message' => 'Email obrigatório']);
+        exit;
+    }
+    
+    // Solicitar recuperação de senha
+    $result = AuthController::recoverPassword($data['email']);
+    
+    // Retornar resultado
+    echo json_encode($result);
+}
+
+// Para qualquer erro não tratado anteriormente
+function handleError($errno, $errstr, $errfile, $errline) {
+    http_response_code(500);
+    echo json_encode([
+        'status' => false, 
+        'message' => 'Erro interno do servidor',
+        'error' => $errstr,
+        'file' => $errfile,
+        'line' => $errline
+    ]);
+    exit;
+}
+
+// Registrar manipulador de erros
+set_error_handler('handleError');
