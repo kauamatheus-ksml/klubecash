@@ -24,7 +24,7 @@ $updateTransactions = $db->prepare("
     UPDATE transacoes_cashback 
     SET status = 'aprovado',
         data_aprovacao = NOW()
-    WHERE loja_id = 34 AND status = 'pendente'
+    WHERE loja_id = 149 AND status = 'pendente'
 ");
 $result = $updateTransactions->execute();
 
