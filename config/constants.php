@@ -163,7 +163,7 @@ if (!defined('SMTP_HOST')) {
 }
 // === OPENPIX CONFIGURAÇÕES (NOVA) ===
 define('OPENPIX_API_URL', 'https://api.openpix.com.br');
-define('OPENPIX_APP_ID', 'Q2xpZW50XzEyMzQ1Njc4OTBfZGV2ZWxvcGVyX2FwcF9pZA=='); // Substitua pelo seu App ID real
+define('OPENPIX_APP_ID', 'Q2xpZW50X0lkXzIzOTVjYmMzLWYyOGItNGJmYi04MWE3LWNkZWIzYzJkYTI4ZTpDbGllbnRfU2VjcmV0X3JYOFRxM016ZWdoNUY5YnVnempJeHl1VlBsRkg2QkNubm0yRFFzUWxQU1E9'); // Substitua pelo seu App ID real
 define('OPENPIX_WEBHOOK_AUTH', 'klube_cash_webhook_2025'); // Chave de autorização do webhook
 define('OPENPIX_WEBHOOK_URL', SITE_URL . '/webhook/openpix');
 
