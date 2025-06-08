@@ -2,43 +2,36 @@
 // approve-payment-manual.php
 require_once 'config/database.php';
 
-$paymentId = 1103;
 $db = Database::getConnection();
 
-// Buscar transações relacionadas ao pagamento pela correlation_id
+// Aprovar transação ID 149
 $stmt = $db->prepare("
-    SELECT t.* FROM transacoes_cashback t 
-    WHERE t.loja_id = 34 AND t.status = 'pendente'
-    ORDER BY t.id DESC LIMIT 5
-");
-$stmt->execute();
-$transacoes = $stmt->fetchAll();
-
-echo "Transações encontradas:<br>";
-foreach ($transacoes as $t) {
-    echo "ID: {$t['id']} - Status: {$t['status']} - Valor: {$t['valor_total']}<br>";
-}
-
-// Aprovar as transações pendentes da loja
-$updateTransactions = $db->prepare("
     UPDATE transacoes_cashback 
     SET status = 'aprovado',
         data_aprovacao = NOW()
-    WHERE loja_id = 149 AND status = 'pendente'
+    WHERE id = 149
 ");
-$result = $updateTransactions->execute();
+$result1 = $stmt->execute();
 
-echo $result ? "✅ Transações aprovadas" : "❌ Erro";
-
-// Liberar cashback para clientes
-$cashbackStmt = $db->prepare("
-    INSERT INTO saldos_cashback (usuario_id, loja_id, valor, tipo, origem_transacao_id)
-    SELECT usuario_id, loja_id, valor_cashback, 'cashback', id 
+// Calcular e liberar cashback (5% de R$ 5,00 = R$ 0,25)
+$stmt = $db->prepare("
+    SELECT usuario_id, loja_id, valor_total * 0.05 as cashback 
     FROM transacoes_cashback 
-    WHERE loja_id = 34 AND status = 'aprovado' AND valor_cashback > 0
-    ON DUPLICATE KEY UPDATE valor = valor
+    WHERE id = 149
 ");
-$cashbackStmt->execute();
+$stmt->execute();
+$trans = $stmt->fetch();
 
-echo "<br>✅ Cashback liberado!";
+if ($trans) {
+    $cashbackStmt = $db->prepare("
+        INSERT INTO saldos_cashback (usuario_id, loja_id, valor, tipo, origem_transacao_id)
+        VALUES (?, ?, ?, 'cashback', 149)
+        ON DUPLICATE KEY UPDATE valor = valor + VALUES(valor)
+    ");
+    $result2 = $cashbackStmt->execute([$trans['usuario_id'], $trans['loja_id'], $trans['cashback']]);
+    
+    echo $result1 && $result2 ? "✅ Transação aprovada e cashback de R$ " . number_format($trans['cashback'], 2) . " liberado!" : "❌ Erro";
+} else {
+    echo "❌ Transação não encontrada";
+}
 ?>
