@@ -42,7 +42,9 @@ if ($method === 'POST' && $action === 'criar_pagamento') {
         $stmt->execute($params);
         $totalComissao = $stmt->fetchColumn() ?: 0;
         
-        // Simplificado: sem coluna de data
+        $db->beginTransaction();
+        
+        // Criar pagamento
         $paymentStmt = $db->prepare("
             INSERT INTO pagamentos_comissao (loja_id, valor_total, metodo_pagamento, status) 
             VALUES (?, ?, ?, 'pendente')
@@ -51,6 +53,18 @@ if ($method === 'POST' && $action === 'criar_pagamento') {
         
         $paymentId = $db->lastInsertId();
         
+        // VINCULAR TRANSAÇÕES AO PAGAMENTO
+        foreach ($transacoes as $transacaoId) {
+            $linkStmt = $db->prepare("
+                UPDATE transacoes_cashback 
+                SET payment_id = ? 
+                WHERE id = ? AND loja_id = ? AND status = 'pendente'
+            ");
+            $linkStmt->execute([$paymentId, $transacaoId, $store['id']]);
+        }
+        
+        $db->commit();
+        
         echo json_encode([
             'status' => true,
             'payment_id' => $paymentId,
@@ -58,6 +72,7 @@ if ($method === 'POST' && $action === 'criar_pagamento') {
         ]);
         
     } catch (Exception $e) {
+        $db->rollback();
         echo json_encode(['status' => false, 'message' => $e->getMessage()]);
     }
 } else {
