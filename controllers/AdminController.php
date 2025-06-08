@@ -1,101 +1,5 @@
 <?php
 
-// TESTE BÁSICO DE FUNCIONAMENTO - Muito simples para não dar erro
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'register') {
-    // Simplesmente retornar uma resposta de teste
-    header('Content-Type: application/json; charset=UTF-8');
-    echo json_encode([
-        'status' => true,
-        'message' => 'TESTE: O interceptador básico está funcionando!',
-        'debug' => 'Código de teste executado com sucesso'
-    ]);
-    exit;
-}
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
-
-
-// INTERCEPTADOR MELHORADO E SEGURO
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'register') {
-    
-    // Iniciar sessão de forma segura
-    if (session_status() === PHP_SESSION_NONE) {
-        session_start();
-    }
-    
-    // Definir headers para JSON
-    header('Content-Type: application/json; charset=UTF-8');
-    
-    // Verificar autenticação básica
-    if (!isset($_SESSION['user_id']) || $_SESSION['user_type'] !== 'admin') {
-        echo json_encode([
-            'status' => false,
-            'message' => 'Acesso restrito a administradores'
-        ]);
-        exit;
-    }
-    
-    // Coletar dados básicos
-    $nome = trim($_POST['nome'] ?? '');
-    $email = trim($_POST['email'] ?? '');
-    $senha = $_POST['senha'] ?? '';
-    
-    // Validações simples
-    if (empty($nome) || empty($email) || empty($senha)) {
-        echo json_encode([
-            'status' => false,
-            'message' => 'Todos os campos são obrigatórios'
-        ]);
-        exit;
-    }
-    
-    // Se chegou até aqui, vamos tentar incluir os arquivos necessários
-    try {
-        // Tentar incluir arquivos usando caminhos relativos mais seguros
-        $baseDir = dirname(__FILE__);
-        
-        if (file_exists($baseDir . '/../config/database.php')) {
-            require_once $baseDir . '/../config/database.php';
-        } else {
-            throw new Exception('Arquivo database.php não encontrado');
-        }
-        
-        if (file_exists($baseDir . '/../config/constants.php')) {
-            require_once $baseDir . '/../config/constants.php';
-        } else {
-            throw new Exception('Arquivo constants.php não encontrado');
-        }
-        
-        if (file_exists($baseDir . '/AuthController.php')) {
-            require_once $baseDir . '/AuthController.php';
-        } else {
-            throw new Exception('Arquivo AuthController.php não encontrado');
-        }
-        
-        // Se chegou até aqui, tentar criar o usuário
-        $resultado = AuthController::register($nome, $email, '', $senha, 'cliente');
-        echo json_encode($resultado);
-        
-    } catch (Exception $e) {
-        echo json_encode([
-            'status' => false,
-            'message' => 'Erro durante processamento: ' . $e->getMessage()
-        ]);
-    }
-    
-    exit;
-}
-
-// PRIMEIRO: Limpar output buffer e configurar headers para AJAX
-if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
-    // Limpar qualquer output anterior
-    while (ob_get_level()) {
-        ob_end_clean();
-    }
-    header('Content-Type: application/json; charset=UTF-8');
-    header('Cache-Control: no-cache, must-revalidate');
-}
 // controllers/AdminController.php
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../config/constants.php';
@@ -105,231 +9,17 @@ require_once __DIR__ . '/AuthController.php';
 
 
 
-// INTERCEPTADOR ESPECÍFICO PARA REGISTRO DE USUÁRIOS
-// Deve ser colocado ANTES de qualquer outro processamento
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'register') {
-    
-    // Iniciar sessão se necessário
-    if (session_status() === PHP_SESSION_NONE) {
-        session_start();
-    }
-    
-    // Limpar qualquer output anterior que possa interferir no JSON
-    if (ob_get_level()) {
-        ob_end_clean();
-    }
-    
-    // Definir headers para resposta JSON
-    header('Content-Type: application/json; charset=UTF-8');
-    header('Cache-Control: no-cache, must-revalidate');
-    
-    // Verificar autenticação de administrador
-    if (!isset($_SESSION['user_id']) || $_SESSION['user_type'] !== USER_TYPE_ADMIN) {
-        echo json_encode([
-            'status' => false, 
-            'message' => 'Acesso restrito a administradores. Faça login novamente.'
-        ]);
-        exit;
-    }
-    
-    try {
-        // Log para debug - você pode remover depois que funcionar
-        error_log("REGISTRO DE USUÁRIO: Processando requisição de registro");
-        
-        // Coletar e validar dados do formulário
-        $nome = trim($_POST['nome'] ?? '');
-        $email = trim($_POST['email'] ?? '');
-        $telefone = trim($_POST['telefone'] ?? '');
-        $senha = $_POST['senha'] ?? '';
-        $tipo = $_POST['tipo'] ?? 'cliente';
-        $status = $_POST['status'] ?? 'ativo';
-        
-        // Validações de entrada
-        $errors = [];
-        
-        if (empty($nome)) {
-            $errors[] = 'Nome é obrigatório';
-        }
-        
-        if (empty($email)) {
-            $errors[] = 'Email é obrigatório';
-        } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            $errors[] = 'Email tem formato inválido';
-        }
-        
-        if (empty($senha)) {
-            $errors[] = 'Senha é obrigatória';
-        } elseif (strlen($senha) < 8) {
-            $errors[] = 'Senha deve ter no mínimo 8 caracteres';
-        }
-        
-        if (!in_array($tipo, ['cliente', 'loja', 'admin'])) {
-            $errors[] = 'Tipo de usuário inválido';
-        }
-        
-        if (!in_array($status, ['ativo', 'inativo', 'bloqueado'])) {
-            $errors[] = 'Status de usuário inválido';
-        }
-        
-        // Se há erros de validação, retornar imediatamente
-        if (!empty($errors)) {
-            echo json_encode([
-                'status' => false,
-                'message' => 'Dados inválidos: ' . implode(', ', $errors)
-            ]);
-            exit;
-        }
-        
-        // Log dos dados que serão processados
-        error_log("REGISTRO DE USUÁRIO: Dados validados - Nome: $nome, Email: $email, Tipo: $tipo");
-        
-        // Chamar o método de registro do AuthController
-        $resultado = AuthController::register($nome, $email, $telefone, $senha, $tipo);
-        
-        // Log do resultado
-        error_log("REGISTRO DE USUÁRIO: Resultado - " . json_encode($resultado));
-        
-        // Retornar o resultado como JSON
-        echo json_encode($resultado);
-        
-    } catch (Exception $e) {
-        // Log do erro para debug
-        error_log("REGISTRO DE USUÁRIO: Erro - " . $e->getMessage());
-        
-        // Retornar erro para o frontend
-        echo json_encode([
-            'status' => false,
-            'message' => 'Erro interno do servidor: ' . $e->getMessage()
-        ]);
-    }
-    
-    // Finalizar execução para evitar processamento adicional
-    exit;
-}
-
-
-// DEBUG TEMPORÁRIO - adicionar no início do AdminController.php
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
-    error_log("=== DEBUG ADMIN CONTROLLER ===");
-    error_log("POST Action recebida: " . $_POST['action']);
-    error_log("Dados POST: " . print_r($_POST, true));
-    error_log("Session user_type: " . ($_SESSION['user_type'] ?? 'não definido'));
-    error_log("Session user_id: " . ($_SESSION['user_id'] ?? 'não definido'));
-    error_log("Basename: " . basename($_SERVER['PHP_SELF']));
-    error_log("=================================");
-}
-// Limpar qualquer output anterior e configurar headers JSON
-if (ob_get_level()) {
-    ob_clean();
-}
-
-function sendJsonResponse($data) {
-    // Garantir que não há output anterior
-    while (ob_get_level()) {
-        ob_end_clean();
-    }
-    
-    // Definir headers corretos
-    header('Content-Type: application/json; charset=UTF-8');
-    header('Cache-Control: no-cache, must-revalidate');
-    
-    // Enviar resposta e finalizar
-    echo json_encode($data, JSON_UNESCAPED_UNICODE);
-    exit;
-}
-
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
-// Processar requisições AJAX
-if (isset($_GET['action'])) {
-    session_start();
-    
-    // Verificar se é admin
-    if (!isset($_SESSION['user_type']) || $_SESSION['user_type'] !== USER_TYPE_ADMIN) {
-        http_response_code(403);
-        echo json_encode(['status' => false, 'message' => 'Acesso negado']);
-        exit;
-    }
-    
-    header('Content-Type: application/json');
-    
-    switch ($_GET['action']) {
-        case 'users':
-            handleUsersAction();
-            break;
-        case 'stores':
-            handleStoresAction();
-            break;
-        case 'transactions':
-            handleTransactionsAction();
-            break;
-        default:
-            http_response_code(404);
-            echo json_encode(['status' => false, 'message' => 'Ação não encontrada']);
-    }
-    exit;
-}
 
-/**
- * Processar ações relacionadas a usuários
- */
-function handleUsersAction() {
-    $method = $_SERVER['REQUEST_METHOD'];
-    
-    switch ($method) {
-        case 'GET':
-            if (isset($_GET['id'])) {
-                echo json_encode(AdminController::getUserDetails(intval($_GET['id'])));
-            } else {
-                $filters = [];
-                if (isset($_GET['tipo'])) $filters['tipo'] = $_GET['tipo'];
-                if (isset($_GET['status'])) $filters['status'] = $_GET['status'];
-                if (isset($_GET['busca'])) $filters['busca'] = $_GET['busca'];
-                
-                $page = isset($_GET['page']) ? intval($_GET['page']) : 1;
-                echo json_encode(AdminController::manageUsers($filters, $page));
-            }
-            break;
-            
-        case 'PUT':
-            $data = json_decode(file_get_contents('php://input'), true);
-            if (isset($_GET['id']) && $data) {
-                echo json_encode(AdminController::updateUser(intval($_GET['id']), $data));
-            } else {
-                echo json_encode(['status' => false, 'message' => 'Dados inválidos']);
-            }
-            break;
-            
-        case 'PATCH':
-            if (isset($_GET['id']) && isset($_GET['status'])) {
-                echo json_encode(AdminController::updateUserStatus(intval($_GET['id']), $_GET['status']));
-            } else {
-                echo json_encode(['status' => false, 'message' => 'Parâmetros obrigatórios ausentes']);
-            }
-            break;
-            
-        default:
-            http_response_code(405);
-            echo json_encode(['status' => false, 'message' => 'Método não permitido']);
-    }
-}
-// Verificar se é uma requisição AJAX válida - VERSÃO CORRIGIDA
+// Verificar se é uma requisição AJAX válida
 $isAjaxRequest = (
     isset($_POST['action']) || 
     isset($_GET['action']) ||
-    (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && 
-     strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') ||
-    (isset($_SERVER['CONTENT_TYPE']) && 
-     strpos($_SERVER['CONTENT_TYPE'], 'application/x-www-form-urlencoded') !== false)
+    !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && 
+    strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest'
 );
-
-// ADICIONAR DEBUG TEMPORÁRIO
-if (isset($_POST['action'])) {
-    error_log("DEBUG: Detecção AJAX - isAjaxRequest: " . ($isAjaxRequest ? 'true' : 'false'));
-    error_log("DEBUG: POST action existe: " . $_POST['action']);
-    error_log("DEBUG: X-Requested-With: " . ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? 'não definido'));
-}
 
 // Se for acesso direto ao arquivo (não AJAX), redirecionar
 if (!$isAjaxRequest && basename($_SERVER['PHP_SELF']) === 'AdminController.php') {
@@ -343,53 +33,21 @@ if (!$isAjaxRequest && basename($_SERVER['PHP_SELF']) === 'AdminController.php')
 }
 
 // Verificar autenticação para requisições AJAX
-
-// ADICIONAR AQUI - Logo após a verificação de autenticação AJAX
-if ($isAjaxRequest && isset($_POST['action']) && $_POST['action'] === 'register') {
-    error_log("DEBUG: Processando action=register via AJAX");
-    
-    header('Content-Type: application/json; charset=UTF-8');
-    
-    try {
-        // Pegar dados do POST
-        $nome = trim($_POST['nome'] ?? '');
-        $email = trim($_POST['email'] ?? '');
-        $telefone = trim($_POST['telefone'] ?? '');
-        $senha = $_POST['senha'] ?? '';
-        $tipo = $_POST['tipo'] ?? 'cliente';
-        
-        // Validações básicas
-        if (empty($nome) || empty($email) || empty($senha)) {
-            echo json_encode(['status' => false, 'message' => 'Todos os campos obrigatórios devem ser preenchidos']);
-            exit;
-        }
-        
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            echo json_encode(['status' => false, 'message' => 'Email inválido']);
-            exit;
-        }
-        
-        if (strlen($senha) < 8) {
-            echo json_encode(['status' => false, 'message' => 'A senha deve ter no mínimo 8 caracteres']);
-            exit;
-        }
-        
-        error_log("DEBUG: Chamando AuthController::register via AJAX - Nome: $nome, Email: $email, Tipo: $tipo");
-        
-        // Chamar método de registro
-        $result = AuthController::register($nome, $email, $telefone, $senha, $tipo);
-        
-        error_log("DEBUG: Resultado do AuthController::register via AJAX: " . json_encode($result));
-        
-        echo json_encode($result);
-        
-    } catch (Exception $e) {
-        error_log('DEBUG: Erro ao criar usuário via AJAX: ' . $e->getMessage());
-        echo json_encode([
-            'status' => false, 
-            'message' => 'Erro interno: ' . $e->getMessage()
-        ]);
+if ($isAjaxRequest) {
+    if (!isset($_SESSION['user_id']) || $_SESSION['user_type'] !== USER_TYPE_ADMIN) {
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode(['status' => false, 'message' => 'Sessão expirada. Faça login novamente.']);
+        exit;
     }
+}
+
+// No início do arquivo, após os includes
+ini_set('display_errors', 0);
+error_reporting(E_ALL);
+
+function sendJsonResponse($data) {
+    header('Content-Type: application/json; charset=UTF-8');
+    echo json_encode($data);
     exit;
 }
 
@@ -791,127 +449,121 @@ public static function getTransactionDetailsWithBalance($transactionId) {
      */
     public static function manageUsers($filters = [], $page = 1) {
         try {
+            // Verificar se é um administrador
+            if (!self::validateAdmin()) {
+                return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
+            }
+            
             $db = Database::getConnection();
             
-            // Base da query
-            $whereConditions = ['1=1'];
-            $params = [];
+            // Consulta simplificada sem filtros
+            $query = "
+                SELECT id, nome, email, tipo, status, data_criacao, ultimo_login
+                FROM usuarios
+                ORDER BY data_criacao DESC
+            ";
             
-            // Aplicar filtros
-            if (!empty($filters['tipo'])) {
-                $whereConditions[] = "tipo = :tipo";
-                $params[':tipo'] = $filters['tipo'];
-            }
+            // Calcular total de registros para paginação
+            $countQuery = "SELECT COUNT(*) as total FROM usuarios";
+            $countStmt = $db->prepare($countQuery);
+            $countStmt->execute();
+            $totalCount = $countStmt->fetch(PDO::FETCH_ASSOC)['total'];
             
-            if (!empty($filters['status'])) {
-                $whereConditions[] = "status = :status";
-                $params[':status'] = $filters['status'];
-            }
+            // Adicionar paginação
+            $perPage = ITEMS_PER_PAGE;
+            $page = max(1, (int)$page); // Garantir que a página é no mínimo 1
+            $offset = ($page - 1) * $perPage;
+            $query .= " LIMIT $offset, $perPage";
             
-            if (!empty($filters['busca'])) {
-                $whereConditions[] = "(nome LIKE :busca OR email LIKE :busca)";
-                $params[':busca'] = '%' . $filters['busca'] . '%';
-            }
+            // Executar consulta
+            $stmt = $db->prepare($query);
+            $stmt->execute();
+            $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
-            $whereClause = implode(' AND ', $whereConditions);
-            
-            // Estatísticas para dashboard
-            $statsStmt = $db->prepare("
+            // Estatísticas dos usuários
+            $statsQuery = "
                 SELECT 
                     COUNT(*) as total_usuarios,
                     SUM(CASE WHEN tipo = 'cliente' THEN 1 ELSE 0 END) as total_clientes,
+                    SUM(CASE WHEN tipo = 'admin' THEN 1 ELSE 0 END) as total_admins,
                     SUM(CASE WHEN tipo = 'loja' THEN 1 ELSE 0 END) as total_lojas,
-                    SUM(CASE WHEN tipo = 'admin' THEN 1 ELSE 0 END) as total_admins
-                FROM usuarios 
-                WHERE $whereClause
-            ");
-            $statsStmt->execute($params);
-            $estatisticas = $statsStmt->fetch(PDO::FETCH_ASSOC);
+                    SUM(CASE WHEN status = 'ativo' THEN 1 ELSE 0 END) as total_ativos,
+                    SUM(CASE WHEN status = 'inativo' THEN 1 ELSE 0 END) as total_inativos,
+                    SUM(CASE WHEN status = 'bloqueado' THEN 1 ELSE 0 END) as total_bloqueados
+                FROM usuarios
+            ";
             
-            // Contar total de registros
-            $countStmt = $db->prepare("SELECT COUNT(*) as total FROM usuarios WHERE $whereClause");
-            $countStmt->execute($params);
-            $total = $countStmt->fetch(PDO::FETCH_ASSOC)['total'];
+            $statsStmt = $db->prepare($statsQuery);
+            $statsStmt->execute();
+            $statistics = $statsStmt->fetch(PDO::FETCH_ASSOC);
             
-            // Calcular paginação
-            $limit = ITEMS_PER_PAGE;
-            $offset = ($page - 1) * $limit;
-            $totalPages = ceil($total / $limit);
-            
-            // Buscar usuários
-            $stmt = $db->prepare("
-                SELECT id, nome, email, telefone, tipo, status, data_criacao, ultimo_login 
-                FROM usuarios 
-                WHERE $whereClause 
-                ORDER BY data_criacao DESC 
-                LIMIT :limit OFFSET :offset
-            ");
-            
-            foreach ($params as $key => $value) {
-                $stmt->bindValue($key, $value);
-            }
-            $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
-            $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
-            
-            $stmt->execute();
-            $usuarios = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            // Calcular informações de paginação
+            $totalPages = ceil($totalCount / $perPage);
             
             return [
                 'status' => true,
                 'data' => [
-                    'usuarios' => $usuarios,
-                    'estatisticas' => $estatisticas,
+                    'usuarios' => $users,
+                    'estatisticas' => $statistics,
                     'paginacao' => [
-                        'current_page' => $page,
-                        'total_pages' => $totalPages,
-                        'total_items' => $total,
-                        'items_per_page' => $limit
+                        'total' => $totalCount,
+                        'por_pagina' => $perPage,
+                        'pagina_atual' => $page,
+                        'total_paginas' => $totalPages
                     ]
                 ]
             ];
             
         } catch (PDOException $e) {
-            error_log('Erro ao buscar usuários: ' . $e->getMessage());
-            return ['status' => false, 'message' => 'Erro interno do servidor'];
+            error_log('Erro ao gerenciar usuários: ' . $e->getMessage());
+            return [
+                'status' => false, 
+                'message' => 'Erro ao carregar usuários: ' . $e->getMessage()
+            ];
         }
     }
     
     /**
-     * Obtém detalhes de um usuário específico
-     * 
-     * @param int $userId ID do usuário
-     * @return array Dados do usuário
-     */
-    public static function getUserDetails($userId) {
-        try {
-            $db = Database::getConnection();
-            
-            $stmt = $db->prepare("
-                SELECT id, nome, email, telefone, cpf, tipo, status, 
-                    data_criacao, ultimo_login, provider, email_verified
-                FROM usuarios 
-                WHERE id = :id
-            ");
-            $stmt->bindParam(':id', $userId, PDO::PARAM_INT);
-            $stmt->execute();
-            
-            $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
-            
-            if (!$usuario) {
-                return ['status' => false, 'message' => 'Usuário não encontrado'];
-            }
-            
-            return [
-                'status' => true,
-                'data' => ['usuario' => $usuario]
-            ];
-            
-        } catch (PDOException $e) {
-            error_log('Erro ao buscar detalhes do usuário: ' . $e->getMessage());
-            return ['status' => false, 'message' => 'Erro interno do servidor'];
+ * Obtém detalhes de um usuário específico
+ * 
+ * @param int $userId ID do usuário
+ * @return array Dados do usuário
+ */
+public static function getUserDetails($userId) {
+    try {
+        // Verificar se é um administrador
+        if (!self::validateAdmin()) {
+            return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
         }
+        
+        $db = Database::getConnection();
+        
+        // Obter dados do usuário
+        $stmt = $db->prepare("
+            SELECT id, nome, email, telefone, tipo, status, data_criacao, ultimo_login
+            FROM usuarios
+            WHERE id = :user_id
+        ");
+        $stmt->bindParam(':user_id', $userId);
+        $stmt->execute();
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$user) {
+            return ['status' => false, 'message' => 'Usuário não encontrado.'];
+        }
+        
+        return [
+            'status' => true,
+            'data' => [
+                'usuario' => $user
+            ]
+        ];
+        
+    } catch (PDOException $e) {
+        error_log('Erro ao obter detalhes do usuário: ' . $e->getMessage());
+        return ['status' => false, 'message' => 'Erro ao carregar dados do usuário: ' . $e->getMessage()];
     }
-
+}
     
      
     // Adicionar este método no AdminController.php
@@ -1170,45 +822,162 @@ public static function manageStoresWithBalance($filters = [], $page = 1) {
             return ['status' => false, 'message' => 'Erro ao carregar detalhes da loja.'];
         }
     }
-    
 
-    
-    
-    
-    
-    
-    
-
-
-    public static function updateUserStatus($userId, $status) {
+    /**
+    * Atualiza dados de um usuário
+    * 
+    * @param int $userId ID do usuário
+    * @param array $data Novos dados do usuário
+    * @return array Resultado da operação
+    */
+    public static function updateUser($userId, $data) {
         try {
-            $db = Database::getConnection();
-            
-            // Validar status
-            $validStatuses = ['ativo', 'inativo', 'bloqueado'];
-            if (!in_array($status, $validStatuses)) {
-                return ['status' => false, 'message' => 'Status inválido'];
+            // Verificar se é um administrador
+            if (!self::validateAdmin()) {
+                return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
             }
             
-            $stmt = $db->prepare("UPDATE usuarios SET status = :status WHERE id = :id");
-            $stmt->bindParam(':status', $status);
-            $stmt->bindParam(':id', $userId, PDO::PARAM_INT);
+            $db = Database::getConnection();
             
-            $result = $stmt->execute();
+            // Verificar se o usuário existe
+            $checkStmt = $db->prepare("SELECT id FROM usuarios WHERE id = :user_id");
+            $checkStmt->bindParam(':user_id', $userId);
+            $checkStmt->execute();
             
-            if ($result) {
-                $action = $status === 'ativo' ? 'ativado' : 'desativado';
-                return ['status' => true, 'message' => "Usuário $action com sucesso"];
+            if ($checkStmt->rowCount() == 0) {
+                return ['status' => false, 'message' => 'Usuário não encontrado.'];
+            }
+            
+            // Criar array de campos a serem atualizados
+            $updateFields = [];
+            $params = [':user_id' => $userId];
+            
+            // Nome
+            if (isset($data['nome']) && !empty($data['nome'])) {
+                $updateFields[] = "nome = :nome";
+                $params[':nome'] = trim($data['nome']);
+            }
+            
+            // Email - validar se não existe em outro usuário
+            if (isset($data['email']) && !empty($data['email'])) {
+                $emailCheckStmt = $db->prepare("SELECT id FROM usuarios WHERE email = :email AND id != :user_id");
+                $emailCheckStmt->bindParam(':email', $data['email']);
+                $emailCheckStmt->bindParam(':user_id', $userId);
+                $emailCheckStmt->execute();
+                
+                if ($emailCheckStmt->rowCount() > 0) {
+                    return ['status' => false, 'message' => 'Este email já está sendo usado por outro usuário.'];
+                }
+                
+                $updateFields[] = "email = :email";
+                $params[':email'] = trim($data['email']);
+            }
+            
+            // Telefone
+            if (isset($data['telefone'])) {
+                $updateFields[] = "telefone = :telefone";
+                $params[':telefone'] = trim($data['telefone']);
+            }
+            
+            // Tipo
+            if (isset($data['tipo']) && !empty($data['tipo'])) {
+                $validTypes = [USER_TYPE_CLIENT, USER_TYPE_ADMIN, USER_TYPE_STORE];
+                if (in_array($data['tipo'], $validTypes)) {
+                    $updateFields[] = "tipo = :tipo";
+                    $params[':tipo'] = $data['tipo'];
+                }
+            }
+            
+            // Status
+            if (isset($data['status']) && !empty($data['status'])) {
+                $validStatus = [USER_ACTIVE, USER_INACTIVE, USER_BLOCKED];
+                if (in_array($data['status'], $validStatus)) {
+                    $updateFields[] = "status = :status";
+                    $params[':status'] = $data['status'];
+                }
+            }
+            
+            // Senha (opcional) - só incluir se foi fornecida e não está vazia
+            if (isset($data['senha']) && !empty(trim($data['senha']))) {
+                $senha = trim($data['senha']);
+                
+                // Validar comprimento mínimo apenas se a senha foi fornecida
+                if (strlen($senha) < PASSWORD_MIN_LENGTH) {
+                    return ['status' => false, 'message' => 'A senha deve ter no mínimo ' . PASSWORD_MIN_LENGTH . ' caracteres.'];
+                }
+                
+                $senha_hash = password_hash($senha, PASSWORD_DEFAULT);
+                $updateFields[] = "senha_hash = :senha_hash";
+                $params[':senha_hash'] = $senha_hash;
+            }
+            
+            // Se não houver campos para atualizar
+            if (empty($updateFields)) {
+                return ['status' => false, 'message' => 'Nenhum dado válido para atualizar.'];
+            }
+            
+            // Construir e executar a query de atualização
+            $query = "UPDATE usuarios SET " . implode(', ', $updateFields) . " WHERE id = :user_id";
+            $stmt = $db->prepare($query);
+            
+            foreach ($params as $param => $value) {
+                $stmt->bindValue($param, $value);
+            }
+            
+            $success = $stmt->execute();
+            
+            if ($success) {
+                return ['status' => true, 'message' => 'Usuário atualizado com sucesso.'];
             } else {
-                return ['status' => false, 'message' => 'Erro ao alterar status do usuário'];
+                return ['status' => false, 'message' => 'Falha ao atualizar usuário no banco de dados.'];
+            }
+            
+        } catch (PDOException $e) {
+            error_log('Erro ao atualizar usuário: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro ao atualizar usuário: ' . $e->getMessage()];
+        }
+    }
+    public static function updateUserStatus($userId, $status) {
+        try {
+            // Verificar se é um administrador
+            if (!self::validateAdmin()) {
+                return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
+            }
+            
+            // Validar status
+            $validStatus = [USER_ACTIVE, 'inativo', 'bloqueado'];
+            if (!in_array($status, $validStatus)) {
+                return ['status' => false, 'message' => 'Status inválido.'];
+            }
+            
+            $db = Database::getConnection();
+            
+            // Verificar se o usuário existe
+            $checkStmt = $db->prepare("SELECT id FROM usuarios WHERE id = :user_id");
+            $checkStmt->bindParam(':user_id', $userId);
+            $checkStmt->execute();
+            
+            if ($checkStmt->rowCount() == 0) {
+                return ['status' => false, 'message' => 'Usuário não encontrado.'];
+            }
+            
+            // Atualizar status
+            $updateStmt = $db->prepare("UPDATE usuarios SET status = :status WHERE id = :user_id");
+            $updateStmt->bindParam(':status', $status);
+            $updateStmt->bindParam(':user_id', $userId);
+            $success = $updateStmt->execute();
+            
+            if ($success) {
+                return ['status' => true, 'message' => 'Status do usuário atualizado com sucesso.'];
+            } else {
+                return ['status' => false, 'message' => 'Falha ao atualizar status do usuário.'];
             }
             
         } catch (PDOException $e) {
             error_log('Erro ao atualizar status do usuário: ' . $e->getMessage());
-            return ['status' => false, 'message' => 'Erro interno do servidor'];
+            return ['status' => false, 'message' => 'Erro ao atualizar status do usuário: ' . $e->getMessage()];
         }
     }
-
     
     /**
      * Gerencia lojas do sistema
@@ -1369,37 +1138,37 @@ public static function manageStoresWithBalance($filters = [], $page = 1) {
  * @return array Lista de lojas sem usuário
  */
 public static function getAvailableStores() {
-        try {
-            // Verificar se é um administrador
-            if (!self::validateAdmin()) {
-                return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
-            }
-            
-            $db = Database::getConnection();
-            
-            // Buscar lojas aprovadas sem usuário vinculado
-            $stmt = $db->prepare("
-                SELECT id, nome_fantasia, razao_social, cnpj, email, telefone, categoria
-                FROM lojas 
-                WHERE status = :status AND (usuario_id IS NULL OR usuario_id = 0)
-                ORDER BY nome_fantasia ASC
-            ");
-            $status = STORE_APPROVED;
-            $stmt->bindParam(':status', $status);
-            $stmt->execute();
-            
-            $stores = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            
-            return [
-                'status' => true,
-                'data' => $stores
-            ];
-            
-        } catch (PDOException $e) {
-            error_log('Erro ao obter lojas disponíveis: ' . $e->getMessage());
-            return ['status' => false, 'message' => 'Erro ao carregar lojas disponíveis.'];
+    try {
+        // Verificar se é um administrador
+        if (!self::validateAdmin()) {
+            return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
         }
+        
+        $db = Database::getConnection();
+        
+        // Buscar lojas aprovadas sem usuário vinculado
+        $stmt = $db->prepare("
+            SELECT id, nome_fantasia, razao_social, cnpj, email, telefone, categoria
+            FROM lojas 
+            WHERE status = :status AND (usuario_id IS NULL OR usuario_id = 0)
+            ORDER BY nome_fantasia ASC
+        ");
+        $status = STORE_APPROVED;
+        $stmt->bindParam(':status', $status);
+        $stmt->execute();
+        
+        $stores = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        return [
+            'status' => true,
+            'data' => $stores
+        ];
+        
+    } catch (PDOException $e) {
+        error_log('Erro ao obter lojas disponíveis: ' . $e->getMessage());
+        return ['status' => false, 'message' => 'Erro ao carregar lojas disponíveis.'];
     }
+}
 
     /**
     * Obtém dados de uma loja específica pelo email
@@ -3282,11 +3051,8 @@ public static function getFinancialReports($filters = []) {
      * 
      * @return bool true se for administrador, false caso contrário
      */
-    public static function validateAdmin() {
-        if (!isset($_SESSION['user_id']) || $_SESSION['user_type'] !== USER_TYPE_ADMIN) {
-            return false;
-        }
-        return true;
+    private static function validateAdmin() {
+        return AuthController::isAdmin();
     }
     
     /**
@@ -3673,73 +3439,8 @@ public static function getFinancialReports($filters = []) {
     }
 }
 
-// ... código anterior ...
-
-// ADICIONAR O BLOCO DE DEBUG AQUI ↓
-if (isset($_POST['action']) && $_POST['action'] === 'register') {
-    error_log("DEBUG: Processando action=register via POST");
-    
-    // Verificar autenticação
-    if (session_status() === PHP_SESSION_NONE) {
-        session_start();
-    }
-    
-    if (!isset($_SESSION['user_id']) || $_SESSION['user_type'] !== USER_TYPE_ADMIN) {
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['status' => false, 'message' => 'Sessão expirada. Faça login novamente.']);
-        exit;
-    }
-    
-    header('Content-Type: application/json; charset=UTF-8');
-    
-    try {
-        // Pegar dados do POST
-        $nome = trim($_POST['nome'] ?? '');
-        $email = trim($_POST['email'] ?? '');
-        $telefone = trim($_POST['telefone'] ?? '');
-        $senha = $_POST['senha'] ?? '';
-        $tipo = $_POST['tipo'] ?? 'cliente';
-        
-        // Validações básicas
-        if (empty($nome) || empty($email) || empty($senha)) {
-            echo json_encode(['status' => false, 'message' => 'Todos os campos obrigatórios devem ser preenchidos']);
-            exit;
-        }
-        
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            echo json_encode(['status' => false, 'message' => 'Email inválido']);
-            exit;
-        }
-        
-        if (strlen($senha) < 8) {
-            echo json_encode(['status' => false, 'message' => 'A senha deve ter no mínimo 8 caracteres']);
-            exit;
-        }
-        
-        error_log("DEBUG: Chamando AuthController::register com - Nome: $nome, Email: $email, Tipo: $tipo");
-        
-        // Chamar método de registro
-        $result = AuthController::register($nome, $email, $telefone, $senha, $tipo);
-        
-        error_log("DEBUG: Resultado do AuthController::register: " . json_encode($result));
-        
-        echo json_encode($result);
-        
-    } catch (Exception $e) {
-        error_log('DEBUG: Erro ao criar usuário: ' . $e->getMessage());
-        echo json_encode([
-            'status' => false, 
-            'message' => 'Erro interno: ' . $e->getMessage()
-        ]);
-    }
-    exit;
-}
-// ATÉ AQUI ↑
-
 // Processar requisições diretas de acesso ao controlador
 if (basename($_SERVER['PHP_SELF']) === 'AdminController.php') {
-    // ... resto do código original continua igual
-    
     // Verificar se o usuário está autenticado
     if (!AuthController::isAuthenticated()) {
         header('Location: ' . LOGIN_URL . '?error=' . urlencode('Você precisa fazer login para acessar esta página.'));
@@ -3755,74 +3456,36 @@ if (basename($_SERVER['PHP_SELF']) === 'AdminController.php') {
     $action = $_REQUEST['action'] ?? '';
     
     switch ($action) {
-        case 'get_available_stores':
-            $result = AdminController::getAvailableStores();
-            sendJsonResponse($result);
-            break;
-            
-        case 'get_store_by_email':
-            $email = $_POST['email'] ?? '';
-            if (empty($email)) {
-                sendJsonResponse(['status' => false, 'message' => 'Email não fornecido']);
-            }
-            $result = AdminController::getStoreByEmail($email);
-            sendJsonResponse($result);
-            break;
-
-        case 'register':
-            $result = AuthController::register(
-                $_POST['nome'] ?? '', 
-                $_POST['email'] ?? '', 
-                $_POST['telefone'] ?? '', 
-                $_POST['senha'] ?? '', 
-                $_POST['tipo'] ?? 'cliente'
-            );
-            sendJsonResponse($result);
-            break;
-        case 'create_user':
-            $result = AuthController::register(
-                $_POST['nome'], 
-                $_POST['email'], 
-                $_POST['telefone'] ?? '', 
-                $_POST['senha'], 
-                $_POST['tipo']
-            );
-            echo json_encode($result);
-            break;
-
+        
         case 'dashboard':
             $result = AdminController::getDashboardData();
-            sendJsonResponse($result);
+            echo json_encode($result);
             break;
             
         case 'users':
-            $filters = [];
-            if (isset($_POST['tipo'])) $filters['tipo'] = $_POST['tipo'];
-            if (isset($_POST['status'])) $filters['status'] = $_POST['status'];
-            if (isset($_POST['busca'])) $filters['busca'] = $_POST['busca'];
-            
             $page = isset($_POST['page']) ? intval($_POST['page']) : 1;
-            $result = AdminController::manageUsers($filters, $page);
-            sendJsonResponse($result);
+            $result = AdminController::manageUsers([], $page);
+            echo json_encode($result);
             break;
             
+        
         case 'getUserDetails':
+            // Garantir que a resposta seja JSON
+            header('Content-Type: application/json');
             $userId = isset($_POST['user_id']) ? intval($_POST['user_id']) : 0;
             $result = AdminController::getUserDetails($userId);
-            sendJsonResponse($result);
+            echo json_encode($result);
+            exit; // Garantir que nada mais seja executado
             break;   
-
         case 'update_user_status':
-        case 'toggle_status':
             $userId = isset($_POST['user_id']) ? intval($_POST['user_id']) : 0;
             $status = $_POST['status'] ?? '';
             $result = AdminController::updateUserStatus($userId, $status);
-            sendJsonResponse($result);
+            echo json_encode($result);
             break;
         case 'update_user':
             $userId = isset($_POST['user_id']) ? intval($_POST['user_id']) : 0;
-            $data = $_POST;
-            $result = AdminController::updateUser($userId, $data);
+            $result = AdminController::updateUser($userId, $_POST);
             echo json_encode($result);
             break;    
         case 'stores':

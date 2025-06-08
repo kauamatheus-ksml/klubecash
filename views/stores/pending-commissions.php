@@ -12,20 +12,6 @@ require_once '../../models/CashbackBalance.php';
 
 // Iniciar sessão
 session_start();
-// Verificar autenticação
-if (!isset($_SESSION['user_id']) || $_SESSION['user_type'] !== 'loja') {
-    header('Location: ' . LOGIN_URL);
-    exit;
-}
-
-$transactionIds = $_GET['transactions'] ?? '';
-if (empty($transactionIds)) {
-    header('Location: ' . STORE_PENDING_TRANSACTIONS_URL);
-    exit;
-}
-
-echo "Página de pagamento funcionando!<br>";
-echo "IDs das transações: " . htmlspecialchars($transactionIds);
 
 // Verificar se o usuário está logado e é uma loja
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION['user_type'] !== 'loja') {
@@ -184,9 +170,7 @@ if ($result['status'] && isset($result['data']['totais'])) {
                     <div class="card-title">Transações Pendentes de Pagamento</div>
                     <?php if ($totalTransacoes > 0): ?>
                     <div style="display: flex; gap: 1rem;">
-                        <button type="button" class="btn btn-success" onclick="processSelectedPayments()" id="btnPagarSelecionadas">
-                            <i class="bi bi-credit-card"></i> Pagar Selecionadas
-                        </button>
+                        <button id="paySelectedBtn" class="btn btn-primary" disabled>Pagar Selecionadas</button>
                         <button id="payPixBtn" class="btn btn-success" disabled>Pagar via PIX</button>
                     </div>
                     <?php endif; ?>
@@ -581,38 +565,7 @@ function toggleInfoSection() {
     }
 }
 </script>
-    <script>
-// Variável global para URL do site
-const SITE_URL = '<?php echo SITE_URL; ?>';
-
-// Função para processar pagamentos selecionados
-function processSelectedPayments() {
-    // Obter checkboxes marcados (nome correto)
-    const checkboxes = document.querySelectorAll('input[name="transacoes[]"]:checked');
-    const selectedIds = [];
     
-    checkboxes.forEach(function(checkbox) {
-        selectedIds.push(checkbox.value);
-    });
-    
-    if (selectedIds.length === 0) {
-        alert('Por favor, selecione pelo menos uma transação para pagar.');
-        return;
-    }
-    
-    // Redirecionar diretamente para a página de pagamento
-    const url = SITE_URL + '/store/pagamento?transactions=' + selectedIds.join(',');
-    window.location.href = url;
-}
-
-// Função para selecionar/desselecionar todas as transações
-function toggleAllTransactions(source) {
-    const checkboxes = document.querySelectorAll('input[name="transacoes[]"]');
-    checkboxes.forEach(function(checkbox) {
-        checkbox.checked = source.checked;
-    });
-}
-</script>
     <style>
         /* Estilos adicionais para saldo usado */
         .balance-used-badge {

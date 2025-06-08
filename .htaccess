@@ -62,18 +62,17 @@ RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
     Header set X-SSL-Enabled "true" env=HTTPS
     Header set X-TLS-Version "1.2+" env=HTTPS
     
-    # Headers específicos para OpenPix
-    Header set X-OpenPix-Integration "KlubeCash-v2.1"
-    Header set X-OpenPix-Quality "optimized"
+    # CSP para PCI Compliance
+    Header set Content-Security-Policy "default-src 'self' https:; script-src 'self' 'unsafe-inline' https://sdk.mercadopago.com https://secure.mlstatic.com; style-src 'self' 'unsafe-inline' https:; font-src 'self' data: https:; img-src 'self' data: https:; connect-src 'self' https://api.mercadopago.com https://*.mercadopago.com; frame-src 'self' https://*.mercadopago.com"
     
-    # Preload de recursos críticos
-    Header add Link "</assets/css/index-v2.css>; rel=preload; as=style"
-    Header add Link "<https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap>; rel=preload; as=style; crossorigin"
-    Header add Link "</assets/js/index-v2.js>; rel=preload; as=script"
+    # Headers para PCI DSS
+    Header set X-Permitted-Cross-Domain-Policies "none"
+    Header set X-Download-Options "noopen"
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
     
-    # Permitir conexões da OpenPix
-    Header add Access-Control-Allow-Origin "https://api.openpix.com.br"
-    Header add Access-Control-Allow-Credentials "true"
+    # Headers específicos para Mercado Pago
+    Header set X-MP-Integration "KlubeCash-v2.1"
+    Header set X-MP-Quality "optimized"
 </IfModule>
 
 
@@ -149,19 +148,12 @@ RewriteRule ^(.*)$ index.php [L]
     AddOutputFilterByType DEFLATE image/svg+xml
 </IfModule>
 
-# === PIX E OPENPIX (NOVO) ===
-RewriteRule ^loja/pagamento-pix/?$ views/stores/payment-pix.php [L,QSA]
-RewriteRule ^api/openpix/?$ api/openpix.php [L,QSA]
-RewriteRule ^api/openpix-webhook/?$ api/openpix-webhook.php [L,QSA]
-RewriteRule ^api/store-payment/?$ api/store-payment.php [L,QSA]
-
-
 # === ROTAS EXISTENTES (MANTIDAS) ===
 # Autenticação
 RewriteRule ^login/?$ views/auth/login.php [L,NC]
 RewriteRule ^registro/?$ views/auth/register.php [L]
 RewriteRule ^recuperar-senha/?$ views/auth/recover-password.php [L]
-RewriteRule ^api/email-test/?$ api/email-test.php [L]
+
 # Cliente
 RewriteRule ^cliente/dashboard/?$ views/client/dashboard.php [L]
 RewriteRule ^cliente/extrato/?$ views/client/statement.php [L]
@@ -186,26 +178,12 @@ RewriteRule ^admin/comissoes/?$ views/admin/commissions.php [L]
 RewriteRule ^admin/pagamentos/?$ views/admin/payments.php [L]
 RewriteRule ^admin/relatorios/?$ views/admin/reports.php [L]
 
-
-# Adicionar estas linhas ao .htaccess existente
-
-# Controlador de ações da loja
-RewriteRule ^controllers/store_actions/?$ controllers/store_actions.php [L,QSA]
-# Rotas para formulário de pagamento
-RewriteRule ^loja/formulario-pagamento/?$ views/stores/payment-form.php [L,QSA]
-RewriteRule ^loja/pagamento-comissoes/?$ views/stores/payment-form.php [L,QSA]
-
-# Controlador de pagamentos
-RewriteRule ^controllers/PaymentController/?$ controllers/PaymentController.php [L,QSA]
 # PIX e Mercado Pago (OTIMIZADO)
 RewriteRule ^store/pagamento-pix/?$ views/stores/payment-pix.php [L,QSA]
 RewriteRule ^api/mercadopago/?$ api/mercadopago.php [L,QSA]
 RewriteRule ^api/mercadopago-webhook/?$ api/mercadopago-webhook.php [L,QSA]
+RewriteRule ^api/store-payment/?$ api/store-payment.php [L,QSA]
 
-
-
-RewriteRule ^api/openpix/?$ api/openpix.php [L,QSA]
-RewriteRule ^test-openpix/?$ test-openpix.php [L,QSA]
 # Lojas
 RewriteRule ^lojas/cadastro/?$ views/stores/register.php [L]
 RewriteRule ^lojas/detalhes/([0-9]+)/?$ views/stores/details.php?id=$1 [L]
@@ -224,9 +202,9 @@ RewriteRule ^admin/email-templates/?$ views/admin/email-templates.php [L]
 RewriteRule ^admin/email-campanhas/?$ views/admin/email-campaigns.php [L]
 
 # AJAX
-RewriteRule ^admin/ajax/stores/?$ controllers/AdminController.php?action=stores [L,QSA]
-RewriteRule ^admin/ajax/users/?$ controllers/AdminController.php?action=users [L,QSA]
-RewriteRule ^admin/ajax/transactions/?$ controllers/AdminController.php?action=transactions [L,QSA]
+RewriteRule ^admin/ajax/stores/?$ controllers/AdminController.php [L,QSA]
+RewriteRule ^admin/ajax/users/?$ controllers/AdminController.php [L,QSA]
+RewriteRule ^admin/ajax/transactions/?$ controllers/AdminController.php [L,QSA]
 RewriteRule ^admin/ajax/stores-direct/?$ controllers/AjaxStoreController.php [L,QSA]
 
 # API
@@ -238,25 +216,6 @@ RewriteRule ^api/transactions/?$ api/transactions.php [L,QSA]
 RewriteRule ^auth/google/auth/?$ auth/google/auth.php [L]
 RewriteRule ^auth/google/register/?$ auth/google/register.php [L]
 RewriteRule ^auth/google/callback/?$ auth/google/callback.php [L]
-# Rotas para pagamento com OpenPix
-
-// Configurações OpenPix (adicionar se não existir)
-if (!defined('OPENPIX_API_KEY')) {
-    define('OPENPIX_API_KEY', 'Q2xpZW50X0lkXzIzOTVjYmMzLWYyOGItNGJmYi04MWE3LWNkZWIzYzJkYTI4ZTpDbGllbnRfU2VjcmV0X3JYOFRxM016ZWdoNUY5YnVnempJeHl1VlBsRkg2QkNubm0yRFFzUWxQU1E9');
-}
-
-if (!defined('OPENPIX_BASE_URL')) {
-    define('OPENPIX_BASE_URL', 'https://api.openpix.com.br/api/v1');
-}
-
-if (!defined('OPENPIX_WEBHOOK_URL')) {
-    define('OPENPIX_WEBHOOK_URL', SITE_URL . '/api/openpix?action=webhook');
-}
-
-# .htaccess - ADICIONE ESTA LINHA NA SEÇÃO DE AUTENTICAÇÃO
-
-# Verificação 2FA
-RewriteRule ^verificar-2fa/?$ views/auth/verify-2fa.php [L]
 
 # === OTIMIZAÇÕES ESPECIAIS PARA MERCADO PAGO ===
 <IfModule mod_headers.c>
@@ -296,8 +255,8 @@ RewriteRule ^verificar-2fa/?$ views/auth/verify-2fa.php [L]
     php_value error_reporting "E_ALL & ~E_NOTICE & ~E_DEPRECATED"
     php_value memory_limit 256M
     
-    # Configurações específicas para OpenPix
-    php_value user_agent "KlubeCash/2.1 (PHP/7.4; OpenPix-Optimized)"
+    # Configurações específicas para Mercado Pago
+    php_value user_agent "KlubeCash/2.0 (PHP/7.4; MercadoPago-Optimized)"
     php_value default_socket_timeout 30
 </IfModule>
 

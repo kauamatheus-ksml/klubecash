@@ -57,7 +57,9 @@ switch ($method) {
     case 'POST':
         handlePostRequest();
         break;
-    
+    case 'PUT':
+        handlePutRequest();
+        break;
     case 'DELETE':
         handleDeleteRequest();
         break;
@@ -143,7 +145,75 @@ function handlePostRequest() {
     echo json_encode($result);
 }
 
-
+// Função para tratar requisições PUT (atualizar usuário existente)
+function handlePutRequest() {
+    // Validar token
+    $userData = validateToken();
+    
+    // Obter dados do corpo da requisição
+    $data = json_decode(file_get_contents('php://input'), true);
+    
+    // Validar dados básicos
+    if (!$data || !isset($data['id'])) {
+        http_response_code(400);
+        echo json_encode(['status' => false, 'message' => 'ID do usuário não fornecido']);
+        exit;
+    }
+    
+    $userId = intval($data['id']);
+    
+    // Verificar permissões: admin pode editar qualquer usuário, outros só podem editar a si mesmos
+    if ($userData['tipo'] !== USER_TYPE_ADMIN && $userId !== $userData['id']) {
+        http_response_code(403);
+        echo json_encode(['status' => false, 'message' => 'Você não tem permissão para editar este usuário']);
+        exit;
+    }
+    
+    // Preparar dados para atualização
+    $updateData = [];
+    
+    // Campos permitidos para atualização
+    $allowedFields = ['nome', 'email', 'telefone'];
+    
+    // Admin pode alterar outros campos
+    if ($userData['tipo'] === USER_TYPE_ADMIN) {
+        $allowedFields = array_merge($allowedFields, ['tipo', 'status']);
+    }
+    
+    // Copiar apenas os campos permitidos
+    foreach ($allowedFields as $field) {
+        if (isset($data[$field])) {
+            $updateData[$field] = $data[$field];
+        }
+    }
+    
+    // Senha pode ser alterada se fornecida
+    if (isset($data['senha']) && !empty($data['senha'])) {
+        // Para não-admin, exigir senha atual
+        if ($userData['tipo'] !== USER_TYPE_ADMIN && (!isset($data['senha_atual']) || empty($data['senha_atual']))) {
+            http_response_code(400);
+            echo json_encode(['status' => false, 'message' => 'Senha atual obrigatória para alteração de senha']);
+            exit;
+        }
+        
+        $updateData['senha'] = $data['senha'];
+        
+        if (isset($data['senha_atual'])) {
+            $updateData['senha_atual'] = $data['senha_atual'];
+        }
+    }
+    
+    // Atualizar usuário
+    if ($userData['tipo'] === USER_TYPE_ADMIN) {
+        $result = AdminController::updateUser($userId, $updateData);
+    } else {
+        // Implementar atualização para cliente/loja (usar ClientController ou criar método específico)
+        $result = ['status' => false, 'message' => 'Função não implementada'];
+    }
+    
+    // Retornar resultado
+    echo json_encode($result);
+}
 
 // Função para tratar requisições DELETE (desativar/remover usuário)
 function handleDeleteRequest() {

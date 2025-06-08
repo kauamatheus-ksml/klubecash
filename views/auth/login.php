@@ -674,7 +674,7 @@ if (!empty($urlError)) {
                 <li>Cashback real</li>
                 <li>Muitas lojas parceiras</li>
                 <li>Sem taxas ou anuidades</li>
-                <li>Utilize em lojas que ele foi gerado</li>
+                <li>Utilize em lojas que ele fopi gerado</li>
             </ul>
         </div>
 
@@ -951,85 +951,5 @@ if (!empty($urlError)) {
             formSubmitted = true;
         });
     </script>
-
-    <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const form = document.getElementById('loginForm');
-    const submitBtn = document.getElementById('submitBtn');
-    const messageContainer = document.getElementById('messageContainer');
-
-    form.addEventListener('submit', function(e) {
-        e.preventDefault();
-        
-        const email = document.getElementById('email').value.trim();
-        const password = document.getElementById('password').value;
-
-        if (!email || !password) {
-            showMessage('Por favor, preencha todos os campos.', 'error');
-            return;
-        }
-
-        submitBtn.disabled = true;
-        submitBtn.textContent = 'Entrando...';
-
-        fetch('../../controllers/AuthController.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: `action=login_with_2fa&email=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}`
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status) {
-                if (data.requires_2fa) {
-                    // Redirecionar para página de verificação 2FA
-                    showMessage(data.message + ' Redirecionando...', 'success');
-                    setTimeout(() => {
-                        window.location.href = '<?php echo SITE_URL; ?>/views/auth/verify-2fa.php';
-                    }, 1000);
-                } else {
-                    // Login normal sem 2FA
-                    showMessage('Login realizado com sucesso! Redirecionando...', 'success');
-                    
-                    setTimeout(() => {
-                        const userType = data.user.type;
-                        let redirectUrl = '<?php echo CLIENT_DASHBOARD_URL; ?>';
-                        
-                        if (userType === 'admin') {
-                            redirectUrl = '<?php echo ADMIN_DASHBOARD_URL; ?>';
-                        } else if (userType === 'loja') {
-                            redirectUrl = '<?php echo STORE_DASHBOARD_URL; ?>';
-                        }
-                        
-                        window.location.href = redirectUrl;
-                    }, 1000);
-                }
-            } else {
-                showMessage(data.message, 'error');
-            }
-        })
-        .catch(error => {
-            showMessage('Erro de conexão. Tente novamente.', 'error');
-        })
-        .finally(() => {
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Entrar';
-        });
-    });
-
-    function showMessage(message, type) {
-        messageContainer.innerHTML = `
-            <div class="alert alert-${type === 'error' ? 'danger' : 'success'}">
-                ${message}
-            </div>
-        `;
-        
-        setTimeout(() => {
-            messageContainer.innerHTML = '';
-        }, 5000);
-    }
-});
-</script>
 </body>
 </html>

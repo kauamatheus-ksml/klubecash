@@ -593,104 +593,14 @@ class StoreController {
             return ['status' => false, 'message' => 'Erro ao carregar lojas. Tente novamente.'];
         }
     }
-    /**
-     * Processar formulário de pagamento
-     */
-    public static function processPaymentForm($data) {
-        try {
-            $db = Database::getConnection();
-            
-            // Verificar se o usuário é uma loja autenticada
-            if (!AuthController::isAuthenticated() || !AuthController::isStore()) {
-                return ['status' => false, 'message' => 'Acesso restrito a lojas parceiras.'];
-            }
-            
-            $userId = AuthController::getCurrentUserId();
-            
-            // Obter dados da loja
-            $storeQuery = $db->prepare("SELECT id, nome_fantasia FROM lojas WHERE usuario_id = ?");
-            $storeQuery->execute([$userId]);
-            $store = $storeQuery->fetch(PDO::FETCH_ASSOC);
-            
-            if (!$store) {
-                return ['status' => false, 'message' => 'Loja não encontrada.'];
-            }
-            
-            // Validar transações selecionadas
-            if (!isset($data['transacoes']) || !is_array($data['transacoes']) || empty($data['transacoes'])) {
-                return ['status' => false, 'message' => 'Nenhuma transação selecionada.'];
-            }
-            
-            // Validar e processar as transações
-            $transactionIds = array_map('intval', $data['transacoes']);
-            $storeId = $store['id'];
-            
-            // Verificar se todas as transações pertencem à loja e estão pendentes
-            $placeholders = implode(',', array_fill(0, count($transactionIds), '?'));
-            $checkStmt = $db->prepare("
-                SELECT COUNT(*) as total 
-                FROM transacoes_cashback 
-                WHERE id IN ($placeholders) 
-                AND loja_id = ? 
-                AND status_comissao = 'pendente'
-            ");
-            $checkStmt->execute([...$transactionIds, $storeId]);
-            $checkResult = $checkStmt->fetch(PDO::FETCH_ASSOC);
-            
-            if ($checkResult['total'] != count($transactionIds)) {
-                return ['status' => false, 'message' => 'Algumas transações não são válidas ou já foram processadas.'];
-            }
-            
-            // Calcular valores totais
-            $valueStmt = $db->prepare("
-                SELECT 
-                    SUM(valor_comissao_admin + valor_comissao_loja) as valor_total,
-                    COUNT(*) as qtd_transacoes
-                FROM transacoes_cashback 
-                WHERE id IN ($placeholders) AND loja_id = ?
-            ");
-            $valueStmt->execute([...$transactionIds, $storeId]);
-            $totals = $valueStmt->fetch(PDO::FETCH_ASSOC);
-            
-            if (!$totals || $totals['valor_total'] <= 0) {
-                return ['status' => false, 'message' => 'Nenhum valor de comissão encontrado para as transações selecionadas.'];
-            }
-            
-            return [
-                'status' => true, 
-                'message' => 'Transações validadas com sucesso.',
-                'data' => [
-                    'transacoes' => $transactionIds,
-                    'valor_total' => $totals['valor_total'],
-                    'quantidade' => $totals['qtd_transacoes'],
-                    'loja_id' => $storeId,
-                    'loja_nome' => $store['nome_fantasia']
-                ]
-            ];
-            
-        } catch (Exception $e) {
-            error_log('Erro ao processar formulário de pagamento: ' . $e->getMessage());
-            return ['status' => false, 'message' => 'Erro interno. Tente novamente.'];
-        }
-    }
-
 }
 
 // Processar requisições diretas de acesso ao controlador
 if (basename($_SERVER['PHP_SELF']) === 'StoreController.php') {
-    // Verificar se é requisição AJAX
-    $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && 
-              strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest';
-
     // Verificar se o usuário está autenticado
     if (!AuthController::isAuthenticated()) {
-        if ($isAjax) {
-            echo json_encode(['status' => false, 'message' => 'Sessão expirada. Faça login novamente.']);
-            exit;
-        } else {
-            header('Location: ' . LOGIN_URL . '?error=' . urlencode('Você precisa fazer login para acessar esta página.'));
-            exit;
-        }
+        header('Location: ' . LOGIN_URL . '?error=' . urlencode('Você precisa fazer login para acessar esta página.'));
+        exit;
     }
     
     $action = $_REQUEST['action'] ?? '';
@@ -729,13 +639,6 @@ if (basename($_SERVER['PHP_SELF']) === 'StoreController.php') {
             $filters = $_POST['filters'] ?? [];
             $page = isset($_POST['page']) ? intval($_POST['page']) : 1;
             $result = StoreController::getStores($filters, $page);
-            echo json_encode($result);
-            break;
-            
-        // NOVA AÇÃO ADICIONADA
-        case 'payment_form':
-            $data = $_POST;
-            $result = StoreController::processPaymentForm($data);
             echo json_encode($result);
             break;
             

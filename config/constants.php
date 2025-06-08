@@ -3,20 +3,6 @@
  * Constantes do sistema - Klube Cash v2.1
  * Configurações otimizadas para Mercado Pago com qualidade máxima
  */
-define('SMTP_HOST', 'smtp.hostinger.com');
-define('SMTP_PORT', 465);
-define('SMTP_USERNAME', 'klubecash@klubecash.com');
-define('SMTP_PASSWORD', 'Aaku_2004@');
-define('SMTP_FROM_EMAIL', 'klubecash@klubecash.com');
-define('SMTP_FROM_NAME', 'Klube Cash');
-define('SMTP_ENCRYPTION', 'ssl');
-
-define('ADMIN_CONTROLLER', 'controllers/AdminController.php');
-define('CLIENT_CONTROLLER', 'controllers/ClientController.php');
-define('STORE_CONTROLLER', 'controllers/StoreController.php');
-define('AUTH_CONTROLLER', 'controllers/AuthController.php');
-
-
 
 // === INFORMAÇÕES DO SISTEMA ===
 define('SYSTEM_NAME', 'Klube Cash');
@@ -63,36 +49,11 @@ define('STORE_PENDING', 'pendente');
 define('STORE_APPROVED', 'aprovado');
 define('STORE_REJECTED', 'rejeitado');
 
-
-define('DEFAULT_TIMEZONE', 'America/Sao_Paulo');
-date_default_timezone_set(DEFAULT_TIMEZONE);
 // === CONFIGURAÇÕES DE SEGURANÇA ===
 define('PASSWORD_MIN_LENGTH', 8);
 define('SESSION_LIFETIME', 86400);
 define('TOKEN_EXPIRATION', 7200);
 define('CPF_REQUIRED', true); // Novo: Indica se CPF é obrigatório
-
-
-// === 🆕 OPENPIX CONFIGURAÇÕES COMPLETAS ===
-// ATENÇÃO: Substitua pela sua API Key real do OpenPix
-define('OPENPIX_API_KEY', 'Q2xpZW50X0lkXzIzOTVjYmMzLWYyOGItNGJmYi04MWE3LWNkZWIzYzJkYTI4ZTpDbGllbnRfU2VjcmV0X3JYOFRxM016ZWdoNUY5YnVnempJeHl1VlBsRkg2QkNubm0yRFFzUWxQU1E9');
-define('OPENPIX_WEBHOOK_URL', SITE_URL . '/api/openpix?action=webhook');
-define('OPENPIX_BASE_URL', 'https://api.openpix.com.br/api/v1');
-define('OPENPIX_TIMEOUT', 30);
-define('LOG_OPENPIX_REQUESTS', true);
-define('OPENPIX_DEBUG', false); // 🆕 Constante necessária para o OpenPixClient
-define('OPENPIX_ENABLE_SSL_VERIFICATION', true); // 🆕 Verificação SSL
-define('OPENPIX_MAX_RETRIES', 3); // 🆕 Máximo de tentativas
-define('OPENPIX_RETRY_DELAY', 1000); // 🆕 Delay entre tentativas (ms)
-
-
-
-
-
-
-
-
-
 
 // === MENSAGENS DE VALIDAÇÃO ===
 define('MSG_CPF_REQUIRED', 'CPF é obrigatório para completar seu perfil');
@@ -115,7 +76,7 @@ define('MP_USER_AGENT', 'KlubeCash/2.1 (Mercado Pago Integration Optimized)');
 
 // === URLs MERCADO PAGO ===
 define('MP_CREATE_PAYMENT_URL', SITE_URL . '/api/mercadopago?action=create_payment');
-define('MP_CHECK_STATUS_URL', SITE_URL . '/api/mercadopago.php?action=status');
+define('MP_CHECK_STATUS_URL', SITE_URL . '/api/mercadopago?action=status');
 define('MP_BASE_URL', 'https://api.mercadopago.com');
 
 // === CONFIGURAÇÕES DE QUALIDADE MP ===
@@ -168,9 +129,7 @@ define('STORE_PAYMENT_URL', SITE_URL . '/store/pagamento');
 define('STORE_PAYMENT_HISTORY_URL', SITE_URL . '/store/historico-pagamentos');
 define('STORE_PROFILE_URL', SITE_URL . '/store/perfil');
 define('STORE_PAYMENT_PIX_URL', SITE_URL . '/store/pagamento-pix');
-// === CONTROLADORES ===
-define('STORE_CONTROLLER_URL', SITE_URL . '/controllers/StoreController.php');
-define('TRANSACTION_CONTROLLER_URL', SITE_URL . '/controllers/TransactionController.php');
+
 // === CONFIGURAÇÕES DE ASSETS ===
 define('ASSETS_VERSION', '2.1.0'); // Para cache busting
 define('CDN_URL', SITE_URL); // Para futuros CDNs
@@ -190,14 +149,14 @@ define('GOOGLE_PEOPLE_API_URL', 'https://people.googleapis.com/v1/people/me');
 
 define('GOOGLE_AUTH_ENDPOINT', SITE_URL . '/auth/google/auth');
 define('GOOGLE_CALLBACK_ENDPOINT', SITE_URL . '/auth/google/callback');
-define('USER_MANAGEMENT_URL', SITE_URL . '/admin/api/user-management');
+
 // === CONFIGURAÇÕES DE EMAIL ===
 if (!defined('SMTP_HOST')) {
     define('SMTP_HOST', 'smtp.hostinger.com');
     define('SMTP_PORT', 465);
     define('SMTP_USERNAME', 'klubecash@klubecash.com');
     define('SMTP_PASSWORD', 'Aaku_2004@');
-    define('SMTP_FROM_EMAIL', 'klubecash@klubecash.com');
+    define('SMTP_FROM_EMAIL', 'noreply@klubecash.com');
     define('SMTP_FROM_NAME', 'Klube Cash');
     define('SMTP_ENCRYPTION', 'ssl');
 }
@@ -210,7 +169,6 @@ if (!defined('ENVIRONMENT')) {
 
 // === EXPORTAÇÕES ===
 define('EXPORTS_DIR', ROOT_DIR . '/exports');
-define('UPLOADS_DIR', ROOT_DIR . '/uploads');
 
 // === CONFIGURAÇÕES DE SESSÃO SEGURA ===
 if (session_status() === PHP_SESSION_NONE) {
@@ -249,13 +207,7 @@ define('LOG_MP_RESPONSES', true); // Log de todas as respostas MP
 define('LOG_WEBHOOK_EVENTS', true); // Log de eventos de webhook
 define('LOG_QUALITY_METRICS', true); // Log de métricas de qualidade
 
-// === MÉTODOS DE PAGAMENTO ===
-define('PAYMENT_METHOD_PIX', 'pix');
-define('PAYMENT_METHOD_PIX_MP', 'pix_mercadopago');
-define('PAYMENT_METHOD_TRANSFER', 'transferencia');
-define('PAYMENT_METHOD_BOLETO', 'boleto');
-define('PAYMENT_METHOD_CARD', 'cartao');
-define('PAYMENT_METHOD_OTHER', 'outro');
+
 
 // === MERCADO PAGO SDK CONFIGURATION ===
 define('MP_SDK_VERSION', 'v2');
@@ -274,14 +226,6 @@ define('HTTPS_ONLY', true);
 define('DEVICE_ID_PREFIX', 'klube_web_');
 define('DEVICE_ID_ALGORITHM', 'enhanced');
 define('DEVICE_ID_STORAGE', 'multi'); // localStorage + sessionStorage + cookie
-
-
-// === CONFIGURAÇÕES DE 2FA ===
-define('TWO_FA_VERIFY_URL', SITE_URL . '/verificar-2fa');
-define('TWO_FA_CODE_LENGTH', 6);
-define('TWO_FA_DEFAULT_EXPIRATION', 5); // minutos
-define('TWO_FA_MAX_ATTEMPTS', 3);
-define('TWO_FA_BLOCK_DURATION', 15); // minutos
 
 // Funções helper para certificados
 function is_ssl_enabled() {

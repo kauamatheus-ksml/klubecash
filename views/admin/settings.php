@@ -89,37 +89,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ensureConfigurationTables($db);
         
         switch ($action) {
-            case 'update_2fa_settings':
-                $config2FA = [
-                    'habilitado' => isset($_POST['2fa_habilitado']) ? 1 : 0,
-                    'tempo_expiracao_minutos' => intval($_POST['tempo_expiracao_minutos'] ?? 5),
-                    'max_tentativas' => intval($_POST['max_tentativas'] ?? 3)
-                ];
-                
-                $result = AuthController::update2FASettings($config2FA);
-                
-                if ($result['status']) {
-                    $message = 'Configurações de 2FA atualizadas com sucesso!';
-                    $messageType = 'success';
-                } else {
-                    $message = $result['message'];
-                    $messageType = 'danger';
-                }
-                break;
-                
             case 'update_cashback':
                 // Converter valores para float para garantir o formato correto
                 $data = [
-                    'porcentagem_total' => 10.00, // Sempre 10%
+                    'porcentagem_total' => floatval($_POST['porcentagem_total']),
                     'porcentagem_cliente' => floatval($_POST['porcentagem_cliente']),
                     'porcentagem_admin' => floatval($_POST['porcentagem_admin']),
-                    'porcentagem_loja' => 0.00 // Loja não recebe cashback
+                    'porcentagem_loja' => floatval($_POST['porcentagem_loja'])
                 ];
                 
                 // Verificar se a soma está correta
-                $soma = $data['porcentagem_cliente'] + $data['porcentagem_admin'];
-                if (abs($soma - 10.00) > 0.01) {
-                    $message = 'Erro: A soma das porcentagens (' . number_format($soma, 2) . '%) não é igual a 10%.';
+                $soma = $data['porcentagem_cliente'] + $data['porcentagem_admin'] + $data['porcentagem_loja'];
+                if (abs($soma - $data['porcentagem_total']) > 0.01) {
+                    $message = 'Erro: A soma das porcentagens (' . number_format($soma, 2) . '%) não é igual à porcentagem total (' . number_format($data['porcentagem_total'], 2) . '%).';
                     $messageType = 'danger';
                 } else {
                     $result = AdminController::updateSettings($data);
@@ -210,9 +192,6 @@ try {
     // Garantir que as tabelas existam antes de consultar
     ensureConfigurationTables($db);
     
-    // Obter configurações de 2FA
-    $config2FA = AuthController::get2FASettings();
-    
     // Configurações de cashback
     $settingsResult = AdminController::getSettings();
     
@@ -267,12 +246,6 @@ try {
     $messageType = 'danger';
     
     // Definir valores padrão em caso de erro
-    $config2FA = [
-        'habilitado' => false,
-        'tempo_expiracao_minutos' => 5,
-        'max_tentativas' => 3
-    ];
-    
     $settings = [
         'porcentagem_total' => DEFAULT_CASHBACK_TOTAL,
         'porcentagem_cliente' => DEFAULT_CASHBACK_CLIENT,
@@ -313,103 +286,13 @@ try {
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
     <link rel="stylesheet" href="../../assets/css/views/admin/settings.css">
     <link rel="stylesheet" href="../../assets/css/layout-fix.css">
-    <style>
-        .btn-sm {
-            padding: 5px 10px;
-            font-size: 12px;
-            margin: 2px;
-        }
-        /* Estilos específicos para 2FA */
-        .status-info {
-            display: flex;
-            align-items: flex-start;
-            gap: 8px;
-            flex-direction: column;
-        }
-
-        .status-info strong {
-            margin-left: 20px;
-        }
-
-        .status-info .form-text {
-            margin-left: 20px;
-            margin-top: 5px;
-        }
-
-        .status-indicator {
-            display: inline-block;
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            margin-right: 8px;
-        }
-
-        .status-indicator.active {
-            background-color: #28a745;
-            box-shadow: 0 0 8px rgba(40, 167, 69, 0.4);
-        }
-
-        .status-indicator.inactive {
-            background-color: #6c757d;
-        }
-
-        .info-box {
-            background-color: #e7f3ff;
-            border: 1px solid #b3d7ff;
-            border-radius: 8px;
-            padding: 15px;
-            margin: 20px 0;
-            display: flex;
-            align-items: flex-start;
-            gap: 12px;
-        }
-
-        .info-icon {
-            font-size: 1.2rem;
-            margin-top: 2px;
-        }
-
-        .info-content {
-            flex: 1;
-            color: #2c5aa0;
-            line-height: 1.5;
-        }
-
-        .info-content strong {
-            color: #1a4480;
-        }
-
-        .btn-group {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-
-        .btn-group .btn {
-            margin: 0;
-        }
-
-        .form-divider {
-            border-top: 1px solid #e9ecef;
-            margin: 25px 0;
-        }
-
-        .subsection-title {
-            font-size: 18px;
-            font-weight: 600;
-            color: #333;
-            margin: 20px 0 15px 0;
-            padding-bottom: 8px;
-            border-bottom: 2px solid #f8f9fa;
-        }
-    </style>
 </head>
 <body>
     <?php include_once '../components/sidebar.php'; ?>
     
     <div class="main-content" id="mainContent">
         <div class="page-wrapper">
-            <h1 class="page-title">Configurações do Sistema</h1>
+            <h1 class="page-title">Configurações</h1>
             
             <?php if (!empty($message)): ?>
                 <div class="alert alert-<?php echo $messageType; ?>">
@@ -417,7 +300,6 @@ try {
                 </div>
             <?php endif; ?>
             
-            <!-- Configurações de Cashback -->
             <form method="post" action="" id="cashbackForm">
                 <input type="hidden" name="action" value="update_cashback">
                 <div class="card">
@@ -425,6 +307,7 @@ try {
                         <h2 class="card-title">Configurações de Cashback</h2>
                     </div>
                     <div class="card-body">
+                        <!-- REMOVIDO: Campo porcentagem total - sempre será 10% -->
                         <div class="info-box">
                             <div class="info-icon">ℹ️</div>
                             <div class="info-content">
@@ -456,100 +339,6 @@ try {
                             <button type="submit" class="btn btn-primary">Salvar Configurações de Cashback</button>
                         </div>
                     </div>
-                </div>
-            </form>
-            
-            <!-- Configurações de Autenticação de Dois Fatores -->
-            <form method="post" action="" id="twoFactorForm">
-                <input type="hidden" name="action" value="update_2fa_settings">
-                <div class="card">
-                    <div class="card-header">
-                        <h2 class="card-title">Autenticação de Dois Fatores (2FA)</h2>
-                    </div>
-                    <div class="card-body">
-                        <div class="info-box">
-                            <div class="info-icon">🔐</div>
-                            <div class="info-content">
-                                <strong>Sobre o 2FA:</strong> A autenticação de dois fatores adiciona uma camada extra de segurança, 
-                                enviando um código por email para verificar a identidade do usuário durante o login.
-                            </div>
-                        </div>
-                        
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label class="form-label">
-                                    <input type="checkbox" name="2fa_habilitado" value="1" <?php echo $config2FA['habilitado'] ? 'checked' : ''; ?>>
-                                    Habilitar verificação em duas etapas
-                                </label>
-                                <small class="form-text">Quando habilitado, todos os usuários precisarão verificar um código enviado por email</small>
-                            </div>
-                        </div>
-                        
-                        <div class="form-divider"></div>
-                        
-                        <h3 class="subsection-title">Configurações Avançadas</h3>
-                        
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label class="form-label" for="tempoExpiracaoMinutos">Tempo de Expiração do Código (minutos)</label>
-                                <input type="number" min="1" max="60" class="form-control" id="tempoExpiracaoMinutos" 
-                                       name="tempo_expiracao_minutos" value="<?php echo $config2FA['tempo_expiracao_minutos']; ?>">
-                                <small class="form-text">Por quanto tempo o código de verificação permanece válido</small>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label class="form-label" for="maxTentativas">Máximo de Tentativas</label>
-                                <input type="number" min="1" max="10" class="form-control" id="maxTentativas" 
-                                       name="max_tentativas" value="<?php echo $config2FA['max_tentativas']; ?>">
-                                <small class="form-text">Número máximo de tentativas antes de bloquear temporariamente</small>
-                            </div>
-                        </div>
-                        
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label class="form-label">Status do Sistema</label>
-                                <div class="status-info">
-                                    <?php if ($config2FA['habilitado']): ?>
-                                        <span class="status-indicator active"></span>
-                                        <strong style="color: var(--success-color);">2FA Ativo</strong>
-                                        <p class="form-text">Todos os novos logins requerem verificação por email</p>
-                                    <?php else: ?>
-                                        <span class="status-indicator inactive"></span>
-                                        <strong style="color: var(--medium-gray);">2FA Inativo</strong>
-                                        <p class="form-text">Login tradicional (apenas email e senha)</p>
-                                    <?php endif; ?>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="btn-group">
-                            <button type="submit" class="btn btn-primary">Salvar Configurações de 2FA</button>
-                        </div>
-
-                        <div class="card" style="margin-top: 20px; border: 1px solid #ddd; padding: 15px;">
-                            <h4>🔧 Diagnósticos do Sistema de Email</h4>
-                            
-                            <div style="margin: 10px 0;">
-                                <strong>1. Verificações Básicas:</strong><br>
-                                <button type="button" class="btn btn-outline-info btn-sm" onclick="makeEmailTestRequest('ping', event.target)">🏓 Ping</button>
-                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="makeEmailTestRequest('check_config', event.target)">⚙️ Configurações</button>
-                                <button type="button" class="btn btn-outline-primary btn-sm" onclick="makeEmailTestRequest('test_phpmailer_load', event.target)">📦 Carregar PHPMailer</button>
-                            </div>
-                            
-                            <div style="margin: 10px 0;">
-                                <strong>2. Testes de Conexão:</strong><br>
-                                <button type="button" class="btn btn-warning btn-sm" onclick="makeEmailTestRequest('test_smtp_basic', event.target)">🔗 Testar SMTP</button>
-                            </div>
-                            
-                            <div style="margin: 10px 0;">
-                                <strong>3. Testes de Envio:</strong><br>
-                                <button type="button" class="btn btn-success btn-sm" onclick="makeEmailTestRequest('send_test_basic', event.target)">📧 Enviar Email</button>
-                            </div>
-                            
-                            <div style="margin: 10px 0; padding: 10px; background: #f8f9fa; border-radius: 5px;">
-                                <small><strong>💡 Ordem recomendada:</strong> Teste primeiro o Ping, depois Configurações, depois Carregar PHPMailer, depois Testar SMTP e finalmente Enviar Email.</small>
-                            </div>
-                        </div>
                 </div>
             </form>
             
@@ -748,7 +537,7 @@ try {
             <!-- Configurações do Sistema -->
             <div class="card">
                 <div class="card-header">
-                    <h2 class="card-title">Informações do Sistema</h2>
+                    <h2 class="card-title">Configurações do Sistema</h2>
                 </div>
                 <div class="card-body">
                     <div class="form-row">
@@ -780,263 +569,97 @@ try {
     </div>
     
     <script>
-        // Função para teste SMTP manual
-        function testSMTPManual() {
-            if (!confirm('Testar conexão SMTP manualmente (sem classe Email)?')) {
-                return;
+        // Atualizar soma das porcentagens em tempo real
+        // Atualizar soma das porcentagens em tempo real
+        function updateSoma() {
+            const porcentagemCliente = parseFloat(document.getElementById('porcentagemCliente').value) || 0;
+            const porcentagemAdmin = parseFloat(document.getElementById('porcentagemAdmin').value) || 0;
+            
+            const soma = porcentagemCliente + porcentagemAdmin;
+            document.getElementById('somaAtual').textContent = soma.toFixed(2);
+            
+            // Verificar se soma é exatamente 10%
+            const somaInfo = document.getElementById('somaInfo');
+            
+            if (Math.abs(soma - 10.00) > 0.01) {
+                somaInfo.style.color = 'var(--danger-color)';
+            } else {
+                somaInfo.style.color = 'var(--success-color)';
             }
-            makeEmailTestRequest('test_connection_manual', event.target);
         }
 
-        // Função para envio de email manual
-        function sendEmailManual() {
-            if (!confirm('Enviar email de teste manualmente (sem classe Email)?')) {
-                return;
+        // Eventos
+        document.getElementById('porcentagemCliente').addEventListener('input', updateSoma);
+        document.getElementById('porcentagemAdmin').addEventListener('input', updateSoma);
+
+        // Inicializar
+        document.addEventListener('DOMContentLoaded', updateSoma);
+        
+        // Validar formulário de cashback antes de enviar
+        // Validar formulário de cashback antes de enviar
+        document.getElementById('cashbackForm').addEventListener('submit', function(event) {
+            const porcentagemCliente = parseFloat(document.getElementById('porcentagemCliente').value);
+            const porcentagemAdmin = parseFloat(document.getElementById('porcentagemAdmin').value);
+            
+            if (isNaN(porcentagemCliente) || isNaN(porcentagemAdmin)) {
+                alert('Por favor, preencha todos os campos com valores numéricos válidos.');
+                event.preventDefault();
+                return false;
             }
-            makeEmailTestRequest('send_simple_manual', event.target);
-        }
-// URL do endpoint de teste
-const EMAIL_TEST_URL = '<?php echo SITE_URL; ?>/test-email-endpoint.php';
-
-// Função para log de debug
-function debugLog(message, data = null) {
-    console.log(`[EMAIL_TEST] ${message}`, data || '');
-}
-
-// Função para fazer requisições com debug completo
-async function makeEmailTestRequest(action, buttonElement) {
-    const originalText = buttonElement.textContent;
-    
-    try {
-        debugLog(`Iniciando teste: ${action}`);
-        
-        // Desabilitar botão
-        buttonElement.disabled = true;
-        buttonElement.textContent = 'Processando...';
-        
-        // Fazer requisição
-        debugLog(`Fazendo requisição para: ${EMAIL_TEST_URL}`);
-        const response = await fetch(EMAIL_TEST_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: `action=${encodeURIComponent(action)}`
-        });
-        
-        debugLog(`Resposta recebida. Status: ${response.status}`);
-        
-        // Verificar status HTTP
-        if (!response.ok) {
-            throw new Error(`Erro HTTP ${response.status}: ${response.statusText}`);
-        }
-        
-        // Obter texto da resposta primeiro
-        const responseText = await response.text();
-        debugLog('Texto da resposta:', responseText);
-        
-        // Verificar se começa com JSON
-        if (!responseText.trim().startsWith('{')) {
-            console.error('Resposta HTML recebida:', responseText);
-            throw new Error('Servidor retornou HTML em vez de JSON. Verifique os logs.');
-        }
-        
-        // Tentar parsear JSON
-        let data;
-        try {
-            data = JSON.parse(responseText);
-        } catch (parseError) {
-            console.error('Erro ao parsear JSON:', parseError);
-            console.error('Texto que não pôde ser parseado:', responseText);
-            throw new Error('Resposta não é um JSON válido');
-        }
-        
-        debugLog('Dados parseados:', data);
-        
-        // Exibir resultado
-        if (data.status) {
-            alert(`✅ Sucesso: ${data.message}`);
-            if (data.data) {
-                console.log('Dados adicionais:', data.data);
+            
+            if (porcentagemCliente < 0 || porcentagemCliente > 10 || 
+                porcentagemAdmin < 0 || porcentagemAdmin > 10) {
+                alert('As porcentagens devem estar entre 0 e 10.');
+                event.preventDefault();
+                return false;
             }
-        } else {
-            alert(`❌ Erro: ${data.message}`);
-        }
-        
-    } catch (error) {
-        debugLog('Erro na requisição:', error);
-        console.error('Erro completo:', error);
-        
-        // Mensagem de erro mais específica
-        let errorMessage = error.message;
-        if (error.message.includes('Failed to fetch')) {
-            errorMessage = 'Erro de conexão. Verifique se o servidor está respondendo.';
-        } else if (error.message.includes('HTML')) {
-            errorMessage = 'Servidor retornou página de erro. Verifique se o endpoint existe.';
-        }
-        
-        alert(`❌ Erro: ${errorMessage}`);
-    } finally {
-        // Restaurar botão
-        buttonElement.disabled = false;
-        buttonElement.textContent = originalText;
-    }
-}
-
-// Função específica para ping (testar se endpoint funciona)
-function pingEndpoint() {
-    debugLog('Fazendo ping no endpoint');
-    makeEmailTestRequest('ping', event.target);
-}
-
-// Função para verificar configurações
-function checkEmailConfig() {
-    debugLog('Verificando configurações');
-    makeEmailTestRequest('check_config', event.target);
-}
-
-// Função para testar conexão SMTP
-function testEmailConnection() {
-    if (!confirm('Deseja testar a conexão com o servidor SMTP?')) {
-        return;
-    }
-    makeEmailTestRequest('test_connection', event.target);
-}
-
-// Função para enviar email simples
-function sendTestEmail() {
-    if (!confirm('Deseja enviar um email de teste simples?')) {
-        return;
-    }
-    makeEmailTestRequest('send_simple', event.target);
-}
-
-// Função para testar email 2FA
-function test2FAEmail() {
-    if (!confirm('Deseja enviar um email de teste 2FA?')) {
-        return;
-    }
-    makeEmailTestRequest('send_2fa', event.target);
-}
-
-// Função para atualizar soma das porcentagens em tempo real
-function updateSoma() {
-    const porcentagemCliente = parseFloat(document.getElementById('porcentagemCliente').value) || 0;
-    const porcentagemAdmin = parseFloat(document.getElementById('porcentagemAdmin').value) || 0;
-    
-    const soma = porcentagemCliente + porcentagemAdmin;
-    document.getElementById('somaAtual').textContent = soma.toFixed(2);
-    
-    // Verificar se soma é exatamente 10%
-    const somaInfo = document.getElementById('somaInfo');
-    
-    if (Math.abs(soma - 10.00) > 0.01) {
-        somaInfo.style.color = 'var(--danger-color)';
-    } else {
-        somaInfo.style.color = 'var(--success-color)';
-    }
-}
-
-// Inicialização do DOM
-document.addEventListener('DOMContentLoaded', function() {
-    debugLog('DOM carregado, inicializando...');
-    
-    // Atualizar soma das porcentagens
-    const porcentagemCliente = document.getElementById('porcentagemCliente');
-    const porcentagemAdmin = document.getElementById('porcentagemAdmin');
-    
-    if (porcentagemCliente && porcentagemAdmin) {
-        porcentagemCliente.addEventListener('input', updateSoma);
-        porcentagemAdmin.addEventListener('input', updateSoma);
-        updateSoma(); // Executar inicialmente
-    }
-    
-    // Controlar campos dependentes do 2FA
-    const habilitado2FA = document.querySelector('input[name="2fa_habilitado"]');
-    const tempoExpiracao = document.querySelector('#tempoExpiracaoMinutos');
-    const maxTentativas = document.querySelector('#maxTentativas');
-    
-    function toggle2FAFields() {
-        const isEnabled = habilitado2FA && habilitado2FA.checked;
-        
-        [tempoExpiracao, maxTentativas].forEach(field => {
-            if (field) {
-                field.disabled = !isEnabled;
-                field.style.opacity = isEnabled ? '1' : '0.5';
+            
+            const soma = porcentagemCliente + porcentagemAdmin;
+            if (Math.abs(soma - 10.00) > 0.01) {
+                alert('A soma das porcentagens deve ser exatamente 10%.');
+                event.preventDefault();
+                return false;
             }
         });
-    }
-    
-    if (habilitado2FA) {
-        habilitado2FA.addEventListener('change', toggle2FAFields);
-        toggle2FAFields(); // Executar inicialmente
-    }
-    
-    // Controlar campos dependentes de configurações de saldo
-    const permitirUsoSaldo = document.querySelector('input[name="permitir_uso_saldo"]');
-    const notificarSaldoBaixo = document.querySelector('input[name="notificar_saldo_baixo"]');
-    const permitirTransferencia = document.querySelector('input[name="permitir_transferencia"]');
-    
-    function toggleDependentFields() {
-        // Campos relacionados ao uso de saldo
-        const balanceFields = document.querySelectorAll('#valorMinimoUso, #percentualMaximoUso');
-        const lowBalanceField = document.querySelector('#limiteSaldoBaixo');
-        const transferFields = document.querySelectorAll('#taxaTransferencia');
         
-        if (permitirUsoSaldo) {
-            balanceFields.forEach(field => {
-                field.disabled = !permitirUsoSaldo.checked;
-                field.style.opacity = permitirUsoSaldo.checked ? '1' : '0.5';
-            });
-        }
-        
-        if (notificarSaldoBaixo && lowBalanceField) {
-            lowBalanceField.disabled = !notificarSaldoBaixo.checked;
-            lowBalanceField.style.opacity = notificarSaldoBaixo.checked ? '1' : '0.5';
-        }
-        
-        if (permitirTransferencia) {
-            transferFields.forEach(field => {
-                field.disabled = !permitirTransferencia.checked;
-                field.style.opacity = permitirTransferencia.checked ? '1' : '0.5';
-            });
-        }
-    }
+        // Controlar visibilidade de campos dependentes
+        document.addEventListener('DOMContentLoaded', function() {
+            const permitirUsoSaldo = document.querySelector('input[name="permitir_uso_saldo"]');
+            const notificarSaldoBaixo = document.querySelector('input[name="notificar_saldo_baixo"]');
+            const permitirTransferencia = document.querySelector('input[name="permitir_transferencia"]');
+            
+            // Função para controlar campos dependentes
+            function toggleDependentFields() {
+                const balanceFields = document.querySelectorAll('#valorMinimoUso, #percentualMaximoUso');
+                const lowBalanceField = document.querySelector('#limiteSaldoBaixo');
+                const transferFields = document.querySelectorAll('#taxaTransferencia');
+                
+                // Campos relacionados ao uso de saldo
+                balanceFields.forEach(field => {
+                    field.disabled = !permitirUsoSaldo.checked;
+                    field.style.opacity = permitirUsoSaldo.checked ? '1' : '0.5';
+                });
+                
+                // Campo relacionado a notificação de saldo baixo
+                lowBalanceField.disabled = !notificarSaldoBaixo.checked;
+                lowBalanceField.style.opacity = notificarSaldoBaixo.checked ? '1' : '0.5';
+                
+                // Campos relacionados à transferência
+                transferFields.forEach(field => {
+                    field.disabled = !permitirTransferencia.checked;
+                    field.style.opacity = permitirTransferencia.checked ? '1' : '0.5';
+                });
+            }
+            
+            // Adicionar eventos
+            permitirUsoSaldo.addEventListener('change', toggleDependentFields);
+            notificarSaldoBaixo.addEventListener('change', toggleDependentFields);
+            permitirTransferencia.addEventListener('change', toggleDependentFields);
+            
+            // Executar inicialmente
+            toggleDependentFields();
+        });
+    </script>
     
-    // Adicionar eventos
-    if (permitirUsoSaldo) permitirUsoSaldo.addEventListener('change', toggleDependentFields);
-    if (notificarSaldoBaixo) notificarSaldoBaixo.addEventListener('change', toggleDependentFields);
-    if (permitirTransferencia) permitirTransferencia.addEventListener('change', toggleDependentFields);
-    
-    // Executar inicialmente
-    toggleDependentFields();
-});
-
-// Validar formulário de cashback antes de enviar
-document.getElementById('cashbackForm').addEventListener('submit', function(event) {
-    const porcentagemCliente = parseFloat(document.getElementById('porcentagemCliente').value);
-    const porcentagemAdmin = parseFloat(document.getElementById('porcentagemAdmin').value);
-    
-    if (isNaN(porcentagemCliente) || isNaN(porcentagemAdmin)) {
-        alert('Por favor, preencha todos os campos com valores numéricos válidos.');
-        event.preventDefault();
-        return false;
-    }
-    
-    if (porcentagemCliente < 0 || porcentagemCliente > 10 || 
-        porcentagemAdmin < 0 || porcentagemAdmin > 10) {
-        alert('As porcentagens devem estar entre 0 e 10.');
-        event.preventDefault();
-        return false;
-    }
-    
-    const soma = porcentagemCliente + porcentagemAdmin;
-    if (Math.abs(soma - 10.00) > 0.01) {
-        alert('A soma das porcentagens deve ser exatamente 10%.');
-        event.preventDefault();
-        return false;
-    }
-});
-</script>
 </body>
 </html>

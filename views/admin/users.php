@@ -142,7 +142,18 @@ try {
             <!-- Filtros e Busca -->
             <div class="filters-section">
                 <form method="GET" class="filters-form" id="filtersForm">
-                    
+                    <div class="filter-group">
+                        <div class="search-bar">
+                            <input type="text" 
+                                   name="busca" 
+                                   id="searchInput"
+                                   placeholder="Buscar por nome ou email..." 
+                                   value="<?php echo htmlspecialchars($_GET['busca'] ?? ''); ?>">
+                            <button type="submit" class="search-btn">
+                                <i class="fas fa-search"></i>
+                            </button>
+                        </div>
+                    </div>
                     
                     <div class="filter-group">
                         <select name="tipo" id="tipoFilter">
@@ -320,7 +331,11 @@ try {
                                         </td>
                                         <td>
                                             <div class="table-actions">
-                                                
+                                                <button class="action-btn edit" 
+                                                        onclick="editUser(<?php echo $user['id']; ?>)"
+                                                        title="Editar usuário">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
                                                 <button class="action-btn view" 
                                                         onclick="viewUser(<?php echo $user['id']; ?>)"
                                                         title="Visualizar usuário">
