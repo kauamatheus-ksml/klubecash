@@ -489,7 +489,8 @@ if ($result['status'] && isset($result['data']['totais'])) {
             try {
                 const response = await fetch('../../api/store-payment.php', {
                     method: 'POST',
-                    body: formData
+                    body: formData,
+                    credentials: 'same-origin' 
                 });
 
                 const result = await response.json();
@@ -509,6 +510,7 @@ if ($result['status'] && isset($result['data']['totais'])) {
             const formData = new FormData();
             formData.append('action', 'criar_pagamento');
             formData.append('metodo_pagamento', 'pix_openpix');
+            formData.append('loja_id', '<?php echo $storeId; ?>');
             
             document.querySelectorAll('.transaction-checkbox:checked').forEach(checkbox => {
                 formData.append('transacoes[]', checkbox.value);
@@ -516,7 +518,8 @@ if ($result['status'] && isset($result['data']['totais'])) {
             
             fetch('../../api/payments.php', {
                 method: 'POST',
-                body: formData
+                body: formData,
+                credentials: 'same-origin'  // Adiciona cookies de sessão
             })
             .then(response => response.json())
             .then(data => {
