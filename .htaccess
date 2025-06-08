@@ -195,6 +195,7 @@ RewriteRule ^store/upload-lote/?$ views/stores/batch-upload.php [L,QSA]
 RewriteRule ^store/pagamento/?$ views/stores/payment.php [L,QSA]
 RewriteRule ^store/historico-pagamentos/?$ views/stores/payment-history.php [L,QSA]
 RewriteRule ^store/perfil/?$ views/stores/profile.php [L,QSA]
+RewriteRule ^store/saldos/?$ views/store/saldos.php [L]
 
 # Email Marketing
 RewriteRule ^admin/email-marketing/?$ views/admin/email-marketing.php [L]
