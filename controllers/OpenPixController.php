@@ -149,12 +149,17 @@ class OpenPixController {
                 ");
                 $approveTransStmt->execute([$payment['loja_id']]);
                 
-                // Liberar cashback para clientes
                 $cashbackStmt = $db->prepare("
                     INSERT INTO cashback_saldos (usuario_id, loja_id, saldo_disponivel) 
-                    SELECT usuario_id, loja_id, valor_total * 0.05 
-                    FROM transacoes_cashback 
-                    WHERE loja_id = ? AND status = 'aprovado'
+                    SELECT t.usuario_id, t.loja_id, t.valor_total * 0.05 
+                    FROM transacoes_cashback t
+                    WHERE t.loja_id = ? AND t.status = 'aprovado' 
+                    AND NOT EXISTS (
+                        SELECT 1 FROM cashback_saldos cs 
+                        WHERE cs.usuario_id = t.usuario_id 
+                        AND cs.loja_id = t.loja_id 
+                        AND cs.origem_transacao_id = t.id
+                    )
                     ON DUPLICATE KEY UPDATE saldo_disponivel = saldo_disponivel + VALUES(saldo_disponivel)
                 ");
                 $cashbackStmt->execute([$payment['loja_id']]);
