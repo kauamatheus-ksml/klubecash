@@ -136,30 +136,34 @@ class OpenPixController {
                     SET status = 'aprovado',
                         openpix_status = 'COMPLETED',
                         openpix_paid_at = NOW(),
-                        data_aprovacao = NOW(),
-                        observacao_admin = CONCAT(COALESCE(observacao_admin, ''), ' - Pagamento PIX aprovado automaticamente via OpenPix')
+                        observacao_admin = 'Pagamento PIX aprovado automaticamente via OpenPix'
                     WHERE id = ?
                 ");
                 $updateStmt->execute([$paymentId]);
                 
-                // Aprovar transações relacionadas usando TransactionController
-                require_once __DIR__ . '/TransactionController.php';
-                $approvalResult = TransactionController::approvePaymentAutomatically(
-                    $paymentId, 
-                    'Pagamento PIX aprovado automaticamente via OpenPix'
-                );
+                // Aprovar transações pendentes da loja
+                $approveTransStmt = $db->prepare("
+                    UPDATE transacoes_cashback 
+                    SET status = 'aprovado'
+                    WHERE loja_id = ? AND status = 'pendente'
+                ");
+                $approveTransStmt->execute([$payment['loja_id']]);
                 
-                if ($approvalResult['status']) {
-                    error_log("OpenPix Webhook: ✅ Pagamento aprovado - ID: {$paymentId}");
-                    return [
-                        'success' => true,
-                        'message' => 'Pagamento processado com sucesso',
-                        'data' => $approvalResult['data']
-                    ];
-                } else {
-                    error_log("OpenPix Webhook: ❌ Erro ao aprovar transações: " . $approvalResult['message']);
-                    return ['success' => false, 'message' => $approvalResult['message']];
-                }
+                // Liberar cashback para clientes
+                $cashbackStmt = $db->prepare("
+                    INSERT INTO cashback_saldos (usuario_id, loja_id, saldo_disponivel) 
+                    SELECT usuario_id, loja_id, valor_total * 0.05 
+                    FROM transacoes_cashback 
+                    WHERE loja_id = ? AND status = 'aprovado'
+                    ON DUPLICATE KEY UPDATE saldo_disponivel = saldo_disponivel + VALUES(saldo_disponivel)
+                ");
+                $cashbackStmt->execute([$payment['loja_id']]);
+                
+                error_log("OpenPix Webhook: ✅ Pagamento aprovado - ID: {$paymentId}");
+                return [
+                    'success' => true,
+                    'message' => 'Pagamento processado com sucesso'
+                ];
             }
             
             // Atualizar apenas o status se não for COMPLETED
