@@ -7,11 +7,26 @@ try {
     require_once 'config/database.php';
     $db = Database::getConnection();
     
-    // Aprovar transação
-    $stmt = $db->prepare("UPDATE transacoes_cashback SET status = 'aprovado' WHERE id = 149");
-    $result = $stmt->execute();
+    // Buscar dados da transação
+    $stmt = $db->prepare("SELECT usuario_id, loja_id, valor_total FROM transacoes_cashback WHERE id = 149");
+    $stmt->execute();
+    $trans = $stmt->fetch();
     
-    echo $result ? "✅ Sucesso" : "❌ Falhou";
+    if ($trans) {
+        $cashback = $trans['valor_total'] * 0.05; // 5% de cashback
+        
+        // Liberar cashback
+        $cashStmt = $db->prepare("
+            INSERT INTO saldos_cashback (usuario_id, loja_id, valor, tipo, origem_transacao_id)
+            VALUES (?, ?, ?, 'cashback', 149)
+            ON DUPLICATE KEY UPDATE valor = valor + VALUES(valor)
+        ");
+        $result = $cashStmt->execute([$trans['usuario_id'], $trans['loja_id'], $cashback]);
+        
+        echo $result ? "✅ Cashback de R$ " . number_format($cashback, 2) . " liberado!" : "❌ Erro no cashback";
+    } else {
+        echo "❌ Transação não encontrada";
+    }
     
 } catch (Exception $e) {
     echo "Erro: " . $e->getMessage();
