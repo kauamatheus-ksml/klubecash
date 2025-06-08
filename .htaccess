@@ -233,7 +233,8 @@ RewriteRule ^admin/ajax/stores-direct/?$ controllers/AjaxStoreController.php [L,
 RewriteRule ^api/users/?$ api/users.php [L,QSA]
 RewriteRule ^api/users/([0-9]+)/?$ api/users.php?id=$1 [L,QSA]
 RewriteRule ^api/transactions/?$ api/transactions.php [L,QSA]
-
+# Adicionar esta nova rota para o UserManagementController
+RewriteRule ^admin/api/user-management/?$ controllers/UserManagementController.php [L,QSA]
 # Google OAuth
 RewriteRule ^auth/google/auth/?$ auth/google/auth.php [L]
 RewriteRule ^auth/google/register/?$ auth/google/register.php [L]

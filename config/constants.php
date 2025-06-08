@@ -184,7 +184,7 @@ define('GOOGLE_PEOPLE_API_URL', 'https://people.googleapis.com/v1/people/me');
 
 define('GOOGLE_AUTH_ENDPOINT', SITE_URL . '/auth/google/auth');
 define('GOOGLE_CALLBACK_ENDPOINT', SITE_URL . '/auth/google/callback');
-
+define('USER_MANAGEMENT_URL', SITE_URL . '/admin/api/user-management');
 // === CONFIGURAÇÕES DE EMAIL ===
 if (!defined('SMTP_HOST')) {
     define('SMTP_HOST', 'smtp.hostinger.com');
