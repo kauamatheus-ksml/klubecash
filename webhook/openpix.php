@@ -1,23 +1,14 @@
 <?php
-// webhook/openpix.php
 header('Content-Type: application/json');
-$logFile = __DIR__ . '/../logs/openpix-webhook.log';
-
-// Log da requisição
-$input_raw = file_get_contents('php://input');
-$logData = ['timestamp' => date('Y-m-d H:i:s'), 'data' => $input_raw];
-file_put_contents($logFile, json_encode($logData) . "\n", FILE_APPEND);
 
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../config/constants.php';
-require_once __DIR__ . '/../controllers/TransactionController.php';
 
-$input = json_decode($input_raw, true);
+$input = json_decode(file_get_contents('php://input'), true);
 
 if ($input && isset($input['charge']) && $input['charge']['status'] === 'COMPLETED') {
     $correlationID = $input['charge']['correlationID'];
     
-    // Extrair payment_id
     if (preg_match('/payment_(\d+)_/', $correlationID, $matches)) {
         $paymentId = $matches[1];
         
@@ -26,15 +17,25 @@ if ($input && isset($input['charge']) && $input['charge']['status'] === 'COMPLET
         $stmt->execute([$paymentId]);
         $payment = $stmt->fetch();
         
-        if ($payment && $payment['status'] === 'openpix_aguardando') {
-            // Aprovar pagamento
-            $updateStmt = $db->prepare("UPDATE pagamentos_comissao SET status = 'aprovado' WHERE id = ?");
-            $updateStmt->execute([$paymentId]);
+        if ($payment) {
+            $db->beginTransaction();
             
-            // Aprovar transações
-            $result = TransactionController::approvePaymentAutomatically($paymentId, 'Aprovado via OpenPix');
+            // 1. Aprovar pagamento
+            $db->prepare("UPDATE pagamentos_comissao SET status = 'aprovado' WHERE id = ?")->execute([$paymentId]);
             
-            file_put_contents($logFile, "SUCCESS: Payment $paymentId approved\n", FILE_APPEND);
+            // 2. Aprovar transações da loja
+            $db->prepare("UPDATE transacoes_cashback SET status = 'aprovado' WHERE loja_id = ? AND status = 'pendente'")->execute([$payment['loja_id']]);
+            
+            // 3. Liberar cashback - buscar transações uma por uma
+            $transStmt = $db->prepare("SELECT usuario_id, valor_total FROM transacoes_cashback WHERE loja_id = ? AND status = 'aprovado'");
+            $transStmt->execute([$payment['loja_id']]);
+            
+            while ($trans = $transStmt->fetch()) {
+                $cashback = $trans['valor_total'] * 0.05;
+                $db->prepare("INSERT INTO cashback_saldos (usuario_id, loja_id, saldo_disponivel) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE saldo_disponivel = saldo_disponivel + ?")->execute([$trans['usuario_id'], $payment['loja_id'], $cashback, $cashback]);
+            }
+            
+            $db->commit();
         }
     }
 }
