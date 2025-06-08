@@ -12,6 +12,20 @@ require_once '../../models/CashbackBalance.php';
 
 // Iniciar sessão
 session_start();
+// Verificar autenticação
+if (!isset($_SESSION['user_id']) || $_SESSION['user_type'] !== 'loja') {
+    header('Location: ' . LOGIN_URL);
+    exit;
+}
+
+$transactionIds = $_GET['transactions'] ?? '';
+if (empty($transactionIds)) {
+    header('Location: ' . STORE_PENDING_TRANSACTIONS_URL);
+    exit;
+}
+
+echo "Página de pagamento funcionando!<br>";
+echo "IDs das transações: " . htmlspecialchars($transactionIds);
 
 // Verificar se o usuário está logado e é uma loja
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION['user_type'] !== 'loja') {
@@ -573,69 +587,22 @@ const SITE_URL = '<?php echo SITE_URL; ?>';
 
 // Função para processar pagamentos selecionados
 function processSelectedPayments() {
-    // Obter todas as checkboxes marcadas
+    // Obter checkboxes marcados (nome correto)
     const checkboxes = document.querySelectorAll('input[name="transacoes[]"]:checked');
     const selectedIds = [];
     
-    // Coletar IDs selecionados
     checkboxes.forEach(function(checkbox) {
         selectedIds.push(checkbox.value);
     });
     
-    // Verificar se há transações selecionadas
     if (selectedIds.length === 0) {
         alert('Por favor, selecione pelo menos uma transação para pagar.');
         return;
     }
     
-    // Mostrar loading no botão
-    const btn = document.getElementById('btnPagarSelecionadas');
-    const originalText = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Processando...';
-    
-    // Criar FormData para envio correto
-    const formData = new FormData();
-    formData.append('action', 'payment_form');
-    
-    // Adicionar cada ID separadamente
-    selectedIds.forEach(function(id) {
-        formData.append('transaction_ids[]', id);
-    });
-    
-    // Enviar requisição
-    fetch(SITE_URL + '/api/store-payment', {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => {
-        // Verificar se a resposta é JSON válido
-        return response.text().then(text => {
-            try {
-                return JSON.parse(text);
-            } catch (e) {
-                console.error('Resposta não é JSON válido:', text);
-                throw new Error('Resposta inválida do servidor');
-            }
-        });
-    })
-    .then(data => {
-        if (data.status === true) {
-            // Sucesso - redirecionar para página de pagamento
-            window.location.href = data.redirect_url;
-        } else {
-            // Erro - mostrar mensagem
-            alert(data.message || 'Erro ao processar pagamento');
-            btn.disabled = false;
-            btn.innerHTML = originalText;
-        }
-    })
-    .catch(error => {
-        console.error('Erro:', error);
-        alert('Erro ao processar requisição. Por favor, tente novamente.');
-        btn.disabled = false;
-        btn.innerHTML = originalText;
-    });
+    // Redirecionar diretamente para a página de pagamento
+    const url = SITE_URL + '/store/pagamento?transactions=' + selectedIds.join(',');
+    window.location.href = url;
 }
 
 // Função para selecionar/desselecionar todas as transações
