@@ -3,7 +3,7 @@
 require_once 'config/database.php';
 require_once 'controllers/TransactionController.php';
 
-$paymentId = 1101; // Mude para ID do seu pagamento
+$paymentId = 1103; // Mude para ID do seu pagamento
 
 $result = TransactionController::approvePaymentAutomatically($paymentId, 'Aprovação manual - PIX OpenPix pago');
 
