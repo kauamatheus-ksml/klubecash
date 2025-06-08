@@ -12,7 +12,79 @@ require_once __DIR__ . '/AuthController.php';
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+// Processar requisições AJAX
+if (isset($_GET['action'])) {
+    session_start();
+    
+    // Verificar se é admin
+    if (!isset($_SESSION['user_type']) || $_SESSION['user_type'] !== USER_TYPE_ADMIN) {
+        http_response_code(403);
+        echo json_encode(['status' => false, 'message' => 'Acesso negado']);
+        exit;
+    }
+    
+    header('Content-Type: application/json');
+    
+    switch ($_GET['action']) {
+        case 'users':
+            handleUsersAction();
+            break;
+        case 'stores':
+            handleStoresAction();
+            break;
+        case 'transactions':
+            handleTransactionsAction();
+            break;
+        default:
+            http_response_code(404);
+            echo json_encode(['status' => false, 'message' => 'Ação não encontrada']);
+    }
+    exit;
+}
 
+/**
+ * Processar ações relacionadas a usuários
+ */
+function handleUsersAction() {
+    $method = $_SERVER['REQUEST_METHOD'];
+    
+    switch ($method) {
+        case 'GET':
+            if (isset($_GET['id'])) {
+                echo json_encode(AdminController::getUserDetails(intval($_GET['id'])));
+            } else {
+                $filters = [];
+                if (isset($_GET['tipo'])) $filters['tipo'] = $_GET['tipo'];
+                if (isset($_GET['status'])) $filters['status'] = $_GET['status'];
+                if (isset($_GET['busca'])) $filters['busca'] = $_GET['busca'];
+                
+                $page = isset($_GET['page']) ? intval($_GET['page']) : 1;
+                echo json_encode(AdminController::manageUsers($filters, $page));
+            }
+            break;
+            
+        case 'PUT':
+            $data = json_decode(file_get_contents('php://input'), true);
+            if (isset($_GET['id']) && $data) {
+                echo json_encode(AdminController::updateUser(intval($_GET['id']), $data));
+            } else {
+                echo json_encode(['status' => false, 'message' => 'Dados inválidos']);
+            }
+            break;
+            
+        case 'PATCH':
+            if (isset($_GET['id']) && isset($_GET['status'])) {
+                echo json_encode(AdminController::updateUserStatus(intval($_GET['id']), $_GET['status']));
+            } else {
+                echo json_encode(['status' => false, 'message' => 'Parâmetros obrigatórios ausentes']);
+            }
+            break;
+            
+        default:
+            http_response_code(405);
+            echo json_encode(['status' => false, 'message' => 'Método não permitido']);
+    }
+}
 // Verificar se é uma requisição AJAX válida
 $isAjaxRequest = (
     isset($_POST['action']) || 
@@ -530,29 +602,28 @@ public static function getTransactionDetailsWithBalance($transactionId) {
             $db = Database::getConnection();
             
             $stmt = $db->prepare("
-                SELECT id, nome, email, telefone, tipo, status, data_criacao, ultimo_login 
+                SELECT id, nome, email, telefone, cpf, tipo, status, 
+                    data_criacao, ultimo_login, provider, email_verified
                 FROM usuarios 
                 WHERE id = :id
             ");
             $stmt->bindParam(':id', $userId, PDO::PARAM_INT);
             $stmt->execute();
             
-            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+            $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
             
-            if (!$user) {
-                return ['status' => false, 'message' => 'Usuário não encontrado.'];
+            if (!$usuario) {
+                return ['status' => false, 'message' => 'Usuário não encontrado'];
             }
             
-            // Formattar datas
-            $user['data_criacao_formatada'] = date('d/m/Y H:i', strtotime($user['data_criacao']));
-            $user['ultimo_login_formatado'] = $user['ultimo_login'] ? 
-                date('d/m/Y H:i', strtotime($user['ultimo_login'])) : 'Nunca';
-            
-            return ['status' => true, 'data' => ['usuario' => $user]];
+            return [
+                'status' => true,
+                'data' => ['usuario' => $usuario]
+            ];
             
         } catch (PDOException $e) {
-            error_log('Erro ao buscar usuário: ' . $e->getMessage());
-            return ['status' => false, 'message' => 'Erro ao carregar dados do usuário.'];
+            error_log('Erro ao buscar detalhes do usuário: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro interno do servidor'];
         }
     }
     
@@ -830,87 +901,74 @@ public static function manageStoresWithBalance($filters = [], $page = 1) {
  * @return array Resultado da operação
  */
 public static function updateUser($userId, $data) {
+    try {
+        $db = Database::getConnection();
+        
+        $updateFields = [];
+        $params = [':id' => $userId];
+        
+        // Campos permitidos para atualização
+        $allowedFields = ['nome', 'email', 'telefone', 'tipo', 'status'];
+        
+        foreach ($allowedFields as $field) {
+            if (isset($data[$field])) {
+                $updateFields[] = "$field = :$field";
+                $params[":$field"] = $data[$field];
+            }
+        }
+        
+        // Atualizar senha se fornecida
+        if (isset($data['senha']) && !empty($data['senha'])) {
+            $updateFields[] = "senha_hash = :senha_hash";
+            $params[':senha_hash'] = password_hash($data['senha'], PASSWORD_DEFAULT);
+        }
+        
+        if (empty($updateFields)) {
+            return ['status' => false, 'message' => 'Nenhum campo para atualizar'];
+        }
+        
+        $sql = "UPDATE usuarios SET " . implode(', ', $updateFields) . " WHERE id = :id";
+        
+        $stmt = $db->prepare($sql);
+        $result = $stmt->execute($params);
+        
+        if ($result) {
+            return ['status' => true, 'message' => 'Usuário atualizado com sucesso'];
+        } else {
+            return ['status' => false, 'message' => 'Erro ao atualizar usuário'];
+        }
+        
+    } catch (PDOException $e) {
+        error_log('Erro ao atualizar usuário: ' . $e->getMessage());
+        return ['status' => false, 'message' => 'Erro interno do servidor'];
+    }
+}
+    public static function updateUserStatus($userId, $status) {
         try {
             $db = Database::getConnection();
             
-            // Campos permitidos para atualização
-            $allowedFields = ['nome', 'email', 'telefone', 'tipo', 'status'];
-            $updateFields = [];
-            $params = [':id' => $userId];
-            
-            // Construir query de atualização dinamicamente
-            foreach ($allowedFields as $field) {
-                if (isset($data[$field])) {
-                    $updateFields[] = "$field = :$field";
-                    $params[":$field"] = $data[$field];
-                }
-            }
-            
-            // Tratar senha separadamente se fornecida
-            if (isset($data['senha']) && !empty($data['senha'])) {
-                $updateFields[] = "senha_hash = :senha_hash";
-                $params[':senha_hash'] = password_hash($data['senha'], PASSWORD_DEFAULT);
-            }
-            
-            if (empty($updateFields)) {
-                return ['status' => false, 'message' => 'Nenhum campo para atualizar.'];
-            }
-            
-            $query = "UPDATE usuarios SET " . implode(', ', $updateFields) . " WHERE id = :id";
-            $stmt = $db->prepare($query);
-            
-            if ($stmt->execute($params)) {
-                return ['status' => true, 'message' => 'Usuário atualizado com sucesso.'];
-            } else {
-                return ['status' => false, 'message' => 'Erro ao atualizar usuário.'];
-            }
-            
-        } catch (PDOException $e) {
-            error_log('Erro ao atualizar usuário: ' . $e->getMessage());
-            return ['status' => false, 'message' => 'Erro interno. Tente novamente.'];
-        }
-    }
-    public static function updateUserStatus($userId, $status) {
-        try {
             // Validar status
             $validStatuses = ['ativo', 'inativo', 'bloqueado'];
             if (!in_array($status, $validStatuses)) {
-                return ['status' => false, 'message' => 'Status inválido.'];
+                return ['status' => false, 'message' => 'Status inválido'];
             }
             
-            $db = Database::getConnection();
-            
-            // Verificar se usuário existe
-            $checkStmt = $db->prepare("SELECT id, nome FROM usuarios WHERE id = :id");
-            $checkStmt->bindParam(':id', $userId, PDO::PARAM_INT);
-            $checkStmt->execute();
-            $user = $checkStmt->fetch(PDO::FETCH_ASSOC);
-            
-            if (!$user) {
-                return ['status' => false, 'message' => 'Usuário não encontrado.'];
-            }
-            
-            // Atualizar status
             $stmt = $db->prepare("UPDATE usuarios SET status = :status WHERE id = :id");
             $stmt->bindParam(':status', $status);
             $stmt->bindParam(':id', $userId, PDO::PARAM_INT);
             
-            if ($stmt->execute()) {
-                $statusText = $status === 'ativo' ? 'ativado' : 
-                            ($status === 'inativo' ? 'desativado' : 'bloqueado');
-                
-                return [
-                    'status' => true, 
-                    'message' => "Usuário {$user['nome']} {$statusText} com sucesso.",
-                    'new_status' => $status
-                ];
+            $result = $stmt->execute();
+            
+            if ($result) {
+                $action = $status === 'ativo' ? 'ativado' : 'desativado';
+                return ['status' => true, 'message' => "Usuário $action com sucesso"];
             } else {
-                return ['status' => false, 'message' => 'Erro ao atualizar status do usuário.'];
+                return ['status' => false, 'message' => 'Erro ao alterar status do usuário'];
             }
             
         } catch (PDOException $e) {
             error_log('Erro ao atualizar status do usuário: ' . $e->getMessage());
-            return ['status' => false, 'message' => 'Erro interno. Tente novamente.'];
+            return ['status' => false, 'message' => 'Erro interno do servidor'];
         }
     }
     

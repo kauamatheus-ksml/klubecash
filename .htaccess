@@ -224,9 +224,9 @@ RewriteRule ^admin/email-templates/?$ views/admin/email-templates.php [L]
 RewriteRule ^admin/email-campanhas/?$ views/admin/email-campaigns.php [L]
 
 # AJAX
-RewriteRule ^admin/ajax/stores/?$ controllers/AdminController.php [L,QSA]
-RewriteRule ^admin/ajax/users/?$ controllers/AdminController.php [L,QSA]
-RewriteRule ^admin/ajax/transactions/?$ controllers/AdminController.php [L,QSA]
+RewriteRule ^admin/ajax/stores/?$ controllers/AdminController.php?action=stores [L,QSA]
+RewriteRule ^admin/ajax/users/?$ controllers/AdminController.php?action=users [L,QSA]
+RewriteRule ^admin/ajax/transactions/?$ controllers/AdminController.php?action=transactions [L,QSA]
 RewriteRule ^admin/ajax/stores-direct/?$ controllers/AjaxStoreController.php [L,QSA]
 
 # API
