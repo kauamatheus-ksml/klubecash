@@ -3418,7 +3418,17 @@ if (basename($_SERVER['PHP_SELF']) === 'AdminController.php') {
     $action = $_REQUEST['action'] ?? '';
     
     switch ($action) {
-        
+        case 'create_user':
+            $result = AuthController::register(
+                $_POST['nome'], 
+                $_POST['email'], 
+                $_POST['telefone'] ?? '', 
+                $_POST['senha'], 
+                $_POST['tipo']
+            );
+            echo json_encode($result);
+            break;
+
         case 'dashboard':
             $result = AdminController::getDashboardData();
             echo json_encode($result);

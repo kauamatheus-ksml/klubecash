@@ -819,8 +819,7 @@ function submitUserForm(event) {
     }
     
     const formData = new FormData(form);
-    const userId = formData.get('id');
-    const isEditing = userId !== '';
+    const isEditing = false;    
     
     // Validação específica para senha
     const senha = formData.get('senha');
@@ -857,7 +856,7 @@ function submitUserForm(event) {
     
     // Preparar dados para envio
     const submitData = new URLSearchParams();
-    submitData.append('action', isEditing ? 'update_user' : 'create_user');
+    submitData.append('action', 'register');
     
     for (let [key, value] of formData.entries()) {
         if (key !== 'id' || (key === 'id' && value !== '')) {
