@@ -7,7 +7,25 @@ require_once __DIR__ . '/../config/email.php';
 require_once __DIR__ . '/../utils/Validator.php';
 require_once __DIR__ . '/AuthController.php';
 
+// Limpar qualquer output anterior e configurar headers JSON
+if (ob_get_level()) {
+    ob_clean();
+}
 
+function sendJsonResponse($data) {
+    // Garantir que não há output anterior
+    while (ob_get_level()) {
+        ob_end_clean();
+    }
+    
+    // Definir headers corretos
+    header('Content-Type: application/json; charset=UTF-8');
+    header('Cache-Control: no-cache, must-revalidate');
+    
+    // Enviar resposta e finalizar
+    echo json_encode($data, JSON_UNESCAPED_UNICODE);
+    exit;
+}
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -113,15 +131,6 @@ if ($isAjaxRequest) {
     }
 }
 
-// No início do arquivo, após os includes
-ini_set('display_errors', 0);
-error_reporting(E_ALL);
-
-function sendJsonResponse($data) {
-    header('Content-Type: application/json; charset=UTF-8');
-    echo json_encode($data);
-    exit;
-}
 
 // Adicione um manipulador de erros para registrar erros sem exibi-los
 set_error_handler(function($errno, $errstr, $errfile, $errline) {
@@ -3533,7 +3542,8 @@ if (basename($_SERVER['PHP_SELF']) === 'AdminController.php') {
             break;
         case 'update_user':
             $userId = isset($_POST['user_id']) ? intval($_POST['user_id']) : 0;
-            $result = AdminController::updateUser($userId, $_POST);
+            $data = $_POST;
+            $result = AdminController::updateUser($userId, $data);
             echo json_encode($result);
             break;    
         case 'stores':
