@@ -835,5 +835,55 @@ if ($result['status'] && isset($result['data']['totais'])) {
             margin-right: 8px;
         }
     </style>
+    <script>
+// Função de teste
+async function testSession() {
+    console.log('=== TESTE DE SESSÃO ===');
+    
+    try {
+        // Teste 1: Verificar sessão atual
+        const sessionResponse = await fetch('/test-session.php', {
+            credentials: 'same-origin'
+        });
+        const sessionData = await sessionResponse.json();
+        console.log('1. Status da sessão:', sessionData);
+        
+        // Teste 2: Testar API payments
+        const formData = new FormData();
+        formData.append('action', 'test');
+        
+        const apiResponse = await fetch('../../api/payments.php', {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin'
+        });
+        
+        const apiData = await apiResponse.json();
+        console.log('2. Resposta da API:', apiData);
+        
+        // Teste 3: Verificar se existe arquivo API
+        const apiExists = await fetch('../../api/payments.php').then(r => r.status !== 404);
+        console.log('3. API existe:', apiExists);
+        
+    } catch (error) {
+        console.error('Erro no teste:', error);
+    }
+}
+
+// Adicionar botão de teste
+const testBtn = document.createElement('button');
+testBtn.innerHTML = '🔍 Testar Sessão';
+testBtn.style.position = 'fixed';
+testBtn.style.top = '10px';
+testBtn.style.right = '10px';
+testBtn.style.zIndex = '9999';
+testBtn.style.padding = '10px';
+testBtn.style.backgroundColor = '#007bff';
+testBtn.style.color = 'white';
+testBtn.style.border = 'none';
+testBtn.style.borderRadius = '5px';
+testBtn.onclick = testSession;
+document.body.appendChild(testBtn);
+</script>
 </body>
 </html>
