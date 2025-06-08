@@ -42,10 +42,10 @@ if ($method === 'POST' && $action === 'criar_pagamento') {
         $stmt->execute($params);
         $totalComissao = $stmt->fetchColumn() ?: 0;
         
-        // Corrigido: usar 'created_at' em vez de 'data_criacao'
+        // Simplificado: sem coluna de data
         $paymentStmt = $db->prepare("
-            INSERT INTO pagamentos_comissao (loja_id, valor_total, metodo_pagamento, status, created_at) 
-            VALUES (?, ?, ?, 'pendente', NOW())
+            INSERT INTO pagamentos_comissao (loja_id, valor_total, metodo_pagamento, status) 
+            VALUES (?, ?, ?, 'pendente')
         ");
         $paymentStmt->execute([$store['id'], $totalComissao, $_POST['metodo_pagamento'] ?? 'pix_openpix']);
         
