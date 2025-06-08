@@ -574,7 +574,7 @@ const SITE_URL = '<?php echo SITE_URL; ?>';
 // Função para processar pagamentos selecionados
 function processSelectedPayments() {
     // Obter todas as checkboxes marcadas
-    const checkboxes = document.querySelectorAll('input[name="transaction_ids[]"]:checked');
+    const checkboxes = document.querySelectorAll('input[name="transacoes[]"]:checked');
     const selectedIds = [];
     
     // Coletar IDs selecionados
@@ -640,7 +640,7 @@ function processSelectedPayments() {
 
 // Função para selecionar/desselecionar todas as transações
 function toggleAllTransactions(source) {
-    const checkboxes = document.querySelectorAll('input[name="transaction_ids[]"]');
+    const checkboxes = document.querySelectorAll('input[name="transacoes[]"]');
     checkboxes.forEach(function(checkbox) {
         checkbox.checked = source.checked;
     });
