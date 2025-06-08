@@ -112,12 +112,14 @@ function handleUsersAction() {
             echo json_encode(['status' => false, 'message' => 'Método não permitido']);
     }
 }
-// Verificar se é uma requisição AJAX válida
+// Verificar se é uma requisição AJAX válida - VERSÃO CORRIGIDA
 $isAjaxRequest = (
     isset($_POST['action']) || 
     isset($_GET['action']) ||
-    !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && 
-    strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest'
+    (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && 
+     strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') ||
+    (isset($_SERVER['CONTENT_TYPE']) && 
+     strpos($_SERVER['CONTENT_TYPE'], 'application/x-www-form-urlencoded') !== false)
 );
 
 // ADICIONAR DEBUG TEMPORÁRIO
@@ -139,14 +141,55 @@ if (!$isAjaxRequest && basename($_SERVER['PHP_SELF']) === 'AdminController.php')
 }
 
 // Verificar autenticação para requisições AJAX
-if ($isAjaxRequest) {
-    if (!isset($_SESSION['user_id']) || $_SESSION['user_type'] !== USER_TYPE_ADMIN) {
-        header('Content-Type: application/json; charset=UTF-8');
-        echo json_encode(['status' => false, 'message' => 'Sessão expirada. Faça login novamente.']);
-        exit;
-    }
-}
 
+// ADICIONAR AQUI - Logo após a verificação de autenticação AJAX
+if ($isAjaxRequest && isset($_POST['action']) && $_POST['action'] === 'register') {
+    error_log("DEBUG: Processando action=register via AJAX");
+    
+    header('Content-Type: application/json; charset=UTF-8');
+    
+    try {
+        // Pegar dados do POST
+        $nome = trim($_POST['nome'] ?? '');
+        $email = trim($_POST['email'] ?? '');
+        $telefone = trim($_POST['telefone'] ?? '');
+        $senha = $_POST['senha'] ?? '';
+        $tipo = $_POST['tipo'] ?? 'cliente';
+        
+        // Validações básicas
+        if (empty($nome) || empty($email) || empty($senha)) {
+            echo json_encode(['status' => false, 'message' => 'Todos os campos obrigatórios devem ser preenchidos']);
+            exit;
+        }
+        
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            echo json_encode(['status' => false, 'message' => 'Email inválido']);
+            exit;
+        }
+        
+        if (strlen($senha) < 8) {
+            echo json_encode(['status' => false, 'message' => 'A senha deve ter no mínimo 8 caracteres']);
+            exit;
+        }
+        
+        error_log("DEBUG: Chamando AuthController::register via AJAX - Nome: $nome, Email: $email, Tipo: $tipo");
+        
+        // Chamar método de registro
+        $result = AuthController::register($nome, $email, $telefone, $senha, $tipo);
+        
+        error_log("DEBUG: Resultado do AuthController::register via AJAX: " . json_encode($result));
+        
+        echo json_encode($result);
+        
+    } catch (Exception $e) {
+        error_log('DEBUG: Erro ao criar usuário via AJAX: ' . $e->getMessage());
+        echo json_encode([
+            'status' => false, 
+            'message' => 'Erro interno: ' . $e->getMessage()
+        ]);
+    }
+    exit;
+}
 
 // Adicione um manipulador de erros para registrar erros sem exibi-los
 set_error_handler(function($errno, $errstr, $errfile, $errline) {
