@@ -818,48 +818,139 @@ public static function manageStoresWithBalance($filters = [], $page = 1) {
  * @return array Resultado da operação
  */
 public static function updateUser($userId, $data) {
-        try {
-            $db = Database::getConnection();
-            
-            // Campos que podem ser atualizados
-            $allowedFields = ['nome', 'email', 'telefone', 'tipo', 'status'];
-            $updateFields = [];
-            $params = [':id' => $userId];
-            
-            foreach ($data as $field => $value) {
-                if (in_array($field, $allowedFields) && !empty($value)) {
-                    $updateFields[] = "$field = :$field";
-                    $params[":$field"] = $value;
-                }
-            }
-            
-            // Verificar se há senha para atualizar
-            if (isset($data['senha']) && !empty($data['senha'])) {
-                $updateFields[] = "senha_hash = :senha_hash";
-                $params[':senha_hash'] = password_hash($data['senha'], PASSWORD_DEFAULT);
-            }
-            
-            if (empty($updateFields)) {
-                return ['status' => false, 'message' => 'Nenhum campo válido para atualizar'];
-            }
-            
-            // Adicionar campo de atualização
-            $updateFields[] = "data_atualizacao = NOW()";
-            
-            $sql = "UPDATE usuarios SET " . implode(', ', $updateFields) . " WHERE id = :id";
-            $stmt = $db->prepare($sql);
-            
-            if ($stmt->execute($params)) {
-                return ['status' => true, 'message' => 'Usuário atualizado com sucesso'];
-            } else {
-                return ['status' => false, 'message' => 'Erro ao atualizar usuário'];
-            }
-            
-        } catch (Exception $e) {
-            error_log('Erro no updateUser: ' . $e->getMessage());
-            return ['status' => false, 'message' => 'Erro ao atualizar dados do usuário'];
+    try {
+        // Verificar se é um administrador
+        if (!self::validateAdmin()) {
+            return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
         }
+        
+        // Validar ID do usuário
+        if (!$userId || !is_numeric($userId)) {
+            return ['status' => false, 'message' => 'ID do usuário inválido.'];
+        }
+        
+        $db = Database::getConnection();
+        
+        // Verificar se o usuário existe
+        $checkStmt = $db->prepare("SELECT id, email FROM usuarios WHERE id = :user_id");
+        $checkStmt->bindParam(':user_id', $userId);
+        $checkStmt->execute();
+        $existingUser = $checkStmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$existingUser) {
+            return ['status' => false, 'message' => 'Usuário não encontrado.'];
+        }
+        
+        // Preparar campos para atualização
+        $updateFields = [];
+        $params = [':user_id' => $userId];
+        
+        // Nome
+        if (isset($data['nome']) && !empty(trim($data['nome']))) {
+            $nome = trim($data['nome']);
+            if (strlen($nome) > NAME_MAX_LENGTH) {
+                return ['status' => false, 'message' => 'Nome muito longo. Máximo ' . NAME_MAX_LENGTH . ' caracteres.'];
+            }
+            $updateFields[] = "nome = :nome";
+            $params[':nome'] = $nome;
+        }
+        
+        // Email
+        if (isset($data['email']) && !empty(trim($data['email']))) {
+            $email = trim($data['email']);
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                return ['status' => false, 'message' => 'Email inválido.'];
+            }
+            if (strlen($email) > EMAIL_MAX_LENGTH) {
+                return ['status' => false, 'message' => 'Email muito longo. Máximo ' . EMAIL_MAX_LENGTH . ' caracteres.'];
+            }
+            
+            // Verificar se o email já existe (exceto para o usuário atual)
+            if ($email !== $existingUser['email']) {
+                $emailCheckStmt = $db->prepare("SELECT id FROM usuarios WHERE email = :email AND id != :user_id");
+                $emailCheckStmt->bindParam(':email', $email);
+                $emailCheckStmt->bindParam(':user_id', $userId);
+                $emailCheckStmt->execute();
+                
+                if ($emailCheckStmt->rowCount() > 0) {
+                    return ['status' => false, 'message' => 'Este email já está em uso por outro usuário.'];
+                }
+                
+                $updateFields[] = "email = :email";
+                $params[':email'] = $email;
+            }
+        }
+        
+        // Telefone
+        if (isset($data['telefone'])) {
+            $telefone = trim($data['telefone']);
+            if (strlen($telefone) > PHONE_MAX_LENGTH) {
+                return ['status' => false, 'message' => 'Telefone muito longo. Máximo ' . PHONE_MAX_LENGTH . ' caracteres.'];
+            }
+            $updateFields[] = "telefone = :telefone";
+            $params[':telefone'] = $telefone;
+        }
+        
+        // Tipo (apenas admin pode alterar)
+        if (isset($data['tipo']) && !empty($data['tipo'])) {
+            $validTypes = [USER_TYPE_CLIENT, USER_TYPE_ADMIN, USER_TYPE_STORE];
+            if (in_array($data['tipo'], $validTypes)) {
+                $updateFields[] = "tipo = :tipo";
+                $params[':tipo'] = $data['tipo'];
+            }
+        }
+        
+        // Status (apenas admin pode alterar)
+        if (isset($data['status']) && !empty($data['status'])) {
+            $validStatus = [USER_ACTIVE, USER_INACTIVE, USER_BLOCKED];
+            if (in_array($data['status'], $validStatus)) {
+                $updateFields[] = "status = :status";
+                $params[':status'] = $data['status'];
+            }
+        }
+        
+        // Senha (opcional) - só incluir se foi fornecida e não está vazia
+        if (isset($data['senha']) && !empty(trim($data['senha']))) {
+            $senha = trim($data['senha']);
+            
+            // Validar comprimento mínimo apenas se a senha foi fornecida
+            if (strlen($senha) < PASSWORD_MIN_LENGTH) {
+                return ['status' => false, 'message' => 'A senha deve ter no mínimo ' . PASSWORD_MIN_LENGTH . ' caracteres.'];
+            }
+            
+            $senha_hash = password_hash($senha, PASSWORD_DEFAULT);
+            $updateFields[] = "senha_hash = :senha_hash";
+            $params[':senha_hash'] = $senha_hash;
+        }
+        
+        // Se não houver campos para atualizar
+        if (empty($updateFields)) {
+            return ['status' => false, 'message' => 'Nenhum dado válido para atualizar.'];
+        }
+        
+        // Construir e executar a query de atualização
+        $query = "UPDATE usuarios SET " . implode(', ', $updateFields) . " WHERE id = :user_id";
+        $stmt = $db->prepare($query);
+        
+        foreach ($params as $param => $value) {
+            $stmt->bindValue($param, $value);
+        }
+        
+        $success = $stmt->execute();
+        
+        if ($success && $stmt->rowCount() > 0) {
+            return ['status' => true, 'message' => 'Usuário atualizado com sucesso.'];
+        } else if ($success) {
+            return ['status' => true, 'message' => 'Nenhuma alteração realizada.'];
+        } else {
+            return ['status' => false, 'message' => 'Falha ao atualizar usuário no banco de dados.'];
+        }
+        
+    } catch (PDOException $e) {
+        error_log('Erro ao atualizar usuário: ' . $e->getMessage());
+        return ['status' => false, 'message' => 'Erro ao atualizar usuário: ' . $e->getMessage()];
     }
+}
     public static function updateUserStatus($userId, $status) {
         try {
             $db = Database::getConnection();
