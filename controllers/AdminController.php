@@ -447,123 +447,125 @@ public static function getTransactionDetailsWithBalance($transactionId) {
      * @param int $page Página atual
      * @return array Lista de usuários
      */
-    public static function manageUsers($filters = [], $page = 1) {
+    public static function manageUsers($filters = [], $page = 1, $limit = 20) {
         try {
-            // Verificar se é um administrador
-            if (!self::validateAdmin()) {
-                return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
-            }
-            
             $db = Database::getConnection();
             
-            // Consulta simplificada sem filtros
-            $query = "
-                SELECT id, nome, email, tipo, status, data_criacao, ultimo_login
-                FROM usuarios
-                ORDER BY data_criacao DESC
+            // Base da query
+            $whereConditions = [];
+            $params = [];
+            
+            // Aplicar filtros
+            if (!empty($filters['tipo'])) {
+                $whereConditions[] = "tipo = :tipo";
+                $params[':tipo'] = $filters['tipo'];
+            }
+            
+            if (!empty($filters['status'])) {
+                $whereConditions[] = "status = :status";
+                $params[':status'] = $filters['status'];
+            }
+            
+            if (!empty($filters['busca'])) {
+                $whereConditions[] = "(nome LIKE :busca OR email LIKE :busca)";
+                $params[':busca'] = '%' . $filters['busca'] . '%';
+            }
+            
+            // Construir WHERE clause
+            $whereClause = !empty($whereConditions) ? 'WHERE ' . implode(' AND ', $whereConditions) : '';
+            
+            // Contar total de registros
+            $countQuery = "SELECT COUNT(*) as total FROM usuarios $whereClause";
+            $countStmt = $db->prepare($countQuery);
+            $countStmt->execute($params);
+            $totalRecords = $countStmt->fetch(PDO::FETCH_ASSOC)['total'];
+            
+            // Calcular offset para paginação
+            $offset = ($page - 1) * $limit;
+            
+            // Query principal com paginação
+            $mainQuery = "
+                SELECT id, nome, email, telefone, tipo, status, data_criacao, ultimo_login 
+                FROM usuarios 
+                $whereClause 
+                ORDER BY data_criacao DESC 
+                LIMIT :limit OFFSET :offset
             ";
             
-            // Calcular total de registros para paginação
-            $countQuery = "SELECT COUNT(*) as total FROM usuarios";
-            $countStmt = $db->prepare($countQuery);
-            $countStmt->execute();
-            $totalCount = $countStmt->fetch(PDO::FETCH_ASSOC)['total'];
+            $stmt = $db->prepare($mainQuery);
             
-            // Adicionar paginação
-            $perPage = ITEMS_PER_PAGE;
-            $page = max(1, (int)$page); // Garantir que a página é no mínimo 1
-            $offset = ($page - 1) * $perPage;
-            $query .= " LIMIT $offset, $perPage";
+            // Bind dos parâmetros
+            foreach ($params as $key => $value) {
+                $stmt->bindValue($key, $value);
+            }
+            $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+            $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
             
-            // Executar consulta
-            $stmt = $db->prepare($query);
             $stmt->execute();
             $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
-            // Estatísticas dos usuários
-            $statsQuery = "
-                SELECT 
-                    COUNT(*) as total_usuarios,
-                    SUM(CASE WHEN tipo = 'cliente' THEN 1 ELSE 0 END) as total_clientes,
-                    SUM(CASE WHEN tipo = 'admin' THEN 1 ELSE 0 END) as total_admins,
-                    SUM(CASE WHEN tipo = 'loja' THEN 1 ELSE 0 END) as total_lojas,
-                    SUM(CASE WHEN status = 'ativo' THEN 1 ELSE 0 END) as total_ativos,
-                    SUM(CASE WHEN status = 'inativo' THEN 1 ELSE 0 END) as total_inativos,
-                    SUM(CASE WHEN status = 'bloqueado' THEN 1 ELSE 0 END) as total_bloqueados
-                FROM usuarios
-            ";
-            
-            $statsStmt = $db->prepare($statsQuery);
-            $statsStmt->execute();
-            $statistics = $statsStmt->fetch(PDO::FETCH_ASSOC);
-            
-            // Calcular informações de paginação
-            $totalPages = ceil($totalCount / $perPage);
+            // Formattar datas para exibição
+            foreach ($users as &$user) {
+                $user['data_criacao_formatada'] = date('d/m/Y H:i', strtotime($user['data_criacao']));
+                $user['ultimo_login_formatado'] = $user['ultimo_login'] ? 
+                    date('d/m/Y H:i', strtotime($user['ultimo_login'])) : 'Nunca';
+            }
             
             return [
                 'status' => true,
                 'data' => [
                     'usuarios' => $users,
-                    'estatisticas' => $statistics,
-                    'paginacao' => [
-                        'total' => $totalCount,
-                        'por_pagina' => $perPage,
-                        'pagina_atual' => $page,
-                        'total_paginas' => $totalPages
+                    'pagination' => [
+                        'current_page' => $page,
+                        'total_pages' => ceil($totalRecords / $limit),
+                        'total_records' => $totalRecords,
+                        'limit' => $limit
                     ]
                 ]
             ];
             
         } catch (PDOException $e) {
-            error_log('Erro ao gerenciar usuários: ' . $e->getMessage());
-            return [
-                'status' => false, 
-                'message' => 'Erro ao carregar usuários: ' . $e->getMessage()
-            ];
+            error_log('Erro ao listar usuários: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro ao carregar usuários.'];
         }
     }
     
     /**
- * Obtém detalhes de um usuário específico
- * 
- * @param int $userId ID do usuário
- * @return array Dados do usuário
- */
-public static function getUserDetails($userId) {
-    try {
-        // Verificar se é um administrador
-        if (!self::validateAdmin()) {
-            return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
+     * Obtém detalhes de um usuário específico
+     * 
+     * @param int $userId ID do usuário
+     * @return array Dados do usuário
+     */
+    public static function getUserDetails($userId) {
+        try {
+            $db = Database::getConnection();
+            
+            $stmt = $db->prepare("
+                SELECT id, nome, email, telefone, tipo, status, data_criacao, ultimo_login 
+                FROM usuarios 
+                WHERE id = :id
+            ");
+            $stmt->bindParam(':id', $userId, PDO::PARAM_INT);
+            $stmt->execute();
+            
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$user) {
+                return ['status' => false, 'message' => 'Usuário não encontrado.'];
+            }
+            
+            // Formattar datas
+            $user['data_criacao_formatada'] = date('d/m/Y H:i', strtotime($user['data_criacao']));
+            $user['ultimo_login_formatado'] = $user['ultimo_login'] ? 
+                date('d/m/Y H:i', strtotime($user['ultimo_login'])) : 'Nunca';
+            
+            return ['status' => true, 'data' => ['usuario' => $user]];
+            
+        } catch (PDOException $e) {
+            error_log('Erro ao buscar usuário: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro ao carregar dados do usuário.'];
         }
-        
-        $db = Database::getConnection();
-        
-        // Obter dados do usuário
-        $stmt = $db->prepare("
-            SELECT id, nome, email, telefone, tipo, status, data_criacao, ultimo_login
-            FROM usuarios
-            WHERE id = :user_id
-        ");
-        $stmt->bindParam(':user_id', $userId);
-        $stmt->execute();
-        $user = $stmt->fetch(PDO::FETCH_ASSOC);
-        
-        if (!$user) {
-            return ['status' => false, 'message' => 'Usuário não encontrado.'];
-        }
-        
-        return [
-            'status' => true,
-            'data' => [
-                'usuario' => $user
-            ]
-        ];
-        
-    } catch (PDOException $e) {
-        error_log('Erro ao obter detalhes do usuário: ' . $e->getMessage());
-        return ['status' => false, 'message' => 'Erro ao carregar dados do usuário: ' . $e->getMessage()];
     }
-}
     
      
     // Adicionar este método no AdminController.php
@@ -822,7 +824,15 @@ public static function manageStoresWithBalance($filters = [], $page = 1) {
             return ['status' => false, 'message' => 'Erro ao carregar detalhes da loja.'];
         }
     }
+    
 
+    
+    
+    
+    
+    
+    
+   
     /**
  * Atualiza dados de um usuário
  * 
@@ -831,198 +841,87 @@ public static function manageStoresWithBalance($filters = [], $page = 1) {
  * @return array Resultado da operação
  */
 public static function updateUser($userId, $data) {
-    try {
-        // Verificar se é um administrador
-        if (!self::validateAdmin()) {
-            return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
-        }
-        
-        // Validar ID do usuário
-        if (!$userId || !is_numeric($userId)) {
-            return ['status' => false, 'message' => 'ID do usuário inválido.'];
-        }
-        
-        $db = Database::getConnection();
-        
-        // Verificar se o usuário existe
-        $checkStmt = $db->prepare("SELECT id, email FROM usuarios WHERE id = :user_id");
-        $checkStmt->bindParam(':user_id', $userId);
-        $checkStmt->execute();
-        $existingUser = $checkStmt->fetch(PDO::FETCH_ASSOC);
-        
-        if (!$existingUser) {
-            return ['status' => false, 'message' => 'Usuário não encontrado.'];
-        }
-        
-        // Preparar campos para atualização
-        $updateFields = [];
-        $params = [':user_id' => $userId];
-        
-        // Nome
-        if (isset($data['nome']) && !empty(trim($data['nome']))) {
-            $nome = trim($data['nome']);
-            if (strlen($nome) > NAME_MAX_LENGTH) {
-                return ['status' => false, 'message' => 'Nome muito longo. Máximo ' . NAME_MAX_LENGTH . ' caracteres.'];
-            }
-            $updateFields[] = "nome = :nome";
-            $params[':nome'] = $nome;
-        }
-        
-        // Email
-        if (isset($data['email']) && !empty(trim($data['email']))) {
-            $email = trim($data['email']);
-            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                return ['status' => false, 'message' => 'Email inválido.'];
-            }
-            if (strlen($email) > EMAIL_MAX_LENGTH) {
-                return ['status' => false, 'message' => 'Email muito longo. Máximo ' . EMAIL_MAX_LENGTH . ' caracteres.'];
-            }
+        try {
+            $db = Database::getConnection();
             
-            // Verificar se o email já existe (exceto para o usuário atual)
-            if ($email !== $existingUser['email']) {
-                $emailCheckStmt = $db->prepare("SELECT id FROM usuarios WHERE email = :email AND id != :user_id");
-                $emailCheckStmt->bindParam(':email', $email);
-                $emailCheckStmt->bindParam(':user_id', $userId);
-                $emailCheckStmt->execute();
-                
-                if ($emailCheckStmt->rowCount() > 0) {
-                    return ['status' => false, 'message' => 'Este email já está em uso por outro usuário.'];
+            // Campos permitidos para atualização
+            $allowedFields = ['nome', 'email', 'telefone', 'tipo', 'status'];
+            $updateFields = [];
+            $params = [':id' => $userId];
+            
+            // Construir query de atualização dinamicamente
+            foreach ($allowedFields as $field) {
+                if (isset($data[$field])) {
+                    $updateFields[] = "$field = :$field";
+                    $params[":$field"] = $data[$field];
                 }
-                
-                $updateFields[] = "email = :email";
-                $params[':email'] = $email;
-            }
-        }
-        
-        // Telefone
-        if (isset($data['telefone'])) {
-            $telefone = trim($data['telefone']);
-            if (strlen($telefone) > PHONE_MAX_LENGTH) {
-                return ['status' => false, 'message' => 'Telefone muito longo. Máximo ' . PHONE_MAX_LENGTH . ' caracteres.'];
-            }
-            $updateFields[] = "telefone = :telefone";
-            $params[':telefone'] = $telefone;
-        }
-        
-        // Tipo (apenas admin pode alterar)
-        if (isset($data['tipo']) && !empty($data['tipo'])) {
-            $validTypes = [USER_TYPE_CLIENT, USER_TYPE_ADMIN, USER_TYPE_STORE];
-            if (in_array($data['tipo'], $validTypes)) {
-                $updateFields[] = "tipo = :tipo";
-                $params[':tipo'] = $data['tipo'];
-            }
-        }
-        
-        // Status (apenas admin pode alterar)
-        if (isset($data['status']) && !empty($data['status'])) {
-            $validStatus = [USER_ACTIVE, USER_INACTIVE, USER_BLOCKED];
-            if (in_array($data['status'], $validStatus)) {
-                $updateFields[] = "status = :status";
-                $params[':status'] = $data['status'];
-            }
-        }
-        
-        // Senha (opcional) - só incluir se foi fornecida e não está vazia
-        if (isset($data['senha']) && !empty(trim($data['senha']))) {
-            $senha = trim($data['senha']);
-            
-            // Validar comprimento mínimo apenas se a senha foi fornecida
-            if (strlen($senha) < PASSWORD_MIN_LENGTH) {
-                return ['status' => false, 'message' => 'A senha deve ter no mínimo ' . PASSWORD_MIN_LENGTH . ' caracteres.'];
             }
             
-            $senha_hash = password_hash($senha, PASSWORD_DEFAULT);
-            $updateFields[] = "senha_hash = :senha_hash";
-            $params[':senha_hash'] = $senha_hash;
+            // Tratar senha separadamente se fornecida
+            if (isset($data['senha']) && !empty($data['senha'])) {
+                $updateFields[] = "senha_hash = :senha_hash";
+                $params[':senha_hash'] = password_hash($data['senha'], PASSWORD_DEFAULT);
+            }
+            
+            if (empty($updateFields)) {
+                return ['status' => false, 'message' => 'Nenhum campo para atualizar.'];
+            }
+            
+            $query = "UPDATE usuarios SET " . implode(', ', $updateFields) . " WHERE id = :id";
+            $stmt = $db->prepare($query);
+            
+            if ($stmt->execute($params)) {
+                return ['status' => true, 'message' => 'Usuário atualizado com sucesso.'];
+            } else {
+                return ['status' => false, 'message' => 'Erro ao atualizar usuário.'];
+            }
+            
+        } catch (PDOException $e) {
+            error_log('Erro ao atualizar usuário: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro interno. Tente novamente.'];
         }
-        
-        // Se não houver campos para atualizar
-        if (empty($updateFields)) {
-            return ['status' => false, 'message' => 'Nenhum dado válido para atualizar.'];
-        }
-        
-        // Construir e executar a query de atualização
-        $query = "UPDATE usuarios SET " . implode(', ', $updateFields) . " WHERE id = :user_id";
-        $stmt = $db->prepare($query);
-        
-        foreach ($params as $param => $value) {
-            $stmt->bindValue($param, $value);
-        }
-        
-        $success = $stmt->execute();
-        
-        if ($success && $stmt->rowCount() > 0) {
-            return ['status' => true, 'message' => 'Usuário atualizado com sucesso.'];
-        } else if ($success) {
-            return ['status' => true, 'message' => 'Nenhuma alteração realizada.'];
-        } else {
-            return ['status' => false, 'message' => 'Falha ao atualizar usuário no banco de dados.'];
-        }
-        
-    } catch (PDOException $e) {
-        error_log('Erro ao atualizar usuário: ' . $e->getMessage());
-        return ['status' => false, 'message' => 'Erro ao atualizar usuário: ' . $e->getMessage()];
     }
-}
     public static function updateUserStatus($userId, $status) {
         try {
-            // Log para debug
-            error_log("updateUserStatus chamado - UserID: $userId, Status: $status");
-            
-            // Verificar se é um administrador
-            if (!self::validateAdmin()) {
-                error_log("Acesso negado - não é admin");
-                return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
-            }
-            
-            // Validar parâmetros
-            if (!$userId || !is_numeric($userId)) {
-                error_log("ID do usuário inválido: $userId");
-                return ['status' => false, 'message' => 'ID do usuário inválido.'];
-            }
-            
             // Validar status
-            $validStatus = [USER_ACTIVE, USER_INACTIVE, USER_BLOCKED];
-            if (!in_array($status, $validStatus)) {
-                error_log("Status inválido: $status");
+            $validStatuses = ['ativo', 'inativo', 'bloqueado'];
+            if (!in_array($status, $validStatuses)) {
                 return ['status' => false, 'message' => 'Status inválido.'];
             }
             
             $db = Database::getConnection();
             
-            // Verificar se o usuário existe
-            $checkStmt = $db->prepare("SELECT id, nome, status FROM usuarios WHERE id = :user_id");
-            $checkStmt->bindParam(':user_id', $userId, PDO::PARAM_INT);
+            // Verificar se usuário existe
+            $checkStmt = $db->prepare("SELECT id, nome FROM usuarios WHERE id = :id");
+            $checkStmt->bindParam(':id', $userId, PDO::PARAM_INT);
             $checkStmt->execute();
             $user = $checkStmt->fetch(PDO::FETCH_ASSOC);
             
             if (!$user) {
-                error_log("Usuário não encontrado: $userId");
                 return ['status' => false, 'message' => 'Usuário não encontrado.'];
             }
             
-            // Verificar se o status já é o mesmo
-            if ($user['status'] === $status) {
-                return ['status' => true, 'message' => 'Status já atualizado.'];
-            }
-            
             // Atualizar status
-            $updateStmt = $db->prepare("UPDATE usuarios SET status = :status WHERE id = :user_id");
-            $updateStmt->bindParam(':status', $status, PDO::PARAM_STR);
-            $updateStmt->bindParam(':user_id', $userId, PDO::PARAM_INT);
-            $success = $updateStmt->execute();
+            $stmt = $db->prepare("UPDATE usuarios SET status = :status WHERE id = :id");
+            $stmt->bindParam(':status', $status);
+            $stmt->bindParam(':id', $userId, PDO::PARAM_INT);
             
-            if ($success && $updateStmt->rowCount() > 0) {
-                error_log("Status atualizado com sucesso - UserID: $userId, Status: $status");
-                return ['status' => true, 'message' => 'Status do usuário atualizado com sucesso.'];
+            if ($stmt->execute()) {
+                $statusText = $status === 'ativo' ? 'ativado' : 
+                            ($status === 'inativo' ? 'desativado' : 'bloqueado');
+                
+                return [
+                    'status' => true, 
+                    'message' => "Usuário {$user['nome']} {$statusText} com sucesso.",
+                    'new_status' => $status
+                ];
             } else {
-                error_log("Falha ao atualizar status - UserID: $userId, Status: $status");
-                return ['status' => false, 'message' => 'Falha ao atualizar status do usuário.'];
+                return ['status' => false, 'message' => 'Erro ao atualizar status do usuário.'];
             }
             
         } catch (PDOException $e) {
             error_log('Erro ao atualizar status do usuário: ' . $e->getMessage());
-            return ['status' => false, 'message' => 'Erro ao atualizar status do usuário: ' . $e->getMessage()];
+            return ['status' => false, 'message' => 'Erro interno. Tente novamente.'];
         }
     }
     
@@ -3488,6 +3387,7 @@ public static function getFinancialReports($filters = []) {
 
 // Processar requisições diretas de acesso ao controlador
 if (basename($_SERVER['PHP_SELF']) === 'AdminController.php') {
+    
     // Verificar se o usuário está autenticado
     if (!AuthController::isAuthenticated()) {
         header('Location: ' . LOGIN_URL . '?error=' . urlencode('Você precisa fazer login para acessar esta página.'));
@@ -3510,9 +3410,18 @@ if (basename($_SERVER['PHP_SELF']) === 'AdminController.php') {
             break;
             
         case 'users':
-            $page = isset($_POST['page']) ? intval($_POST['page']) : 1;
-            $result = AdminController::manageUsers([], $page);
+            header('Content-Type: application/json; charset=UTF-8');
+            
+            // Aceitar parâmetros tanto de GET quanto POST
+            $filters = [];
+            if (isset($_REQUEST['tipo'])) $filters['tipo'] = $_REQUEST['tipo'];
+            if (isset($_REQUEST['status'])) $filters['status'] = $_REQUEST['status'];
+            if (isset($_REQUEST['busca'])) $filters['busca'] = $_REQUEST['busca'];
+            
+            $page = isset($_REQUEST['page']) ? intval($_REQUEST['page']) : 1;
+            $result = AdminController::manageUsers($filters, $page);
             echo json_encode($result);
+            exit;
             break;
             
         
@@ -3525,6 +3434,7 @@ if (basename($_SERVER['PHP_SELF']) === 'AdminController.php') {
             exit; // Garantir que nada mais seja executado
             break;   
         case 'update_user_status':
+        case 'toggle_status': // Alias para compatibilidade
             // Garantir que a resposta seja JSON
             header('Content-Type: application/json; charset=UTF-8');
             
@@ -3545,9 +3455,23 @@ if (basename($_SERVER['PHP_SELF']) === 'AdminController.php') {
                 exit;
             }
             
+            // Verificar se não está tentando desativar a si mesmo
+            if ($userId === $_SESSION['user_id']) {
+                echo json_encode(['status' => false, 'message' => 'Não é possível alterar seu próprio status']);
+                exit;
+            }
+            
+            // Validar status permitidos
+            $validStatuses = ['ativo', 'inativo', 'bloqueado'];
+            if (!in_array($status, $validStatuses)) {
+                echo json_encode(['status' => false, 'message' => 'Status inválido']);
+                exit;
+            }
+            
             $result = AdminController::updateUserStatus($userId, $status);
             echo json_encode($result);
-            exit; 
+            exit;
+            break;
         case 'update_user':
             $userId = isset($_POST['user_id']) ? intval($_POST['user_id']) : 0;
             $result = AdminController::updateUser($userId, $_POST);

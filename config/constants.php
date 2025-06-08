@@ -63,6 +63,9 @@ define('STORE_PENDING', 'pendente');
 define('STORE_APPROVED', 'aprovado');
 define('STORE_REJECTED', 'rejeitado');
 
+
+define('DEFAULT_TIMEZONE', 'America/Sao_Paulo');
+date_default_timezone_set(DEFAULT_TIMEZONE);
 // === CONFIGURAÇÕES DE SEGURANÇA ===
 define('PASSWORD_MIN_LENGTH', 8);
 define('SESSION_LIFETIME', 86400);
