@@ -908,57 +908,8 @@ public static function manageStoresWithBalance($filters = [], $page = 1) {
     
     
     
-   
-    /**
- * Atualiza dados de um usuário
- * 
- * @param int $userId ID do usuário
- * @param array $data Dados para atualização
- * @return array Resultado da operação
- */
-public static function updateUser($userId, $data) {
-    try {
-        $db = Database::getConnection();
-        
-        $updateFields = [];
-        $params = [':id' => $userId];
-        
-        // Campos permitidos para atualização
-        $allowedFields = ['nome', 'email', 'telefone', 'tipo', 'status'];
-        
-        foreach ($allowedFields as $field) {
-            if (isset($data[$field])) {
-                $updateFields[] = "$field = :$field";
-                $params[":$field"] = $data[$field];
-            }
-        }
-        
-        // Atualizar senha se fornecida
-        if (isset($data['senha']) && !empty($data['senha'])) {
-            $updateFields[] = "senha_hash = :senha_hash";
-            $params[':senha_hash'] = password_hash($data['senha'], PASSWORD_DEFAULT);
-        }
-        
-        if (empty($updateFields)) {
-            return ['status' => false, 'message' => 'Nenhum campo para atualizar'];
-        }
-        
-        $sql = "UPDATE usuarios SET " . implode(', ', $updateFields) . " WHERE id = :id";
-        
-        $stmt = $db->prepare($sql);
-        $result = $stmt->execute($params);
-        
-        if ($result) {
-            return ['status' => true, 'message' => 'Usuário atualizado com sucesso'];
-        } else {
-            return ['status' => false, 'message' => 'Erro ao atualizar usuário'];
-        }
-        
-    } catch (PDOException $e) {
-        error_log('Erro ao atualizar usuário: ' . $e->getMessage());
-        return ['status' => false, 'message' => 'Erro interno do servidor'];
-    }
-}
+
+
     public static function updateUserStatus($userId, $status) {
         try {
             $db = Database::getConnection();
