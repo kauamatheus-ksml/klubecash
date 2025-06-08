@@ -966,26 +966,28 @@ public static function updateUser($userId, $data) {
 }
     public static function updateUserStatus($userId, $status) {
         try {
-            // Log para debug
-            error_log("updateUserStatus chamado - UserID: $userId, Status: $status");
+            // Log detalhado para debug
+            error_log('=== MÉTODO updateUserStatus INICIADO ===');
+            error_log('UserID: ' . $userId);
+            error_log('Status: ' . $status);
             
             // Verificar se é um administrador
             if (!self::validateAdmin()) {
-                error_log("Acesso negado - não é admin");
+                error_log('ERRO: Não é admin');
                 return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
             }
             
             // Validar parâmetros
-            if (!$userId || !is_numeric($userId)) {
-                error_log("ID do usuário inválido: $userId");
+            if (!$userId || !is_numeric($userId) || $userId <= 0) {
+                error_log('ERRO: ID do usuário inválido');
                 return ['status' => false, 'message' => 'ID do usuário inválido.'];
             }
             
             // Validar status
             $validStatus = [USER_ACTIVE, USER_INACTIVE, USER_BLOCKED];
             if (!in_array($status, $validStatus)) {
-                error_log("Status inválido: $status");
-                return ['status' => false, 'message' => 'Status inválido.'];
+                error_log('ERRO: Status inválido. Recebido: ' . $status . ', Válidos: ' . implode(', ', $validStatus));
+                return ['status' => false, 'message' => 'Status inválido. Status válidos: ' . implode(', ', $validStatus)];
             }
             
             $db = Database::getConnection();
@@ -997,13 +999,22 @@ public static function updateUser($userId, $data) {
             $user = $checkStmt->fetch(PDO::FETCH_ASSOC);
             
             if (!$user) {
-                error_log("Usuário não encontrado: $userId");
+                error_log('ERRO: Usuário não encontrado com ID: ' . $userId);
                 return ['status' => false, 'message' => 'Usuário não encontrado.'];
             }
             
+            error_log('Usuário encontrado: ' . $user['nome'] . ' (Status atual: ' . $user['status'] . ')');
+            
             // Verificar se o status já é o mesmo
             if ($user['status'] === $status) {
-                return ['status' => true, 'message' => 'Status já atualizado.'];
+                error_log('INFO: Status já é o mesmo');
+                return ['status' => true, 'message' => 'Status já está atualizado.'];
+            }
+            
+            // Não permitir que admin desative a si mesmo
+            if (isset($_SESSION['user_id']) && $_SESSION['user_id'] == $userId && $status !== USER_ACTIVE) {
+                error_log('ERRO: Admin tentando desativar a si mesmo');
+                return ['status' => false, 'message' => 'Você não pode desativar seu próprio usuário.'];
             }
             
             // Atualizar status
@@ -1013,16 +1024,32 @@ public static function updateUser($userId, $data) {
             $success = $updateStmt->execute();
             
             if ($success && $updateStmt->rowCount() > 0) {
-                error_log("Status atualizado com sucesso - UserID: $userId, Status: $status");
-                return ['status' => true, 'message' => 'Status do usuário atualizado com sucesso.'];
+                error_log('✅ Status atualizado com sucesso');
+                return [
+                    'status' => true, 
+                    'message' => 'Status do usuário atualizado com sucesso.',
+                    'data' => [
+                        'user_id' => $userId,
+                        'new_status' => $status,
+                        'user_name' => $user['nome']
+                    ]
+                ];
+            } else if ($success) {
+                error_log('⚠️ Query executada mas nenhuma linha afetada');
+                return ['status' => true, 'message' => 'Nenhuma alteração necessária.'];
             } else {
-                error_log("Falha ao atualizar status - UserID: $userId, Status: $status");
+                error_log('❌ Falha na execução da query');
                 return ['status' => false, 'message' => 'Falha ao atualizar status do usuário.'];
             }
             
         } catch (PDOException $e) {
-            error_log('Erro ao atualizar status do usuário: ' . $e->getMessage());
-            return ['status' => false, 'message' => 'Erro ao atualizar status do usuário: ' . $e->getMessage()];
+            error_log('ERRO PDO em updateUserStatus: ' . $e->getMessage());
+            error_log('Stack trace: ' . $e->getTraceAsString());
+            return ['status' => false, 'message' => 'Erro de banco de dados: ' . $e->getMessage()];
+        } catch (Exception $e) {
+            error_log('ERRO geral em updateUserStatus: ' . $e->getMessage());
+            error_log('Stack trace: ' . $e->getTraceAsString());
+            return ['status' => false, 'message' => 'Erro interno: ' . $e->getMessage()];
         }
     }
     
