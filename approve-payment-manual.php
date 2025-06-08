@@ -1,44 +1,35 @@
 <?php
 // approve-payment-manual.php
 require_once 'config/database.php';
+require_once 'controllers/TransactionController.php';
 
-$paymentId = 1103; // Seu ID
+$paymentId = 1103; // Seu pagamento
 
 $db = Database::getConnection();
 
-// Verificar pagamento
-$stmt = $db->prepare("SELECT * FROM pagamentos_comissao WHERE id = ?");
-$stmt->execute([$paymentId]);
-$payment = $stmt->fetch(PDO::FETCH_ASSOC);
+// 1. Atualizar status do pagamento
+$updateStmt = $db->prepare("
+    UPDATE pagamentos_comissao 
+    SET status = 'aprovado',
+        openpix_status = 'COMPLETED',
+        observacao_admin = 'PIX OpenPix aprovado manualmente'
+    WHERE id = ?
+");
+$result1 = $updateStmt->execute([$paymentId]);
 
-echo "<h3>Status do Pagamento ID: $paymentId</h3>";
-if ($payment) {
-    echo "<pre>";
-    print_r($payment);
-    echo "</pre>";
-    
-    // Se status for 'openpix_aguardando', aprovar diretamente
-    if ($payment['status'] === 'openpix_aguardando') {
-        $updateStmt = $db->prepare("
-            UPDATE pagamentos_comissao 
-            SET status = 'aprovado', 
-                observacao_admin = 'Aprovado manualmente - PIX OpenPix pago'
-            WHERE id = ?
-        ");
-        $result = $updateStmt->execute([$paymentId]);
-        
-        echo $result ? "<p style='color:green'>✅ Pagamento aprovado!</p>" : "<p style='color:red'>❌ Erro ao aprovar</p>";
-    } else {
-        echo "<p>Status atual: " . $payment['status'] . "</p>";
-    }
-} else {
-    echo "<p style='color:red'>❌ Pagamento não encontrado!</p>";
-}
+echo $result1 ? "✅ Pagamento atualizado<br>" : "❌ Erro ao atualizar pagamento<br>";
 
-// Listar todos os pagamentos
-echo "<h3>Todos os Pagamentos:</h3>";
-$all = $db->query("SELECT id, loja_id, valor_total, status, metodo_pagamento FROM pagamentos_comissao ORDER BY id DESC LIMIT 10")->fetchAll();
+// 2. Aprovar transações usando TransactionController
+$result2 = TransactionController::approvePaymentAutomatically($paymentId, 'PIX OpenPix aprovado manualmente');
+
 echo "<pre>";
-print_r($all);
+print_r($result2);
 echo "</pre>";
+
+// 3. Verificar resultado
+$stmt = $db->prepare("SELECT status FROM pagamentos_comissao WHERE id = ?");
+$stmt->execute([$paymentId]);
+$newStatus = $stmt->fetchColumn();
+
+echo "Status final: $newStatus";
 ?>
