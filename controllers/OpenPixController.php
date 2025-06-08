@@ -114,8 +114,10 @@ class OpenPixController {
             
             // Buscar pagamento
             $stmt = $db->prepare("
-                SELECT * FROM pagamentos_comissao 
-                WHERE id = ? AND openpix_charge_id = ?
+                SELECT p.*, l.nome_fantasia as loja_nome 
+                FROM pagamentos_comissao p
+                LEFT JOIN lojas l ON p.loja_id = l.id
+                WHERE p.openpix_charge_id = ?
             ");
             $stmt->execute([$paymentId, $chargeId]);
             $payment = $stmt->fetch(PDO::FETCH_ASSOC);
