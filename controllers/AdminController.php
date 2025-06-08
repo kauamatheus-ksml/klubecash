@@ -811,55 +811,55 @@ public static function manageStoresWithBalance($filters = [], $page = 1) {
     }
 
     /**
-     * Atualiza dados de um usuário
-     * 
-     * @param int $userId ID do usuário
-     * @param array $data Dados para atualização
-     * @return array Resultado da operação
-     */
-    public static function updateUser($userId, $data) {
-            try {
-                $db = Database::getConnection();
-                
-                // Campos que podem ser atualizados
-                $allowedFields = ['nome', 'email', 'telefone', 'tipo', 'status'];
-                $updateFields = [];
-                $params = [':id' => $userId];
-                
-                foreach ($data as $field => $value) {
-                    if (in_array($field, $allowedFields) && !empty($value)) {
-                        $updateFields[] = "$field = :$field";
-                        $params[":$field"] = $value;
-                    }
+ * Atualiza dados de um usuário
+ * 
+ * @param int $userId ID do usuário
+ * @param array $data Dados para atualização
+ * @return array Resultado da operação
+ */
+public static function updateUser($userId, $data) {
+        try {
+            $db = Database::getConnection();
+            
+            // Campos que podem ser atualizados
+            $allowedFields = ['nome', 'email', 'telefone', 'tipo', 'status'];
+            $updateFields = [];
+            $params = [':id' => $userId];
+            
+            foreach ($data as $field => $value) {
+                if (in_array($field, $allowedFields) && !empty($value)) {
+                    $updateFields[] = "$field = :$field";
+                    $params[":$field"] = $value;
                 }
-                
-                // Verificar se há senha para atualizar
-                if (isset($data['senha']) && !empty($data['senha'])) {
-                    $updateFields[] = "senha_hash = :senha_hash";
-                    $params[':senha_hash'] = password_hash($data['senha'], PASSWORD_DEFAULT);
-                }
-                
-                if (empty($updateFields)) {
-                    return ['status' => false, 'message' => 'Nenhum campo válido para atualizar'];
-                }
-                
-                // Adicionar campo de atualização
-                $updateFields[] = "data_atualizacao = NOW()";
-                
-                $sql = "UPDATE usuarios SET " . implode(', ', $updateFields) . " WHERE id = :id";
-                $stmt = $db->prepare($sql);
-                
-                if ($stmt->execute($params)) {
-                    return ['status' => true, 'message' => 'Usuário atualizado com sucesso'];
-                } else {
-                    return ['status' => false, 'message' => 'Erro ao atualizar usuário'];
-                }
-                
-            } catch (Exception $e) {
-                error_log('Erro no updateUser: ' . $e->getMessage());
-                return ['status' => false, 'message' => 'Erro ao atualizar dados do usuário'];
             }
+            
+            // Verificar se há senha para atualizar
+            if (isset($data['senha']) && !empty($data['senha'])) {
+                $updateFields[] = "senha_hash = :senha_hash";
+                $params[':senha_hash'] = password_hash($data['senha'], PASSWORD_DEFAULT);
+            }
+            
+            if (empty($updateFields)) {
+                return ['status' => false, 'message' => 'Nenhum campo válido para atualizar'];
+            }
+            
+            // Adicionar campo de atualização
+            $updateFields[] = "data_atualizacao = NOW()";
+            
+            $sql = "UPDATE usuarios SET " . implode(', ', $updateFields) . " WHERE id = :id";
+            $stmt = $db->prepare($sql);
+            
+            if ($stmt->execute($params)) {
+                return ['status' => true, 'message' => 'Usuário atualizado com sucesso'];
+            } else {
+                return ['status' => false, 'message' => 'Erro ao atualizar usuário'];
+            }
+            
+        } catch (Exception $e) {
+            error_log('Erro no updateUser: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro ao atualizar dados do usuário'];
         }
+    }
     public static function updateUserStatus($userId, $status) {
         try {
             $db = Database::getConnection();
@@ -3563,20 +3563,34 @@ if (basename($_SERVER['PHP_SELF']) === 'AdminController.php') {
             exit; // Garantir que nada mais seja executado
             break;   
         case 'update_user_status':
-            handleUpdateUserStatus();
-            break;
-        case 'get_user_details':
-            handleGetUserDetails();
-            break;
-        case 'list_users':
-            handleListUsers();
-            break;
-        case 'create_user':
-            handleCreateUser();
-            break;             
+            // Garantir que a resposta seja JSON
+            header('Content-Type: application/json; charset=UTF-8');
+            
+            // Log para debug
+            error_log('Ação update_user_status recebida');
+            error_log('POST data: ' . print_r($_POST, true));
+            
+            $userId = isset($_POST['user_id']) ? intval($_POST['user_id']) : 0;
+            $status = $_POST['status'] ?? '';
+            
+            if (!$userId) {
+                echo json_encode(['status' => false, 'message' => 'ID do usuário não fornecido']);
+                exit;
+            }
+            
+            if (empty($status)) {
+                echo json_encode(['status' => false, 'message' => 'Status não fornecido']);
+                exit;
+            }
+            
+            $result = AdminController::updateUserStatus($userId, $status);
+            echo json_encode($result);
+            exit; 
         case 'update_user':
-            handleUpdateUser();
-            break;
+            $userId = isset($_POST['user_id']) ? intval($_POST['user_id']) : 0;
+            $result = AdminController::updateUser($userId, $_POST);
+            echo json_encode($result);
+            break;    
         case 'stores':
             $filters = $_POST['filters'] ?? [];
             $page = isset($_POST['page']) ? intval($_POST['page']) : 1;
