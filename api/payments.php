@@ -19,7 +19,6 @@ if ($method === 'POST' && $action === 'criar_pagamento') {
         $db = Database::getConnection();
         $userId = $_SESSION['user_id'];
         
-        // Buscar loja
         $storeStmt = $db->prepare("SELECT id FROM lojas WHERE usuario_id = ?");
         $storeStmt->execute([$userId]);
         $store = $storeStmt->fetch();
@@ -33,7 +32,6 @@ if ($method === 'POST' && $action === 'criar_pagamento') {
             throw new Exception('Nenhuma transação selecionada');
         }
         
-        // Calcular valor total das comissões (corrigido)
         $placeholders = str_repeat('?,', count($transacoes) - 1) . '?';
         $stmt = $db->prepare("
             SELECT SUM(valor_total * 0.10) as total_comissao
@@ -44,9 +42,9 @@ if ($method === 'POST' && $action === 'criar_pagamento') {
         $stmt->execute($params);
         $totalComissao = $stmt->fetchColumn() ?: 0;
         
-        // Criar pagamento
+        // Corrigido: usar 'created_at' em vez de 'data_criacao'
         $paymentStmt = $db->prepare("
-            INSERT INTO pagamentos_comissao (loja_id, valor_total, metodo_pagamento, status, data_criacao) 
+            INSERT INTO pagamentos_comissao (loja_id, valor_total, metodo_pagamento, status, created_at) 
             VALUES (?, ?, ?, 'pendente', NOW())
         ");
         $paymentStmt->execute([$store['id'], $totalComissao, $_POST['metodo_pagamento'] ?? 'pix_openpix']);
