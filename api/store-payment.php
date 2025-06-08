@@ -1,13 +1,45 @@
 <?php
-// api/store-payment.php
+/**
+ * API para pagamentos de lojas - Klube Cash
+ * Processa pagamentos de comissões via PIX/OpenPix
+ */
+
+// Headers para JSON
+header('Content-Type: application/json; charset=UTF-8');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
+
+// Responder OPTIONS (CORS preflight)
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit;
+}
 
 // Incluir arquivos necessários
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../config/constants.php';
 require_once __DIR__ . '/../controllers/AuthController.php';
-require_once __DIR__ . '/../utils/Logger.php';
 
-// Iniciar sessão se ainda não iniciada
+// Verificar se Logger existe, senão usar error_log
+if (file_exists(__DIR__ . '/../utils/Logger.php')) {
+    require_once __DIR__ . '/../utils/Logger.php';
+    $useLogger = true;
+} else {
+    $useLogger = false;
+}
+
+// Função helper para log
+function logMessage($context, $message, $level = 'INFO') {
+    global $useLogger;
+    if ($useLogger && class_exists('Logger')) {
+        Logger::log($context, $message, $level);
+    } else {
+        error_log("[$level] $context: $message");
+    }
+}
+
+// Iniciar sessão se necessário
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -19,30 +51,34 @@ if (!isset($_SESSION['user_id']) || $_SESSION['user_type'] !== 'loja') {
     exit;
 }
 
-// Obter ação - pode vir via GET ou POST
 $action = $_REQUEST['action'] ?? '';
 $userId = $_SESSION['user_id'];
 
-// Debug - registrar a requisição
-Logger::log('store_payment', "Requisição recebida - Ação: {$action}, Método: {$_SERVER['REQUEST_METHOD']}", 'INFO');
+logMessage('store_payment', "Ação: {$action}, Método: {$_SERVER['REQUEST_METHOD']}, User: {$userId}");
 
-// Processar ação
-switch ($action) {
-    case 'payment_form':
-        handlePaymentForm();
-        break;
-        
-    case 'create_pix':
-        handleCreatePix();
-        break;
-        
-    case 'check_status':
-        handleCheckStatus();
-        break;
-        
-    default:
-        echo json_encode(['status' => false, 'message' => 'Ação não reconhecida: ' . $action]);
-        break;
+try {
+    switch ($action) {
+        case 'payment_form':
+            handlePaymentForm();
+            break;
+            
+        case 'create_pix':
+            handleCreatePix();
+            break;
+            
+        case 'check_status':
+            handleCheckStatus();
+            break;
+            
+        default:
+            http_response_code(400);
+            echo json_encode(['status' => false, 'message' => 'Ação não reconhecida: ' . $action]);
+            break;
+    }
+} catch (Exception $e) {
+    logMessage('store_payment', 'Erro geral: ' . $e->getMessage(), 'ERROR');
+    http_response_code(500);
+    echo json_encode(['status' => false, 'message' => 'Erro interno do servidor']);
 }
 
 /**
@@ -51,65 +87,97 @@ switch ($action) {
 function handlePaymentForm() {
     global $userId;
     
-    // Obter IDs das transações
     $transactionIds = $_POST['transaction_ids'] ?? [];
     
-    // Log para debug
-    Logger::log('store_payment', 'IDs recebidos: ' . json_encode($transactionIds), 'DEBUG');
-    
-    if (empty($transactionIds)) {
+    // Validar entrada
+    if (empty($transactionIds) || !is_array($transactionIds)) {
         echo json_encode(['status' => false, 'message' => 'Nenhuma transação selecionada']);
         return;
     }
+    
+    // Filtrar e validar IDs
+    $validIds = array_filter($transactionIds, function($id) {
+        return is_numeric($id) && $id > 0;
+    });
+    
+    if (empty($validIds)) {
+        echo json_encode(['status' => false, 'message' => 'IDs de transação inválidos']);
+        return;
+    }
+    
+    logMessage('store_payment', 'Processando ' . count($validIds) . ' transações para usuário ' . $userId);
     
     try {
         $db = Database::getConnection();
         
         // Buscar dados da loja
         $stmtLoja = $db->prepare("
-            SELECT id, nome_fantasia, cnpj, email, telefone 
+            SELECT id, nome_fantasia, cnpj, email, telefone, status 
             FROM lojas 
-            WHERE usuario_id = ? 
+            WHERE usuario_id = ? AND status = 'aprovado'
             LIMIT 1
         ");
         $stmtLoja->execute([$userId]);
         $loja = $stmtLoja->fetch(PDO::FETCH_ASSOC);
         
         if (!$loja) {
-            throw new Exception('Loja não encontrada');
+            throw new Exception('Loja não encontrada ou não aprovada');
         }
         
-        // Preparar consulta para buscar transações
-        $placeholders = str_repeat('?,', count($transactionIds) - 1) . '?';
+        // Preparar placeholders para consulta
+        $placeholders = str_repeat('?,', count($validIds) - 1) . '?';
+        
+        // Buscar transações válidas
         $stmt = $db->prepare("
             SELECT 
                 t.id,
                 t.valor_total,
                 t.data_transacao,
-                COALESCE(tc.valor_admin, t.valor_total * 0.10) as valor_comissao
+                t.codigo_transacao,
+                COALESCE(tsu.valor_usado, 0) as saldo_usado,
+                (t.valor_total - COALESCE(tsu.valor_usado, 0)) * 0.10 as valor_comissao,
+                u.nome as cliente_nome
             FROM transacoes_cashback t
-            LEFT JOIN transacoes_comissao tc ON tc.transacao_id = t.id AND tc.tipo = 'admin'
+            LEFT JOIN transacoes_saldo_usado tsu ON tsu.transacao_id = t.id
+            LEFT JOIN usuarios u ON t.usuario_id = u.id
             WHERE t.id IN ($placeholders) 
             AND t.loja_id = ?
             AND t.status IN ('pendente', 'pagamento_pendente')
+            ORDER BY t.data_transacao DESC
         ");
         
-        // Executar consulta
-        $params = array_merge($transactionIds, [$loja['id']]);
+        $params = array_merge($validIds, [$loja['id']]);
         $stmt->execute($params);
         $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         if (empty($transactions)) {
-            throw new Exception('Nenhuma transação válida encontrada');
+            throw new Exception('Nenhuma transação válida encontrada para pagamento');
         }
         
-        // Calcular valor total da comissão
+        // Calcular valores
         $valorTotal = 0;
+        $detalhes = [];
+        
         foreach ($transactions as $transaction) {
-            $valorTotal += $transaction['valor_comissao'];
+            $comissao = floatval($transaction['valor_comissao']);
+            $valorTotal += $comissao;
+            
+            $detalhes[] = [
+                'id' => $transaction['id'],
+                'codigo' => $transaction['codigo_transacao'],
+                'cliente' => $transaction['cliente_nome'],
+                'valor_original' => floatval($transaction['valor_total']),
+                'saldo_usado' => floatval($transaction['saldo_usado']),
+                'comissao' => $comissao,
+                'data' => $transaction['data_transacao']
+            ];
         }
         
-        // Iniciar transação no banco
+        if ($valorTotal <= 0) {
+            throw new Exception('Valor total da comissão inválido');
+        }
+        
+        // Iniciar transação do banco
         $db->beginTransaction();
         
         try {
@@ -120,18 +188,42 @@ function handlePaymentForm() {
                     valor_total, 
                     data_criacao, 
                     status,
-                    metodo_pagamento
-                ) VALUES (?, ?, NOW(), 'pendente', 'pix_openpix')
+                    metodo_pagamento,
+                    observacao
+                ) VALUES (?, ?, NOW(), 'pendente', 'pix_openpix', ?)
             ");
-            $stmtPagamento->execute([$loja['id'], $valorTotal]);
+            
+            $observacao = 'Pagamento de comissão - ' . count($transactions) . ' transações';
+            $stmtPagamento->execute([$loja['id'], $valorTotal, $observacao]);
             $paymentId = $db->lastInsertId();
             
-            // Verificar se a tabela pagamento_transacoes existe
-            $tableCheck = $db->query("SHOW TABLES LIKE 'pagamento_transacoes'");
-            if ($tableCheck->rowCount() > 0) {
-                // Associar transações ao pagamento
+            // Verificar se tabela pagamentos_transacoes existe
+            $tableExists = false;
+            try {
+                $tableCheck = $db->query("SELECT 1 FROM pagamentos_transacoes LIMIT 1");
+                $tableExists = true;
+            } catch (PDOException $e) {
+                logMessage('store_payment', 'Tabela pagamentos_transacoes não existe, criando...', 'WARNING');
+                
+                // Criar tabela se não existir
+                $createTable = $db->exec("
+                    CREATE TABLE IF NOT EXISTS pagamentos_transacoes (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        pagamento_id INT NOT NULL,
+                        transacao_id INT NOT NULL,
+                        data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (pagamento_id) REFERENCES pagamentos_comissao(id),
+                        FOREIGN KEY (transacao_id) REFERENCES transacoes_cashback(id),
+                        UNIQUE KEY unique_payment_transaction (pagamento_id, transacao_id)
+                    )
+                ");
+                $tableExists = true;
+            }
+            
+            // Associar transações ao pagamento
+            if ($tableExists) {
                 $stmtAssoc = $db->prepare("
-                    INSERT INTO pagamento_transacoes (pagamento_id, transacao_id) 
+                    INSERT INTO pagamentos_transacoes (pagamento_id, transacao_id) 
                     VALUES (?, ?)
                 ");
                 
@@ -143,32 +235,38 @@ function handlePaymentForm() {
             // Atualizar status das transações
             $stmtUpdate = $db->prepare("
                 UPDATE transacoes_cashback 
-                SET status = 'pagamento_pendente' 
+                SET status = 'pagamento_pendente', data_atualizacao = NOW()
                 WHERE id IN ($placeholders)
             ");
-            $stmtUpdate->execute($transactionIds);
+            $stmtUpdate->execute($validIds);
             
             // Confirmar transação
             $db->commit();
             
-            // Retornar sucesso com URL de redirecionamento
+            logMessage('store_payment', "Pagamento {$paymentId} criado com sucesso - Valor: R$ {$valorTotal}");
+            
+            // Retornar sucesso
             echo json_encode([
                 'status' => true,
-                'payment_id' => $paymentId,
-                'valor_total' => $valorTotal,
-                'quantidade_transacoes' => count($transactions),
+                'message' => 'Pagamento criado com sucesso',
+                'data' => [
+                    'payment_id' => $paymentId,
+                    'valor_total' => $valorTotal,
+                    'quantidade_transacoes' => count($transactions),
+                    'loja' => $loja['nome_fantasia'],
+                    'detalhes' => $detalhes
+                ],
                 'redirect_url' => SITE_URL . '/store/pagamento?id=' . $paymentId
             ]);
             
         } catch (Exception $e) {
-            // Reverter transação em caso de erro
             $db->rollBack();
             throw $e;
         }
         
     } catch (Exception $e) {
-        Logger::log('store_payment', 'Erro em handlePaymentForm: ' . $e->getMessage(), 'ERROR');
-        echo json_encode(['status' => false, 'message' => 'Erro ao processar pagamento: ' . $e->getMessage()]);
+        logMessage('store_payment', 'Erro em handlePaymentForm: ' . $e->getMessage(), 'ERROR');
+        echo json_encode(['status' => false, 'message' => $e->getMessage()]);
     }
 }
 
@@ -178,10 +276,10 @@ function handlePaymentForm() {
 function handleCreatePix() {
     global $userId;
     
-    $paymentId = $_POST['payment_id'] ?? 0;
+    $paymentId = $_POST['payment_id'] ?? $_GET['payment_id'] ?? 0;
     
-    if (!$paymentId) {
-        echo json_encode(['status' => false, 'message' => 'ID do pagamento não informado']);
+    if (!$paymentId || !is_numeric($paymentId)) {
+        echo json_encode(['status' => false, 'message' => 'ID do pagamento inválido']);
         return;
     }
     
@@ -202,19 +300,42 @@ function handleCreatePix() {
             throw new Exception('Pagamento não encontrado ou já processado');
         }
         
+        // Verificar se PIX já foi criado
+        if (!empty($payment['pix_charge_id'])) {
+            echo json_encode([
+                'status' => true,
+                'message' => 'PIX já criado anteriormente',
+                'data' => [
+                    'charge_id' => $payment['pix_charge_id'],
+                    'qr_code' => $payment['pix_qr_code'],
+                    'qr_code_image' => $payment['pix_qr_code_image'],
+                    'value' => floatval($payment['valor_total'])
+                ]
+            ]);
+            return;
+        }
+        
         // Preparar dados para OpenPix
+        $correlationId = "payment_{$paymentId}_" . time();
         $chargeData = [
-            'value' => (int)($payment['valor_total'] * 100), // Valor em centavos
-            'comment' => "Comissão Klube Cash - Pagamento #{$payment['id']} - {$payment['nome_fantasia']}",
-            'correlationID' => "payment_{$payment['id']}_" . time(),
+            'value' => (int)(floatval($payment['valor_total']) * 100), // Centavos
+            'comment' => "Comissão Klube Cash - {$payment['nome_fantasia']} - Pagamento #{$paymentId}",
+            'correlationID' => $correlationId,
             'expiresIn' => 86400 // 24 horas
         ];
+        
+        logMessage('store_payment', "Criando PIX para pagamento {$paymentId} - Valor: R$ {$payment['valor_total']}");
         
         // Fazer requisição para OpenPix
         $response = makeOpenPixRequest('POST', '/charge', $chargeData);
         
-        if (isset($response['charge'])) {
+        if (isset($response['charge']) && !empty($response['charge']['id'])) {
             $charge = $response['charge'];
+            
+            // Calcular data de expiração
+            $expiresAt = isset($charge['expiresDate']) ? 
+                date('Y-m-d H:i:s', strtotime($charge['expiresDate'])) : 
+                date('Y-m-d H:i:s', strtotime('+24 hours'));
             
             // Atualizar pagamento com dados do PIX
             $updateStmt = $db->prepare("
@@ -225,41 +346,42 @@ function handleCreatePix() {
                     pix_qr_code = ?,
                     pix_qr_code_image = ?,
                     pix_expires_at = ?,
+                    status = 'pix_aguardando',
                     data_atualizacao = NOW()
                 WHERE id = ?
             ");
             
-            $expiresAt = isset($charge['expiresDate']) ? 
-                date('Y-m-d H:i:s', strtotime($charge['expiresDate'])) : 
-                date('Y-m-d H:i:s', strtotime('+24 hours'));
-            
             $updateStmt->execute([
                 $charge['id'],
-                $charge['correlationID'],
-                $charge['brCode'],
-                $charge['qrCodeImage'],
+                $correlationId,
+                $charge['brCode'] ?? '',
+                $charge['qrCodeImage'] ?? '',
                 $expiresAt,
-                $payment['id']
+                $paymentId
             ]);
+            
+            logMessage('store_payment', "PIX criado com sucesso - Charge ID: {$charge['id']}");
             
             // Retornar dados do PIX
             echo json_encode([
                 'status' => true,
+                'message' => 'PIX criado com sucesso',
                 'data' => [
                     'charge_id' => $charge['id'],
-                    'qr_code' => $charge['brCode'],
-                    'qr_code_image' => $charge['qrCodeImage'],
+                    'qr_code' => $charge['brCode'] ?? '',
+                    'qr_code_image' => $charge['qrCodeImage'] ?? '',
                     'expires_at' => $expiresAt,
-                    'value' => $payment['valor_total']
+                    'value' => floatval($payment['valor_total']),
+                    'correlation_id' => $correlationId
                 ]
             ]);
         } else {
-            throw new Exception('Erro ao criar cobrança PIX');
+            throw new Exception('Resposta inválida da API OpenPix');
         }
         
     } catch (Exception $e) {
-        Logger::log('store_payment', 'Erro ao criar PIX: ' . $e->getMessage(), 'ERROR');
-        echo json_encode(['status' => false, 'message' => $e->getMessage()]);
+        logMessage('store_payment', 'Erro ao criar PIX: ' . $e->getMessage(), 'ERROR');
+        echo json_encode(['status' => false, 'message' => 'Erro ao criar PIX: ' . $e->getMessage()]);
     }
 }
 
@@ -268,41 +390,63 @@ function handleCreatePix() {
  */
 function handleCheckStatus() {
     $chargeId = $_GET['charge_id'] ?? '';
+    $paymentId = $_GET['payment_id'] ?? 0;
     
-    if (empty($chargeId)) {
-        echo json_encode(['status' => false, 'message' => 'ID da cobrança não informado']);
+    if (empty($chargeId) && !$paymentId) {
+        echo json_encode(['status' => false, 'message' => 'ID da cobrança ou pagamento é obrigatório']);
         return;
     }
     
     try {
+        $db = Database::getConnection();
+        
+        // Se temos payment_id, buscar charge_id
+        if ($paymentId && empty($chargeId)) {
+            $stmt = $db->prepare("SELECT pix_charge_id FROM pagamentos_comissao WHERE id = ?");
+            $stmt->execute([$paymentId]);
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            $chargeId = $result['pix_charge_id'] ?? '';
+        }
+        
+        if (empty($chargeId)) {
+            throw new Exception('Cobrança PIX não encontrada');
+        }
+        
         // Verificar status na OpenPix
         $response = makeOpenPixRequest('GET', "/charge/{$chargeId}");
         
         if (isset($response['charge'])) {
             $charge = $response['charge'];
-            $isPaid = $charge['status'] === 'COMPLETED';
+            $status = $charge['status'] ?? 'UNKNOWN';
+            $isPaid = ($status === 'COMPLETED');
             
             // Se pago, atualizar no banco
             if ($isPaid) {
-                $db = Database::getConnection();
-                $stmt = $db->prepare("
+                $updateStmt = $db->prepare("
                     UPDATE pagamentos_comissao 
-                    SET status = 'pago', pix_paid_at = NOW() 
-                    WHERE pix_charge_id = ? AND status = 'pendente'
+                    SET status = 'pago', pix_paid_at = NOW(), data_atualizacao = NOW()
+                    WHERE pix_charge_id = ? AND status IN ('pendente', 'pix_aguardando')
                 ");
-                $stmt->execute([$chargeId]);
+                $result = $updateStmt->execute([$chargeId]);
+                
+                if ($result && $updateStmt->rowCount() > 0) {
+                    logMessage('store_payment', "Pagamento automaticamente aprovado - Charge: {$chargeId}");
+                }
             }
             
             echo json_encode([
                 'status' => true,
                 'paid' => $isPaid,
-                'charge_status' => $charge['status']
+                'charge_status' => $status,
+                'value' => isset($charge['value']) ? $charge['value'] / 100 : 0,
+                'paid_at' => $charge['paidAt'] ?? null
             ]);
         } else {
-            throw new Exception('Cobrança não encontrada');
+            throw new Exception('Cobrança não encontrada na OpenPix');
         }
         
     } catch (Exception $e) {
+        logMessage('store_payment', 'Erro ao verificar status: ' . $e->getMessage(), 'ERROR');
         echo json_encode(['status' => false, 'message' => $e->getMessage()]);
     }
 }
@@ -311,27 +455,34 @@ function handleCheckStatus() {
  * Fazer requisição para API da OpenPix
  */
 function makeOpenPixRequest($method, $endpoint, $data = null) {
-    $baseUrl = OPENPIX_BASE_URL;
-    $url = $baseUrl . $endpoint;
+    if (!defined('OPENPIX_API_KEY') || !defined('OPENPIX_BASE_URL')) {
+        throw new Exception('Configurações OpenPix não encontradas');
+    }
+    
+    $url = OPENPIX_BASE_URL . $endpoint;
     
     $headers = [
         'Authorization: ' . OPENPIX_API_KEY,
         'Content-Type: application/json',
-        'Accept: application/json'
+        'Accept: application/json',
+        'User-Agent: KlubeCash/2.1'
     ];
     
     $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+    curl_setopt_array($ch, [
+        CURLOPT_URL => $url,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER => $headers,
+        CURLOPT_SSL_VERIFYPEER => true,
+        CURLOPT_SSL_VERIFYHOST => 2,
+        CURLOPT_TIMEOUT => 30,
+        CURLOPT_CONNECTTIMEOUT => 10,
+        CURLOPT_FOLLOWLOCATION => false
+    ]);
     
-    if ($method === 'POST') {
+    if ($method === 'POST' && $data) {
         curl_setopt($ch, CURLOPT_POST, true);
-        if ($data) {
-            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-        }
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
     }
     
     $response = curl_exec($ch);
@@ -340,14 +491,27 @@ function makeOpenPixRequest($method, $endpoint, $data = null) {
     curl_close($ch);
     
     if ($error) {
-        throw new Exception('Erro na requisição: ' . $error);
+        throw new Exception("Erro cURL: {$error}");
+    }
+    
+    if (!$response) {
+        throw new Exception('Resposta vazia da API OpenPix');
     }
     
     $result = json_decode($response, true);
     
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        throw new Exception('Resposta JSON inválida da OpenPix');
+    }
+    
     if ($httpCode >= 400) {
-        $errorMessage = $result['error'] ?? 'Erro na API OpenPix';
-        throw new Exception($errorMessage);
+        $errorMsg = 'Erro HTTP ' . $httpCode;
+        if (isset($result['error'])) {
+            $errorMsg .= ': ' . $result['error'];
+        } elseif (isset($result['message'])) {
+            $errorMsg .= ': ' . $result['message'];
+        }
+        throw new Exception($errorMsg);
     }
     
     return $result;
