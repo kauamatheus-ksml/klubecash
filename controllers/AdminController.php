@@ -6,7 +6,16 @@ require_once __DIR__ . '/../config/constants.php';
 require_once __DIR__ . '/../config/email.php';
 require_once __DIR__ . '/../utils/Validator.php';
 require_once __DIR__ . '/AuthController.php';
-
+// DEBUG TEMPORÁRIO - adicionar no início do AdminController.php
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    error_log("=== DEBUG ADMIN CONTROLLER ===");
+    error_log("POST Action recebida: " . $_POST['action']);
+    error_log("Dados POST: " . print_r($_POST, true));
+    error_log("Session user_type: " . ($_SESSION['user_type'] ?? 'não definido'));
+    error_log("Session user_id: " . ($_SESSION['user_id'] ?? 'não definido'));
+    error_log("Basename: " . basename($_SERVER['PHP_SELF']));
+    error_log("=================================");
+}
 // Limpar qualquer output anterior e configurar headers JSON
 if (ob_get_level()) {
     ob_clean();
@@ -110,6 +119,13 @@ $isAjaxRequest = (
     !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && 
     strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest'
 );
+
+// ADICIONAR DEBUG TEMPORÁRIO
+if (isset($_POST['action'])) {
+    error_log("DEBUG: Detecção AJAX - isAjaxRequest: " . ($isAjaxRequest ? 'true' : 'false'));
+    error_log("DEBUG: POST action existe: " . $_POST['action']);
+    error_log("DEBUG: X-Requested-With: " . ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? 'não definido'));
+}
 
 // Se for acesso direto ao arquivo (não AJAX), redirecionar
 if (!$isAjaxRequest && basename($_SERVER['PHP_SELF']) === 'AdminController.php') {
