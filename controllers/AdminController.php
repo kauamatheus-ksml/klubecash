@@ -6,6 +6,112 @@ require_once __DIR__ . '/../config/constants.php';
 require_once __DIR__ . '/../config/email.php';
 require_once __DIR__ . '/../utils/Validator.php';
 require_once __DIR__ . '/AuthController.php';
+
+
+
+// INTERCEPTADOR ESPECÍFICO PARA REGISTRO DE USUÁRIOS
+// Deve ser colocado ANTES de qualquer outro processamento
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'register') {
+    
+    // Iniciar sessão se necessário
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+    
+    // Limpar qualquer output anterior que possa interferir no JSON
+    if (ob_get_level()) {
+        ob_end_clean();
+    }
+    
+    // Definir headers para resposta JSON
+    header('Content-Type: application/json; charset=UTF-8');
+    header('Cache-Control: no-cache, must-revalidate');
+    
+    // Verificar autenticação de administrador
+    if (!isset($_SESSION['user_id']) || $_SESSION['user_type'] !== USER_TYPE_ADMIN) {
+        echo json_encode([
+            'status' => false, 
+            'message' => 'Acesso restrito a administradores. Faça login novamente.'
+        ]);
+        exit;
+    }
+    
+    try {
+        // Log para debug - você pode remover depois que funcionar
+        error_log("REGISTRO DE USUÁRIO: Processando requisição de registro");
+        
+        // Coletar e validar dados do formulário
+        $nome = trim($_POST['nome'] ?? '');
+        $email = trim($_POST['email'] ?? '');
+        $telefone = trim($_POST['telefone'] ?? '');
+        $senha = $_POST['senha'] ?? '';
+        $tipo = $_POST['tipo'] ?? 'cliente';
+        $status = $_POST['status'] ?? 'ativo';
+        
+        // Validações de entrada
+        $errors = [];
+        
+        if (empty($nome)) {
+            $errors[] = 'Nome é obrigatório';
+        }
+        
+        if (empty($email)) {
+            $errors[] = 'Email é obrigatório';
+        } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $errors[] = 'Email tem formato inválido';
+        }
+        
+        if (empty($senha)) {
+            $errors[] = 'Senha é obrigatória';
+        } elseif (strlen($senha) < 8) {
+            $errors[] = 'Senha deve ter no mínimo 8 caracteres';
+        }
+        
+        if (!in_array($tipo, ['cliente', 'loja', 'admin'])) {
+            $errors[] = 'Tipo de usuário inválido';
+        }
+        
+        if (!in_array($status, ['ativo', 'inativo', 'bloqueado'])) {
+            $errors[] = 'Status de usuário inválido';
+        }
+        
+        // Se há erros de validação, retornar imediatamente
+        if (!empty($errors)) {
+            echo json_encode([
+                'status' => false,
+                'message' => 'Dados inválidos: ' . implode(', ', $errors)
+            ]);
+            exit;
+        }
+        
+        // Log dos dados que serão processados
+        error_log("REGISTRO DE USUÁRIO: Dados validados - Nome: $nome, Email: $email, Tipo: $tipo");
+        
+        // Chamar o método de registro do AuthController
+        $resultado = AuthController::register($nome, $email, $telefone, $senha, $tipo);
+        
+        // Log do resultado
+        error_log("REGISTRO DE USUÁRIO: Resultado - " . json_encode($resultado));
+        
+        // Retornar o resultado como JSON
+        echo json_encode($resultado);
+        
+    } catch (Exception $e) {
+        // Log do erro para debug
+        error_log("REGISTRO DE USUÁRIO: Erro - " . $e->getMessage());
+        
+        // Retornar erro para o frontend
+        echo json_encode([
+            'status' => false,
+            'message' => 'Erro interno do servidor: ' . $e->getMessage()
+        ]);
+    }
+    
+    // Finalizar execução para evitar processamento adicional
+    exit;
+}
+
+
 // DEBUG TEMPORÁRIO - adicionar no início do AdminController.php
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     error_log("=== DEBUG ADMIN CONTROLLER ===");
