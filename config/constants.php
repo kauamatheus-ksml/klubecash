@@ -108,7 +108,7 @@ define('MP_TIMEOUT', 30); // Timeout em segundos
 define('MP_USER_AGENT', 'KlubeCash/2.1 (Mercado Pago Integration Optimized)');
 
 // === URLs MERCADO PAGO ===
-define('MP_CREATE_PAYMENT_URL', SITE_URL . '/api/mercadopago.php?action=create_payment');
+define('MP_CREATE_PAYMENT_URL', SITE_URL . '/api/mercadopago?action=create_payment');
 define('MP_CHECK_STATUS_URL', SITE_URL . '/api/mercadopago.php?action=status');
 define('MP_BASE_URL', 'https://api.mercadopago.com');
 
