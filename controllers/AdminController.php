@@ -1,4 +1,5 @@
 <?php
+
 // TESTE BÁSICO DE FUNCIONAMENTO - Muito simples para não dar erro
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'register') {
     // Simplesmente retornar uma resposta de teste
@@ -84,6 +85,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
     
     exit;
+}
+
+// PRIMEIRO: Limpar output buffer e configurar headers para AJAX
+if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
+    // Limpar qualquer output anterior
+    while (ob_get_level()) {
+        ob_end_clean();
+    }
+    header('Content-Type: application/json; charset=UTF-8');
+    header('Cache-Control: no-cache, must-revalidate');
 }
 // controllers/AdminController.php
 require_once __DIR__ . '/../config/database.php';
@@ -1358,37 +1369,37 @@ public static function manageStoresWithBalance($filters = [], $page = 1) {
  * @return array Lista de lojas sem usuário
  */
 public static function getAvailableStores() {
-    try {
-        // Verificar se é um administrador
-        if (!self::validateAdmin()) {
-            return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
+        try {
+            // Verificar se é um administrador
+            if (!self::validateAdmin()) {
+                return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
+            }
+            
+            $db = Database::getConnection();
+            
+            // Buscar lojas aprovadas sem usuário vinculado
+            $stmt = $db->prepare("
+                SELECT id, nome_fantasia, razao_social, cnpj, email, telefone, categoria
+                FROM lojas 
+                WHERE status = :status AND (usuario_id IS NULL OR usuario_id = 0)
+                ORDER BY nome_fantasia ASC
+            ");
+            $status = STORE_APPROVED;
+            $stmt->bindParam(':status', $status);
+            $stmt->execute();
+            
+            $stores = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            return [
+                'status' => true,
+                'data' => $stores
+            ];
+            
+        } catch (PDOException $e) {
+            error_log('Erro ao obter lojas disponíveis: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro ao carregar lojas disponíveis.'];
         }
-        
-        $db = Database::getConnection();
-        
-        // Buscar lojas aprovadas sem usuário vinculado
-        $stmt = $db->prepare("
-            SELECT id, nome_fantasia, razao_social, cnpj, email, telefone, categoria
-            FROM lojas 
-            WHERE status = :status AND (usuario_id IS NULL OR usuario_id = 0)
-            ORDER BY nome_fantasia ASC
-        ");
-        $status = STORE_APPROVED;
-        $stmt->bindParam(':status', $status);
-        $stmt->execute();
-        
-        $stores = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        
-        return [
-            'status' => true,
-            'data' => $stores
-        ];
-        
-    } catch (PDOException $e) {
-        error_log('Erro ao obter lojas disponíveis: ' . $e->getMessage());
-        return ['status' => false, 'message' => 'Erro ao carregar lojas disponíveis.'];
     }
-}
 
     /**
     * Obtém dados de uma loja específica pelo email
@@ -3271,8 +3282,11 @@ public static function getFinancialReports($filters = []) {
      * 
      * @return bool true se for administrador, false caso contrário
      */
-    private static function validateAdmin() {
-        return AuthController::isAdmin();
+    public static function validateAdmin() {
+        if (!isset($_SESSION['user_id']) || $_SESSION['user_type'] !== USER_TYPE_ADMIN) {
+            return false;
+        }
+        return true;
     }
     
     /**
@@ -3741,39 +3755,29 @@ if (basename($_SERVER['PHP_SELF']) === 'AdminController.php') {
     $action = $_REQUEST['action'] ?? '';
     
     switch ($action) {
-        case 'register':
-            if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-                // Pegar dados do POST
-                $nome = $_POST['nome'] ?? '';
-                $email = $_POST['email'] ?? '';
-                $telefone = $_POST['telefone'] ?? '';
-                $senha = $_POST['senha'] ?? '';
-                $tipo = $_POST['tipo'] ?? '';
-                $status = $_POST['status'] ?? 'ativo';
-                
-                // Verificar se é requisição AJAX
-                $isAjax = isset($_POST['ajax']) || 
-                        (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && 
-                        strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest');
-                
-                // Chamar método de registro
-                $result = AuthController::register($nome, $email, $telefone, $senha, $tipo);
-                
-                if ($isAjax) {
-                    // Responder com JSON para AJAX
-                    header('Content-Type: application/json');
-                    echo json_encode($result);
-                    exit;
-                } else {
-                    // Para requisições normais
-                    if ($result['status']) {
-                        header('Location: ' . ADMIN_USERS_URL . '?success=' . urlencode($result['message']));
-                    } else {
-                        header('Location: ' . ADMIN_USERS_URL . '?error=' . urlencode($result['message']));
-                    }
-                    exit;
-                }
+        case 'get_available_stores':
+            $result = AdminController::getAvailableStores();
+            sendJsonResponse($result);
+            break;
+            
+        case 'get_store_by_email':
+            $email = $_POST['email'] ?? '';
+            if (empty($email)) {
+                sendJsonResponse(['status' => false, 'message' => 'Email não fornecido']);
             }
+            $result = AdminController::getStoreByEmail($email);
+            sendJsonResponse($result);
+            break;
+
+        case 'register':
+            $result = AuthController::register(
+                $_POST['nome'] ?? '', 
+                $_POST['email'] ?? '', 
+                $_POST['telefone'] ?? '', 
+                $_POST['senha'] ?? '', 
+                $_POST['tipo'] ?? 'cliente'
+            );
+            sendJsonResponse($result);
             break;
         case 'create_user':
             $result = AuthController::register(
@@ -3788,71 +3792,32 @@ if (basename($_SERVER['PHP_SELF']) === 'AdminController.php') {
 
         case 'dashboard':
             $result = AdminController::getDashboardData();
-            echo json_encode($result);
+            sendJsonResponse($result);
             break;
             
         case 'users':
-            header('Content-Type: application/json; charset=UTF-8');
-            
-            // Aceitar parâmetros tanto de GET quanto POST
             $filters = [];
-            if (isset($_REQUEST['tipo'])) $filters['tipo'] = $_REQUEST['tipo'];
-            if (isset($_REQUEST['status'])) $filters['status'] = $_REQUEST['status'];
-            if (isset($_REQUEST['busca'])) $filters['busca'] = $_REQUEST['busca'];
+            if (isset($_POST['tipo'])) $filters['tipo'] = $_POST['tipo'];
+            if (isset($_POST['status'])) $filters['status'] = $_POST['status'];
+            if (isset($_POST['busca'])) $filters['busca'] = $_POST['busca'];
             
-            $page = isset($_REQUEST['page']) ? intval($_REQUEST['page']) : 1;
+            $page = isset($_POST['page']) ? intval($_POST['page']) : 1;
             $result = AdminController::manageUsers($filters, $page);
-            echo json_encode($result);
-            exit;
+            sendJsonResponse($result);
             break;
             
-        
         case 'getUserDetails':
-            // Garantir que a resposta seja JSON
-            header('Content-Type: application/json');
             $userId = isset($_POST['user_id']) ? intval($_POST['user_id']) : 0;
             $result = AdminController::getUserDetails($userId);
-            echo json_encode($result);
-            exit; // Garantir que nada mais seja executado
+            sendJsonResponse($result);
             break;   
+
         case 'update_user_status':
-        case 'toggle_status': // Alias para compatibilidade
-            // Garantir que a resposta seja JSON
-            header('Content-Type: application/json; charset=UTF-8');
-            
-            // Log para debug
-            error_log('Ação update_user_status recebida');
-            error_log('POST data: ' . print_r($_POST, true));
-            
+        case 'toggle_status':
             $userId = isset($_POST['user_id']) ? intval($_POST['user_id']) : 0;
             $status = $_POST['status'] ?? '';
-            
-            if (!$userId) {
-                echo json_encode(['status' => false, 'message' => 'ID do usuário não fornecido']);
-                exit;
-            }
-            
-            if (empty($status)) {
-                echo json_encode(['status' => false, 'message' => 'Status não fornecido']);
-                exit;
-            }
-            
-            // Verificar se não está tentando desativar a si mesmo
-            if ($userId === $_SESSION['user_id']) {
-                echo json_encode(['status' => false, 'message' => 'Não é possível alterar seu próprio status']);
-                exit;
-            }
-            
-            // Validar status permitidos
-            $validStatuses = ['ativo', 'inativo', 'bloqueado'];
-            if (!in_array($status, $validStatuses)) {
-                echo json_encode(['status' => false, 'message' => 'Status inválido']);
-                exit;
-            }
-            
             $result = AdminController::updateUserStatus($userId, $status);
-            echo json_encode($result);
-            exit;
+            sendJsonResponse($result);
             break;
         case 'update_user':
             $userId = isset($_POST['user_id']) ? intval($_POST['user_id']) : 0;
