@@ -13,6 +13,78 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
+
+
+// INTERCEPTADOR MELHORADO E SEGURO
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'register') {
+    
+    // Iniciar sessão de forma segura
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+    
+    // Definir headers para JSON
+    header('Content-Type: application/json; charset=UTF-8');
+    
+    // Verificar autenticação básica
+    if (!isset($_SESSION['user_id']) || $_SESSION['user_type'] !== 'admin') {
+        echo json_encode([
+            'status' => false,
+            'message' => 'Acesso restrito a administradores'
+        ]);
+        exit;
+    }
+    
+    // Coletar dados básicos
+    $nome = trim($_POST['nome'] ?? '');
+    $email = trim($_POST['email'] ?? '');
+    $senha = $_POST['senha'] ?? '';
+    
+    // Validações simples
+    if (empty($nome) || empty($email) || empty($senha)) {
+        echo json_encode([
+            'status' => false,
+            'message' => 'Todos os campos são obrigatórios'
+        ]);
+        exit;
+    }
+    
+    // Se chegou até aqui, vamos tentar incluir os arquivos necessários
+    try {
+        // Tentar incluir arquivos usando caminhos relativos mais seguros
+        $baseDir = dirname(__FILE__);
+        
+        if (file_exists($baseDir . '/../config/database.php')) {
+            require_once $baseDir . '/../config/database.php';
+        } else {
+            throw new Exception('Arquivo database.php não encontrado');
+        }
+        
+        if (file_exists($baseDir . '/../config/constants.php')) {
+            require_once $baseDir . '/../config/constants.php';
+        } else {
+            throw new Exception('Arquivo constants.php não encontrado');
+        }
+        
+        if (file_exists($baseDir . '/AuthController.php')) {
+            require_once $baseDir . '/AuthController.php';
+        } else {
+            throw new Exception('Arquivo AuthController.php não encontrado');
+        }
+        
+        // Se chegou até aqui, tentar criar o usuário
+        $resultado = AuthController::register($nome, $email, '', $senha, 'cliente');
+        echo json_encode($resultado);
+        
+    } catch (Exception $e) {
+        echo json_encode([
+            'status' => false,
+            'message' => 'Erro durante processamento: ' . $e->getMessage()
+        ]);
+    }
+    
+    exit;
+}
 // controllers/AdminController.php
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../config/constants.php';
