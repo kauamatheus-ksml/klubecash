@@ -6,7 +6,6 @@ header('Content-Type: application/json');
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../config/constants.php';
 
-// Verificar sessão
 if (!isset($_SESSION['user_id']) || $_SESSION['user_type'] !== 'loja') {
     echo json_encode(['status' => false, 'message' => 'Sessão expirada. Faça login novamente.']);
     exit;
@@ -34,18 +33,15 @@ if ($method === 'POST' && $action === 'criar_pagamento') {
             throw new Exception('Nenhuma transação selecionada');
         }
         
-        // Calcular valor total das comissões
-        $transacaoIds = implode(',', array_map('intval', $transacoes));
+        // Calcular valor total das comissões (corrigido)
+        $placeholders = str_repeat('?,', count($transacoes) - 1) . '?';
         $stmt = $db->prepare("
-            SELECT SUM(CASE 
-                WHEN valor_saldo_usado > 0 
-                THEN (valor_total - valor_saldo_usado) * 0.10 
-                ELSE valor_total * 0.10 
-            END) as total_comissao
+            SELECT SUM(valor_total * 0.10) as total_comissao
             FROM transacoes_cashback 
-            WHERE id IN ($transacaoIds) AND loja_id = ? AND status = 'pendente'
+            WHERE id IN ($placeholders) AND loja_id = ? AND status = 'pendente'
         ");
-        $stmt->execute([$store['id']]);
+        $params = array_merge($transacoes, [$store['id']]);
+        $stmt->execute($params);
         $totalComissao = $stmt->fetchColumn() ?: 0;
         
         // Criar pagamento
