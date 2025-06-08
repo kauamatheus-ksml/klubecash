@@ -516,10 +516,11 @@ if ($result['status'] && isset($result['data']['totais'])) {
                 formData.append('transacoes[]', checkbox.value);
             });
             
-            fetch('../../api/payments.php', {
+            // CORREÇÃO: Usar caminho absoluto
+            fetch('/api/payments.php', {
                 method: 'POST',
                 body: formData,
-                credentials: 'same-origin'  // Adiciona cookies de sessão
+                credentials: 'same-origin'
             })
             .then(response => response.json())
             .then(data => {
