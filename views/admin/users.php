@@ -142,18 +142,7 @@ try {
             <!-- Filtros e Busca -->
             <div class="filters-section">
                 <form method="GET" class="filters-form" id="filtersForm">
-                    <div class="filter-group">
-                        <div class="search-bar">
-                            <input type="text" 
-                                   name="busca" 
-                                   id="searchInput"
-                                   placeholder="Buscar por nome ou email..." 
-                                   value="<?php echo htmlspecialchars($_GET['busca'] ?? ''); ?>">
-                            <button type="submit" class="search-btn">
-                                <i class="fas fa-search"></i>
-                            </button>
-                        </div>
-                    </div>
+                    
                     
                     <div class="filter-group">
                         <select name="tipo" id="tipoFilter">
