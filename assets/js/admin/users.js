@@ -314,8 +314,10 @@ function hideLoading() {
  */
 async function makeRequest(url, data, method = 'POST') {
     try {
+        console.log('=== DEBUG JAVASCRIPT ===');
         console.log(`Fazendo requisição ${method} para:`, url);
-        console.log('Dados enviados:', data);
+        console.log('Dados enviados:', data instanceof URLSearchParams ? Object.fromEntries(data) : data);
+        console.log('========================');
         
         const response = await fetch(url, {
             method: method,
@@ -326,26 +328,26 @@ async function makeRequest(url, data, method = 'POST') {
             body: data instanceof URLSearchParams ? data.toString() : data
         });
         
-        console.log('Resposta recebida:', response);
+        console.log('Status da resposta:', response.status);
+        console.log('Headers da resposta:', Object.fromEntries(response.headers.entries()));
         
-        // Verificar se a resposta é válida
         if (!response.ok) {
             throw new Error(`Erro HTTP: ${response.status} - ${response.statusText}`);
         }
         
-        // Verificar se a resposta é JSON
-        const contentType = response.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-            // Tentar ler como texto para debug
-            const text = await response.text();
-            console.error('Resposta não-JSON recebida:', text);
-            throw new Error('Resposta do servidor não é JSON válido');
+        const text = await response.text();
+        console.log('Resposta como texto:', text);
+        
+        try {
+            const jsonData = JSON.parse(text);
+            console.log('Dados JSON parseados:', jsonData);
+            return jsonData;
+        } catch (parseError) {
+            console.error('Erro ao fazer parse do JSON:', parseError);
+            console.error('Texto recebido:', text);
+            throw new Error('Resposta não é JSON válido');
         }
         
-        const jsonData = await response.json();
-        console.log('Dados JSON recebidos:', jsonData);
-        
-        return jsonData;
     } catch (error) {
         console.error('Erro na requisição:', error);
         throw error;

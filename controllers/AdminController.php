@@ -3425,8 +3425,72 @@ public static function getFinancialReports($filters = []) {
     }
 }
 
+// ... código anterior ...
+
+// ADICIONAR O BLOCO DE DEBUG AQUI ↓
+if (isset($_POST['action']) && $_POST['action'] === 'register') {
+    error_log("DEBUG: Processando action=register via POST");
+    
+    // Verificar autenticação
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+    
+    if (!isset($_SESSION['user_id']) || $_SESSION['user_type'] !== USER_TYPE_ADMIN) {
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode(['status' => false, 'message' => 'Sessão expirada. Faça login novamente.']);
+        exit;
+    }
+    
+    header('Content-Type: application/json; charset=UTF-8');
+    
+    try {
+        // Pegar dados do POST
+        $nome = trim($_POST['nome'] ?? '');
+        $email = trim($_POST['email'] ?? '');
+        $telefone = trim($_POST['telefone'] ?? '');
+        $senha = $_POST['senha'] ?? '';
+        $tipo = $_POST['tipo'] ?? 'cliente';
+        
+        // Validações básicas
+        if (empty($nome) || empty($email) || empty($senha)) {
+            echo json_encode(['status' => false, 'message' => 'Todos os campos obrigatórios devem ser preenchidos']);
+            exit;
+        }
+        
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            echo json_encode(['status' => false, 'message' => 'Email inválido']);
+            exit;
+        }
+        
+        if (strlen($senha) < 8) {
+            echo json_encode(['status' => false, 'message' => 'A senha deve ter no mínimo 8 caracteres']);
+            exit;
+        }
+        
+        error_log("DEBUG: Chamando AuthController::register com - Nome: $nome, Email: $email, Tipo: $tipo");
+        
+        // Chamar método de registro
+        $result = AuthController::register($nome, $email, $telefone, $senha, $tipo);
+        
+        error_log("DEBUG: Resultado do AuthController::register: " . json_encode($result));
+        
+        echo json_encode($result);
+        
+    } catch (Exception $e) {
+        error_log('DEBUG: Erro ao criar usuário: ' . $e->getMessage());
+        echo json_encode([
+            'status' => false, 
+            'message' => 'Erro interno: ' . $e->getMessage()
+        ]);
+    }
+    exit;
+}
+// ATÉ AQUI ↑
+
 // Processar requisições diretas de acesso ao controlador
 if (basename($_SERVER['PHP_SELF']) === 'AdminController.php') {
+    // ... resto do código original continua igual
     
     // Verificar se o usuário está autenticado
     if (!AuthController::isAuthenticated()) {
