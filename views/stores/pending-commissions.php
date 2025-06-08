@@ -87,6 +87,8 @@ if ($result['status'] && isset($result['data']['totais'])) {
     <title>Comissões Pendentes - Klube Cash</title>
     
     <link rel="stylesheet" href="../../assets/css/views/stores/pending-commissions.css">
+    <link rel="stylesheet" href="../../assets/css/openpix-styles.css">
+    <script src="../../assets/js/openpix-integration.js"></script>
 </head>
 <body>
     <?php include_once '../components/sidebar-store.php'; ?>
@@ -826,5 +828,42 @@ function toggleInfoSection() {
             margin-right: 8px;
         }
     </style>
+    <script>
+    // Adicionar função para o botão OpenPix nas transações pendentes
+    function pagarViaOpenPix(paymentIds) {
+        if (!Array.isArray(paymentIds)) {
+            paymentIds = [paymentIds];
+        }
+        
+        if (paymentIds.length === 0) {
+            alert('Selecione pelo menos uma transação para pagar');
+            return;
+        }
+        
+        if (paymentIds.length > 1) {
+            alert('OpenPix: Selecione apenas uma transação por vez para pagamento via PIX');
+            return;
+        }
+        
+        const paymentId = paymentIds[0];
+        openPixIntegration.createCharge(paymentId);
+    }
+
+    // Adicionar botão na interface (onde já existem os outros botões de pagamento)
+    document.addEventListener('DOMContentLoaded', function() {
+        const paymentButtons = document.querySelector('.payment-buttons');
+        if (paymentButtons) {
+            const openPixButton = document.createElement('button');
+            openPixButton.className = 'btn-pix-openpix';
+            openPixButton.innerHTML = '🔥 Pagar via PIX 2';
+            openPixButton.onclick = function() {
+                const selected = getSelectedTransactions();
+                pagarViaOpenPix(selected);
+            };
+            
+            paymentButtons.appendChild(openPixButton);
+        }
+    });
+    </script>
 </body>
 </html>

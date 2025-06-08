@@ -161,6 +161,11 @@ if (!defined('SMTP_HOST')) {
     define('SMTP_FROM_NAME', 'Klube Cash');
     define('SMTP_ENCRYPTION', 'ssl');
 }
+// === OPENPIX CONFIGURAÇÕES (NOVA) ===
+define('OPENPIX_API_URL', 'https://api.openpix.com.br');
+define('OPENPIX_APP_ID', 'Q2xpZW50XzEyMzQ1Njc4OTBfZGV2ZWxvcGVyX2FwcF9pZA=='); // Substitua pelo seu App ID real
+define('OPENPIX_WEBHOOK_AUTH', 'klube_cash_webhook_2025'); // Chave de autorização do webhook
+define('OPENPIX_WEBHOOK_URL', SITE_URL . '/webhook/openpix');
 
 // === AMBIENTE ===
 if (!defined('ENVIRONMENT')) {

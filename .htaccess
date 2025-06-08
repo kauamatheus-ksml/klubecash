@@ -196,7 +196,10 @@ RewriteRule ^store/pagamento/?$ views/stores/payment.php [L,QSA]
 RewriteRule ^store/historico-pagamentos/?$ views/stores/payment-history.php [L,QSA]
 RewriteRule ^store/perfil/?$ views/stores/profile.php [L,QSA]
 
-
+# NOVA ROTA OPENPIX
+RewriteRule ^api/openpix/?$ api/openpix.php [L]
+# NOVO WEBHOOK OPENPIX
+RewriteRule ^webhook/openpix/?$ webhook/openpix.php [L]
 # Email Marketing
 RewriteRule ^admin/email-marketing/?$ views/admin/email-marketing.php [L]
 RewriteRule ^admin/email-templates/?$ views/admin/email-templates.php [L]

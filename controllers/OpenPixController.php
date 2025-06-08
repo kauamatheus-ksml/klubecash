@@ -1,0 +1,239 @@
+<?php
+// controllers/OpenPixController.php
+
+require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../config/constants.php';
+
+class OpenPixController {
+    
+    /**
+     * Criar cobrança PIX na OpenPix
+     */
+    public static function createCharge($paymentId, $value, $correlationID) {
+        try {
+            $endpoint = '/api/v1/charge';
+            
+            $payload = [
+                'value' => (int)($value * 100), // Converter para centavos
+                'correlationID' => $correlationID,
+                'comment' => "Comissão Klube Cash - Pagamento #{$paymentId}",
+                'customer' => [
+                    'name' => 'Loja Parceira',
+                    'email' => 'loja@klubecash.com'
+                ]
+            ];
+            
+            $response = self::makeApiRequest('POST', $endpoint, $payload);
+            
+            if ($response['success'] && isset($response['data']['charge'])) {
+                return [
+                    'success' => true,
+                    'data' => [
+                        'charge_id' => $response['data']['charge']['identifier'],
+                        'qr_code' => $response['data']['brCode'],
+                        'qr_code_image' => $response['data']['charge']['qrCodeImage'],
+                        'payment_link' => $response['data']['charge']['paymentLinkUrl'] ?? null
+                    ]
+                ];
+            }
+            
+            return [
+                'success' => false,
+                'message' => 'Erro ao criar cobrança: ' . ($response['message'] ?? 'Erro desconhecido')
+            ];
+            
+        } catch (Exception $e) {
+            error_log("OpenPix createCharge error: " . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Erro interno ao processar cobrança'
+            ];
+        }
+    }
+    
+    /**
+     * Verificar status de uma cobrança
+     */
+    public static function getChargeStatus($chargeId) {
+        try {
+            $endpoint = "/api/v1/charge/{$chargeId}";
+            $response = self::makeApiRequest('GET', $endpoint);
+            
+            if ($response['success'] && isset($response['data']['charge'])) {
+                return [
+                    'success' => true,
+                    'data' => [
+                        'status' => $response['data']['charge']['status'],
+                        'value' => $response['data']['charge']['value'],
+                        'paid_at' => $response['data']['charge']['paidAt'] ?? null
+                    ]
+                ];
+            }
+            
+            return [
+                'success' => false,
+                'message' => 'Cobrança não encontrada'
+            ];
+            
+        } catch (Exception $e) {
+            error_log("OpenPix getChargeStatus error: " . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Erro ao consultar status'
+            ];
+        }
+    }
+    
+    /**
+     * Processar webhook da OpenPix
+     */
+    public static function processWebhook($data) {
+        try {
+            if (!isset($data['charge'])) {
+                return ['success' => false, 'message' => 'Dados inválidos'];
+            }
+            
+            $charge = $data['charge'];
+            $chargeId = $charge['identifier'] ?? null;
+            $status = $charge['status'] ?? null;
+            $correlationID = $charge['correlationID'] ?? null;
+            
+            if (!$chargeId || !$status || !$correlationID) {
+                return ['success' => false, 'message' => 'Dados incompletos'];
+            }
+            
+            // Extrair payment_id do correlationID
+            if (preg_match('/payment_(\d+)_/', $correlationID, $matches)) {
+                $paymentId = $matches[1];
+            } else {
+                error_log("OpenPix Webhook: CorrelationID inválido: {$correlationID}");
+                return ['success' => false, 'message' => 'CorrelationID inválido'];
+            }
+            
+            $db = Database::getConnection();
+            
+            // Buscar pagamento
+            $stmt = $db->prepare("
+                SELECT * FROM pagamentos_comissao 
+                WHERE id = ? AND openpix_charge_id = ?
+            ");
+            $stmt->execute([$paymentId, $chargeId]);
+            $payment = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$payment) {
+                error_log("OpenPix Webhook: Pagamento não encontrado - ID: {$paymentId}, ChargeID: {$chargeId}");
+                return ['success' => false, 'message' => 'Pagamento não encontrado'];
+            }
+            
+            // Se o pagamento foi completado
+            if ($status === 'COMPLETED' && $payment['status'] === 'openpix_aguardando') {
+                
+                // Atualizar pagamento
+                $updateStmt = $db->prepare("
+                    UPDATE pagamentos_comissao 
+                    SET status = 'aprovado',
+                        openpix_status = 'COMPLETED',
+                        openpix_paid_at = NOW(),
+                        data_aprovacao = NOW(),
+                        observacao_admin = CONCAT(COALESCE(observacao_admin, ''), ' - Pagamento PIX aprovado automaticamente via OpenPix')
+                    WHERE id = ?
+                ");
+                $updateStmt->execute([$paymentId]);
+                
+                // Aprovar transações relacionadas usando TransactionController
+                require_once __DIR__ . '/TransactionController.php';
+                $approvalResult = TransactionController::approvePaymentAutomatically(
+                    $paymentId, 
+                    'Pagamento PIX aprovado automaticamente via OpenPix'
+                );
+                
+                if ($approvalResult['status']) {
+                    error_log("OpenPix Webhook: ✅ Pagamento aprovado - ID: {$paymentId}");
+                    return [
+                        'success' => true,
+                        'message' => 'Pagamento processado com sucesso',
+                        'data' => $approvalResult['data']
+                    ];
+                } else {
+                    error_log("OpenPix Webhook: ❌ Erro ao aprovar transações: " . $approvalResult['message']);
+                    return ['success' => false, 'message' => $approvalResult['message']];
+                }
+            }
+            
+            // Atualizar apenas o status se não for COMPLETED
+            $updateStmt = $db->prepare("
+                UPDATE pagamentos_comissao 
+                SET openpix_status = ?
+                WHERE id = ?
+            ");
+            $updateStmt->execute([$status, $paymentId]);
+            
+            return ['success' => true, 'message' => 'Status atualizado'];
+            
+        } catch (Exception $e) {
+            error_log("OpenPix processWebhook error: " . $e->getMessage());
+            return ['success' => false, 'message' => 'Erro interno'];
+        }
+    }
+    
+    /**
+     * Fazer requisição para API da OpenPix
+     */
+    private static function makeApiRequest($method, $endpoint, $data = null) {
+        try {
+            $url = OPENPIX_API_URL . $endpoint;
+            
+            $headers = [
+                'Content-Type: application/json',
+                'Authorization: ' . OPENPIX_APP_ID,
+                'User-Agent: KlubeCash/1.0'
+            ];
+            
+            $ch = curl_init();
+            curl_setopt_array($ch, [
+                CURLOPT_URL => $url,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_CUSTOMREQUEST => $method,
+                CURLOPT_HTTPHEADER => $headers,
+                CURLOPT_TIMEOUT => 30,
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_SSL_VERIFYPEER => true
+            ]);
+            
+            if ($data && in_array($method, ['POST', 'PUT', 'PATCH'])) {
+                curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+            }
+            
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = curl_error($ch);
+            curl_close($ch);
+            
+            if ($error) {
+                throw new Exception("cURL Error: {$error}");
+            }
+            
+            $decodedResponse = json_decode($response, true);
+            
+            if ($httpCode >= 200 && $httpCode < 300) {
+                return [
+                    'success' => true,
+                    'data' => $decodedResponse
+                ];
+            } else {
+                return [
+                    'success' => false,
+                    'message' => $decodedResponse['message'] ?? "HTTP Error: {$httpCode}",
+                    'http_code' => $httpCode
+                ];
+            }
+            
+        } catch (Exception $e) {
+            return [
+                'success' => false,
+                'message' => $e->getMessage()
+            ];
+        }
+    }
+}
+?>

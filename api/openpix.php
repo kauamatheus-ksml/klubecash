@@ -1,80 +1,59 @@
-
 <?php
 // api/openpix.php
 
-header('Content-Type: application/json; charset=UTF-8');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
+header('Content-Type: application/json');
+session_start();
 
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
+require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../config/constants.php';
+require_once __DIR__ . '/../controllers/AuthController.php';
+require_once __DIR__ . '/../controllers/OpenPixController.php';
+
+// Verificar autenticação
+if (!AuthController::isAuthenticated() || !AuthController::isStore()) {
+    http_response_code(401);
+    echo json_encode(['status' => false, 'message' => 'Acesso negado']);
     exit;
 }
 
-// Incluir arquivos básicos
-require_once __DIR__ . '/../config/database.php';
-require_once __DIR__ . '/../config/constants.php';
-
-// Verificar se outros arquivos existem antes de incluir
-if (file_exists(__DIR__ . '/../controllers/AuthController.php')) {
-    require_once __DIR__ . '/../controllers/AuthController.php';
-}
-if (file_exists(__DIR__ . '/../controllers/TransactionController.php')) {
-    require_once __DIR__ . '/../controllers/TransactionController.php';
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    echo json_encode(['status' => false, 'message' => 'Método não permitido']);
+    exit;
 }
 
-$method = $_SERVER['REQUEST_METHOD'];
-$action = $_GET['action'] ?? '';
+$input = json_decode(file_get_contents('php://input'), true);
+$action = $input['action'] ?? '';
 
-switch ($method) {
-    case 'POST':
-        if ($action === 'create_charge') {
-            createPixCharge();
-        } elseif ($action === 'webhook') {
-            handleWebhook();
-        }
+switch ($action) {
+    case 'create_charge':
+        handleCreateCharge($input);
         break;
-    case 'GET':
-        if ($action === 'status') {
-            checkChargeStatus();
-        } elseif ($action === 'test') {
-            testEndpoint();
-        } elseif ($action === 'test_charge') {
-            testCreateCharge();
-        }
+    case 'check_status':
+        handleCheckStatus($input);
         break;
     default:
-        http_response_code(405);
-        echo json_encode(['status' => false, 'message' => 'Método não permitido']);
-        break;
-}
-
-function testEndpoint() {
-    http_response_code(200);
-    echo json_encode(['status' => true, 'message' => 'Endpoint funcionando']);
-}
-
-function createPixCharge() {
-    // REMOVER as linhas de teste e implementar API real:
-    
-    $input = json_decode(file_get_contents('php://input'), true);
-    
-    if (!$input || !isset($input['payment_id'])) {
         http_response_code(400);
-        echo json_encode(['status' => false, 'message' => 'payment_id obrigatório']);
-        return;
-    }
+        echo json_encode(['status' => false, 'message' => 'Ação inválida']);
+}
 
+function handleCreateCharge($input) {
     try {
+        $paymentId = $input['payment_id'] ?? 0;
+        
+        if (!$paymentId) {
+            echo json_encode(['status' => false, 'message' => 'ID do pagamento é obrigatório']);
+            return;
+        }
+        
         $db = Database::getConnection();
+        
+        // Buscar dados do pagamento
         $stmt = $db->prepare("
-            SELECT p.*, l.nome_fantasia, l.email 
-            FROM pagamentos_comissao p
-            JOIN lojas l ON p.loja_id = l.id 
-            WHERE p.id = ? AND p.status = 'pendente'
+            SELECT * FROM pagamentos_comissao 
+            WHERE id = ? AND status = 'pendente'
         ");
-        $stmt->execute([$input['payment_id']]);
+        $stmt->execute([$paymentId]);
         $payment = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if (!$payment) {
@@ -82,185 +61,68 @@ function createPixCharge() {
             return;
         }
         
-        // Criar cobrança PIX real
-        $chargeData = [
-            'value' => (int)($payment['valor_total'] * 100), // centavos
-            'comment' => "Comissão Klube Cash - Pagamento #{$payment['id']}",
-            'correlationID' => "payment_{$payment['id']}_" . time()
-        ];
+        // Criar correlationID único
+        $correlationID = "payment_{$paymentId}_" . time() . "_openpix";
         
-        $response = makeOpenPixRequest('POST', '/charge', $chargeData);
+        // Criar cobrança na OpenPix
+        $result = OpenPixController::createCharge(
+            $payment['id'],
+            $payment['valor_total'],
+            $correlationID
+        );
         
-        if ($response['success']) {
-            $charge = $response['data']['charge'];
-            
-            // Salvar no banco
+        if ($result['success']) {
+            // Salvar dados da cobrança no banco
             $updateStmt = $db->prepare("
                 UPDATE pagamentos_comissao 
-                SET pix_charge_id = ?, pix_qr_code = ?, pix_qr_code_image = ?, metodo_pagamento = 'pix_automatico'
+                SET openpix_charge_id = ?,
+                    openpix_qr_code = ?,
+                    openpix_qr_code_image = ?,
+                    openpix_correlation_id = ?,
+                    metodo_pagamento = 'pix_openpix',
+                    status = 'openpix_aguardando'
                 WHERE id = ?
             ");
             $updateStmt->execute([
-                $charge['id'],
-                $charge['brCode'],
-                $charge['qrCodeImage'],
-                $payment['id']
+                $result['data']['charge_id'],
+                $result['data']['qr_code'],
+                $result['data']['qr_code_image'],
+                $correlationID,
+                $paymentId
             ]);
             
             echo json_encode([
                 'status' => true,
-                'data' => [
-                    'charge_id' => $charge['id'],
-                    'qr_code' => $charge['brCode'],
-                    'qr_code_image' => $charge['qrCodeImage']
-                ]
+                'data' => $result['data']
             ]);
         } else {
-            echo json_encode(['status' => false, 'message' => $response['message']]);
+            echo json_encode([
+                'status' => false,
+                'message' => $result['message']
+            ]);
         }
         
     } catch (Exception $e) {
+        error_log("API OpenPix createCharge error: " . $e->getMessage());
         echo json_encode(['status' => false, 'message' => 'Erro interno']);
     }
 }
 
-function handleWebhook() {
-    // Log para debug
-    $input_raw = file_get_contents('php://input');
-    error_log("Webhook OpenPix recebido: " . $input_raw);
-    
-    // SEMPRE retornar 200 para o OpenPix
-    http_response_code(200);
-    
-    $input = json_decode($input_raw, true);
-    
-    // Se for apenas teste do OpenPix
-    if (!$input || !isset($input['charge'])) {
-        echo json_encode(['status' => 'ok', 'message' => 'Webhook recebido']);
-        return;
-    }
-    
+function handleCheckStatus($input) {
     try {
-        $charge = $input['charge'];
-        $chargeId = $charge['id'];
-        $status = $charge['status'];
+        $chargeId = $input['charge_id'] ?? '';
         
-        if ($status === 'COMPLETED') {
-            $db = Database::getConnection();
-            
-            // Buscar pagamento pelo charge_id
-            $stmt = $db->prepare("SELECT * FROM pagamentos_comissao WHERE pix_charge_id = ?");
-            $stmt->execute([$chargeId]);
-            $payment = $stmt->fetch(PDO::FETCH_ASSOC);
-            
-            if ($payment && $payment['status'] === 'pendente') {
-                // Verificar se TransactionController existe
-                if (class_exists('TransactionController') && 
-                    method_exists('TransactionController', 'approvePaymentAutomatically')) {
-                    
-                    $result = TransactionController::approvePaymentAutomatically(
-                        $payment['id'], 
-                        'Pagamento PIX confirmado automaticamente'
-                    );
-                    
-                    if ($result['status']) {
-                        error_log("Pagamento PIX aprovado automaticamente: {$payment['id']}");
-                    } else {
-                        error_log("Erro ao aprovar pagamento PIX: {$result['message']}");
-                    }
-                } else {
-                    // Fallback: aprovar diretamente no banco
-                    $updateStmt = $db->prepare("
-                        UPDATE pagamentos_comissao 
-                        SET status = 'aprovado', data_aprovacao = NOW(), pix_paid_at = NOW() 
-                        WHERE id = ?
-                    ");
-                    $updateStmt->execute([$payment['id']]);
-                    error_log("Pagamento PIX aprovado via fallback: {$payment['id']}");
-                }
-            }
+        if (!$chargeId) {
+            echo json_encode(['status' => false, 'message' => 'ID da cobrança é obrigatório']);
+            return;
         }
         
-        echo json_encode(['status' => 'ok', 'message' => 'Webhook processado']);
+        $result = OpenPixController::getChargeStatus($chargeId);
+        echo json_encode($result);
         
     } catch (Exception $e) {
-        error_log('Erro no webhook OpenPix: ' . $e->getMessage());
-        echo json_encode(['status' => 'ok', 'message' => 'Webhook recebido com erro']);
+        error_log("API OpenPix checkStatus error: " . $e->getMessage());
+        echo json_encode(['status' => false, 'message' => 'Erro interno']);
     }
-}
-
-function checkChargeStatus() {
-    $chargeId = $_GET['charge_id'] ?? '';
-    
-    if (empty($chargeId)) {
-        http_response_code(400);
-        echo json_encode(['status' => false, 'message' => 'charge_id obrigatório']);
-        return;
-    }
-    
-    try {
-        $response = makeOpenPixRequest('GET', "/charge/{$chargeId}");
-        echo json_encode($response);
-        
-    } catch (Exception $e) {
-        error_log('Erro ao verificar status PIX: ' . $e->getMessage());
-        echo json_encode(['status' => false, 'message' => 'Erro interno do servidor']);
-    }
-}
-
-function makeOpenPixRequest($method, $endpoint, $data = null) {
-    $baseUrl = 'https://api.openpix.com.br/api/v1';
-    $url = $baseUrl . $endpoint;
-    
-    // DEBUG: Log da API key
-    error_log("API Key sendo usada: " . OPENPIX_API_KEY);
-
-    $headers = [
-        'Authorization: ' . OPENPIX_API_KEY,
-        'Content-Type: application/json'
-    ];
-    
-    $ch = curl_init();
-    curl_setopt_array($ch, [
-        CURLOPT_URL => $url,
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_HTTPHEADER => $headers,
-        CURLOPT_TIMEOUT => 30,
-        CURLOPT_CUSTOMREQUEST => $method,
-        CURLOPT_SSL_VERIFYPEER => false
-    ]);
-    
-    if ($data && in_array($method, ['POST', 'PUT'])) {
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-    }
-    
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $error = curl_error($ch);
-    curl_close($ch);
-    
-    if ($error) {
-        return ['success' => false, 'message' => "Erro cURL: {$error}"];
-    }
-    
-    if ($httpCode >= 200 && $httpCode < 300) {
-        return ['success' => true, 'data' => json_decode($response, true)];
-    } else {
-        return ['success' => false, 'message' => "Erro HTTP {$httpCode}", 'response' => $response];
-    }
-}
-function testCreateCharge() {
-    $chargeData = [
-        'value' => 100, // R$ 1,00
-        'comment' => "Teste Klube Cash",
-        'correlationID' => "test_" . time(),
-        'customer' => [
-            'name' => "Teste Loja",
-            'email' => "teste@klubecash.com"
-        ]
-    ];
-    
-    $response = makeOpenPixRequest('POST', '/charge', $chargeData);
-    echo json_encode($response);
 }
 ?>
