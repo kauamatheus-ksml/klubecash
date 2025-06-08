@@ -3418,6 +3418,40 @@ if (basename($_SERVER['PHP_SELF']) === 'AdminController.php') {
     $action = $_REQUEST['action'] ?? '';
     
     switch ($action) {
+        case 'register':
+            if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+                // Pegar dados do POST
+                $nome = $_POST['nome'] ?? '';
+                $email = $_POST['email'] ?? '';
+                $telefone = $_POST['telefone'] ?? '';
+                $senha = $_POST['senha'] ?? '';
+                $tipo = $_POST['tipo'] ?? '';
+                $status = $_POST['status'] ?? 'ativo';
+                
+                // Verificar se é requisição AJAX
+                $isAjax = isset($_POST['ajax']) || 
+                        (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && 
+                        strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest');
+                
+                // Chamar método de registro
+                $result = AuthController::register($nome, $email, $telefone, $senha, $tipo);
+                
+                if ($isAjax) {
+                    // Responder com JSON para AJAX
+                    header('Content-Type: application/json');
+                    echo json_encode($result);
+                    exit;
+                } else {
+                    // Para requisições normais
+                    if ($result['status']) {
+                        header('Location: ' . ADMIN_USERS_URL . '?success=' . urlencode($result['message']));
+                    } else {
+                        header('Location: ' . ADMIN_USERS_URL . '?error=' . urlencode($result['message']));
+                    }
+                    exit;
+                }
+            }
+            break;
         case 'create_user':
             $result = AuthController::register(
                 $_POST['nome'], 
