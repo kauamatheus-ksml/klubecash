@@ -449,72 +449,77 @@ public static function getTransactionDetailsWithBalance($transactionId) {
      */
     public static function manageUsers($filters = [], $page = 1) {
         try {
+            // Verificar se é um administrador
+            if (!self::validateAdmin()) {
+                return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
+            }
+            
             $db = Database::getConnection();
-            $limit = 20;
-            $offset = ($page - 1) * $limit;
             
-            // Construir query com filtros
-            $where = [];
-            $params = [];
+            // Consulta simplificada sem filtros
+            $query = "
+                SELECT id, nome, email, tipo, status, data_criacao, ultimo_login
+                FROM usuarios
+                ORDER BY data_criacao DESC
+            ";
             
-            if (!empty($filters['tipo'])) {
-                $where[] = "tipo = :tipo";
-                $params[':tipo'] = $filters['tipo'];
-            }
+            // Calcular total de registros para paginação
+            $countQuery = "SELECT COUNT(*) as total FROM usuarios";
+            $countStmt = $db->prepare($countQuery);
+            $countStmt->execute();
+            $totalCount = $countStmt->fetch(PDO::FETCH_ASSOC)['total'];
             
-            if (!empty($filters['status'])) {
-                $where[] = "status = :status";
-                $params[':status'] = $filters['status'];
-            }
+            // Adicionar paginação
+            $perPage = ITEMS_PER_PAGE;
+            $page = max(1, (int)$page); // Garantir que a página é no mínimo 1
+            $offset = ($page - 1) * $perPage;
+            $query .= " LIMIT $offset, $perPage";
             
-            if (!empty($filters['busca'])) {
-                $where[] = "(nome LIKE :busca OR email LIKE :busca)";
-                $params[':busca'] = '%' . $filters['busca'] . '%';
-            }
-            
-            $whereClause = !empty($where) ? 'WHERE ' . implode(' AND ', $where) : '';
-            
-            // Query principal
-            $stmt = $db->prepare("
-                SELECT 
-                    id, nome, email, telefone, tipo, status, 
-                    data_criacao, ultimo_login 
-                FROM usuarios 
-                $whereClause
-                ORDER BY data_criacao DESC 
-                LIMIT :limit OFFSET :offset
-            ");
-            
-            foreach ($params as $key => $value) {
-                $stmt->bindValue($key, $value);
-            }
-            $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
-            $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+            // Executar consulta
+            $stmt = $db->prepare($query);
             $stmt->execute();
-            
             $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
-            // Contar total para paginação
-            $countStmt = $db->prepare("SELECT COUNT(*) as total FROM usuarios $whereClause");
-            foreach ($params as $key => $value) {
-                $countStmt->bindValue($key, $value);
-            }
-            $countStmt->execute();
-            $total = $countStmt->fetch(PDO::FETCH_ASSOC)['total'];
+            // Estatísticas dos usuários
+            $statsQuery = "
+                SELECT 
+                    COUNT(*) as total_usuarios,
+                    SUM(CASE WHEN tipo = 'cliente' THEN 1 ELSE 0 END) as total_clientes,
+                    SUM(CASE WHEN tipo = 'admin' THEN 1 ELSE 0 END) as total_admins,
+                    SUM(CASE WHEN tipo = 'loja' THEN 1 ELSE 0 END) as total_lojas,
+                    SUM(CASE WHEN status = 'ativo' THEN 1 ELSE 0 END) as total_ativos,
+                    SUM(CASE WHEN status = 'inativo' THEN 1 ELSE 0 END) as total_inativos,
+                    SUM(CASE WHEN status = 'bloqueado' THEN 1 ELSE 0 END) as total_bloqueados
+                FROM usuarios
+            ";
+            
+            $statsStmt = $db->prepare($statsQuery);
+            $statsStmt->execute();
+            $statistics = $statsStmt->fetch(PDO::FETCH_ASSOC);
+            
+            // Calcular informações de paginação
+            $totalPages = ceil($totalCount / $perPage);
             
             return [
                 'status' => true,
                 'data' => [
-                    'users' => $users,
-                    'total' => $total,
-                    'page' => $page,
-                    'total_pages' => ceil($total / $limit)
+                    'usuarios' => $users,
+                    'estatisticas' => $statistics,
+                    'paginacao' => [
+                        'total' => $totalCount,
+                        'por_pagina' => $perPage,
+                        'pagina_atual' => $page,
+                        'total_paginas' => $totalPages
+                    ]
                 ]
             ];
             
-        } catch (Exception $e) {
-            error_log('Erro no manageUsers: ' . $e->getMessage());
-            return ['status' => false, 'message' => 'Erro ao listar usuários'];
+        } catch (PDOException $e) {
+            error_log('Erro ao gerenciar usuários: ' . $e->getMessage());
+            return [
+                'status' => false, 
+                'message' => 'Erro ao carregar usuários: ' . $e->getMessage()
+            ];
         }
     }
     
@@ -525,32 +530,40 @@ public static function getTransactionDetailsWithBalance($transactionId) {
  * @return array Dados do usuário
  */
 public static function getUserDetails($userId) {
-        try {
-            $db = Database::getConnection();
-            
-            $stmt = $db->prepare("
-                SELECT 
-                    id, nome, email, telefone, tipo, status, 
-                    data_criacao, ultimo_login 
-                FROM usuarios 
-                WHERE id = :id
-            ");
-            $stmt->bindParam(':id', $userId, PDO::PARAM_INT);
-            $stmt->execute();
-            $user = $stmt->fetch(PDO::FETCH_ASSOC);
-            
-            if ($user) {
-                return ['status' => true, 'data' => $user];
-            } else {
-                return ['status' => false, 'message' => 'Usuário não encontrado'];
-            }
-            
-        } catch (Exception $e) {
-            error_log('Erro no getUserDetails: ' . $e->getMessage());
-            return ['status' => false, 'message' => 'Erro ao buscar dados do usuário'];
+    try {
+        // Verificar se é um administrador
+        if (!self::validateAdmin()) {
+            return ['status' => false, 'message' => 'Acesso restrito a administradores.'];
         }
+        
+        $db = Database::getConnection();
+        
+        // Obter dados do usuário
+        $stmt = $db->prepare("
+            SELECT id, nome, email, telefone, tipo, status, data_criacao, ultimo_login
+            FROM usuarios
+            WHERE id = :user_id
+        ");
+        $stmt->bindParam(':user_id', $userId);
+        $stmt->execute();
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$user) {
+            return ['status' => false, 'message' => 'Usuário não encontrado.'];
+        }
+        
+        return [
+            'status' => true,
+            'data' => [
+                'usuario' => $user
+            ]
+        ];
+        
+    } catch (PDOException $e) {
+        error_log('Erro ao obter detalhes do usuário: ' . $e->getMessage());
+        return ['status' => false, 'message' => 'Erro ao carregar dados do usuário: ' . $e->getMessage()];
     }
-
+}
     
      
     // Adicionar este método no AdminController.php
