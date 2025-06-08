@@ -331,11 +331,7 @@ try {
                                         </td>
                                         <td>
                                             <div class="table-actions">
-                                                <button class="action-btn edit" 
-                                                        onclick="editUser(<?php echo $user['id']; ?>)"
-                                                        title="Editar usuário">
-                                                    <i class="fas fa-edit"></i>
-                                                </button>
+                                                
                                                 <button class="action-btn view" 
                                                         onclick="viewUser(<?php echo $user['id']; ?>)"
                                                         title="Visualizar usuário">

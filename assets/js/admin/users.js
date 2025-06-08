@@ -566,69 +566,7 @@ function hideUserModal() {
     }
 }
 
-/**
- * Edita usuário - VERSÃO COMPLETAMENTE CORRIGIDA
- */
-function editUser(userId) {
-    if (!userId) {
-        showMessage('ID do usuário não fornecido', 'error');
-        return;
-    }
-    
-    currentUserId = userId;
-    isEditMode = true;
-    
-    const modal = document.getElementById('userModal');
-    const title = document.getElementById('userModalTitle');
-    const form = document.getElementById('userForm');
-    const passwordGroup = document.getElementById('passwordGroup');
-    const passwordField = document.getElementById('userPassword');
-    const passwordHelp = document.getElementById('passwordHelp');
-    
-    if (!modal) {
-        showMessage('Modal de usuário não encontrado', 'error');
-        return;
-    }
-    
-    // Configurar modal para edição
-    if (title) title.innerHTML = '<i class="fas fa-user-edit"></i> Editar Usuário';
-    if (form) form.reset();
-    
-    // Configurar campo de senha (opcional na edição)
-    if (passwordGroup) passwordGroup.style.display = 'block';
-    if (passwordField) passwordField.required = false;
-    if (passwordHelp) passwordHelp.textContent = 'Mínimo de 8 caracteres (deixe em branco para manter a senha atual)';
-    
-    // Resetar campos de loja
-    resetStoreFields();
-    
-    // Mostrar modal
-    modal.classList.add('show');
-    
-    // Carregar dados do usuário
-    showLoading('Carregando dados do usuário...');
-    
-    const formData = new URLSearchParams();
-    formData.append('action', 'getUserDetails');
-    formData.append('user_id', userId);
-    
-    makeRequest('../../controllers/AdminController.php', formData)
-    .then(data => {
-        hideLoading();
-        
-        if (data.status && data.data && data.data.usuario) {
-            fillUserForm(data.data.usuario);
-        } else {
-            hideUserModal();
-            showMessage(data.message || 'Erro ao carregar dados do usuário', 'error');
-        }
-    })
-    .catch(error => {
-        hideLoading();
-        hideUserModal();
-        showMessage('Erro ao carregar dados do usuário: ' + error.message, 'error');
-    });
-}
+
 
 /**
  * Preenche o formulário com dados do usuário
