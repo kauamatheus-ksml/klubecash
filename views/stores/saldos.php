@@ -39,13 +39,21 @@ $activeMenu = 'saldos'; // Definir o menu ativo
 
 <body>
     <!-- Incluir Header -->
-    <?php include_once '../components/header.php'; ?>
+    <?php 
+    // Usar a sidebar do documento que você mostrou
+    require_once '../../config/constants.php';
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+    
+    // Include da sidebar
+    include_once './sidebar_store.php'; // Criar um arquivo específico com a sidebar
+    ?>
     
     <!-- Container Principal -->
     <div class="main-content">
         
-        <!-- Incluir Sidebar -->
-        <?php include_once '../components/sidebar.php'; ?>
+        <
         
         <!-- Área de Conteúdo -->
         <div class="page-wrapper">
