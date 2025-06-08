@@ -223,16 +223,17 @@ RewriteRule ^admin/email-marketing/?$ views/admin/email-marketing.php [L]
 RewriteRule ^admin/email-templates/?$ views/admin/email-templates.php [L]
 RewriteRule ^admin/email-campanhas/?$ views/admin/email-campaigns.php [L]
 
-# AJAX
-RewriteRule ^admin/ajax/stores/?$ controllers/AdminController.php?action=stores [L,QSA]
-RewriteRule ^admin/ajax/users/?$ controllers/AdminController.php?action=users [L,QSA]
-RewriteRule ^admin/ajax/transactions/?$ controllers/AdminController.php?action=transactions [L,QSA]
+# === AJAX ROUTES (MANTIDAS PARA COMPATIBILIDADE) ===
+RewriteRule ^admin/ajax/stores/?$ controllers/AdminController.php [L,QSA]
+RewriteRule ^admin/ajax/transactions/?$ controllers/AdminController.php [L,QSA]
 RewriteRule ^admin/ajax/stores-direct/?$ controllers/AjaxStoreController.php [L,QSA]
 
-# API
+# === API ROUTES (NOVO) ===
+# API de usuários - agora usando o novo UserController via API
 RewriteRule ^api/users/?$ api/users.php [L,QSA]
 RewriteRule ^api/users/([0-9]+)/?$ api/users.php?id=$1 [L,QSA]
 RewriteRule ^api/transactions/?$ api/transactions.php [L,QSA]
+RewriteRule ^api/stores/?$ api/stores.php [L,QSA]
 
 # Google OAuth
 RewriteRule ^auth/google/auth/?$ auth/google/auth.php [L]
