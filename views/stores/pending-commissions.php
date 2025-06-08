@@ -836,54 +836,64 @@ if ($result['status'] && isset($result['data']['totais'])) {
         }
     </style>
     <script>
-// Função de teste
-async function testSession() {
+// Teste de sessão
+function testSession() {
     console.log('=== TESTE DE SESSÃO ===');
     
-    try {
-        // Teste 1: Verificar sessão atual
-        const sessionResponse = await fetch('/test-session.php', {
-            credentials: 'same-origin'
-        });
-        const sessionData = await sessionResponse.json();
-        console.log('1. Status da sessão:', sessionData);
+    fetch('/test-session.php', {
+        credentials: 'same-origin'
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log('1. Status da sessão:', data);
         
-        // Teste 2: Testar API payments
+        // Teste API
         const formData = new FormData();
         formData.append('action', 'test');
         
-        const apiResponse = await fetch('../../api/payments.php', {
+        return fetch('../../api/payments.php', {
             method: 'POST',
             body: formData,
             credentials: 'same-origin'
         });
-        
-        const apiData = await apiResponse.json();
-        console.log('2. Resposta da API:', apiData);
-        
-        // Teste 3: Verificar se existe arquivo API
-        const apiExists = await fetch('../../api/payments.php').then(r => r.status !== 404);
-        console.log('3. API existe:', apiExists);
-        
-    } catch (error) {
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log('2. Resposta da API:', data);
+    })
+    .catch(error => {
         console.error('Erro no teste:', error);
-    }
+    });
 }
 
-// Adicionar botão de teste
-const testBtn = document.createElement('button');
-testBtn.innerHTML = '🔍 Testar Sessão';
-testBtn.style.position = 'fixed';
-testBtn.style.top = '10px';
-testBtn.style.right = '10px';
-testBtn.style.zIndex = '9999';
-testBtn.style.padding = '10px';
-testBtn.style.backgroundColor = '#007bff';
-testBtn.style.color = 'white';
-testBtn.style.border = 'none';
-testBtn.style.borderRadius = '5px';
-testBtn.onclick = testSession;
-document.body.appendChild(testBtn);
+// Criar botão após DOM carregado
+document.addEventListener('DOMContentLoaded', function() {
+    const testBtn = document.createElement('button');
+    testBtn.innerHTML = '🔍 Testar';
+    testBtn.type = 'button';
+    testBtn.style.cssText = `
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        z-index: 9999;
+        padding: 10px 15px;
+        background: #007bff;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 14px;
+    `;
+    
+    testBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('Botão clicado!');
+        testSession();
+    });
+    
+    document.body.appendChild(testBtn);
+});
 </script>
 </body>
 </html>
