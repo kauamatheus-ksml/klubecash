@@ -174,6 +174,9 @@ if ($result['status'] && isset($result['data']['totais'])) {
                     <div style="display: flex; gap: 1rem;">
                         <button id="paySelectedBtn" class="btn btn-primary" disabled>Pagar Selecionadas</button>
                         <button id="payPixBtn" class="btn btn-success" disabled>Pagar via PIX</button>
+                        <button type="button" class="btn btn-success" id="btnPixOpenpix" style="margin-left: 10px;">
+                            🔥 Pagar via PIX 2
+                        </button>
                     </div>
                     <?php endif; ?>
                 </div>
@@ -828,6 +831,53 @@ function toggleInfoSection() {
             margin-right: 8px;
         }
     </style>
+
+
+    <script>
+    document.getElementById('btnPixOpenpix').onclick = function() {
+        const selectedCheckboxes = document.querySelectorAll('input[type="checkbox"]:checked');
+        if (selectedCheckboxes.length !== 1) {
+            alert('Selecione apenas UMA transação para PIX OpenPix');
+            return;
+        }
+        
+        // Pegar o ID da transação selecionada
+        const row = selectedCheckboxes[0].closest('tr');
+        const transactionCode = row.cells[1].textContent.trim(); // KC25060819291781584
+        
+        // Criar pagamento com as transações selecionadas e depois usar OpenPix
+        createPaymentAndUseOpenPix();
+    };
+
+    function createPaymentAndUseOpenPix() {
+        const formData = new FormData();
+        formData.append('action', 'criar_pagamento');
+        formData.append('metodo_pagamento', 'pix_openpix');
+        
+        // Adicionar transações selecionadas
+        document.querySelectorAll('input[type="checkbox"]:checked').forEach(checkbox => {
+            formData.append('transacoes[]', checkbox.value);
+        });
+        
+        fetch('/api/payments', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status) {
+                // Usar OpenPix com o ID do pagamento criado
+                openPixIntegration.createCharge(data.payment_id);
+            } else {
+                alert('Erro: ' + data.message);
+            }
+        })
+        .catch(error => {
+            alert('Erro de conexão');
+            console.error(error);
+        });
+    }
+    </script>
     <script>
     // Adicionar função para o botão OpenPix nas transações pendentes
     function pagarViaOpenPix(paymentIds) {
