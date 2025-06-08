@@ -313,10 +313,6 @@ Options -Indexes
 RewriteCond %{REQUEST_FILENAME} -f
 RewriteCond %{REQUEST_URI} /controllers/.*\.php$ [NC]
 RewriteRule ^(.*)$ - [L]
-# Rota específica para UserController
-RewriteRule ^api/users/?$ controllers/UserController.php [L]
-RewriteRule ^admin/users/api/?$ controllers/UserController.php [L]
-
 
 # Permitir arquivos existentes
 RewriteCond %{REQUEST_FILENAME} !-d
