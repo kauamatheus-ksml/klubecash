@@ -1,38 +1,320 @@
-Options -Indexes
-RewriteEngine On
+# Klube Cash - .htaccess Otimizado para Mercado Pago v2.1
 
-# Redirecionamento HTTPS
+# Habilitar o motor de reescrita
+RewriteEngine On
+RewriteBase /
+
+# === SEGURANÇA AVANÇADA PARA MERCADO PAGO ===
+<IfModule mod_headers.c>
+    # Proteção XSS
+    Header set X-XSS-Protection "1; mode=block"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set X-Content-Type-Options "nosniff"
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+    
+    # CSP otimizado para o Mercado Pago SDK
+    Header set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' unpkg.com googleapis.com sdk.mercadopago.com secure.mlstatic.com; style-src 'self' 'unsafe-inline' fonts.googleapis.com; font-src 'self' fonts.gstatic.com; img-src 'self' data: blob: *.mlstatic.com; connect-src 'self' viacep.com.br api.mercadopago.com *.mercadopago.com"
+    
+    # HSTS para HTTPS (OBRIGATÓRIO PARA MP)
+    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" env=HTTPS
+    
+    # Headers adicionais para Mercado Pago
+    Header set X-Permitted-Cross-Domain-Policies "none"
+    Header set X-Download-Options "noopen"
+</IfModule>
+
+# === FORÇA HTTPS OBRIGATÓRIO ===
+# Redirecionar www para non-www
+RewriteCond %{HTTP_HOST} ^www\.(.*)$ [NC]
+RewriteRule ^(.*)$ https://%1/$1 [R=301,L]
+
+# Forçar HTTPS (OBRIGATÓRIO PARA MERCADO PAGO)
 RewriteCond %{HTTPS} off
 RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
+# === SSL/TLS CONFIGURATION APRIMORADA ===
+<IfModule mod_ssl.c>
+    # Força TLS 1.2+ (OBRIGATÓRIO PARA MP)
+    SSLProtocol TLSv1.2 TLSv1.3
+    SSLCipherSuite ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256
+    SSLHonorCipherOrder on
+    SSLCompression off
+    SSLSessionTickets off
+    
+    # OCSP Stapling
+    SSLUseStapling on
+    SSLStaplingResponderTimeout 5
+    SSLStaplingReturnResponderErrors off
+    
+    # Headers de segurança SSL aprimorados
+    Header always set Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" env=HTTPS
+    Header always set X-Content-Type-Options "nosniff" env=HTTPS
+    Header always set X-Frame-Options "SAMEORIGIN" env=HTTPS
+    Header always set X-XSS-Protection "1; mode=block" env=HTTPS
+</IfModule>
+
+# === HEADERS DE SEGURANÇA APRIMORADOS ===
+<IfModule mod_headers.c>
+    # Protocolo HTTPS obrigatório
+    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" env=HTTPS
+    
+    # Certificado SSL válido
+    Header set X-SSL-Enabled "true" env=HTTPS
+    Header set X-TLS-Version "1.2+" env=HTTPS
+    
+    # Headers específicos para OpenPix
+    Header set X-OpenPix-Integration "KlubeCash-v2.1"
+    Header set X-OpenPix-Quality "optimized"
+    
+    # Preload de recursos críticos
+    Header add Link "</assets/css/index-v2.css>; rel=preload; as=style"
+    Header add Link "<https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap>; rel=preload; as=style; crossorigin"
+    Header add Link "</assets/js/index-v2.js>; rel=preload; as=script"
+    
+    # Permitir conexões da OpenPix
+    Header add Access-Control-Allow-Origin "https://api.openpix.com.br"
+    Header add Access-Control-Allow-Credentials "true"
+</IfModule>
+
+
+
+# === PROTEÇÃO DE DADOS SENSÍVEIS ===
+<IfModule mod_rewrite.c>
+    # Bloquear tentativas de acesso direto a endpoints com CPF
+    RewriteCond %{QUERY_STRING} cpf= [NC]
+    RewriteCond %{REQUEST_URI} !^/(cliente|admin|api)/ [NC]
+    RewriteRule ^(.*)$ - [F]
+</IfModule>
+
+# === REGRA PARA INDEX ===
+# Garantir que index.php funcione
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_URI} ^/$
+RewriteRule ^(.*)$ index.php [L]
+# === CONFIGURAÇÕES PCI COMPLIANCE ===
+<IfModule mod_rewrite.c>
+    # Força HTTPS para todas as páginas sensíveis
+    RewriteCond %{HTTPS} off
+    RewriteCond %{REQUEST_URI} ^/(store|admin|cliente|api).*$
+    RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+</IfModule>
+
+# === CACHE E PERFORMANCE ===
+<IfModule mod_expires.c>
+    ExpiresActive On
+    
+    # Imagens
+    ExpiresByType image/jpg "access plus 1 year"
+    ExpiresByType image/jpeg "access plus 1 year"
+    ExpiresByType image/gif "access plus 1 year"
+    ExpiresByType image/png "access plus 1 year"
+    ExpiresByType image/webp "access plus 1 year"
+    ExpiresByType image/svg+xml "access plus 1 year"
+    ExpiresByType image/x-icon "access plus 1 year"
+    
+    # CSS e JS
+    ExpiresByType text/css "access plus 3 months"
+    ExpiresByType application/javascript "access plus 3 months"
+    ExpiresByType text/javascript "access plus 3 months"
+    
+    # Fontes
+    ExpiresByType font/woff "access plus 1 year"
+    ExpiresByType font/woff2 "access plus 1 year"
+    ExpiresByType application/font-woff "access plus 1 year"
+    ExpiresByType application/font-woff2 "access plus 1 year"
+    
+    # HTML
+    ExpiresByType text/html "access plus 1 day"
+    
+    # Dados
+    ExpiresByType application/json "access plus 1 day"
+    ExpiresByType application/xml "access plus 1 day"
+    ExpiresByType text/xml "access plus 1 day"
+</IfModule>
+
+# === COMPRESSÃO GZIP ===
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/plain
+    AddOutputFilterByType DEFLATE text/html
+    AddOutputFilterByType DEFLATE text/xml
+    AddOutputFilterByType DEFLATE text/css
+    AddOutputFilterByType DEFLATE text/javascript
+    AddOutputFilterByType DEFLATE application/xml
+    AddOutputFilterByType DEFLATE application/xhtml+xml
+    AddOutputFilterByType DEFLATE application/rss+xml
+    AddOutputFilterByType DEFLATE application/javascript
+    AddOutputFilterByType DEFLATE application/x-javascript
+    AddOutputFilterByType DEFLATE application/json
+    AddOutputFilterByType DEFLATE image/svg+xml
+</IfModule>
+
+# === PIX E OPENPIX (NOVO) ===
+RewriteRule ^loja/pagamento-pix/?$ views/stores/payment-pix.php [L,QSA]
+RewriteRule ^api/openpix/?$ api/openpix.php [L,QSA]
+RewriteRule ^api/openpix-webhook/?$ api/openpix-webhook.php [L,QSA]
+RewriteRule ^api/store-payment/?$ api/store-payment.php [L,QSA]
+
+
+# === ROTAS EXISTENTES (MANTIDAS) ===
 # Autenticação
-RewriteRule ^login/?$ views/auth/login.php [L]
+RewriteRule ^login/?$ views/auth/login.php [L,NC]
 RewriteRule ^registro/?$ views/auth/register.php [L]
 RewriteRule ^recuperar-senha/?$ views/auth/recover-password.php [L]
-
+RewriteRule ^api/email-test/?$ api/email-test.php [L]
 # Cliente
 RewriteRule ^cliente/dashboard/?$ views/client/dashboard.php [L]
 RewriteRule ^cliente/extrato/?$ views/client/statement.php [L]
 RewriteRule ^cliente/lojas-parceiras/?$ views/client/partner-stores.php [L]
 RewriteRule ^cliente/perfil/?$ views/client/profile.php [L]
+RewriteRule ^cliente/saldo/?$ views/client/balance.php [L]
+RewriteRule ^cliente/actions/?$ controllers/client_actions.php [L,QSA]
+RewriteRule ^cliente/devolucoes/?$ views/client/refund-status.php [L]
+
+# API de Devoluções
+RewriteRule ^api/refunds/?$ api/refunds.php [L,QSA]
 
 # Admin
 RewriteRule ^admin/dashboard/?$ views/admin/dashboard.php [L]
 RewriteRule ^admin/usuarios/?$ views/admin/users.php [L]
 RewriteRule ^admin/lojas/?$ views/admin/stores.php [L]
 RewriteRule ^admin/transacoes/?$ views/admin/purchases.php [L]
+RewriteRule ^admin/transacao/([0-9]+)/?$ views/admin/transaction-details.php?id=$1 [L]
+RewriteRule ^admin/configuracoes/?$ views/admin/settings.php [L]
+RewriteRule ^admin/saldo/?$ views/admin/balance.php [L]
+RewriteRule ^admin/comissoes/?$ views/admin/commissions.php [L]
 RewriteRule ^admin/pagamentos/?$ views/admin/payments.php [L]
+RewriteRule ^admin/relatorios/?$ views/admin/reports.php [L]
 
-# Lojas (SEM DUPLICAÇÕES)
-RewriteRule ^store/dashboard/?$ views/stores/dashboard.php [L]
-RewriteRule ^store/transacoes/?$ views/stores/transactions.php [L]
-RewriteRule ^store/transacoes-pendentes/?$ views/stores/pending-commissions.php [L]
-RewriteRule ^store/registrar-transacao/?$ views/stores/register-transaction.php [L]
-RewriteRule ^store/pagamento/?$ views/stores/payment.php [L]
 
-# APIs
-RewriteRule ^api/store-payment/?$ api/store-payment.php [L,QSA]
+# Adicionar estas linhas ao .htaccess existente
+
+# Controlador de ações da loja
+RewriteRule ^controllers/store_actions/?$ controllers/store_actions.php [L,QSA]
+# Rotas para formulário de pagamento
+RewriteRule ^loja/formulario-pagamento/?$ views/stores/payment-form.php [L,QSA]
+RewriteRule ^loja/pagamento-comissoes/?$ views/stores/payment-form.php [L,QSA]
+
+# Controlador de pagamentos
+RewriteRule ^controllers/PaymentController/?$ controllers/PaymentController.php [L,QSA]
+# PIX e Mercado Pago (OTIMIZADO)
+RewriteRule ^store/pagamento-pix/?$ views/stores/payment-pix.php [L,QSA]
+RewriteRule ^api/mercadopago/?$ api/mercadopago.php [L,QSA]
+RewriteRule ^api/mercadopago-webhook/?$ api/mercadopago-webhook.php [L,QSA]
+
+
+
 RewriteRule ^api/openpix/?$ api/openpix.php [L,QSA]
+RewriteRule ^test-openpix/?$ test-openpix.php [L,QSA]
+# Lojas
+RewriteRule ^lojas/cadastro/?$ views/stores/register.php [L]
+RewriteRule ^lojas/detalhes/([0-9]+)/?$ views/stores/details.php?id=$1 [L]
+RewriteRule ^store/dashboard/?$ views/stores/dashboard.php [L,QSA]
+RewriteRule ^store/transacoes/?$ views/stores/transactions.php [L,QSA]
+RewriteRule ^store/transacoes-pendentes/?$ views/stores/pending-commissions.php [L,QSA]
+RewriteRule ^store/registrar-transacao/?$ views/stores/register-transaction.php [L,QSA]
+RewriteRule ^store/upload-lote/?$ views/stores/batch-upload.php [L,QSA]
+RewriteRule ^store/pagamento/?$ views/stores/payment.php [L,QSA]
+RewriteRule ^store/historico-pagamentos/?$ views/stores/payment-history.php [L,QSA]
+RewriteRule ^store/perfil/?$ views/stores/profile.php [L,QSA]
+
+# Email Marketing
+RewriteRule ^admin/email-marketing/?$ views/admin/email-marketing.php [L]
+RewriteRule ^admin/email-templates/?$ views/admin/email-templates.php [L]
+RewriteRule ^admin/email-campanhas/?$ views/admin/email-campaigns.php [L]
+
+# AJAX
+RewriteRule ^admin/ajax/stores/?$ controllers/AdminController.php?action=stores [L,QSA]
+RewriteRule ^admin/ajax/users/?$ controllers/AdminController.php?action=users [L,QSA]
+RewriteRule ^admin/ajax/transactions/?$ controllers/AdminController.php?action=transactions [L,QSA]
+RewriteRule ^admin/ajax/stores-direct/?$ controllers/AjaxStoreController.php [L,QSA]
+
+# API
+RewriteRule ^api/users/?$ api/users.php [L,QSA]
+RewriteRule ^api/users/([0-9]+)/?$ api/users.php?id=$1 [L,QSA]
+RewriteRule ^api/transactions/?$ api/transactions.php [L,QSA]
 
 # Google OAuth
+RewriteRule ^auth/google/auth/?$ auth/google/auth.php [L]
+RewriteRule ^auth/google/register/?$ auth/google/register.php [L]
 RewriteRule ^auth/google/callback/?$ auth/google/callback.php [L]
+# Rotas para pagamento com OpenPix
+
+// Configurações OpenPix (adicionar se não existir)
+if (!defined('OPENPIX_API_KEY')) {
+    define('OPENPIX_API_KEY', 'Q2xpZW50X0lkXzIzOTVjYmMzLWYyOGItNGJmYi04MWE3LWNkZWIzYzJkYTI4ZTpDbGllbnRfU2VjcmV0X3JYOFRxM016ZWdoNUY5YnVnempJeHl1VlBsRkg2QkNubm0yRFFzUWxQU1E9');
+}
+
+if (!defined('OPENPIX_BASE_URL')) {
+    define('OPENPIX_BASE_URL', 'https://api.openpix.com.br/api/v1');
+}
+
+if (!defined('OPENPIX_WEBHOOK_URL')) {
+    define('OPENPIX_WEBHOOK_URL', SITE_URL . '/api/openpix?action=webhook');
+}
+
+# .htaccess - ADICIONE ESTA LINHA NA SEÇÃO DE AUTENTICAÇÃO
+
+# Verificação 2FA
+RewriteRule ^verificar-2fa/?$ views/auth/verify-2fa.php [L]
+
+# === OTIMIZAÇÕES ESPECIAIS PARA MERCADO PAGO ===
+<IfModule mod_headers.c>
+    # Preload de recursos críticos
+    Header add Link "</assets/css/index-v2.css>; rel=preload; as=style"
+    Header add Link "<https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap>; rel=preload; as=style; crossorigin"
+    Header add Link "</assets/js/index-v2.js>; rel=preload; as=script"
+    
+    # Permitir conexões do SDK do Mercado Pago
+    Header add Access-Control-Allow-Origin "https://sdk.mercadopago.com"
+    Header add Access-Control-Allow-Credentials "true"
+</IfModule>
+
+# === BLOQUEIO DE ARQUIVOS SENSÍVEIS ===
+<FilesMatch "^(\.htaccess|\.htpasswd|\.git|\.env|config\.php|constants\.php)">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# === MIME TYPES MODERNOS ===
+<IfModule mod_mime.c>
+    AddType image/webp .webp
+    AddType font/woff .woff
+    AddType font/woff2 .woff2
+    AddType application/font-woff .woff
+    AddType application/font-woff2 .woff2
+    AddType application/json .json
+</IfModule>
+
+# === CONFIGURAÇÕES PHP OTIMIZADAS ===
+<IfModule mod_php7.c>
+    php_value upload_max_filesize 10M
+    php_value post_max_size 10M
+    php_value max_execution_time 300
+    php_value max_input_time 300
+    php_flag display_errors off
+    php_value error_reporting "E_ALL & ~E_NOTICE & ~E_DEPRECATED"
+    php_value memory_limit 256M
+    
+    # Configurações específicas para OpenPix
+    php_value user_agent "KlubeCash/2.1 (PHP/7.4; OpenPix-Optimized)"
+    php_value default_socket_timeout 30
+</IfModule>
+
+# === PÁGINAS DE ERRO ===
+ErrorDocument 404 /views/errors/404.php
+ErrorDocument 500 /views/errors/500.php
+
+# === BLOQUEIO DE NAVEGAÇÃO ===
+Options -Indexes
+
+# === REGRAS FINAIS ===
+# Permitir acesso direto aos controladores para AJAX
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteCond %{REQUEST_URI} /controllers/.*\.php$ [NC]
+RewriteRule ^(.*)$ - [L]
+
+# Permitir arquivos existentes
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_FILENAME}\.php -f
+RewriteRule ^(.*)$ $1.php [L]
