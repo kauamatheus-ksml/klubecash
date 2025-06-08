@@ -1,5 +1,111 @@
 <?php
+// INTERCEPTADOR UNIVERSAL DE DEBUG - Adicionar logo após <?php
 
+// Capturar TODA informação sobre a requisição
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    // Criar um log detalhado de tudo que está acontecendo
+    $debugInfo = [
+        'timestamp' => date('Y-m-d H:i:s'),
+        'method' => $_SERVER['REQUEST_METHOD'],
+        'action' => $_POST['action'],
+        'post_data' => $_POST,
+        'session_data' => $_SESSION ?? 'Sessão não iniciada',
+        'script_name' => $_SERVER['SCRIPT_NAME'],
+        'request_uri' => $_SERVER['REQUEST_URI'],
+        'headers' => getallheaders()
+    ];
+    
+    // Escrever no log para investigação posterior
+    error_log("=== INTERCEPTADOR DEBUG ===");
+    error_log("Requisição capturada: " . json_encode($debugInfo, JSON_PRETTY_PRINT));
+    error_log("========================");
+    
+    // Se for especificamente a ação register, vamos processá-la IMEDIATAMENTE
+    if ($_POST['action'] === 'register') {
+        // Forçar início de sessão
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        
+        // Limpar qualquer output buffer que possa interferir
+        while (ob_get_level()) {
+            ob_end_clean();
+        }
+        
+        // Definir headers JSON limpos
+        header('Content-Type: application/json; charset=UTF-8');
+        header('Cache-Control: no-cache, must-revalidate');
+        
+        error_log("INTERCEPTADOR: Processando ação register diretamente");
+        
+        // Verificar se temos um usuário admin logado
+        if (!isset($_SESSION['user_id']) || $_SESSION['user_type'] !== 'admin') {
+            error_log("INTERCEPTADOR: Falha na autenticação - user_id: " . ($_SESSION['user_id'] ?? 'não definido') . ", user_type: " . ($_SESSION['user_type'] ?? 'não definido'));
+            
+            echo json_encode([
+                'status' => false,
+                'message' => 'Sessão expirada ou sem permissão. Faça login como administrador.',
+                'debug' => 'Falha na verificação de sessão'
+            ]);
+            exit;
+        }
+        
+        error_log("INTERCEPTADOR: Autenticação OK para usuário ID " . $_SESSION['user_id']);
+        
+        // Processar a criação do usuário diretamente aqui
+        try {
+            // Como estamos antes dos includes, vamos incluir apenas o que precisamos
+            require_once __DIR__ . '/../../config/database.php';
+            require_once __DIR__ . '/../../config/constants.php';
+            require_once __DIR__ . '/../../controllers/AuthController.php';
+            
+            $nome = trim($_POST['nome'] ?? '');
+            $email = trim($_POST['email'] ?? '');
+            $telefone = trim($_POST['telefone'] ?? '');
+            $senha = $_POST['senha'] ?? '';
+            $tipo = $_POST['tipo'] ?? 'cliente';
+            
+            error_log("INTERCEPTADOR: Dados coletados - Nome: $nome, Email: $email, Tipo: $tipo");
+            
+            // Validações simples
+            if (empty($nome) || empty($email) || empty($senha)) {
+                echo json_encode([
+                    'status' => false,
+                    'message' => 'Todos os campos obrigatórios devem ser preenchidos'
+                ]);
+                exit;
+            }
+            
+            if (strlen($senha) < 8) {
+                echo json_encode([
+                    'status' => false,
+                    'message' => 'A senha deve ter no mínimo 8 caracteres'
+                ]);
+                exit;
+            }
+            
+            error_log("INTERCEPTADOR: Chamando AuthController::register");
+            
+            // Chamar o registro
+            $resultado = AuthController::register($nome, $email, $telefone, $senha, $tipo);
+            
+            error_log("INTERCEPTADOR: Resultado do registro: " . json_encode($resultado));
+            
+            echo json_encode($resultado);
+            exit;
+            
+        } catch (Exception $e) {
+            error_log("INTERCEPTADOR: Erro durante processamento: " . $e->getMessage());
+            
+            echo json_encode([
+                'status' => false,
+                'message' => 'Erro interno: ' . $e->getMessage(),
+                'debug' => 'Exceção capturada no interceptador'
+            ]);
+            exit;
+        }
+    }
+}
 // controllers/AdminController.php
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../config/constants.php';
