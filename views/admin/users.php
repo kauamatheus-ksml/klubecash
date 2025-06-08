@@ -1,33 +1,62 @@
 <?php
 // views/admin/users.php
+// Definir o menu ativo na sidebar
 $activeMenu = 'usuarios';
 
+// Incluir conexão com o banco de dados e arquivos necessários
 require_once '../../config/database.php';
 require_once '../../config/constants.php';
 require_once '../../controllers/AuthController.php';
-require_once '../../controllers/UserManagementController.php';
+require_once '../../controllers/AdminController.php';
 
-session_start();
+// Iniciar sessão
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
-// Verificar autenticação
-if (!isset($_SESSION['user_id']) || $_SESSION['user_type'] !== USER_TYPE_ADMIN) {
+// Verificar se o usuário está logado e é administrador
+if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION['user_type'] !== USER_TYPE_ADMIN) {
+    // Redirecionar para a página de login com mensagem de erro
     header("Location: " . LOGIN_URL . "?error=acesso_restrito");
     exit;
 }
 
-// Processar filtros
-$filters = [
-    'tipo' => $_GET['tipo'] ?? '',
-    'status' => $_GET['status'] ?? '',
-    'busca' => $_GET['busca'] ?? ''
-];
-$page = $_GET['page'] ?? 1;
+// Inicializar variáveis de paginação e filtros
+$page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
+$filters = [];
 
-// Buscar dados
-$result = UserManagementController::listUsers($filters, $page);
-$users = $result['data']['usuarios'] ?? [];
-$stats = $result['data']['estatisticas'] ?? [];
-$totalPages = $result['data']['total_paginas'] ?? 1;
+// Processar filtros se enviados
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET)) {
+    if (!empty($_GET['tipo']) && $_GET['tipo'] !== 'todos') {
+        $filters['tipo'] = $_GET['tipo'];
+    }
+    if (!empty($_GET['status']) && $_GET['status'] !== 'todos') {
+        $filters['status'] = $_GET['status'];
+    }
+    if (!empty($_GET['busca'])) {
+        $filters['busca'] = trim($_GET['busca']);
+    }
+}
+
+try {
+    // Obter dados dos usuários com filtros aplicados
+    $result = AdminController::manageUsers($filters, $page);
+
+    // Verificar se houve erro
+    $hasError = !$result['status'];
+    $errorMessage = $hasError ? $result['message'] : '';
+
+    // Dados para exibição na página
+    $users = $hasError ? [] : $result['data']['usuarios'];
+    $statistics = $hasError ? [] : $result['data']['estatisticas'];
+    $pagination = $hasError ? [] : $result['data']['paginacao'];
+} catch (Exception $e) {
+    $hasError = true;
+    $errorMessage = "Erro ao processar a requisição: " . $e->getMessage();
+    $users = [];
+    $statistics = [];
+    $pagination = [];
+}
 ?>
 
 <!DOCTYPE html>
@@ -37,306 +66,491 @@ $totalPages = $result['data']['total_paginas'] ?? 1;
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gerenciar Usuários - Klube Cash</title>
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    
+    <!-- Font Awesome primeiro -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" integrity="sha512-Avb2QiuDEEvB4bZJYdft2mNjVShBftLdPG8FJ0V7irTLQ8Uo0qcPxh4Plq7G5tGm0rU+1SPhVotteLpBERwTkw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="stylesheet" href="../../assets/font-awesome/css/font-awesome.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" integrity="sha512-Avb2QiuDEEvB4bZJYdft2mNjVShBftLdPG8FJ0V7irTLQ8Uo0qcPxh4Plq7G5tGm0rU+1SPhVotteLpBERwTkw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <!-- Seu CSS depois -->
     <link rel="stylesheet" href="../../assets/css/views/admin/users.css">
     <link rel="stylesheet" href="../../assets/css/layout-fix.css">
 </head>
 <body>
     <?php include_once '../components/sidebar.php'; ?>
     
+    <!-- Conteúdo Principal -->
     <div class="main-content" id="mainContent">
         <div class="page-wrapper">
-            <!-- Cabeçalho -->
+            <!-- Cabeçalho da Página -->
             <div class="page-header">
-                <h1>Gerenciar Usuários</h1>
-                <button class="btn btn-primary" onclick="openUserModal()">
-                    <i class="fas fa-plus"></i> Novo Usuário
-                </button>
+                <div class="page-title">
+                    <h1><i class="fas fa-users"></i> Gerenciar Usuários</h1>
+                    <p>Visualize e gerencie todos os usuários do sistema</p>
+                </div>
+                <div class="page-actions">
+                    <button class="btn btn-primary" onclick="showUserModal()">
+                        <i class="fas fa-plus"></i> Novo Usuário
+                    </button>
+                </div>
             </div>
-            
-            <!-- Estatísticas -->
+
+            <!-- Estatísticas Rápidas -->
+            <?php if (!$hasError && !empty($statistics)): ?>
             <div class="stats-grid">
                 <div class="stat-card">
-                    <i class="fas fa-users"></i>
-                    <div>
-                        <h3><?php echo $stats['total'] ?? 0; ?></h3>
+                    <div class="stat-icon">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3><?php echo number_format($statistics['total_usuarios']); ?></h3>
                         <p>Total de Usuários</p>
                     </div>
                 </div>
                 <div class="stat-card">
-                    <i class="fas fa-check-circle text-success"></i>
-                    <div>
-                        <h3><?php echo $stats['ativos'] ?? 0; ?></h3>
-                        <p>Usuários Ativos</p>
+                    <div class="stat-icon client">
+                        <i class="fas fa-user"></i>
                     </div>
-                </div>
-                <div class="stat-card">
-                    <i class="fas fa-user"></i>
-                    <div>
-                        <h3><?php echo $stats['clientes'] ?? 0; ?></h3>
+                    <div class="stat-content">
+                        <h3><?php echo number_format($statistics['total_clientes']); ?></h3>
                         <p>Clientes</p>
                     </div>
                 </div>
                 <div class="stat-card">
-                    <i class="fas fa-store"></i>
-                    <div>
-                        <h3><?php echo $stats['lojas'] ?? 0; ?></h3>
+                    <div class="stat-icon store">
+                        <i class="fas fa-store"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3><?php echo number_format($statistics['total_lojas']); ?></h3>
                         <p>Lojas</p>
                     </div>
                 </div>
+                <div class="stat-card">
+                    <div class="stat-icon admin">
+                        <i class="fas fa-user-shield"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3><?php echo number_format($statistics['total_admins']); ?></h3>
+                        <p>Administradores</p>
+                    </div>
+                </div>
             </div>
+            <?php endif; ?>
             
-            <!-- Filtros -->
+            <!-- Container de mensagens -->
+            <div id="messageContainer" class="alert-container"></div>
+            
+            <!-- Filtros e Busca -->
             <div class="filters-section">
-                <form method="get" class="filters-form">
+                <form method="GET" class="filters-form" id="filtersForm">
+                    
+                    
                     <div class="filter-group">
-                        <select name="tipo" class="form-control">
-                            <option value="">Todos os tipos</option>
-                            <option value="cliente" <?php echo $filters['tipo'] === 'cliente' ? 'selected' : ''; ?>>Cliente</option>
-                            <option value="loja" <?php echo $filters['tipo'] === 'loja' ? 'selected' : ''; ?>>Loja</option>
-                            <option value="admin" <?php echo $filters['tipo'] === 'admin' ? 'selected' : ''; ?>>Admin</option>
+                        <select name="tipo" id="tipoFilter">
+                            <option value="todos">Todos os tipos</option>
+                            <option value="cliente" <?php echo (($_GET['tipo'] ?? '') === 'cliente') ? 'selected' : ''; ?>>Clientes</option>
+                            <option value="loja" <?php echo (($_GET['tipo'] ?? '') === 'loja') ? 'selected' : ''; ?>>Lojas</option>
+                            <option value="admin" <?php echo (($_GET['tipo'] ?? '') === 'admin') ? 'selected' : ''; ?>>Administradores</option>
                         </select>
                     </div>
+                    
                     <div class="filter-group">
-                        <select name="status" class="form-control">
-                            <option value="">Todos os status</option>
-                            <option value="ativo" <?php echo $filters['status'] === 'ativo' ? 'selected' : ''; ?>>Ativo</option>
-                            <option value="inativo" <?php echo $filters['status'] === 'inativo' ? 'selected' : ''; ?>>Inativo</option>
-                            <option value="bloqueado" <?php echo $filters['status'] === 'bloqueado' ? 'selected' : ''; ?>>Bloqueado</option>
+                        <select name="status" id="statusFilter">
+                            <option value="todos">Todos os status</option>
+                            <option value="ativo" <?php echo (($_GET['status'] ?? '') === 'ativo') ? 'selected' : ''; ?>>Ativo</option>
+                            <option value="inativo" <?php echo (($_GET['status'] ?? '') === 'inativo') ? 'selected' : ''; ?>>Inativo</option>
+                            <option value="bloqueado" <?php echo (($_GET['status'] ?? '') === 'bloqueado') ? 'selected' : ''; ?>>Bloqueado</option>
                         </select>
                     </div>
+                    
                     <div class="filter-group">
-                        <input type="text" name="busca" placeholder="Buscar por nome ou email" 
-                               value="<?php echo htmlspecialchars($filters['busca']); ?>" class="form-control">
+                        <button type="button" class="btn btn-secondary" onclick="clearFilters()">
+                            <i class="fas fa-times"></i> Limpar
+                        </button>
                     </div>
-                    <button type="submit" class="btn btn-secondary">
-                        <i class="fas fa-search"></i> Filtrar
-                    </button>
                 </form>
             </div>
-            
-            <!-- Tabela de usuários -->
-            <div class="users-table-wrapper">
-                <table class="users-table">
-                    <thead>
-                        <tr>
-                            <th>Nome</th>
-                            <th>Email</th>
-                            <th>Tipo</th>
-                            <th>Status</th>
-                            <th>Cashback Total</th>
-                            <th>Data Cadastro</th>
-                            <th>Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($users as $user): ?>
-                        <tr>
-                            <td><?php echo htmlspecialchars($user['nome']); ?></td>
-                            <td><?php echo htmlspecialchars($user['email']); ?></td>
-                            <td>
-                                <span class="badge badge-<?php echo $user['tipo']; ?>">
-                                    <?php echo ucfirst($user['tipo']); ?>
-                                </span>
-                            </td>
-                            <td>
-                                <span class="badge badge-<?php echo $user['status']; ?>">
-                                    <?php echo ucfirst($user['status']); ?>
-                                </span>
-                            </td>
-                            <td>R$ <?php echo number_format($user['total_cashback'] ?? 0, 2, ',', '.'); ?></td>
-                            <td><?php echo date('d/m/Y', strtotime($user['data_criacao'])); ?></td>
-                            <td>
-                                <div class="action-buttons">
-                                    <button onclick="editUser(<?php echo $user['id']; ?>)" 
-                                            class="btn btn-sm btn-info" title="Editar">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                    <button onclick="deleteUser(<?php echo $user['id']; ?>)" 
-                                            class="btn btn-sm btn-danger" title="Excluir">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
+
+            <!-- Barra de Ações em Massa -->
+            <div id="bulkActionBar" class="bulk-action-bar" style="display: none;">
+                <div class="bulk-info">
+                    <span id="selectedCount">0</span> usuários selecionados
+                </div>
+                <div class="bulk-actions">
+                    <button class="btn btn-sm btn-success" onclick="bulkAction('ativo')">
+                        <i class="fas fa-check"></i> Ativar
+                    </button>
+                    <button class="btn btn-sm btn-warning" onclick="bulkAction('inativo')">
+                        <i class="fas fa-pause"></i> Desativar
+                    </button>
+                    <button class="btn btn-sm btn-danger" onclick="bulkAction('bloqueado')">
+                        <i class="fas fa-ban"></i> Bloquear
+                    </button>
+                </div>
             </div>
             
-            <!-- Paginação -->
-            <?php if ($totalPages > 1): ?>
-            <div class="pagination">
-                <?php for ($i = 1; $i <= $totalPages; $i++): ?>
-                    <a href="?page=<?php echo $i; ?>&<?php echo http_build_query($filters); ?>" 
-                       class="<?php echo $i == $page ? 'active' : ''; ?>">
-                        <?php echo $i; ?>
-                    </a>
-                <?php endfor; ?>
+            <?php if ($hasError): ?>
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <?php echo htmlspecialchars($errorMessage); ?>
+                </div>
+            <?php else: ?>
+            
+            <!-- Tabela de Usuários -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>Lista de Usuários</h3>
+                    <div class="card-actions">
+                        <button class="btn btn-sm btn-outline" onclick="exportUsers()">
+                            <i class="fas fa-download"></i> Exportar
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="table-container">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th class="checkbox-column">
+                                    <div class="checkbox-wrapper">
+                                        <input type="checkbox" id="selectAll" onchange="toggleSelectAll()">
+                                        <span class="checkmark"></span>
+                                    </div>
+                                </th>
+                                <th>Usuário</th>
+                                <th>Tipo</th>
+                                <th>Status</th>
+                                <th>Cadastro</th>
+                                <th>Último Login</th>
+                                <th class="actions-column">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php if (empty($users)): ?>
+                                <tr>
+                                    <td colspan="7" class="no-data">
+                                        <div class="no-data-content">
+                                            <i class="fas fa-users"></i>
+                                            <h4>Nenhum usuário encontrado</h4>
+                                            <p>Não há usuários que atendam aos critérios de busca.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <?php else: ?>
+                                <?php foreach ($users as $user): ?>
+                                    <tr>
+                                        <td>
+                                            <div class="checkbox-wrapper">
+                                                <input type="checkbox" 
+                                                       class="user-checkbox" 
+                                                       value="<?php echo $user['id']; ?>" 
+                                                       onchange="toggleUserSelection(this, <?php echo $user['id']; ?>)">
+                                                <span class="checkmark"></span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="user-info">
+                                                <div class="user-avatar">
+                                                    <i class="fas fa-user"></i>
+                                                </div>
+                                                <div class="user-details">
+                                                    <div class="user-name"><?php echo htmlspecialchars($user['nome']); ?></div>
+                                                    <div class="user-email"><?php echo htmlspecialchars($user['email']); ?></div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span class="type-badge type-<?php echo $user['tipo']; ?>">
+                                                <?php 
+                                                    $tipos = [
+                                                        'cliente' => 'Cliente',
+                                                        'loja' => 'Loja',
+                                                        'admin' => 'Admin'
+                                                    ];
+                                                    echo $tipos[$user['tipo']] ?? ucfirst($user['tipo']);
+                                                ?>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <?php 
+                                                $statusClass = '';
+                                                $statusIcon = '';
+                                                switch ($user['status']) {
+                                                    case 'ativo':
+                                                        $statusClass = 'badge-success';
+                                                        $statusIcon = 'fas fa-check';
+                                                        break;
+                                                    case 'inativo':
+                                                        $statusClass = 'badge-warning';
+                                                        $statusIcon = 'fas fa-pause';
+                                                        break;
+                                                    case 'bloqueado':
+                                                        $statusClass = 'badge-danger';
+                                                        $statusIcon = 'fas fa-ban';
+                                                        break;
+                                                }
+                                            ?>
+                                            <span class="badge <?php echo $statusClass; ?>">
+                                                <i class="<?php echo $statusIcon; ?>"></i>
+                                                <?php echo htmlspecialchars(ucfirst($user['status'])); ?>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div class="date-info">
+                                                <div class="date-primary">
+                                                    <?php echo date('d/m/Y', strtotime($user['data_criacao'])); ?>
+                                                </div>
+                                                <div class="date-secondary">
+                                                    <?php echo date('H:i', strtotime($user['data_criacao'])); ?>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="date-info">
+                                                <?php if ($user['ultimo_login']): ?>
+                                                    <div class="date-primary">
+                                                        <?php echo date('d/m/Y', strtotime($user['ultimo_login'])); ?>
+                                                    </div>
+                                                    <div class="date-secondary">
+                                                        <?php echo date('H:i', strtotime($user['ultimo_login'])); ?>
+                                                    </div>
+                                                <?php else: ?>
+                                                    <span class="text-muted">Nunca</span>
+                                                <?php endif; ?>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="table-actions">
+                                                
+                                                <button class="action-btn view" 
+                                                        onclick="viewUser(<?php echo $user['id']; ?>)"
+                                                        title="Visualizar usuário">
+                                                    <i class="fas fa-eye"></i>
+                                                </button>
+                                                <?php if ($user['status'] === 'ativo'): ?>
+                                                    <button class="action-btn deactivate" 
+                                                            onclick="changeUserStatus(<?php echo $user['id']; ?>, 'inativo', '<?php echo addslashes($user['nome']); ?>')"
+                                                            title="Desativar usuário">
+                                                        <i class="fas fa-pause"></i>
+                                                    </button>
+                                                <?php else: ?>
+                                                    <button class="action-btn activate" 
+                                                            onclick="changeUserStatus(<?php echo $user['id']; ?>, 'ativo', '<?php echo addslashes($user['nome']); ?>')"
+                                                            title="Ativar usuário">
+                                                        <i class="fas fa-check"></i>
+                                                    </button>
+                                                <?php endif; ?>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Paginação -->
+                <?php if (!empty($pagination) && $pagination['total_paginas'] > 1): ?>
+                    <div class="pagination-wrapper">
+                        <div class="pagination-info">
+                            Mostrando <?php echo (($page - 1) * $pagination['por_pagina']) + 1; ?>-<?php echo min($page * $pagination['por_pagina'], $pagination['total']); ?> 
+                            de <?php echo $pagination['total']; ?> usuários
+                        </div>
+                        <div class="pagination">
+                            <?php if ($page > 1): ?>
+                                <a href="?page=1<?php echo http_build_query($_GET, '', '&amp;', PHP_QUERY_RFC3986); ?>" class="pagination-arrow" title="Primeira página">
+                                    <i class="fas fa-angle-double-left"></i>
+                                </a>
+                                <a href="?page=<?php echo max(1, $page - 1); ?><?php echo http_build_query($_GET, '', '&amp;', PHP_QUERY_RFC3986); ?>" class="pagination-arrow" title="Página anterior">
+                                    <i class="fas fa-angle-left"></i>
+                                </a>
+                            <?php endif; ?>
+                            
+                            <?php 
+                                $startPage = max(1, $page - 2);
+                                $endPage = min($pagination['total_paginas'], $startPage + 4);
+                                if ($endPage - $startPage < 4) {
+                                    $startPage = max(1, $endPage - 4);
+                                }
+                                
+                                for ($i = $startPage; $i <= $endPage; $i++): 
+                            ?>
+                                <a href="?page=<?php echo $i; ?><?php echo http_build_query($_GET, '', '&amp;', PHP_QUERY_RFC3986); ?>" 
+                                   class="pagination-item <?php echo ($i == $page) ? 'active' : ''; ?>">
+                                    <?php echo $i; ?>
+                                </a>
+                            <?php endfor; ?>
+                            
+                            <?php if ($page < $pagination['total_paginas']): ?>
+                                <a href="?page=<?php echo min($pagination['total_paginas'], $page + 1); ?><?php echo http_build_query($_GET, '', '&amp;', PHP_QUERY_RFC3986); ?>" class="pagination-arrow" title="Próxima página">
+                                    <i class="fas fa-angle-right"></i>
+                                </a>
+                                <a href="?page=<?php echo $pagination['total_paginas']; ?><?php echo http_build_query($_GET, '', '&amp;', PHP_QUERY_RFC3986); ?>" class="pagination-arrow" title="Última página">
+                                    <i class="fas fa-angle-double-right"></i>
+                                </a>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                <?php endif; ?>
             </div>
             <?php endif; ?>
         </div>
     </div>
     
-    <!-- Modal de Usuário -->
-    <div id="userModal" class="modal">
+    <!-- Modal de Adicionar/Editar Usuário -->
+    <div class="modal" id="userModal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 id="modalTitle">Novo Usuário</h2>
-                <span class="close" onclick="closeUserModal()">&times;</span>
+                <h3 class="modal-title" id="userModalTitle">
+                    <i class="fas fa-user-plus"></i> Adicionar Usuário
+                </h3>
+                <button class="modal-close" onclick="hideUserModal()" type="button">
+                    <i class="fas fa-times"></i>
+                </button>
             </div>
-            <form id="userForm">
-                <input type="hidden" id="userId" name="id">
-                <div class="form-group">
-                    <label for="nome">Nome Completo</label>
-                    <input type="text" id="nome" name="nome" required class="form-control">
+            
+            <div class="modal-body">
+                <form id="userForm" onsubmit="submitUserForm(event)">
+                    <input type="hidden" id="userId" name="id" value="">
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label required" for="userType">Tipo de Usuário</label>
+                            <select class="form-select" id="userType" name="tipo" required>
+                                <option value="">Selecione o tipo...</option>
+                                <option value="cliente">Cliente</option>
+                                <option value="loja">Loja</option>
+                                <option value="admin">Administrador</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label required" for="userStatus">Status</label>
+                            <select class="form-select" id="userStatus" name="status" required>
+                                <option value="ativo">Ativo</option>
+                                <option value="inativo">Inativo</option>
+                                <option value="bloqueado">Bloqueado</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label required" for="userName">Nome Completo</label>
+                        <input type="text" 
+                               class="form-control" 
+                               id="userName" 
+                               name="nome" 
+                               required 
+                               placeholder="Digite o nome completo">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label required" for="userEmail">E-mail</label>
+                        <div id="emailSelectContainer" style="display: none;">
+                            <select class="form-select" id="userEmailSelect" name="email_select">
+                                <option value="">Selecione uma loja...</option>
+                            </select>
+                        </div>
+                        <input type="email" 
+                               class="form-control" 
+                               id="userEmail" 
+                               name="email" 
+                               required 
+                               placeholder="Digite o e-mail">
+                    </div>
+                    
+                    <!-- Campos que serão preenchidos automaticamente quando for loja -->
+                    <div id="storeDataFields" style="display: none;">
+                        <div class="form-group">
+                            <label class="form-label" for="storeName">Nome da Loja</label>
+                            <input type="text" class="form-control" id="storeName" readonly>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label" for="storeDocument">CNPJ</label>
+                            <input type="text" class="form-control" id="storeDocument" readonly>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label" for="storeCategory">Categoria</label>
+                            <input type="text" class="form-control" id="storeCategory" readonly>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="userPhone">Telefone</label>
+                        <input type="tel" 
+                               class="form-control" 
+                               id="userPhone" 
+                               name="telefone" 
+                               placeholder="(00) 00000-0000">
+                    </div>
+                    
+                    <div class="form-group" id="passwordGroup">
+                        <label class="form-label required" for="userPassword">Senha</label>
+                        <div class="password-input">
+                            <input type="password" 
+                                   class="form-control" 
+                                   id="userPassword" 
+                                   name="senha"
+                                   placeholder="Digite a senha">
+                            <button type="button" class="password-toggle" onclick="togglePassword('userPassword')">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                        <small id="passwordHelp" class="form-text">
+                            Mínimo de 8 caracteres (deixe em branco para manter a senha atual ao editar)
+                        </small>
+                    </div>
+                </form>
+            </div>
+            
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="hideUserModal()">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+                <button type="submit" form="userForm" class="btn btn-primary" id="submitBtn">
+                    <i class="fas fa-save"></i> Salvar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Visualização de Usuário -->
+    <div class="modal" id="viewUserModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">
+                    <i class="fas fa-eye"></i> Detalhes do Usuário
+                </h3>
+                <button class="modal-close" onclick="hideViewUserModal()" type="button">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="modal-body">
+                <div id="userViewContent">
+                    <!-- Conteúdo será carregado dinamicamente -->
                 </div>
-                <div class="form-group">
-                    <label for="email">Email</label>
-                    <input type="email" id="email" name="email" required class="form-control">
-                </div>
-                <div class="form-group">
-                    <label for="telefone">Telefone</label>
-                    <input type="text" id="telefone" name="telefone" class="form-control">
-                </div>
-                <div class="form-group">
-                    <label for="senha">Senha</label>
-                    <input type="password" id="senha" name="senha" class="form-control">
-                    <small>Deixe em branco para manter a senha atual (apenas edição)</small>
-                </div>
-                <div class="form-group">
-                    <label for="tipo">Tipo de Usuário</label>
-                    <select id="tipo" name="tipo" required class="form-control">
-                        <option value="cliente">Cliente</option>
-                        <option value="loja">Loja</option>
-                        <option value="admin">Administrador</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="status">Status</label>
-                    <select id="status" name="status" required class="form-control">
-                        <option value="ativo">Ativo</option>
-                        <option value="inativo">Inativo</option>
-                        <option value="bloqueado">Bloqueado</option>
-                    </select>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" onclick="closeUserModal()">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Salvar</button>
-                </div>
-            </form>
+            </div>
+            
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="hideViewUserModal()">
+                    <i class="fas fa-times"></i> Fechar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+        <div class="loading-spinner">
+            <i class="fas fa-spinner fa-spin"></i>
+            <p>Carregando...</p>
         </div>
     </div>
     
-    <script>
-    const API_URL = '<?php echo USER_MANAGEMENT_URL; ?>';
+    <!-- JavaScript -->
+    <script src="../../assets/js/admin/users.js"></script>
     
-    // Abrir modal
-    function openUserModal() {
-        document.getElementById('userModal').style.display = 'block';
-        document.getElementById('modalTitle').textContent = 'Novo Usuário';
-        document.getElementById('userForm').reset();
-        document.getElementById('userId').value = '';
-        document.getElementById('senha').required = true;
-    }
-    
-    // Fechar modal
-    function closeUserModal() {
-        document.getElementById('userModal').style.display = 'none';
-    }
-    
-    // Editar usuário
-    async function editUser(id) {
-        try {
-            const response = await fetch(`${API_URL}?id=${id}`);
-            const result = await response.json();
-            
-            if (result.status) {
-                const user = result.data;
-                document.getElementById('modalTitle').textContent = 'Editar Usuário';
-                document.getElementById('userId').value = user.id;
-                document.getElementById('nome').value = user.nome;
-                document.getElementById('email').value = user.email;
-                document.getElementById('telefone').value = user.telefone || '';
-                document.getElementById('senha').value = '';
-                document.getElementById('senha').required = false;
-                document.getElementById('tipo').value = user.tipo;
-                document.getElementById('status').value = user.status;
-                document.getElementById('userModal').style.display = 'block';
-            } else {
-                alert(result.message || 'Erro ao buscar usuário');
-            }
-        } catch (error) {
-            alert('Erro ao buscar usuário');
-        }
-    }
-    
-    // Excluir usuário
-    async function deleteUser(id) {
-        if (!confirm('Tem certeza que deseja excluir este usuário?')) {
-            return;
-        }
-        
-        try {
-            const response = await fetch(`${API_URL}?id=${id}`, {
-                method: 'DELETE'
-            });
-            const result = await response.json();
-            
-            if (result.status) {
-                alert('Usuário excluído com sucesso');
-                location.reload();
-            } else {
-                alert(result.message || 'Erro ao excluir usuário');
-            }
-        } catch (error) {
-            alert('Erro ao excluir usuário');
-        }
-    }
-    
-    // Salvar usuário
-    document.getElementById('userForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        
-        const formData = new FormData(e.target);
-        const data = Object.fromEntries(formData);
-        const userId = data.id;
-        delete data.id;
-        
-        // Remover senha se estiver vazia (edição)
-        if (!data.senha) {
-            delete data.senha;
-        }
-        
-        try {
-            const response = await fetch(userId ? `${API_URL}?id=${userId}` : API_URL, {
-                method: userId ? 'PUT' : 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(data)
-            });
-            
-            const result = await response.json();
-            
-            if (result.status) {
-                alert(userId ? 'Usuário atualizado com sucesso' : 'Usuário criado com sucesso');
-                location.reload();
-            } else {
-                alert(result.message || 'Erro ao salvar usuário');
-            }
-        } catch (error) {
-            alert('Erro ao salvar usuário');
-        }
-    });
-    
-    // Fechar modal ao clicar fora
-    window.onclick = function(event) {
-        const modal = document.getElementById('userModal');
-        if (event.target == modal) {
-            closeUserModal();
-        }
-    }
-    </script>
 </body>
 </html>
