@@ -61,6 +61,7 @@ if (isset($_GET['metodo_pagamento']) && !empty($_GET['metodo_pagamento'])) {
 // Obter histórico de pagamentos com informações de saldo
 $result = TransactionController::getPaymentHistoryWithBalance($storeId, $filters, $page);
 
+
 // Calcular estatísticas
 $totalPagamentos = 0;
 $totalAprovados = 0;
@@ -71,28 +72,9 @@ $valorTotalVendasOriginais = 0;
 $totalSaldoUsado = 0;
 
 if ($result['status'] && isset($result['data']['pagamentos'])) {
-    foreach ($result['data']['pagamentos'] as $payment) {
-        $totalPagamentos++;
-        $valorTotalPagamentos += $payment['valor_total'];
-        
-        // CORREÇÃO: Calcular vendas originais baseado na comissão
-        if (in_array($payment['metodo_pagamento'], ['pix_openpix', 'pix_mercadopago'])) {
-            // Para PIX, calcular vendas originais: comissão / 0.10
-            $vendasOriginais = $payment['valor_total'] / 0.10;
-        } else {
-            // Para outros métodos, usar valor existente ou calcular
-            $vendasOriginais = $payment['valor_vendas_originais'] ?? ($payment['valor_total'] / 0.10);
-        }
-        
-        $valorTotalVendasOriginais += $vendasOriginais;
-        $totalSaldoUsado += $payment['total_saldo_usado'] ?? 0;
-        
-        if ($payment['status'] === 'aprovado') {
-            $totalAprovados++;
-        } elseif ($payment['status'] === 'pendente') {
-            $totalPendentes++;
-        } elseif ($payment['status'] === 'rejeitado') {
-            $totalRejeitados++;
+    foreach ($result['data']['pagamentos'] as &$payment) {
+        if ($payment['metodo_pagamento'] === 'pix_openpix' && $payment['valor_vendas_originais'] == 0) {
+            $payment['valor_vendas_originais'] = $payment['valor_total'] / 0.10;
         }
     }
 }
