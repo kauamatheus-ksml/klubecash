@@ -73,8 +73,18 @@ $totalSaldoUsado = 0;
 
 if ($result['status'] && isset($result['data']['pagamentos'])) {
     foreach ($result['data']['pagamentos'] as &$payment) {
-        if ($payment['metodo_pagamento'] === 'pix_openpix' && $payment['valor_vendas_originais'] == 0) {
-            $payment['valor_vendas_originais'] = $payment['valor_total'] / 0.10;
+        if ($payment['metodo_pagamento'] === 'pix_openpix') {
+            // Corrigir valor de vendas
+            if ($payment['valor_vendas_originais'] == 0) {
+                $payment['valor_vendas_originais'] = $payment['valor_total'] / 0.10;
+            }
+            
+            // Corrigir quantidade de transações
+            if ($payment['qtd_transacoes'] == 0) {
+                $stmt = $db->prepare("SELECT COUNT(*) FROM transacoes_cashback WHERE loja_id = ? AND status = 'aprovado'");
+                $stmt->execute([$storeId]);
+                $payment['qtd_transacoes'] = $stmt->fetchColumn();
+            }
         }
     }
 }
