@@ -74,8 +74,18 @@ if ($result['status'] && isset($result['data']['pagamentos'])) {
     foreach ($result['data']['pagamentos'] as $payment) {
         $totalPagamentos++;
         $valorTotalPagamentos += $payment['valor_total'];
-        $valorTotalVendasOriginais += $payment['valor_vendas_originais'];
-        $totalSaldoUsado += $payment['total_saldo_usado'];
+        
+        // CORREÇÃO: Calcular vendas originais baseado na comissão
+        if (in_array($payment['metodo_pagamento'], ['pix_openpix', 'pix_mercadopago'])) {
+            // Para PIX, calcular vendas originais: comissão / 0.10
+            $vendasOriginais = $payment['valor_total'] / 0.10;
+        } else {
+            // Para outros métodos, usar valor existente ou calcular
+            $vendasOriginais = $payment['valor_vendas_originais'] ?? ($payment['valor_total'] / 0.10);
+        }
+        
+        $valorTotalVendasOriginais += $vendasOriginais;
+        $totalSaldoUsado += $payment['total_saldo_usado'] ?? 0;
         
         if ($payment['status'] === 'aprovado') {
             $totalAprovados++;
