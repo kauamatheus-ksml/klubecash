@@ -522,7 +522,12 @@ if ($activeTab === 'balance') {
                                                     </div>
                                                 </td>
                                                 <td><?php echo ucfirst($payment['metodo_pagamento']); ?></td>
-                                                <td><?php echo date('d/m/Y H:i', strtotime($payment['data_registro'])); ?></td>
+                                                <td>
+                                                    <?php 
+                                                    // Aplica a subtração de 3 horas no fuso
+                                                    echo date('d/m/Y H:i', strtotime($payment['data_registro']) - (3 * 60 * 60)); 
+                                                    ?>
+                                                </td>
                                                 <td>
                                                     <?php echo $payment['total_transacoes']; ?> vendas
                                                     <?php if ($payment['transacoes_com_saldo'] > 0): ?>
