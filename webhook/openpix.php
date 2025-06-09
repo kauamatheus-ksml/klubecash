@@ -1,24 +1,51 @@
 <?php
 require_once __DIR__ . '/../config/database.php';
 
-$db = Database::getConnection();
+$input = json_decode(file_get_contents('php://input'), true);
 
-// Log
-file_put_contents(__DIR__ . '/../logs/openpix.log', date('H:i:s') . " - Processando\n", FILE_APPEND);
-
-// SEMPRE aprovar quando webhook for chamado (independente dos dados)
-$db->prepare("UPDATE transacoes_cashback SET status = 'aprovado' WHERE loja_id = 34 AND status = 'pendente'")->execute();
-$db->prepare("UPDATE pagamentos_comissao SET status = 'aprovado' WHERE loja_id = 34 AND metodo_pagamento = 'pix_openpix' AND status != 'aprovado'")->execute();
-
-// Liberar cashback
-$stmt = $db->prepare("SELECT usuario_id, valor_total FROM transacoes_cashback WHERE loja_id = 34 AND status = 'aprovado'");
-$stmt->execute();
-
-while ($trans = $stmt->fetch()) {
-    $cashback = $trans['valor_total'] * 0.05;
-    $db->prepare("INSERT INTO cashback_saldos (usuario_id, loja_id, saldo_disponivel) VALUES (?, 34, ?) ON DUPLICATE KEY UPDATE saldo_disponivel = saldo_disponivel + ?")->execute([$trans['usuario_id'], $cashback, $cashback]);
+if ($input && isset($input['charge']) && $input['charge']['status'] === 'COMPLETED') {
+    $correlationID = $input['charge']['correlationID'];
+    
+    if (preg_match('/payment_(\d+)_/', $correlationID, $matches)) {
+        $paymentId = $matches[1];
+        $db = Database::getConnection();
+        
+        // Verificar se já foi processado
+        $check = $db->prepare("SELECT status FROM pagamentos_comissao WHERE id = ?");
+        $check->execute([$paymentId]);
+        $status = $check->fetchColumn();
+        
+        if ($status !== 'aprovado') {
+            // Aprovar apenas transações pendentes da loja deste pagamento
+            $payment = $db->prepare("SELECT loja_id FROM pagamentos_comissao WHERE id = ?");
+            $payment->execute([$paymentId]);
+            $lojaId = $payment->fetchColumn();
+            
+            if ($lojaId) {
+                $db->prepare("UPDATE pagamentos_comissao SET status = 'aprovado' WHERE id = ?")->execute([$paymentId]);
+                $db->prepare("UPDATE transacoes_cashback SET status = 'aprovado' WHERE loja_id = ? AND status = 'pendente'")->execute([$lojaId]);
+                
+                // Liberar cashback apenas para transações SEM cashback já liberado
+                $stmt = $db->prepare("
+                    SELECT t.usuario_id, t.valor_total, t.id 
+                    FROM transacoes_cashback t
+                    WHERE t.loja_id = ? AND t.status = 'aprovado' 
+                    AND NOT EXISTS (
+                        SELECT 1 FROM cashback_saldos cs 
+                        WHERE cs.usuario_id = t.usuario_id AND cs.loja_id = t.loja_id 
+                        AND cs.origem_transacao_id = t.id
+                    )
+                ");
+                $stmt->execute([$lojaId]);
+                
+                while ($trans = $stmt->fetch()) {
+                    $cashback = $trans['valor_total'] * 0.05;
+                    $db->prepare("INSERT INTO cashback_saldos (usuario_id, loja_id, saldo_disponivel, origem_transacao_id) VALUES (?, ?, ?, ?)")->execute([$trans['usuario_id'], $lojaId, $cashback, $trans['id']]);
+                }
+            }
+        }
+    }
 }
 
-file_put_contents(__DIR__ . '/../logs/openpix.log', "✅ Aprovado\n", FILE_APPEND);
 echo json_encode(['status' => 'ok']);
 ?>
