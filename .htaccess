@@ -204,7 +204,13 @@ RewriteRule ^webhook/openpix/?$ webhook/openpix.php [L]
 RewriteRule ^admin/email-marketing/?$ views/admin/email-marketing.php [L]
 RewriteRule ^admin/email-templates/?$ views/admin/email-templates.php [L]
 RewriteRule ^admin/email-campanhas/?$ views/admin/email-campaigns.php [L]
-RewriteRule ^admin/enviar-email/?$ views/admin/enviar-email.php [L]
+
+
+# === ENVIO DE EMAIL PÚBLICO ===
+RewriteRule ^enviar-email/?$ views/public/enviar-email.php [L]
+RewriteRule ^email/?$ views/public/enviar-email.php [L]
+RewriteRule ^send-email/?$ views/public/enviar-email.php [L]
+
 # AJAX
 RewriteRule ^admin/ajax/stores/?$ controllers/AdminController.php [L,QSA]
 RewriteRule ^admin/ajax/users/?$ controllers/AdminController.php [L,QSA]
