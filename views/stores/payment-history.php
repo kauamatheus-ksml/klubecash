@@ -872,7 +872,13 @@ document.addEventListener('DOMContentLoaded', function() {
                         </div>
                         <div class="summary-item">
                             <span class="summary-label">Data do Registro:</span>
-                            <span class="summary-value">${formatDate(payment.data_registro)}</span>
+                            <span class="summary-value">${
+                            (() => {
+                                const data = new Date(payment.data_registro);
+                                data.setHours(data.getHours() - 3);
+                                return formatDate(data);
+                            })()
+                            }</span>
                         </div>
                         <div class="summary-item">
                             <span class="summary-label">Status:</span>
