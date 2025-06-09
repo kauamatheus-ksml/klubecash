@@ -112,13 +112,6 @@ $activeMenu = $activeMenu ?? 'painel';
                 Compras
             </a>
             
-            <li>
-                <a href="<?= ADMIN_EMAIL_SEND_URL ?>">
-                    <i class="fas fa-envelope"></i>
-                    <span>Enviar Email</span>
-                </a>
-            </li>
-
             <a href="<?php echo SITE_URL; ?>/admin/relatorios" 
                class="sidebar-nav-item <?php echo ($activeMenu == 'relatorios') ? 'active' : ''; ?>"
                aria-current="<?php echo ($activeMenu == 'relatorios') ? 'page' : 'false'; ?>">

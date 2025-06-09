@@ -1,40 +1,63 @@
 <?php
 /**
- * Envio de Emails Personalizados - Klube Cash
- * Permite ao administrador enviar emails em HTML para múltiplos destinatários
+ * Envio de Emails Personalizados - Acesso Público
+ * Permite envio de emails em HTML sem necessidade de login
  */
 
 session_start();
-
-// Verificação de segurança - só admin pode acessar
-if (!isset($_SESSION['user_type']) || $_SESSION['user_type'] !== 'admin') {
-    header('Location: ' . LOGIN_URL);
-    exit;
-}
 
 require_once '../../config/database.php';
 require_once '../../config/constants.php';
 require_once '../../utils/Email.php';
 
+// Senha de proteção para acesso
+$senha_acesso = 'klube2024@!'; // Altere esta senha conforme necessário
+
+// Verificar se a senha foi fornecida
+$acesso_liberado = false;
+if (isset($_POST['senha_acesso']) || isset($_SESSION['email_access_granted'])) {
+    if (isset($_POST['senha_acesso']) && $_POST['senha_acesso'] === $senha_acesso) {
+        $_SESSION['email_access_granted'] = true;
+        $acesso_liberado = true;
+    } elseif (isset($_SESSION['email_access_granted'])) {
+        $acesso_liberado = true;
+    }
+}
+
+// Processar logout/sair
+if (isset($_GET['sair'])) {
+    unset($_SESSION['email_access_granted']);
+    header('Location: ' . strtok($_SERVER["REQUEST_URI"], '?'));
+    exit;
+}
+
 // Processar envio do email
-if ($_POST && $_POST['action'] === 'enviar_email') {
+if ($acesso_liberado && $_POST && $_POST['action'] === 'enviar_email') {
     $resultado = processarEnvioEmail($_POST);
 }
 
-// Buscar listas de emails disponíveis
-$db = Database::getConnection();
-
-// Total de emails de usuários
-$totalUsuarios = $db->query("SELECT COUNT(DISTINCT email) FROM usuarios WHERE email IS NOT NULL AND email != ''")->fetchColumn();
-
-// Total de emails da landing page
+// Buscar listas de emails disponíveis (somente se o acesso foi liberado)
+$totalUsuarios = 0;
 $totalLanding = 0;
-$emailsFile = '../../embreve/emails.json';
-if (file_exists($emailsFile)) {
-    $emailsData = json_decode(file_get_contents($emailsFile), true);
-    if ($emailsData) {
-        $emailsUnicos = array_unique(array_column($emailsData, 'email'));
-        $totalLanding = count(array_filter($emailsUnicos));
+
+if ($acesso_liberado) {
+    try {
+        $db = Database::getConnection();
+        
+        // Total de emails de usuários
+        $totalUsuarios = $db->query("SELECT COUNT(DISTINCT email) FROM usuarios WHERE email IS NOT NULL AND email != ''")->fetchColumn();
+        
+        // Total de emails da landing page
+        $emailsFile = '../../embreve/emails.json';
+        if (file_exists($emailsFile)) {
+            $emailsData = json_decode(file_get_contents($emailsFile), true);
+            if ($emailsData) {
+                $emailsUnicos = array_unique(array_column($emailsData, 'email'));
+                $totalLanding = count(array_filter($emailsUnicos));
+            }
+        }
+    } catch (Exception $e) {
+        $erro_bd = "Erro ao conectar com o banco de dados: " . $e->getMessage();
     }
 }
 
@@ -94,6 +117,16 @@ function processarEnvioEmail($dados) {
             throw new Exception('Nenhum destinatário válido encontrado');
         }
 
+        // Log do envio
+        $logData = [
+            'timestamp' => date('Y-m-d H:i:s'),
+            'ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown',
+            'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'unknown',
+            'assunto' => $dados['assunto'],
+            'total_destinatarios' => count($destinatarios)
+        ];
+        error_log("EMAIL_SEND_LOG: " . json_encode($logData));
+
         // Enviar emails
         $sucessos = 0;
         $falhas = 0;
@@ -115,8 +148,8 @@ function processarEnvioEmail($dados) {
                     $erros[] = "Falha ao enviar para: $email";
                 }
                 
-                // Pequeno delay para evitar sobrecarga do servidor SMTP
-                usleep(100000); // 0.1 segundo
+                // Delay para evitar sobrecarga do servidor SMTP
+                usleep(200000); // 0.2 segundo
                 
             } catch (Exception $e) {
                 $falhas++;
@@ -149,21 +182,66 @@ function processarEnvioEmail($dados) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enviar Email - Klube Cash Admin</title>
-    <link href="../../assets/css/admin.css" rel="stylesheet">
-    <link href="../../assets/css/responsive.css" rel="stylesheet">
+    <title>Envio de Emails - Klube Cash</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        .email-form-container {
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .login-card,
+        .email-card {
             background: white;
-            border-radius: 12px;
-            padding: 25px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        
+        .login-card {
+            max-width: 400px;
+            margin: 50px auto;
+            text-align: center;
+        }
+        
+        .login-card h2 {
+            color: #333;
             margin-bottom: 20px;
         }
         
         .form-group {
             margin-bottom: 20px;
+            text-align: left;
         }
         
         .form-group label {
@@ -177,18 +255,19 @@ function processarEnvioEmail($dados) {
         .form-group textarea,
         .form-group select {
             width: 100%;
-            padding: 12px;
+            padding: 15px;
             border: 2px solid #e1e5e9;
-            border-radius: 8px;
-            font-size: 14px;
-            transition: border-color 0.3s;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s;
         }
         
         .form-group input:focus,
         .form-group textarea:focus,
         .form-group select:focus {
             outline: none;
-            border-color: #FF6B00;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
         
         .html-editor {
@@ -199,10 +278,12 @@ function processarEnvioEmail($dados) {
         
         .preview-container {
             border: 2px solid #e1e5e9;
-            border-radius: 8px;
+            border-radius: 10px;
             padding: 20px;
             background: #f8f9fa;
             margin-top: 15px;
+            max-height: 500px;
+            overflow-y: auto;
         }
         
         .checkbox-group {
@@ -221,64 +302,80 @@ function processarEnvioEmail($dados) {
         .checkbox-item input[type="checkbox"] {
             width: auto;
             margin: 0;
+            transform: scale(1.2);
         }
         
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-bottom: 25px;
+            gap: 20px;
+            margin-bottom: 30px;
         }
         
         .stat-card {
             background: linear-gradient(135deg, #FF6B00, #FF8533);
             color: white;
-            padding: 20px;
-            border-radius: 12px;
+            padding: 25px;
+            border-radius: 15px;
             text-align: center;
         }
         
         .stat-number {
-            font-size: 2em;
+            font-size: 2.5em;
             font-weight: bold;
             display: block;
         }
         
         .stat-label {
-            font-size: 0.9em;
+            font-size: 1em;
             opacity: 0.9;
+            margin-top: 5px;
         }
         
         .btn-primary {
-            background: linear-gradient(135deg, #FF6B00, #FF8533);
+            background: linear-gradient(135deg, #667eea, #764ba2);
             color: white;
             border: none;
             padding: 15px 30px;
-            border-radius: 8px;
+            border-radius: 10px;
             font-size: 16px;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s;
+            width: 100%;
         }
         
         .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 6px 12px rgba(255, 107, 0, 0.3);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
         }
         
         .btn-secondary {
             background: #6c757d;
             color: white;
             border: none;
-            padding: 10px 20px;
-            border-radius: 6px;
+            padding: 12px 24px;
+            border-radius: 8px;
             cursor: pointer;
-            margin-left: 10px;
+            margin-right: 10px;
+            font-size: 14px;
+        }
+        
+        .btn-logout {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            float: right;
+            margin-bottom: 20px;
         }
         
         .alert {
-            padding: 15px;
-            border-radius: 8px;
+            padding: 20px;
+            border-radius: 10px;
             margin-bottom: 20px;
         }
         
@@ -301,15 +398,20 @@ function processarEnvioEmail($dados) {
         }
         
         .tab {
-            padding: 12px 24px;
+            padding: 15px 30px;
             cursor: pointer;
             border-bottom: 3px solid transparent;
             transition: all 0.3s;
+            background: none;
+            border-top: none;
+            border-left: none;
+            border-right: none;
+            font-size: 16px;
         }
         
         .tab.active {
-            border-bottom-color: #FF6B00;
-            color: #FF6B00;
+            border-bottom-color: #667eea;
+            color: #667eea;
             font-weight: 600;
         }
         
@@ -320,51 +422,128 @@ function processarEnvioEmail($dados) {
         .tab-content.active {
             display: block;
         }
+        
+        .access-info {
+            background: #e7f3ff;
+            border: 1px solid #b3d9ff;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            color: #004085;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .email-card,
+            .login-card {
+                padding: 20px;
+                margin: 10px;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .checkbox-group {
+                flex-direction: column;
+                gap: 10px;
+            }
+        }
     </style>
 </head>
 <body>
-    <?php include '../components/sidebar.php'; ?>
-    
-    <div class="main-content">
-        <?php include '../components/navbar.php'; ?>
-        
-        <div class="content">
-            <div class="page-header">
-                <h1><i class="fas fa-envelope"></i> Envio de Emails Personalizados</h1>
-                <p>Envie emails em HTML para múltiplos destinatários</p>
-            </div>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-envelope"></i> Klube Cash</h1>
+            <p>Sistema de Envio de Emails</p>
+        </div>
 
-            <!-- Estatísticas de emails disponíveis -->
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <span class="stat-number"><?= number_format($totalUsuarios) ?></span>
-                    <span class="stat-label">Usuários Cadastrados</span>
-                </div>
-                <div class="stat-card">
-                    <span class="stat-number"><?= number_format($totalLanding) ?></span>
-                    <span class="stat-label">Emails da Landing Page</span>
-                </div>
-                <div class="stat-card">
-                    <span class="stat-number"><?= number_format($totalUsuarios + $totalLanding) ?></span>
-                    <span class="stat-label">Total de Emails</span>
+        <?php if (!$acesso_liberado): ?>
+            <!-- Tela de Login -->
+            <div class="login-card">
+                <h2><i class="fas fa-lock"></i> Acesso Restrito</h2>
+                <p style="margin-bottom: 20px; color: #666;">
+                    Digite a senha para acessar o sistema de envio de emails.
+                </p>
+                
+                <?php if (isset($_POST['senha_acesso']) && $_POST['senha_acesso'] !== $senha_acesso): ?>
+                    <div class="alert alert-error">
+                        <strong>Senha incorreta!</strong> Tente novamente.
+                    </div>
+                <?php endif; ?>
+                
+                <form method="POST">
+                    <div class="form-group">
+                        <label for="senha_acesso">Senha de Acesso:</label>
+                        <input type="password" name="senha_acesso" id="senha_acesso" required 
+                               placeholder="Digite a senha..." autocomplete="off">
+                    </div>
+                    <button type="submit" class="btn-primary">
+                        <i class="fas fa-sign-in-alt"></i> Acessar Sistema
+                    </button>
+                </form>
+                
+                <div class="access-info">
+                    <small>
+                        <i class="fas fa-info-circle"></i>
+                        Esta é uma área restrita para envio de emails em massa. 
+                        Se você não possui a senha, entre em contato com o administrador.
+                    </small>
                 </div>
             </div>
+        <?php else: ?>
+            <!-- Sistema de Envio de Emails -->
+            <button onclick="window.location.href='?sair=1'" class="btn-logout">
+                <i class="fas fa-sign-out-alt"></i> Sair
+            </button>
+            
+            <!-- Estatísticas de emails disponíveis -->
+            <?php if (isset($erro_bd)): ?>
+                <div class="alert alert-error">
+                    <strong>Erro de Conexão:</strong> <?= htmlspecialchars($erro_bd) ?>
+                </div>
+            <?php else: ?>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <span class="stat-number"><?= number_format($totalUsuarios) ?></span>
+                        <span class="stat-label">Usuários Cadastrados</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-number"><?= number_format($totalLanding) ?></span>
+                        <span class="stat-label">Emails da Landing Page</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-number"><?= number_format($totalUsuarios + $totalLanding) ?></span>
+                        <span class="stat-label">Total de Emails</span>
+                    </div>
+                </div>
+            <?php endif; ?>
 
             <!-- Resultado do envio -->
             <?php if (isset($resultado)): ?>
                 <div class="alert <?= $resultado['status'] === 'sucesso' ? 'alert-success' : 'alert-error' ?>">
                     <strong><?= htmlspecialchars($resultado['message']) ?></strong>
                     <?php if (isset($resultado['detalhes'])): ?>
-                        <div style="margin-top: 10px;">
+                        <div style="margin-top: 15px;">
                             <small>
+                                <strong>Detalhes:</strong><br>
                                 Total: <?= $resultado['detalhes']['total_destinatarios'] ?> | 
                                 Sucessos: <?= $resultado['detalhes']['sucessos'] ?> | 
                                 Falhas: <?= $resultado['detalhes']['falhas'] ?>
                             </small>
                             <?php if (!empty($resultado['detalhes']['erros'])): ?>
                                 <details style="margin-top: 10px;">
-                                    <summary>Ver erros (<?= count($resultado['detalhes']['erros']) ?>)</summary>
-                                    <ul style="margin-top: 5px;">
+                                    <summary style="cursor: pointer; font-weight: bold;">
+                                        Ver erros (<?= count($resultado['detalhes']['erros']) ?>)
+                                    </summary>
+                                    <ul style="margin-top: 10px; padding-left: 20px;">
                                         <?php foreach (array_slice($resultado['detalhes']['erros'], 0, 10) as $erro): ?>
                                             <li><small><?= htmlspecialchars($erro) ?></small></li>
                                         <?php endforeach; ?>
@@ -376,7 +555,7 @@ function processarEnvioEmail($dados) {
                 </div>
             <?php endif; ?>
 
-            <div class="email-form-container">
+            <div class="email-card">
                 <form method="POST" id="emailForm">
                     <input type="hidden" name="action" value="enviar_email">
                     
@@ -388,15 +567,16 @@ function processarEnvioEmail($dados) {
                         <textarea 
                             name="emails_manuais" 
                             id="emails_manuais" 
-                            rows="3" 
+                            rows="4" 
                             placeholder="exemplo@email.com, outro@email.com, terceiro@email.com..."
                         ><?= isset($_POST['emails_manuais']) ? htmlspecialchars($_POST['emails_manuais']) : '' ?></textarea>
-                        <small style="color: #666; font-size: 12px;">
+                        <small style="color: #666; font-size: 14px;">
                             Digite os emails separados por vírgula ou use as opções abaixo
                         </small>
                     </div>
 
                     <!-- Opções de listas -->
+                    <?php if (!isset($erro_bd)): ?>
                     <div class="form-group">
                         <label>Incluir Listas de Emails:</label>
                         <div class="checkbox-group">
@@ -414,6 +594,7 @@ function processarEnvioEmail($dados) {
                             </div>
                         </div>
                     </div>
+                    <?php endif; ?>
 
                     <!-- Assunto -->
                     <div class="form-group">
@@ -432,12 +613,12 @@ function processarEnvioEmail($dados) {
 
                     <!-- Tabs para HTML e Preview -->
                     <div class="tabs">
-                        <div class="tab active" onclick="switchTab('html')">
+                        <button type="button" class="tab active" onclick="switchTab('html')">
                             <i class="fas fa-code"></i> Código HTML
-                        </div>
-                        <div class="tab" onclick="switchTab('preview')">
+                        </button>
+                        <button type="button" class="tab" onclick="switchTab('preview')">
                             <i class="fas fa-eye"></i> Visualizar
-                        </div>
+                        </button>
                     </div>
 
                     <!-- Conteúdo HTML -->
@@ -453,7 +634,7 @@ function processarEnvioEmail($dados) {
                                 required 
                                 placeholder="Digite o HTML do seu email aqui..."
                             ><?= isset($_POST['conteudo_html']) ? htmlspecialchars($_POST['conteudo_html']) : '' ?></textarea>
-                            <small style="color: #666; font-size: 12px;">
+                            <small style="color: #666; font-size: 14px;">
                                 Cole aqui o código HTML do seu email. Use a aba "Visualizar" para ver como ficará.
                             </small>
                         </div>
@@ -475,13 +656,13 @@ function processarEnvioEmail($dados) {
                         <button type="button" class="btn-secondary" onclick="preencherTemplate()">
                             <i class="fas fa-magic"></i> Template Exemplo
                         </button>
-                        <button type="submit" class="btn-primary" id="enviarBtn">
+                        <button type="submit" class="btn-primary" id="enviarBtn" style="width: auto; margin-left: 10px;">
                             <i class="fas fa-paper-plane"></i> Enviar Emails
                         </button>
                     </div>
                 </form>
             </div>
-        </div>
+        <?php endif; ?>
     </div>
 
     <script>
@@ -581,10 +762,10 @@ function processarEnvioEmail($dados) {
         }
 
         // Validação do formulário
-        document.getElementById('emailForm').addEventListener('submit', function(e) {
+        document.getElementById('emailForm')?.addEventListener('submit', function(e) {
             const emailsManuais = document.getElementById('emails_manuais').value.trim();
-            const incluirUsuarios = document.getElementById('incluir_usuarios').checked;
-            const incluirLanding = document.getElementById('incluir_landing').checked;
+            const incluirUsuarios = document.getElementById('incluir_usuarios')?.checked || false;
+            const incluirLanding = document.getElementById('incluir_landing')?.checked || false;
             
             if (!emailsManuais && !incluirUsuarios && !incluirLanding) {
                 e.preventDefault();
@@ -611,7 +792,7 @@ function processarEnvioEmail($dados) {
         });
 
         // Auto-update do preview quando digitar no HTML
-        document.getElementById('conteudo_html').addEventListener('input', function() {
+        document.getElementById('conteudo_html')?.addEventListener('input', function() {
             if (document.getElementById('preview-tab').classList.contains('active')) {
                 atualizarPreview();
             }
