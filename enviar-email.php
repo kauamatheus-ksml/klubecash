@@ -1,7 +1,7 @@
 <?php
 /**
  * Sistema de Envio de Emails - Klube Cash
- * Versão com SMTP funcional
+ * Versão com AJAX e progresso em tempo real
  */
 
 session_start();
@@ -27,195 +27,22 @@ if (isset($_GET['sair'])) {
     exit;
 }
 
-// Configurações SMTP do Hostinger
-$smtp_config = [
-    'host' => 'smtp.hostinger.com',
-    'port' => 465,
-    'username' => 'klubecash@klubecash.com',
-    'password' => 'Aaku_2004@',
-    'from_email' => 'klubecash@klubecash.com',
-    'from_name' => 'Klube Cash',
-    'encryption' => 'ssl'
-];
-
-/**
- * Função de envio SMTP usando sockets
- */
-function enviarEmailSMTP($para, $assunto, $html, $config) {
-    try {
-        // Criar contexto SSL
-        $context = stream_context_create([
-            'ssl' => [
-                'verify_peer' => false,
-                'verify_peer_name' => false,
-                'allow_self_signed' => true
-            ]
-        ]);
-        
-        // Conectar ao servidor SMTP
-        $socket = stream_socket_client(
-            "ssl://{$config['host']}:{$config['port']}", 
-            $errno, 
-            $errstr, 
-            30, 
-            STREAM_CLIENT_CONNECT, 
-            $context
-        );
-        
-        if (!$socket) {
-            throw new Exception("Não foi possível conectar ao servidor SMTP: $errstr ($errno)");
-        }
-        
-        // Ler resposta inicial
-        $response = fgets($socket, 1024);
-        if (substr($response, 0, 3) != '220') {
-            throw new Exception("Erro na conexão SMTP: $response");
-        }
-        
-        // Comando EHLO
-        fwrite($socket, "EHLO klubecash.com\r\n");
-        $response = fgets($socket, 1024);
-        
-        // Autenticação
-        fwrite($socket, "AUTH LOGIN\r\n");
-        $response = fgets($socket, 1024);
-        
-        fwrite($socket, base64_encode($config['username']) . "\r\n");
-        $response = fgets($socket, 1024);
-        
-        fwrite($socket, base64_encode($config['password']) . "\r\n");
-        $response = fgets($socket, 1024);
-        if (substr($response, 0, 3) != '235') {
-            throw new Exception("Falha na autenticação SMTP: $response");
-        }
-        
-        // Comando MAIL FROM
-        fwrite($socket, "MAIL FROM: <{$config['from_email']}>\r\n");
-        $response = fgets($socket, 1024);
-        
-        // Comando RCPT TO
-        fwrite($socket, "RCPT TO: <$para>\r\n");
-        $response = fgets($socket, 1024);
-        if (substr($response, 0, 3) != '250') {
-            throw new Exception("Destinatário rejeitado: $response");
-        }
-        
-        // Comando DATA
-        fwrite($socket, "DATA\r\n");
-        $response = fgets($socket, 1024);
-        
-        // Cabeçalhos e corpo do email
-        $headers = "From: {$config['from_name']} <{$config['from_email']}>\r\n";
-        $headers .= "To: $para\r\n";
-        $headers .= "Subject: $assunto\r\n";
-        $headers .= "MIME-Version: 1.0\r\n";
-        $headers .= "Content-Type: text/html; charset=UTF-8\r\n";
-        $headers .= "Content-Transfer-Encoding: 8bit\r\n";
-        $headers .= "\r\n";
-        
-        fwrite($socket, $headers . $html . "\r\n.\r\n");
-        $response = fgets($socket, 1024);
-        
-        // Comando QUIT
-        fwrite($socket, "QUIT\r\n");
-        fclose($socket);
-        
-        return substr($response, 0, 3) == '250';
-        
-    } catch (Exception $e) {
-        error_log("Erro SMTP: " . $e->getMessage());
-        return false;
-    }
-}
-
-/**
- * Fallback usando PHPMailer se existir
- */
-function enviarEmailPHPMailer($para, $assunto, $html, $config) {
-    // Verificar se PHPMailer existe
-    $phpmailer_paths = [
-        'libs/PHPMailer/src/PHPMailer.php',
-        'vendor/phpmailer/phpmailer/src/PHPMailer.php'
-    ];
-    
-    $phpmailer_found = false;
-    foreach ($phpmailer_paths as $path) {
-        if (file_exists($path)) {
-            require_once $path;
-            require_once str_replace('PHPMailer.php', 'SMTP.php', $path);
-            require_once str_replace('PHPMailer.php', 'Exception.php', $path);
-            $phpmailer_found = true;
-            break;
-        }
-    }
-    
-    if (!$phpmailer_found) {
-        return false;
-    }
+// API para envio via AJAX
+if (isset($_GET['api']) && $_GET['api'] === 'enviar' && $acesso_liberado) {
+    header('Content-Type: application/json');
     
     try {
-        $mail = new PHPMailer\PHPMailer\PHPMailer(true);
+        $input = json_decode(file_get_contents('php://input'), true);
         
-        $mail->isSMTP();
-        $mail->Host = $config['host'];
-        $mail->SMTPAuth = true;
-        $mail->Username = $config['username'];
-        $mail->Password = $config['password'];
-        $mail->SMTPSecure = $config['encryption'];
-        $mail->Port = $config['port'];
-        $mail->CharSet = 'UTF-8';
-        
-        $mail->setFrom($config['from_email'], $config['from_name']);
-        $mail->addAddress($para);
-        $mail->Subject = $assunto;
-        $mail->Body = $html;
-        $mail->isHTML(true);
-        
-        return $mail->send();
-        
-    } catch (Exception $e) {
-        error_log("Erro PHPMailer: " . $e->getMessage());
-        return false;
-    }
-}
-
-/**
- * Função principal de envio (tenta múltiplos métodos)
- */
-function enviarEmail($para, $assunto, $html) {
-    global $smtp_config;
-    
-    // Método 1: SMTP nativo
-    if (enviarEmailSMTP($para, $assunto, $html, $smtp_config)) {
-        return true;
-    }
-    
-    // Método 2: PHPMailer se disponível
-    if (enviarEmailPHPMailer($para, $assunto, $html, $smtp_config)) {
-        return true;
-    }
-    
-    // Método 3: mail() nativo (último recurso)
-    $headers = "MIME-Version: 1.0\r\n";
-    $headers .= "Content-type: text/html; charset=UTF-8\r\n";
-    $headers .= "From: {$smtp_config['from_name']} <{$smtp_config['from_email']}>\r\n";
-    
-    return mail($para, $assunto, $html, $headers);
-}
-
-// Processar envio do formulário
-$resultado = null;
-if ($acesso_liberado && $_POST && isset($_POST['action']) && $_POST['action'] === 'enviar_email') {
-    try {
-        if (empty($_POST['assunto']) || empty($_POST['conteudo_html'])) {
-            throw new Exception('Assunto e conteúdo HTML são obrigatórios');
+        if (!$input || empty($input['assunto']) || empty($input['conteudo_html'])) {
+            throw new Exception('Dados incompletos');
         }
 
         $destinatarios = [];
         
         // Emails manuais
-        if (!empty($_POST['emails_manuais'])) {
-            $emailsManuais = explode(',', $_POST['emails_manuais']);
+        if (!empty($input['emails_manuais'])) {
+            $emailsManuais = explode(',', $input['emails_manuais']);
             foreach ($emailsManuais as $email) {
                 $email = trim($email);
                 if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -224,18 +51,14 @@ if ($acesso_liberado && $_POST && isset($_POST['action']) && $_POST['action'] ==
             }
         }
 
-        // Buscar emails do banco (com proteção contra timeout)
-        if (isset($_POST['incluir_usuarios']) && $_POST['incluir_usuarios'] == '1') {
+        // Buscar emails do banco
+        if (!empty($input['incluir_usuarios'])) {
             try {
-                // Tentar incluir arquivos de configuração do banco
                 if (file_exists('config/database.php')) {
                     require_once 'config/database.php';
-                    
                     if (class_exists('Database')) {
                         $db = Database::getConnection();
-                        $stmt = $db->prepare("SELECT DISTINCT email FROM usuarios WHERE email IS NOT NULL AND email != '' LIMIT 100");
-                        $stmt->execute();
-                        
+                        $stmt = $db->query("SELECT DISTINCT email FROM usuarios WHERE email IS NOT NULL AND email != '' LIMIT 50");
                         while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
                             if (!in_array($row['email'], $destinatarios)) {
                                 $destinatarios[] = $row['email'];
@@ -244,13 +67,12 @@ if ($acesso_liberado && $_POST && isset($_POST['action']) && $_POST['action'] ==
                     }
                 }
             } catch (Exception $e) {
-                // Ignorar erros de banco e continuar só com emails manuais
-                error_log("Erro ao buscar emails do banco: " . $e->getMessage());
+                // Ignorar erros de banco
             }
         }
 
         // Buscar emails da landing page
-        if (isset($_POST['incluir_landing']) && $_POST['incluir_landing'] == '1') {
+        if (!empty($input['incluir_landing'])) {
             $emailsFile = 'embreve/emails.json';
             if (file_exists($emailsFile)) {
                 $emailsData = json_decode(file_get_contents($emailsFile), true);
@@ -267,69 +89,101 @@ if ($acesso_liberado && $_POST && isset($_POST['action']) && $_POST['action'] ==
         }
 
         if (empty($destinatarios)) {
-            throw new Exception('Nenhum destinatário válido encontrado');
+            throw new Exception('Nenhum destinatário válido');
         }
 
-        // Log do envio
-        error_log("KLUBE_EMAIL_SEND: Iniciando envio para " . count($destinatarios) . " destinatários");
+        // Configurações SMTP
+        $smtp_config = [
+            'host' => 'smtp.hostinger.com',
+            'port' => 587, // Mudando para porta 587 (menos restritiva)
+            'username' => 'klubecash@klubecash.com',
+            'password' => 'Aaku_2004@',
+            'from_email' => 'klubecash@klubecash.com',
+            'from_name' => 'Klube Cash'
+        ];
 
-        // Enviar emails com limite de tempo
-        set_time_limit(300); // 5 minutos
+        // Função de envio simplificada
+        function enviarEmailSimples($para, $assunto, $html, $config) {
+            $headers = "MIME-Version: 1.0\r\n";
+            $headers .= "Content-Type: text/html; charset=UTF-8\r\n";
+            $headers .= "From: {$config['from_name']} <{$config['from_email']}>\r\n";
+            $headers .= "Reply-To: {$config['from_email']}\r\n";
+            $headers .= "X-Mailer: PHP/" . phpversion() . "\r\n";
+            
+            // Adicionar parâmetros adicionais para o sendmail
+            $parametros = "-f {$config['from_email']}";
+            
+            return mail($para, $assunto, $html, $headers, $parametros);
+        }
+
+        // Enviar emails com feedback em tempo real
         $sucessos = 0;
         $falhas = 0;
         $erros = [];
+        $total = count($destinatarios);
 
         foreach ($destinatarios as $index => $email) {
             try {
-                $enviado = enviarEmail($email, $_POST['assunto'], $_POST['conteudo_html']);
+                $enviado = enviarEmailSimples($email, $input['assunto'], $input['conteudo_html'], $smtp_config);
                 
                 if ($enviado) {
                     $sucessos++;
-                    error_log("KLUBE_EMAIL_SUCCESS: $email");
                 } else {
                     $falhas++;
-                    $erros[] = "Falha ao enviar para: $email";
-                    error_log("KLUBE_EMAIL_FAIL: $email");
+                    $erros[] = "Falha: $email";
                 }
                 
-                // Delay progressivo (mais delay conforme mais emails)
-                $delay = min(500000, 100000 + ($index * 10000)); // 0.1s a 0.5s
-                usleep($delay);
+                // Pequeno delay
+                usleep(250000); // 0.25 segundos
+                
+                // Enviar progresso (flush output)
+                $progresso = round((($index + 1) / $total) * 100);
+                echo json_encode([
+                    'status' => 'progresso',
+                    'progresso' => $progresso,
+                    'atual' => $index + 1,
+                    'total' => $total,
+                    'email_atual' => $email,
+                    'sucessos' => $sucessos,
+                    'falhas' => $falhas
+                ]) . "\n";
+                
+                if (ob_get_level()) {
+                    ob_flush();
+                }
+                flush();
                 
             } catch (Exception $e) {
                 $falhas++;
-                $erros[] = "Erro para $email: " . $e->getMessage();
-                error_log("KLUBE_EMAIL_ERROR: $email - " . $e->getMessage());
+                $erros[] = "Erro: $email - " . $e->getMessage();
             }
         }
 
-        $resultado = [
-            'status' => 'sucesso',
+        // Resultado final
+        echo json_encode([
+            'status' => 'concluido',
             'message' => "Envio concluído! Sucessos: $sucessos, Falhas: $falhas",
-            'detalhes' => [
-                'total_destinatarios' => count($destinatarios),
-                'sucessos' => $sucessos,
-                'falhas' => $falhas,
-                'erros' => $erros
-            ]
-        ];
+            'sucessos' => $sucessos,
+            'falhas' => $falhas,
+            'erros' => $erros,
+            'total' => $total
+        ]);
 
     } catch (Exception $e) {
-        $resultado = [
+        echo json_encode([
             'status' => 'erro',
-            'message' => 'Erro no envio: ' . $e->getMessage()
-        ];
-        error_log("KLUBE_EMAIL_FATAL: " . $e->getMessage());
+            'message' => $e->getMessage()
+        ]);
     }
+    exit;
 }
 
-// Buscar totais (com proteção)
+// Buscar totais para exibição
 $totalUsuarios = 0;
 $totalLanding = 0;
 
 if ($acesso_liberado) {
     try {
-        // Tentar buscar total de usuários
         if (file_exists('config/database.php')) {
             require_once 'config/database.php';
             if (class_exists('Database')) {
@@ -338,10 +192,9 @@ if ($acesso_liberado) {
             }
         }
     } catch (Exception $e) {
-        // Continuar sem erro se banco não funcionar
+        // Continuar sem erro
     }
     
-    // Total de emails da landing page
     $emailsFile = 'embreve/emails.json';
     if (file_exists($emailsFile)) {
         $emailsData = json_decode(file_get_contents($emailsFile), true);
@@ -479,7 +332,7 @@ if ($acesso_liberado) {
         }
         
         .html-editor {
-            min-height: 400px;
+            min-height: 300px;
             font-family: 'Courier New', monospace;
             resize: vertical;
         }
@@ -494,6 +347,18 @@ if ($acesso_liberado) {
             font-weight: 600;
             cursor: pointer;
             width: 100%;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
         }
         
         .btn-logout {
@@ -533,23 +398,57 @@ if ($acesso_liberado) {
             color: #721c24;
         }
         
-        .preview-container {
-            border: 2px solid #e1e5e9;
-            border-radius: 10px;
-            padding: 20px;
-            background: #f8f9fa;
-            margin-top: 15px;
-            max-height: 400px;
-            overflow-y: auto;
+        .alert-info {
+            background: #d1ecf1;
+            color: #0c5460;
         }
         
-        .smtp-status {
-            background: #fff3cd;
-            border: 1px solid #ffeaa7;
-            color: #856404;
-            padding: 15px;
-            border-radius: 10px;
+        .progress-container {
+            display: none;
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
             margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: #e9ecef;
+            border-radius: 15px;
+            overflow: hidden;
+            margin-bottom: 15px;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #28a745, #20c997);
+            width: 0%;
+            transition: width 0.3s ease;
+            border-radius: 15px;
+        }
+        
+        .progress-text {
+            text-align: center;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .progress-details {
+            font-size: 14px;
+            color: #666;
+            text-align: center;
+        }
+        
+        .result-container {
+            display: none;
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
         }
     </style>
 </head>
@@ -557,7 +456,7 @@ if ($acesso_liberado) {
     <div class="container">
         <div class="header">
             <h1><i class="fas fa-envelope"></i> Klube Cash</h1>
-            <p>Sistema de Envio de Emails com SMTP</p>
+            <p>Sistema de Envio de Emails com Progresso</p>
         </div>
 
         <?php if (!$acesso_liberado): ?>
@@ -590,13 +489,6 @@ if ($acesso_liberado) {
                 <i class="fas fa-sign-out-alt"></i> Sair
             </button>
             
-            <!-- Status SMTP -->
-            <div class="smtp-status">
-                <strong><i class="fas fa-server"></i> Configuração SMTP:</strong> 
-                Hostinger (<?= $smtp_config['host'] ?>:<?= $smtp_config['port'] ?>) - 
-                Usuário: <?= $smtp_config['username'] ?>
-            </div>
-            
             <!-- Estatísticas -->
             <div class="stats-grid">
                 <div class="stat-card">
@@ -613,46 +505,32 @@ if ($acesso_liberado) {
                 </div>
             </div>
             
-            <!-- Resultado -->
-            <?php if ($resultado): ?>
-                <div class="alert <?= $resultado['status'] === 'sucesso' ? 'alert-success' : 'alert-error' ?>">
-                    <strong><?= htmlspecialchars($resultado['message']) ?></strong>
-                    <?php if (isset($resultado['detalhes'])): ?>
-                        <div style="margin-top: 15px;">
-                            <small>
-                                <strong>Detalhes:</strong><br>
-                                Total: <?= $resultado['detalhes']['total_destinatarios'] ?> | 
-                                Sucessos: <?= $resultado['detalhes']['sucessos'] ?> | 
-                                Falhas: <?= $resultado['detalhes']['falhas'] ?>
-                            </small>
-                            <?php if (!empty($resultado['detalhes']['erros'])): ?>
-                                <details style="margin-top: 10px;">
-                                    <summary style="cursor: pointer; font-weight: bold;">
-                                        Ver erros (<?= count($resultado['detalhes']['erros']) ?>)
-                                    </summary>
-                                    <ul style="margin-top: 10px; padding-left: 20px;">
-                                        <?php foreach (array_slice($resultado['detalhes']['erros'], 0, 10) as $erro): ?>
-                                            <li><small><?= htmlspecialchars($erro) ?></small></li>
-                                        <?php endforeach; ?>
-                                    </ul>
-                                </details>
-                            <?php endif; ?>
-                        </div>
-                    <?php endif; ?>
+            <!-- Progresso -->
+            <div class="progress-container" id="progressContainer">
+                <h3 style="text-align: center; margin-bottom: 20px;">
+                    <i class="fas fa-paper-plane"></i> Enviando Emails
+                </h3>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
                 </div>
-            <?php endif; ?>
+                <div class="progress-text" id="progressText">Preparando envio...</div>
+                <div class="progress-details" id="progressDetails">Aguarde...</div>
+            </div>
+            
+            <!-- Resultado -->
+            <div class="result-container" id="resultContainer">
+                <div id="resultContent"></div>
+            </div>
 
-            <div class="email-card">
+            <div class="email-card" id="emailForm">
                 <button type="button" class="btn-template" onclick="preencherTemplate()">
                     <i class="fas fa-magic"></i> Carregar Template de Exemplo
                 </button>
                 
-                <form method="POST">
-                    <input type="hidden" name="action" value="enviar_email">
-                    
+                <form id="formEnvio">
                     <div class="form-group">
                         <label><i class="fas fa-users"></i> Emails (separados por vírgula)</label>
-                        <textarea name="emails_manuais" rows="3" placeholder="email1@exemplo.com, email2@exemplo.com"><?= isset($_POST['emails_manuais']) ? htmlspecialchars($_POST['emails_manuais']) : '' ?></textarea>
+                        <textarea name="emails_manuais" id="emails_manuais" rows="3" placeholder="email1@exemplo.com, email2@exemplo.com"></textarea>
                         <small style="color: #666;">Digite os emails ou use as opções abaixo</small>
                     </div>
 
@@ -682,23 +560,16 @@ if ($acesso_liberado) {
 
                     <div class="form-group">
                         <label><i class="fas fa-tag"></i> Assunto *</label>
-                        <input type="text" name="assunto" required placeholder="Digite o assunto do email" value="<?= isset($_POST['assunto']) ? htmlspecialchars($_POST['assunto']) : '' ?>">
+                        <input type="text" name="assunto" id="assunto" required placeholder="Digite o assunto do email">
                     </div>
 
                     <div class="form-group">
                         <label><i class="fas fa-code"></i> Conteúdo HTML *</label>
-                        <textarea name="conteudo_html" class="html-editor" required placeholder="Cole o HTML do seu email aqui..."><?= isset($_POST['conteudo_html']) ? htmlspecialchars($_POST['conteudo_html']) : '' ?></textarea>
+                        <textarea name="conteudo_html" id="conteudo_html" class="html-editor" required placeholder="Cole o HTML do seu email aqui..."></textarea>
                     </div>
 
-                    <div class="form-group">
-                        <label><i class="fas fa-eye"></i> Preview</label>
-                        <div class="preview-container" id="preview">
-                            <p style="color: #666; font-style: italic;">O preview aparecerá aqui...</p>
-                        </div>
-                    </div>
-
-                    <button type="submit" class="btn-primary" onclick="return confirmarEnvio()">
-                        <i class="fas fa-paper-plane"></i> Enviar Emails via SMTP
+                    <button type="submit" class="btn-primary" id="btnEnviar">
+                        <i class="fas fa-paper-plane"></i> Enviar Emails
                     </button>
                 </form>
             </div>
@@ -707,9 +578,9 @@ if ($acesso_liberado) {
 
     <script>
         function preencherTemplate() {
-            document.querySelector('input[name="assunto"]').value = 'Novidades Klube Cash - Seu cashback te espera!';
+            document.getElementById('assunto').value = 'Novidades Klube Cash - Seu cashback te espera!';
             
-            document.querySelector('textarea[name="conteudo_html"]').value = `<!DOCTYPE html>
+            document.getElementById('conteudo_html').value = `<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
@@ -730,17 +601,6 @@ if ($acesso_liberado) {
                 ainda melhor e com mais oportunidades para você ganhar dinheiro de volta.
             </p>
             
-            <p style="color: #666; line-height: 1.6; font-size: 16px;">
-                <strong>O que há de novo:</strong>
-            </p>
-            
-            <ul style="color: #666; line-height: 1.6;">
-                <li>Novas lojas parceiras com cashback de até 15%</li>
-                <li>Sistema mais rápido e fácil de usar</li>
-                <li>Promoções exclusivas para membros</li>
-                <li>Notificações em tempo real</li>
-            </ul>
-            
             <div style="text-align: center; margin: 30px 0;">
                 <a href="https://klubecash.com" 
                    style="background: linear-gradient(135deg, #FF6B00, #FF8533); 
@@ -757,54 +617,132 @@ if ($acesso_liberado) {
         
         <div style="background-color: #f8f9fa; padding: 20px; text-align: center; color: #666; font-size: 14px;">
             <p style="margin: 0;">© 2024 Klube Cash. Todos os direitos reservados.</p>
-            <p style="margin: 10px 0 0 0;">Este é um email automático, por favor não responda.</p>
         </div>
     </div>
 </body>
 </html>`;
+        }
+
+        // Função para enviar emails via AJAX
+        document.getElementById('formEnvio').addEventListener('submit', function(e) {
+            e.preventDefault();
             
-            atualizarPreview();
-        }
-
-        function atualizarPreview() {
-            const html = document.querySelector('textarea[name="conteudo_html"]').value;
-            document.getElementById('preview').innerHTML = html || '<p style="color: #666; font-style: italic;">Digite o HTML para ver o preview...</p>';
-        }
-
-        function confirmarEnvio() {
-            const emails = document.querySelector('textarea[name="emails_manuais"]').value.trim();
-            const incluirUsuarios = document.querySelector('input[name="incluir_usuarios"]')?.checked || false;
-            const incluirLanding = document.querySelector('input[name="incluir_landing"]')?.checked || false;
+            const emails = document.getElementById('emails_manuais').value.trim();
+            const incluirUsuarios = document.getElementById('incluir_usuarios')?.checked || false;
+            const incluirLanding = document.getElementById('incluir_landing')?.checked || false;
+            const assunto = document.getElementById('assunto').value;
+            const conteudo = document.getElementById('conteudo_html').value;
             
             if (!emails && !incluirUsuarios && !incluirLanding) {
                 alert('Digite pelo menos um email ou marque uma das opções de lista!');
-                return false;
+                return;
             }
             
-            let totalEstimado = 0;
-            if (emails) totalEstimado += emails.split(',').length;
-            if (incluirUsuarios) totalEstimado += <?= $totalUsuarios ?>;
-            if (incluirLanding) totalEstimado += <?= $totalLanding ?>;
-            
-            if (!confirm(`Confirma o envio para aproximadamente ${totalEstimado} destinatário(s)?\n\nO processo pode demorar alguns minutos.`)) {
-                return false;
+            if (!assunto || !conteudo) {
+                alert('Assunto e conteúdo HTML são obrigatórios!');
+                return;
             }
             
-            // Mostrar loading
-            const btn = document.querySelector('button[type="submit"]');
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando via SMTP...';
-            btn.disabled = true;
+            // Mostrar progresso
+            document.getElementById('emailForm').style.display = 'none';
+            document.getElementById('progressContainer').style.display = 'block';
             
-            return true;
-        }
-
-        // Auto-update preview
-        document.querySelector('textarea[name="conteudo_html"]')?.addEventListener('input', atualizarPreview);
-        
-        // Preview inicial se houver conteúdo
-        if (document.querySelector('textarea[name="conteudo_html"]').value) {
-            atualizarPreview();
-        }
+            // Dados para envio
+            const dados = {
+                emails_manuais: emails,
+                incluir_usuarios: incluirUsuarios ? '1' : '',
+                incluir_landing: incluirLanding ? '1' : '',
+                assunto: assunto,
+                conteudo_html: conteudo
+            };
+            
+            // Fazer requisição AJAX
+            fetch('?api=enviar', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(dados)
+            })
+            .then(response => response.text())
+            .then(data => {
+                // Processar resposta linha por linha (para progresso)
+                const linhas = data.trim().split('\n');
+                let resultado = null;
+                
+                linhas.forEach(linha => {
+                    try {
+                        const json = JSON.parse(linha);
+                        
+                        if (json.status === 'progresso') {
+                            // Atualizar progresso
+                            document.getElementById('progressFill').style.width = json.progresso + '%';
+                            document.getElementById('progressText').textContent = json.progresso + '% concluído';
+                            document.getElementById('progressDetails').textContent = 
+                                `${json.atual}/${json.total} emails | Sucessos: ${json.sucessos} | Falhas: ${json.falhas}`;
+                        } else if (json.status === 'concluido') {
+                            resultado = json;
+                        } else if (json.status === 'erro') {
+                            resultado = json;
+                        }
+                    } catch (e) {
+                        // Ignorar linhas que não são JSON válido
+                    }
+                });
+                
+                // Mostrar resultado final
+                if (resultado) {
+                    document.getElementById('progressContainer').style.display = 'none';
+                    document.getElementById('resultContainer').style.display = 'block';
+                    
+                    let html = `<h3 style="color: ${resultado.status === 'erro' ? '#dc3545' : '#28a745'};">
+                        <i class="fas fa-${resultado.status === 'erro' ? 'exclamation-triangle' : 'check-circle'}"></i> 
+                        ${resultado.message}
+                    </h3>`;
+                    
+                    if (resultado.sucessos !== undefined) {
+                        html += `<div style="margin-top: 20px;">
+                            <p><strong>Estatísticas:</strong></p>
+                            <ul>
+                                <li>Total: ${resultado.total}</li>
+                                <li>Sucessos: ${resultado.sucessos}</li>
+                                <li>Falhas: ${resultado.falhas}</li>
+                            </ul>
+                        </div>`;
+                        
+                        if (resultado.erros && resultado.erros.length > 0) {
+                            html += `<details style="margin-top: 15px;">
+                                <summary style="cursor: pointer; font-weight: bold;">Ver erros (${resultado.erros.length})</summary>
+                                <ul style="margin-top: 10px;">`;
+                            resultado.erros.slice(0, 10).forEach(erro => {
+                                html += `<li><small>${erro}</small></li>`;
+                            });
+                            html += `</ul></details>`;
+                        }
+                    }
+                    
+                    html += `<button class="btn-primary" onclick="location.reload()" style="margin-top: 20px;">
+                        <i class="fas fa-redo"></i> Enviar Novos Emails
+                    </button>`;
+                    
+                    document.getElementById('resultContent').innerHTML = html;
+                }
+            })
+            .catch(error => {
+                console.error('Erro:', error);
+                document.getElementById('progressContainer').style.display = 'none';
+                document.getElementById('resultContainer').style.display = 'block';
+                document.getElementById('resultContent').innerHTML = `
+                    <h3 style="color: #dc3545;">
+                        <i class="fas fa-exclamation-triangle"></i> Erro na Comunicação
+                    </h3>
+                    <p>Ocorreu um erro durante o envio. Tente novamente.</p>
+                    <button class="btn-primary" onclick="location.reload()" style="margin-top: 20px;">
+                        <i class="fas fa-redo"></i> Tentar Novamente
+                    </button>
+                `;
+            });
+        });
     </script>
 </body>
 </html>
