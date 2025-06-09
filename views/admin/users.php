@@ -306,29 +306,37 @@ try {
                                             </span>
                                         </td>
                                         <td>
-                                            <div class="date-info">
-                                                <div class="date-primary">
-                                                    <?php echo date('d/m/Y', strtotime($user['data_criacao'])); ?>
-                                                </div>
-                                                <div class="date-secondary">
-                                                    <?php echo date('H:i', strtotime($user['data_criacao'])); ?>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <div class="date-info">
-                                                <?php if ($user['ultimo_login']): ?>
-                                                    <div class="date-primary">
-                                                        <?php echo date('d/m/Y', strtotime($user['ultimo_login'])); ?>
-                                                    </div>
-                                                    <div class="date-secondary">
-                                                        <?php echo date('H:i', strtotime($user['ultimo_login'])); ?>
-                                                    </div>
-                                                <?php else: ?>
-                                                    <span class="text-muted">Nunca</span>
-                                                <?php endif; ?>
-                                            </div>
-                                        </td>
+    <div class="date-info">
+        <?php
+            // Calcula o timestamp com 3 horas a menos para a data de criação
+            $timestamp_criacao = strtotime($user['data_criacao']) - (3 * 60 * 60);
+        ?>
+        <div class="date-primary">
+            <?php echo date('d/m/Y', $timestamp_criacao); ?>
+        </div>
+        <div class="date-secondary">
+            <?php echo date('H:i', $timestamp_criacao); ?>
+        </div>
+    </div>
+</td>
+<td>
+    <div class="date-info">
+        <?php if ($user['ultimo_login']): ?>
+            <?php
+                // Calcula o timestamp com 3 horas a menos para o último login
+                $timestamp_login = strtotime($user['ultimo_login']) - (3 * 60 * 60);
+            ?>
+            <div class="date-primary">
+                <?php echo date('d/m/Y', $timestamp_login); ?>
+            </div>
+            <div class="date-secondary">
+                <?php echo date('H:i', $timestamp_login); ?>
+            </div>
+        <?php else: ?>
+            <span class="text-muted">Nunca</span>
+        <?php endif; ?>
+    </div>
+</td>
                                         <td>
                                             <div class="table-actions">
                                                 <button class="action-btn edit" 
