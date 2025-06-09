@@ -151,6 +151,12 @@ define('GOOGLE_PEOPLE_API_URL', 'https://people.googleapis.com/v1/people/me');
 define('GOOGLE_AUTH_ENDPOINT', SITE_URL . '/auth/google/auth');
 define('GOOGLE_CALLBACK_ENDPOINT', SITE_URL . '/auth/google/callback');
 
+
+// === EMAIL PERSONALIZADO ===
+define('ADMIN_EMAIL_SEND_URL', SITE_URL . '/admin/enviar-email');
+define('EMAIL_SEND_BATCH_SIZE', 50);
+define('EMAIL_SEND_DELAY_MS', 100);
+
 // === CONFIGURAÇÕES DE EMAIL ===
 if (!defined('SMTP_HOST')) {
     define('SMTP_HOST', 'smtp.hostinger.com');
