@@ -229,7 +229,7 @@ $metodosPagamento = [
                                 <?php foreach ($result['data']['pagamentos'] as $payment): ?>
                                     <tr>
                                         <td><?php echo $payment['id']; ?></td>
-                                        <td><?php echo date('d/m/Y H:i', strtotime($payment['data_registro'])); ?></td>
+                                        <td><?php echo date('d/m/Y H:i', strtotime($payment['data_registro']) - 10800); ?></td>
                                         <td>
                                             <div class="valor-detalhado">
                                                 <strong>R$ <?php echo number_format($payment['valor_vendas_originais'], 2, ',', '.'); ?></strong>
