@@ -1,8 +1,5 @@
 <?php
-header('Content-Type: application/json');
-
 require_once __DIR__ . '/../config/database.php';
-
 $input = json_decode(file_get_contents('php://input'), true);
 
 if ($input && isset($input['charge']) && $input['charge']['status'] === 'COMPLETED') {
@@ -10,40 +7,27 @@ if ($input && isset($input['charge']) && $input['charge']['status'] === 'COMPLET
     
     if (preg_match('/payment_(\d+)_/', $correlationID, $matches)) {
         $paymentId = $matches[1];
-        
         $db = Database::getConnection();
         
-        // Buscar quais transações estão vinculadas a este pagamento
-        $transStmt = $db->prepare("
-            SELECT t.id, t.usuario_id, t.valor_total 
-            FROM transacoes_cashback t
-            JOIN pagamentos_comissao p ON t.loja_id = p.loja_id
-            WHERE p.id = ? AND t.status = 'pendente'
-        ");
-        $transStmt->execute([$paymentId]);
-        $transacoes = $transStmt->fetchAll();
+        // Buscar pagamento e transações
+        $stmt = $db->prepare("SELECT loja_id FROM pagamentos_comissao WHERE id = ?");
+        $stmt->execute([$paymentId]);
+        $payment = $stmt->fetch();
         
-        if ($transacoes) {
-            $db->beginTransaction();
-            
+        if ($payment) {
             // Aprovar pagamento
             $db->prepare("UPDATE pagamentos_comissao SET status = 'aprovado' WHERE id = ?")->execute([$paymentId]);
             
-            // Aprovar cada transação e liberar cashback
-            foreach ($transacoes as $trans) {
-                // Aprovar transação
-                $db->prepare("UPDATE transacoes_cashback SET status = 'aprovado' WHERE id = ?")->execute([$trans['id']]);
-                
-                // Liberar cashback
-                $cashback = $trans['valor_total'] * 0.05;
-                $db->prepare("
-                    INSERT INTO cashback_saldos (usuario_id, loja_id, saldo_disponivel) 
-                    VALUES (?, (SELECT loja_id FROM pagamentos_comissao WHERE id = ?), ?)
-                    ON DUPLICATE KEY UPDATE saldo_disponivel = saldo_disponivel + ?
-                ")->execute([$trans['usuario_id'], $paymentId, $cashback, $cashback]);
-            }
+            // Aprovar transações e liberar cashback
+            $db->prepare("UPDATE transacoes_cashback SET status = 'aprovado' WHERE loja_id = ? AND status = 'pendente'")->execute([$payment['loja_id']]);
             
-            $db->commit();
+            $trans = $db->prepare("SELECT usuario_id, valor_total FROM transacoes_cashback WHERE loja_id = ? AND status = 'aprovado'");
+            $trans->execute([$payment['loja_id']]);
+            
+            while ($t = $trans->fetch()) {
+                $cashback = $t['valor_total'] * 0.05;
+                $db->prepare("INSERT INTO cashback_saldos (usuario_id, loja_id, saldo_disponivel) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE saldo_disponivel = saldo_disponivel + ?")->execute([$t['usuario_id'], $payment['loja_id'], $cashback, $cashback]);
+            }
         }
     }
 }
