@@ -79,10 +79,15 @@ if ($result['status'] && isset($result['data']['pagamentos'])) {
                 $payment['valor_vendas_originais'] = $payment['valor_total'] / 0.10;
             }
             
-            // Corrigir quantidade de transações
+            // Corrigir quantidade de transações - buscar por período próximo ao pagamento
             if ($payment['qtd_transacoes'] == 0) {
-                $stmt = $db->prepare("SELECT COUNT(*) FROM transacoes_cashback WHERE loja_id = ? AND status = 'aprovado'");
-                $stmt->execute([$storeId]);
+                $paymentDate = $payment['data_registro'];
+                $stmt = $db->prepare("
+                    SELECT COUNT(*) FROM transacoes_cashback 
+                    WHERE loja_id = ? AND status = 'aprovado' 
+                    AND DATE(data_transacao) = DATE(?)
+                ");
+                $stmt->execute([$storeId, $paymentDate]);
                 $payment['qtd_transacoes'] = $stmt->fetchColumn();
             }
         }
