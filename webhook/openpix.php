@@ -16,32 +16,25 @@ if ($input && isset($input['charge']) && $input['charge']['status'] === 'COMPLET
         $status = $check->fetchColumn();
         
         if ($status !== 'aprovado') {
-            // Aprovar apenas transações pendentes da loja deste pagamento
             $payment = $db->prepare("SELECT loja_id FROM pagamentos_comissao WHERE id = ?");
             $payment->execute([$paymentId]);
             $lojaId = $payment->fetchColumn();
             
             if ($lojaId) {
+                // Aprovar pagamento e transações
                 $db->prepare("UPDATE pagamentos_comissao SET status = 'aprovado' WHERE id = ?")->execute([$paymentId]);
                 $db->prepare("UPDATE transacoes_cashback SET status = 'aprovado' WHERE loja_id = ? AND status = 'pendente'")->execute([$lojaId]);
                 
-                // Liberar cashback apenas para transações SEM cashback já liberado
-                $stmt = $db->prepare("
-                    SELECT t.usuario_id, t.valor_total, t.id 
-                    FROM transacoes_cashback t
-                    WHERE t.loja_id = ? AND t.status = 'aprovado' 
-                    AND NOT EXISTS (
-                        SELECT 1 FROM cashback_saldos cs 
-                        WHERE cs.usuario_id = t.usuario_id AND cs.loja_id = t.loja_id 
-                        AND cs.origem_transacao_id = t.id
-                    )
-                ");
+                // Liberar cashback simples
+                $stmt = $db->prepare("SELECT usuario_id, valor_total FROM transacoes_cashback WHERE loja_id = ? AND status = 'aprovado'");
                 $stmt->execute([$lojaId]);
                 
                 while ($trans = $stmt->fetch()) {
                     $cashback = $trans['valor_total'] * 0.05;
-                    $db->prepare("INSERT INTO cashback_saldos (usuario_id, loja_id, saldo_disponivel, origem_transacao_id) VALUES (?, ?, ?, ?)")->execute([$trans['usuario_id'], $lojaId, $cashback, $trans['id']]);
+                    $db->prepare("INSERT INTO cashback_saldos (usuario_id, loja_id, saldo_disponivel) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE saldo_disponivel = saldo_disponivel + ?")->execute([$trans['usuario_id'], $lojaId, $cashback, $cashback]);
                 }
+                
+                file_put_contents(__DIR__ . '/../logs/openpix.log', "✅ Cashback liberado para loja $lojaId\n", FILE_APPEND);
             }
         }
     }
