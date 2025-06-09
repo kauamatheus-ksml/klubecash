@@ -1,5 +1,4 @@
 <?php
-// api/payments.php
 session_start();
 header('Content-Type: application/json');
 
@@ -42,14 +41,26 @@ if ($method === 'POST' && $action === 'criar_pagamento') {
         $stmt->execute($params);
         $totalComissao = $stmt->fetchColumn() ?: 0;
         
-        // Criar pagamento simples
+        $db->beginTransaction();
+        
+        // Criar pagamento
         $paymentStmt = $db->prepare("
             INSERT INTO pagamentos_comissao (loja_id, valor_total, metodo_pagamento, status) 
             VALUES (?, ?, ?, 'pendente')
         ");
         $paymentStmt->execute([$store['id'], $totalComissao, $_POST['metodo_pagamento'] ?? 'pix_openpix']);
-        
         $paymentId = $db->lastInsertId();
+        
+        // VINCULAR transações ao pagamento (criar tabela de relacionamento se necessário)
+        foreach ($transacoes as $transId) {
+            $db->prepare("
+                INSERT INTO pagamento_transacoes (pagamento_id, transacao_id) 
+                VALUES (?, ?)
+                ON DUPLICATE KEY UPDATE pagamento_id = pagamento_id
+            ")->execute([$paymentId, $transId]);
+        }
+        
+        $db->commit();
         
         echo json_encode([
             'status' => true,
@@ -58,6 +69,7 @@ if ($method === 'POST' && $action === 'criar_pagamento') {
         ]);
         
     } catch (Exception $e) {
+        $db->rollback();
         echo json_encode(['status' => false, 'message' => $e->getMessage()]);
     }
 } else {

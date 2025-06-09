@@ -117,9 +117,9 @@ class OpenPixController {
                 SELECT p.*, l.nome_fantasia as loja_nome 
                 FROM pagamentos_comissao p
                 LEFT JOIN lojas l ON p.loja_id = l.id
-                WHERE p.openpix_charge_id = ?
+                WHERE p.id = ?
             ");
-            $stmt->execute([$paymentId, $chargeId]);
+            $stmt->execute([$paymentId]);
             $payment = $stmt->fetch(PDO::FETCH_ASSOC);
             
             if (!$payment) {
