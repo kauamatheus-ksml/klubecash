@@ -54,7 +54,7 @@ if ($method === 'POST' && $action === 'criar_pagamento') {
         // VINCULAR transações ao pagamento (criar tabela de relacionamento se necessário)
         foreach ($transacoes as $transId) {
             $db->prepare("
-                INSERT INTO pagamento_transacoes (pagamento_id, transacao_id) 
+                INSERT INTO pagamentos_transacoes (pagamento_id, transacao_id) 
                 VALUES (?, ?)
                 ON DUPLICATE KEY UPDATE pagamento_id = pagamento_id
             ")->execute([$paymentId, $transId]);
