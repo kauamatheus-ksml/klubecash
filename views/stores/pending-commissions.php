@@ -151,11 +151,11 @@ if ($result['status'] && isset($result['data']['totais'])) {
                     <div class="card-title">Transações Pendentes de Pagamento</div>
                     <?php if ($totalTransacoes > 0): ?>
                     <div style="display: flex; gap: 1rem;">
-                        <button id="paySelectedBtn" class="btn btn-primary" disabled>Pagar Selecionadas</button>
+                        <!--<button id="paySelectedBtn" class="btn btn-primary" disabled>Pagar Selecionadas</button>-->
                         <button id="payPixBtn" class="btn btn-success" disabled>Pagar via PIX</button>
-                        <button type="button" class="btn btn-success" id="btnPixOpenpix">
+                        <!--<button type="button" class="btn btn-success" id="btnPixOpenpix">
                             🔥 Pagar via PIX 2
-                        </button>
+                        </button>-->
                     </div>
                     <?php endif; ?>
                 </div>
