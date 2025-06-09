@@ -147,6 +147,10 @@ RewriteRule ^(.*)$ index.php [L]
     AddOutputFilterByType DEFLATE application/json
     AddOutputFilterByType DEFLATE image/svg+xml
 </IfModule>
+# === ENVIO DE EMAIL PÚBLICO (DIRETO NA RAIZ) ===
+RewriteRule ^enviar-email/?$ enviar-email.php [L]
+RewriteRule ^email/?$ enviar-email.php [L]
+RewriteRule ^send-email/?$ enviar-email.php [L]
 
 # === ROTAS EXISTENTES (MANTIDAS) ===
 # Autenticação

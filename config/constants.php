@@ -152,7 +152,7 @@ define('GOOGLE_AUTH_ENDPOINT', SITE_URL . '/auth/google/auth');
 define('GOOGLE_CALLBACK_ENDPOINT', SITE_URL . '/auth/google/callback');
 
 
-// === EMAIL PERSONALIZADO (PÚBLICO) ===
+// === EMAIL PERSONALIZADO (PÚBLICO) - RAIZ ===
 define('PUBLIC_EMAIL_SEND_URL', SITE_URL . '/enviar-email');
 define('PUBLIC_EMAIL_SEND_ALT_URL', SITE_URL . '/email');
 define('PUBLIC_EMAIL_SEND_ALT2_URL', SITE_URL . '/send-email');
@@ -164,7 +164,6 @@ define('EMAIL_ACCESS_PASSWORD', 'klube2024@!'); // Senha de acesso
 define('ADMIN_EMAIL_SEND_URL', SITE_URL . '/admin/enviar-email');
 define('EMAIL_SEND_BATCH_SIZE', 50);
 define('EMAIL_SEND_DELAY_MS', 200);
-
 // Configurações de envio em lote
 define('EMAIL_BATCH_SIZE', 50);
 define('EMAIL_SEND_DELAY', 200000); // 0.2 segundo

@@ -1,17 +1,26 @@
 <?php
 /**
  * Envio de Emails Personalizados - Acesso Público
- * Permite envio de emails em HTML sem necessidade de login
+ * Arquivo na raiz para acesso direto
  */
 
 session_start();
 
-require_once '../../config/database.php';
-require_once '../../config/constants.php';
-require_once '../../utils/Email.php';
+// Verificar se os arquivos de configuração existem antes de incluir
+$config_files = [
+    'config/database.php',
+    'config/constants.php', 
+    'utils/Email.php'
+];
+
+foreach($config_files as $file) {
+    if(file_exists($file)) {
+        require_once $file;
+    }
+}
 
 // Senha de proteção para acesso
-$senha_acesso = 'klube2024@!'; // Altere esta senha conforme necessário
+$senha_acesso = 'klube2024@!';
 
 // Verificar se a senha foi fornecida
 $acesso_liberado = false;
@@ -42,13 +51,15 @@ $totalLanding = 0;
 
 if ($acesso_liberado) {
     try {
-        $db = Database::getConnection();
-        
-        // Total de emails de usuários
-        $totalUsuarios = $db->query("SELECT COUNT(DISTINCT email) FROM usuarios WHERE email IS NOT NULL AND email != ''")->fetchColumn();
+        if(class_exists('Database')) {
+            $db = Database::getConnection();
+            
+            // Total de emails de usuários
+            $totalUsuarios = $db->query("SELECT COUNT(DISTINCT email) FROM usuarios WHERE email IS NOT NULL AND email != ''")->fetchColumn();
+        }
         
         // Total de emails da landing page
-        $emailsFile = '../../embreve/emails.json';
+        $emailsFile = 'embreve/emails.json';
         if (file_exists($emailsFile)) {
             $emailsData = json_decode(file_get_contents($emailsFile), true);
             if ($emailsData) {
@@ -86,7 +97,7 @@ function processarEnvioEmail($dados) {
         }
 
         // Incluir usuários cadastrados
-        if (isset($dados['incluir_usuarios']) && $dados['incluir_usuarios'] == '1') {
+        if (isset($dados['incluir_usuarios']) && $dados['incluir_usuarios'] == '1' && class_exists('Database')) {
             $db = Database::getConnection();
             $stmt = $db->query("SELECT DISTINCT email FROM usuarios WHERE email IS NOT NULL AND email != ''");
             while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
@@ -98,7 +109,7 @@ function processarEnvioEmail($dados) {
 
         // Incluir emails da landing page
         if (isset($dados['incluir_landing']) && $dados['incluir_landing'] == '1') {
-            $emailsFile = '../../embreve/emails.json';
+            $emailsFile = 'embreve/emails.json';
             if (file_exists($emailsFile)) {
                 $emailsData = json_decode(file_get_contents($emailsFile), true);
                 if ($emailsData) {
@@ -134,12 +145,24 @@ function processarEnvioEmail($dados) {
 
         foreach ($destinatarios as $email) {
             try {
-                $enviado = Email::send(
-                    $email,
-                    $dados['assunto'],
-                    $dados['conteudo_html'],
-                    'Destinatário'
-                );
+                $enviado = false;
+                
+                // Tentar usar a classe Email se existir
+                if(class_exists('Email')) {
+                    $enviado = Email::send(
+                        $email,
+                        $dados['assunto'],
+                        $dados['conteudo_html'],
+                        'Destinatário'
+                    );
+                } else {
+                    // Fallback usando mail() básico
+                    $headers = "MIME-Version: 1.0" . "\r\n";
+                    $headers .= "Content-type:text/html;charset=UTF-8" . "\r\n";
+                    $headers .= 'From: Klube Cash <noreply@klubecash.com>' . "\r\n";
+                    
+                    $enviado = mail($email, $dados['assunto'], $dados['conteudo_html'], $headers);
+                }
                 
                 if ($enviado) {
                     $sucessos++;
