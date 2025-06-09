@@ -666,7 +666,12 @@ try {
                             <?php if (!empty($balanceData['movimentacoes'])): ?>
                                 <?php foreach ($balanceData['movimentacoes'] as $mov): ?>
                                     <tr>
-                                        <td><?php echo date('d/m/Y H:i', strtotime($mov['data_operacao'])); ?></td>
+                                        <td>
+                                            <?php 
+                                            // Subtrai 3 horas do fuso horário
+                                            echo date('d/m/Y H:i', strtotime($mov['data_operacao']) - (3 * 60 * 60)); 
+                                            ?>
+                                        </td>
                                         <td><?php echo htmlspecialchars($mov['descricao']); ?></td>
                                         <td>
                                             <span class="movement-type <?php echo $mov['tipo']; ?>">
