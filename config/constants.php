@@ -9,7 +9,13 @@ define('SYSTEM_NAME', 'Klube Cash');
 define('SYSTEM_VERSION', '2.1.0');
 define('SITE_URL', 'https://klubecash.com');
 define('ADMIN_EMAIL', 'contato@klubecash.com');
-
+// === SMTP CONFIGURAÇÕES ===
+define('SMTP_HOST_HOSTINGER', 'smtp.hostinger.com');
+define('SMTP_PORT_HOSTINGER', 465);
+define('SMTP_USER_HOSTINGER', 'klubecash@klubecash.com');
+define('SMTP_PASS_HOSTINGER', 'Aaku_2004@');
+define('SMTP_FROM_HOSTINGER', 'klubecash@klubecash.com');
+define('SMTP_NAME_HOSTINGER', 'Klube Cash');
 // === CORES DO TEMA ===
 define('PRIMARY_COLOR', '#FF7A00');
 define('SECONDARY_COLOR', '#1A1A1A');
