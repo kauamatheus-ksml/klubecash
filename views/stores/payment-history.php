@@ -79,16 +79,9 @@ if ($result['status'] && isset($result['data']['pagamentos'])) {
                 $payment['valor_vendas_originais'] = $payment['valor_total'] / 0.10;
             }
             
-            // Corrigir quantidade de transações - buscar por período próximo ao pagamento
+            // Para OpenPix, assumir 1 transação por pagamento
             if ($payment['qtd_transacoes'] == 0) {
-                $paymentDate = $payment['data_registro'];
-                $stmt = $db->prepare("
-                    SELECT COUNT(*) FROM transacoes_cashback 
-                    WHERE loja_id = ? AND status = 'aprovado' 
-                    AND DATE(data_transacao) = DATE(?)
-                ");
-                $stmt->execute([$storeId, $paymentDate]);
-                $payment['qtd_transacoes'] = $stmt->fetchColumn();
+                $payment['qtd_transacoes'] = 1;
             }
         }
     }
