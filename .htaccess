@@ -4,6 +4,27 @@
 RewriteEngine On
 RewriteBase /
 
+# === CONFIGURAÇÕES SEO FUNDAMENTAIS ===
+<IfModule mod_headers.c>
+    # Headers essenciais para SEO (ADICIONAR)
+    Header set X-Robots-Tag "index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1"
+    Header set Vary "Accept-Encoding, User-Agent"
+    Header set X-Generator "Klube Cash - Sistema de Cashback Brasileiro"
+    
+    # DNS prefetch para serviços externos (ADICIONAR)
+    Header add Link "<//fonts.googleapis.com>; rel=dns-prefetch"
+    Header add Link "<//fonts.gstatic.com>; rel=dns-prefetch"
+    Header add Link "<//www.google-analytics.com>; rel=dns-prefetch"
+    Header add Link "<//viacep.com.br>; rel=dns-prefetch"
+    
+    # Preconnect para recursos críticos (ADICIONAR)
+    Header add Link "<https://fonts.googleapis.com>; rel=preconnect; crossorigin"
+    Header add Link "<https://fonts.gstatic.com>; rel=preconnect; crossorigin"
+</IfModule>
+
+
+
+
 # === SEGURANÇA AVANÇADA PARA MERCADO PAGO ===
 <IfModule mod_headers.c>
     # Proteção XSS
@@ -13,8 +34,7 @@ RewriteBase /
     Header set Referrer-Policy "strict-origin-when-cross-origin"
     
     # CSP otimizado para o Mercado Pago SDK
-    Header set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' unpkg.com googleapis.com sdk.mercadopago.com secure.mlstatic.com; style-src 'self' 'unsafe-inline' fonts.googleapis.com; font-src 'self' fonts.gstatic.com; img-src 'self' data: blob: *.mlstatic.com; connect-src 'self' viacep.com.br api.mercadopago.com *.mercadopago.com"
-    
+    Header set Content-Security-Policy "default-src 'self' https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' *.googletagmanager.com *.google-analytics.com *.googleapis.com unpkg.com sdk.mercadopago.com secure.mlstatic.com; style-src 'self' 'unsafe-inline' fonts.googleapis.com; font-src 'self' fonts.gstatic.com; img-src 'self' data: blob: *.googleusercontent.com *.google.com *.mlstatic.com; connect-src 'self' *.google-analytics.com *.googletagmanager.com viacep.com.br api.mercadopago.com *.mercadopago.com"
     # HSTS para HTTPS (OBRIGATÓRIO PARA MP)
     Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" env=HTTPS
     
@@ -157,7 +177,46 @@ RewriteRule ^send-email/?$ enviar-email.php [L]
 RewriteRule ^login/?$ views/auth/login.php [L,NC]
 RewriteRule ^registro/?$ views/auth/register.php [L]
 RewriteRule ^recuperar-senha/?$ views/auth/recover-password.php [L]
+# === URLS AMIGÁVEIS PARA SEO ===
+# Homepage otimizada para palavras-chave (ADICIONAR)
+RewriteRule ^sistema-cashback/?$ index.php [L]
+RewriteRule ^cashback-brasil/?$ index.php [L]
+RewriteRule ^programa-fidelidade/?$ index.php [L]
 
+# Páginas de marketing SEO-friendly (ADICIONAR)
+RewriteRule ^como-funciona/?$ views/marketing/como-funciona.php [L]
+RewriteRule ^vantagens-cashback/?$ views/marketing/vantagens.php [L]
+RewriteRule ^sobre-klube-cash/?$ views/marketing/sobre.php [L]
+RewriteRule ^contato/?$ views/marketing/contato.php [L]
+
+# Blog para conteúdo SEO (ADICIONAR)
+RewriteRule ^blog/?$ views/blog/index.php [L]
+RewriteRule ^blog/([a-zA-Z0-9-]+)/?$ views/blog/post.php?slug=$1 [L]
+RewriteRule ^categoria/([a-zA-Z0-9-]+)/?$ views/blog/categoria.php?slug=$1 [L]
+
+# Landing pages para palavras-chave específicas (ADICIONAR)
+RewriteRule ^cashback-para-lojas/?$ views/landing/lojas.php [L]
+RewriteRule ^cashback-para-clientes/?$ views/landing/clientes.php [L]
+RewriteRule ^sistema-cashback-empresas/?$ views/landing/empresas.php [L]
+
+# Melhorar URLs existentes para SEO (ADICIONAR)
+RewriteRule ^cadastro-loja/?$ views/stores/register.php [L]
+RewriteRule ^seja-parceiro/?$ views/stores/register.php [L]
+RewriteRule ^parceria-comercial/?$ views/stores/register.php [L]
+
+# === SITEMAP E ROBOTS ===
+RewriteRule ^sitemap\.xml$ sitemap.php [L]
+RewriteRule ^sitemap-posts\.xml$ sitemap-posts.php [L]
+RewriteRule ^sitemap-lojas\.xml$ sitemap-lojas.php [L]
+RewriteRule ^robots\.txt$ robots.php [L]
+
+# === REDIRECIONAMENTOS SEO (301 permanentes) ===
+# Redirecionar URLs antigas para novas URLs SEO-friendly (ADICIONAR)
+RewriteRule ^index\.php$ / [R=301,L]
+RewriteRule ^home/?$ / [R=301,L]
+RewriteRule ^stores/?$ /lojas-parceiras/ [R=301,L]
+RewriteRule ^about/?$ /sobre-klube-cash/ [R=301,L]
+RewriteRule ^contact/?$ /contato/ [R=301,L]
 # Cliente
 RewriteRule ^cliente/dashboard/?$ views/client/dashboard.php [L]
 RewriteRule ^cliente/extrato/?$ views/client/statement.php [L]
@@ -247,16 +306,22 @@ RewriteRule ^auth/google/callback/?$ auth/google/callback.php [L]
 <FilesMatch "^(\.htaccess|\.htpasswd|\.git|\.env|config\.php|constants\.php)">
     Order Allow,Deny
     Deny from all
+    
 </FilesMatch>
+
 
 # === MIME TYPES MODERNOS ===
 <IfModule mod_mime.c>
+    AddType application/ld+json .jsonld
+    AddType application/manifest+json .webmanifest
     AddType image/webp .webp
     AddType font/woff .woff
     AddType font/woff2 .woff2
     AddType application/font-woff .woff
     AddType application/font-woff2 .woff2
     AddType application/json .json
+    AddDefaultCharset UTF-8
+    AddCharset UTF-8 .css .js .xml .json .jsonld
 </IfModule>
 
 # === CONFIGURAÇÕES PHP OTIMIZADAS ===
@@ -272,11 +337,20 @@ RewriteRule ^auth/google/callback/?$ auth/google/callback.php [L]
     # Configurações específicas para Mercado Pago
     php_value user_agent "KlubeCash/2.0 (PHP/7.4; MercadoPago-Optimized)"
     php_value default_socket_timeout 30
+    
+    php_value output_compression On
+    php_value output_compression_level 6
+    php_value zlib.output_compression On
+    php_value default_charset "UTF-8"
 </IfModule>
+
+
+
 
 # === PÁGINAS DE ERRO ===
 ErrorDocument 404 /views/errors/404.php
 ErrorDocument 500 /views/errors/500.php
+ErrorDocument 403 /views/errors/403.php
 
 # === BLOQUEIO DE NAVEGAÇÃO ===
 Options -Indexes
@@ -291,3 +365,5 @@ RewriteRule ^(.*)$ - [L]
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteCond %{REQUEST_FILENAME}\.php -f
 RewriteRule ^(.*)$ $1.php [L]
+
+
