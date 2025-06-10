@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Teste SEO Klube Cash</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test { margin: 10px 0; padding: 10px; border: 1px solid #ddd; }
+        .pass { background: #d4edda; }
+        .fail { background: #f8d7da; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Teste SEO Klube Cash</h1>
+    <button onclick="testarUrls()">Testar URLs</button>
+    <button onclick="testarMetaTags()">Testar Meta Tags</button>
+    <button onclick="testarSchema()">Testar Schema</button>
+    
+    <div id="resultados"></div>
+
+    <script>
+        const URLs_TESTE = [
+            'https://seudominio.com/como-funciona/',
+            'https://seudominio.com/vantagens-cashback/',
+            'https://seudominio.com/cashback-para-lojas/',
+            'https://seudominio.com/blog/',
+            'https://seudominio.com/sitemap.xml',
+            'https://seudominio.com/robots.txt'
+        ];
+
+        async function testarUrls() {
+            const resultados = document.getElementById('resultados');
+            resultados.innerHTML = '<h2>Testando URLs...</h2>';
+            
+            for (let url of URLs_TESTE) {
+                try {
+                    const response = await fetch(url, { method: 'HEAD' });
+                    const status = response.status;
+                    const classe = status === 200 ? 'pass' : 'fail';
+                    resultados.innerHTML += `
+                        <div class="test ${classe}">
+                            <strong>${url}</strong><br>
+                            Status: ${status} ${status === 200 ? '✅' : '❌'}
+                        </div>
+                    `;
+                } catch (error) {
+                    resultados.innerHTML += `
+                        <div class="test fail">
+                            <strong>${url}</strong><br>
+                            Erro: ${error.message} ❌
+                        </div>
+                    `;
+                }
+            }
+        }
+
+        function testarMetaTags() {
+            const title = document.title;
+            const description = document.querySelector('meta[name="description"]');
+            const canonical = document.querySelector('link[rel="canonical"]');
+            
+            const resultados = document.getElementById('resultados');
+            resultados.innerHTML = '<h2>Teste Meta Tags da Página Atual</h2>';
+            
+            resultados.innerHTML += `
+                <div class="test ${title ? 'pass' : 'fail'}">
+                    <strong>Title:</strong> ${title || 'Não encontrado'} ${title ? '✅' : '❌'}
+                </div>
+                <div class="test ${description ? 'pass' : 'fail'}">
+                    <strong>Description:</strong> ${description ? description.content : 'Não encontrado'} ${description ? '✅' : '❌'}
+                </div>
+                <div class="test ${canonical ? 'pass' : 'fail'}">
+                    <strong>Canonical:</strong> ${canonical ? canonical.href : 'Não encontrado'} ${canonical ? '✅' : '❌'}
+                </div>
+            `;
+        }
+
+        function testarSchema() {
+            const schemas = document.querySelectorAll('script[type="application/ld+json"]');
+            const resultados = document.getElementById('resultados');
+            resultados.innerHTML = '<h2>Teste Schema Markup</h2>';
+            
+            if (schemas.length > 0) {
+                schemas.forEach((schema, index) => {
+                    try {
+                        const data = JSON.parse(schema.textContent);
+                        resultados.innerHTML += `
+                            <div class="test pass">
+                                <strong>Schema ${index + 1}:</strong> ${data['@type']} ✅<br>
+                                <small>Tipo: ${data['@type']}</small>
+                            </div>
+                        `;
+                    } catch (error) {
+                        resultados.innerHTML += `
+                            <div class="test fail">
+                                <strong>Schema ${index + 1}:</strong> Erro no JSON ❌<br>
+                                <small>${error.message}</small>
+                            </div>
+                        `;
+                    }
+                });
+            } else {
+                resultados.innerHTML += `
+                    <div class="test fail">
+                        <strong>Schema Markup:</strong> Nenhum encontrado ❌
+                    </div>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>
