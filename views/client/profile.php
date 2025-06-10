@@ -587,261 +587,353 @@ $profileCompletion = $totalSteps > 0 ? ($completedSteps / $totalSteps) * 100 : 0
 
     <!-- Scripts simplificados e corrigidos -->
     <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Aplicar máscara no CPF
+            const cpfField = document.getElementById('cpf');
+            if (cpfField && !cpfField.readOnly) {
+                cpfField.addEventListener('input', function(e) {
+                    let value = e.target.value.replace(/\D/g, '');
+                    value = value.replace(/(\d{3})(\d)/, '$1.$2');
+                    value = value.replace(/(\d{3})(\d)/, '$1.$2');
+                    value = value.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+                    e.target.value = value;
+                });
+            }
+            
+            // Aplicar máscaras em telefones
+            const telefoneField = document.getElementById('telefone');
+            if (telefoneField) {
+                telefoneField.addEventListener('input', function(e) {
+                    let value = e.target.value.replace(/\D/g, '');
+                    value = value.replace(/(\d{2})(\d)/, '($1) $2');
+                    value = value.replace(/(\d{4})(\d)/, '$1-$2');
+                    e.target.value = value;
+                });
+            }
+            
+            const celularField = document.getElementById('celular');
+            if (celularField) {
+                celularField.addEventListener('input', function(e) {
+                    let value = e.target.value.replace(/\D/g, '');
+                    value = value.replace(/(\d{2})(\d)/, '($1) $2');
+                    value = value.replace(/(\d{5})(\d)/, '$1-$2');
+                    e.target.value = value;
+                });
+            }
+            
+            // Aplicar máscara no CEP e buscar endereço
+            const cepField = document.getElementById('cep');
+            if (cepField) {
+                cepField.addEventListener('input', function(e) {
+                    let value = e.target.value.replace(/\D/g, '');
+                    value = value.replace(/(\d{5})(\d)/, '$1-$2');
+                    e.target.value = value;
+                });
+                
+                cepField.addEventListener('blur', function(e) {
+                    const cep = e.target.value.replace(/\D/g, '');
+                    if (cep.length === 8) {
+                        fetch(`https://viacep.com.br/ws/${cep}/json/`)
+                            .then(response => response.json())
+                            .then(data => {
+                                if (!data.erro) {
+                                    const logradouroField = document.getElementById('logradouro');
+                                    const bairroField = document.getElementById('bairro');
+                                    const cidadeField = document.getElementById('cidade');
+                                    const estadoField = document.getElementById('estado');
+                                    
+                                    if (logradouroField) logradouroField.value = data.logradouro || '';
+                                    if (bairroField) bairroField.value = data.bairro || '';
+                                    if (cidadeField) cidadeField.value = data.localidade || '';
+                                    if (estadoField) estadoField.value = data.uf || '';
+                                }
+                            })
+                            .catch(error => console.log('Erro ao buscar CEP:', error));
+                    }
+                });
+            }
+            
+            // Validação de senhas
+            const novaSenhaField = document.getElementById('nova_senha');
+            const confirmarSenhaField = document.getElementById('confirmar_senha');
+            
+            if (novaSenhaField && confirmarSenhaField) {
+                function validatePasswords() {
+                    const novaSenha = novaSenhaField.value;
+                    const confirmarSenha = confirmarSenhaField.value;
+                    
+                    if (confirmarSenha && novaSenha !== confirmarSenha) {
+                        confirmarSenhaField.setCustomValidity('As senhas não coincidem');
+                    } else {
+                        confirmarSenhaField.setCustomValidity('');
+                    }
+                }
+                
+                novaSenhaField.addEventListener('input', validatePasswords);
+                confirmarSenhaField.addEventListener('input', validatePasswords);
+            }
+        });
+    </script>
+    <script>
 document.addEventListener('DOMContentLoaded', function() {
     // Manter todo o código de máscaras existente...
     
-    // VERSÃO CORRIGIDA E MELHORADA da busca de CEP
+    // VERSÃO ULTRA-ROBUSTA da busca de CEP
     const cepField = document.getElementById('cep');
     if (cepField) {
-        // Aplicar máscara de CEP
+        let timeoutBusca = null; // Para debounce
+        
+        // Aplicar máscara e validação em tempo real
         cepField.addEventListener('input', function(e) {
             let value = e.target.value.replace(/\D/g, '');
             value = value.replace(/(\d{5})(\d)/, '$1-$2');
             e.target.value = value;
+            
+            // Limpar timeout anterior
+            if (timeoutBusca) {
+                clearTimeout(timeoutBusca);
+            }
+            
+            // Feedback visual durante digitação
+            const cep = value.replace(/\D/g, '');
+            if (cep.length === 8) {
+                if (validarFormatoCEP(cep)) {
+                    e.target.style.borderColor = '#28a745'; // Verde
+                    // Buscar automaticamente após 800ms de pausa na digitação
+                    timeoutBusca = setTimeout(() => {
+                        buscarEnderecoPorCEP(cep);
+                    }, 800);
+                } else {
+                    e.target.style.borderColor = '#dc3545'; // Vermelho
+                    mostrarErroCEP('❌ Este CEP não parece estar no formato válido para o Brasil');
+                }
+            } else if (cep.length > 0) {
+                e.target.style.borderColor = '#ffc107'; // Amarelo para incompleto
+            } else {
+                e.target.style.borderColor = ''; // Reset
+            }
         });
         
-        // Buscar endereço com tratamento de erro aprimorado
+        // Buscar também quando sair do campo (comportamento original mantido)
         cepField.addEventListener('blur', function(e) {
             const cep = e.target.value.replace(/\D/g, '');
-            
-            // Verificar se CEP tem 8 dígitos
-            if (cep.length === 8) {
-                // Mostrar carregamento
-                mostrarCarregandoCEP(true);
-                
-                // Tentar múltiplas URLs caso uma falhe
-                const urls = [
-                    `https://viacep.com.br/ws/${cep}/json/`,
-                    `https://brasilapi.com.br/api/cep/v1/${cep}` // API alternativa
-                ];
-                
-                tentarConsultaCEP(urls, 0)
-                    .then(data => {
-                        if (data) {
-                            preencherCamposEndereco(data);
-                            mostrarSucessoCEP('✅ Endereço encontrado e preenchido!');
-                        } else {
-                            throw new Error('CEP não encontrado em nenhuma API');
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Erro detalhado:', error);
-                        // Mostrar erro específico baseado no tipo
-                        if (error.message.includes('não encontrado')) {
-                            mostrarErroCEP('❌ CEP não encontrado. Verifique se está correto.');
-                        } else if (error.message.includes('rede') || error.message.includes('fetch')) {
-                            mostrarErroCEP('🌐 Problema de conexão. Verifique sua internet.');
-                        } else {
-                            mostrarErroCEP('⚠️ Erro no serviço de CEP. Preencha manualmente.');
-                        }
-                        limparCamposEndereco();
-                    })
-                    .finally(() => {
-                        mostrarCarregandoCEP(false);
-                    });
-            } else if (cep.length > 0) {
-                mostrarErroCEP('📝 CEP deve ter exatamente 8 dígitos');
-                limparCamposEndereco();
+            if (cep.length === 8 && validarFormatoCEP(cep)) {
+                // Se não foi buscado automaticamente, buscar agora
+                if (timeoutBusca) {
+                    clearTimeout(timeoutBusca);
+                    buscarEnderecoPorCEP(cep);
+                }
             }
         });
     }
     
-    // Função que tenta consultar CEP em múltiplas APIs
-    async function tentarConsultaCEP(urls, indice) {
-        if (indice >= urls.length) {
-            throw new Error('Todas as APIs de CEP falharam');
-        }
+    // Função para validar se o CEP está em faixas conhecidas do Brasil
+    function validarFormatoCEP(cep) {
+        // CEPs brasileiros válidos: 01000-000 a 99999-999
+        // Mas vamos ser mais específicos com faixas conhecidas
+        const cepNum = parseInt(cep);
         
-        try {
-            const response = await fetch(urls[indice], {
-                method: 'GET',
-                headers: {
-                    'Accept': 'application/json',
-                },
-                // Timeout de 5 segundos
-                signal: AbortSignal.timeout ? AbortSignal.timeout(5000) : undefined
-            });
-            
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-            
-            const data = await response.json();
-            
-            // Verificar se é ViaCEP (tem propriedade 'erro') ou BrasilAPI (diferente estrutura)
-            if (data.erro || data.error) {
-                throw new Error('CEP não encontrado nesta API');
-            }
-            
-            // Normalizar dados para formato padrão
-            return {
-                logradouro: data.logradouro || data.street || '',
-                bairro: data.bairro || data.district || '',
-                localidade: data.localidade || data.city || '',
-                uf: data.uf || data.state || ''
-            };
-            
-        } catch (error) {
-            console.warn(`API ${urls[indice]} falhou:`, error.message);
-            // Tentar próxima API
-            return tentarConsultaCEP(urls, indice + 1);
-        }
-    }
-    
-    // Função aprimorada para preencher campos
-    function preencherCamposEndereco(data) {
-        const campos = [
-            { id: 'logradouro', valor: data.logradouro, nome: 'Logradouro' },
-            { id: 'bairro', valor: data.bairro, nome: 'Bairro' },
-            { id: 'cidade', valor: data.localidade, nome: 'Cidade' },
-            { id: 'estado', valor: data.uf, nome: 'Estado' }
+        // Faixas principais de CEPs ativos no Brasil
+        const faixasValidas = [
+            [1000, 19999], // São Paulo
+            [20000, 28999], // Rio de Janeiro
+            [30000, 39999], // Minas Gerais
+            [40000, 48999], // Bahia
+            [50000, 56999], // Pernambuco
+            [60000, 63999], // Ceará
+            [64000, 64999], // Piauí
+            [65000, 65999], // Maranhão
+            [66000, 68999], // Pará
+            [69000, 69999], // Amazonas/Acre/Rondônia/Roraima
+            [70000, 72999], // Distrito Federal/Goiás
+            [73000, 73999], // Tocantins
+            [74000, 76999], // Goiás
+            [77000, 78999], // Mato Grosso
+            [79000, 79999], // Mato Grosso do Sul
+            [80000, 87999], // Paraná
+            [88000, 89999], // Santa Catarina
+            [90000, 99999]  // Rio Grande do Sul
         ];
         
-        let camposPreenchidos = 0;
+        return faixasValidas.some(faixa => cepNum >= faixa[0] && cepNum <= faixa[1]);
+    }
+    
+    // Função principal de busca com múltiplas tentativas
+    async function buscarEnderecoPorCEP(cep) {
+        mostrarCarregandoCEP(true);
         
-        campos.forEach(campo => {
-            const elemento = document.getElementById(campo.id);
-            if (elemento && campo.valor) {
-                elemento.value = campo.valor;
-                elemento.style.backgroundColor = '#e8f5e8';
-                elemento.style.transition = 'background-color 0.3s ease';
-                camposPreenchidos++;
+        const apis = [
+            {
+                nome: 'ViaCEP',
+                url: `https://viacep.com.br/ws/${cep}/json/`,
+                processar: (data) => ({
+                    logradouro: data.logradouro || '',
+                    bairro: data.bairro || '',
+                    localidade: data.localidade || '',
+                    uf: data.uf || ''
+                }),
+                validar: (data) => !data.erro
+            },
+            {
+                nome: 'BrasilAPI',
+                url: `https://brasilapi.com.br/api/cep/v1/${cep}`,
+                processar: (data) => ({
+                    logradouro: data.street || '',
+                    bairro: data.district || '',
+                    localidade: data.city || '',
+                    uf: data.state || ''
+                }),
+                validar: (data) => !data.error && data.city
+            },
+            {
+                nome: 'CEP Aberto',
+                url: `https://www.cepaberto.com/api/v3/cep?cep=${cep}`,
+                processar: (data) => ({
+                    logradouro: data.address || '',
+                    bairro: data.district || '',
+                    localidade: data.city?.name || '',
+                    uf: data.state?.name || ''
+                }),
+                validar: (data) => data.status === 200
             }
-        });
+        ];
         
-        // Remover destaque após 3 segundos
-        setTimeout(() => {
-            campos.forEach(campo => {
-                const elemento = document.getElementById(campo.id);
-                if (elemento) {
-                    elemento.style.backgroundColor = '';
+        let ultimoErro = null;
+        
+        for (let i = 0; i < apis.length; i++) {
+            const api = apis[i];
+            
+            try {
+                console.log(`Tentando API ${api.nome}...`);
+                
+                const response = await fetch(api.url, {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' },
+                    signal: AbortSignal.timeout ? AbortSignal.timeout(5000) : undefined
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
-            });
-        }, 3000);
-        
-        // Focar no próximo campo lógico
-        const numeroField = document.getElementById('numero');
-        if (numeroField) {
-            numeroField.focus();
-            numeroField.select(); // Selecionar texto existente para facilitar substituição
+                
+                const data = await response.json();
+                
+                if (api.validar(data)) {
+                    const enderecoNormalizado = api.processar(data);
+                    
+                    if (enderecoNormalizado.localidade) { // Pelo menos cidade deve existir
+                        preencherCamposEndereco(enderecoNormalizado);
+                        mostrarSucessoCEP(`✅ Endereço encontrado via ${api.nome}!`);
+                        return; // Sucesso, parar aqui
+                    }
+                }
+                
+                throw new Error(`CEP não encontrado na ${api.nome}`);
+                
+            } catch (error) {
+                console.warn(`${api.nome} falhou:`, error.message);
+                ultimoErro = error;
+                
+                // Se não é o último API, continuar tentando
+                if (i < apis.length - 1) {
+                    continue;
+                }
+            }
         }
         
-        console.log(`✅ ${camposPreenchidos} campos preenchidos automaticamente`);
-    }
-    
-    // Função melhorada para limpar campos
-    function limparCamposEndereco() {
-        const campos = ['logradouro', 'bairro', 'cidade', 'estado'];
+        // Se chegou aqui, todas as APIs falharam
+        console.error('Todas as APIs de CEP falharam:', ultimoErro);
         
-        campos.forEach(campoId => {
-            const campo = document.getElementById(campoId);
-            if (campo) {
-                // Não limpar campos que já têm conteúdo válido
-                if (!campo.value.trim()) {
-                    campo.style.backgroundColor = '#ffe8e8';
-                    campo.style.transition = 'background-color 0.3s ease';
-                }
-            }
-        });
-        
-        // Remover destaque após 3 segundos
-        setTimeout(() => {
-            campos.forEach(campoId => {
-                const campo = document.getElementById(campoId);
-                if (campo) campo.style.backgroundColor = '';
-            });
-        }, 3000);
-    }
-    
-    // Função de carregamento visual
-    function mostrarCarregandoCEP(mostrar) {
-        const cepField = document.getElementById('cep');
-        if (!cepField) return;
-        
-        if (mostrar) {
-            cepField.style.backgroundImage = 'url("data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTggMFY0TTggMTJWMTZNMTYgOEgxMk00IDhIME0xMy42NTY5IDIuMzQzMTVMMTEuMzEzNyA0LjY4NjI5TTQuNjg2MjkgMTEuMzEzN0wyLjM0MzE1IDEzLjY1NjlNMTMuNjU2OSAxMy42NTY5TDExLjMxMzcgMTEuMzEzN000LjY4NjI5IDQuNjg2MjlMMi4zNDMxNSAyLjM0MzE1IiBzdHJva2U9IiNGRjdBMDAiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+CjxhbmltYXRlVHJhbnNmb3JtIGF0dHJpYnV0ZU5hbWU9InRyYW5zZm9ybSIgYXR0cmlidXRlVHlwZT0iWE1MIiB0eXBlPSJyb3RhdGUiIGZyb209IjAgOCA4IiB0bz0iMzYwIDggOCIgZHVyPSIxcyIgcmVwZWF0Q291bnQ9ImluZGVmaW5pdGUiLz4KPC9zdmc+")';
-            cepField.style.backgroundRepeat = 'no-repeat';
-            cepField.style.backgroundPosition = 'right 10px center';
-            cepField.style.backgroundSize = '16px 16px';
-            cepField.disabled = true;
-            cepField.style.cursor = 'wait';
+        // Dar feedback específico baseado no tipo de erro
+        if (ultimoErro?.message.includes('não encontrado')) {
+            mostrarErroCEP(`❌ CEP ${cep.replace(/(\d{5})(\d{3})/, '$1-$2')} não foi encontrado. Verifique se está correto ou preencha manualmente.`);
+            sugerirCEPsProximos(cep);
+        } else if (ultimoErro?.message.includes('timeout') || ultimoErro?.name === 'AbortError') {
+            mostrarErroCEP('⏱️ Tempo limite esgotado. Verifique sua conexão com a internet.');
         } else {
-            cepField.style.backgroundImage = '';
-            cepField.disabled = false;
-            cepField.style.cursor = '';
+            mostrarErroCEP('⚠️ Serviços de CEP temporariamente indisponíveis. Preencha o endereço manualmente.');
+        }
+        
+        limparCamposEndereco();
+    }
+    
+    // Função para sugerir CEPs próximos
+    function sugerirCEPsProximos(cep) {
+        const cepNum = parseInt(cep);
+        const sugestoes = [];
+        
+        // Gerar alguns CEPs próximos para teste
+        for (let i = -5; i <= 5; i++) {
+            if (i !== 0) {
+                const novoCep = (cepNum + i).toString().padStart(8, '0');
+                if (validarFormatoCEP(novoCep)) {
+                    sugestoes.push(novoCep.replace(/(\d{5})(\d{3})/, '$1-$2'));
+                }
+            }
+        }
+        
+        if (sugestoes.length > 0) {
+            const sugestoesTexto = sugestoes.slice(0, 3).join(', ');
+            mostrarInfoCEP(`💡 Tente CEPs próximos: ${sugestoesTexto}`);
         }
     }
     
-    // Funções de mensagem (reutilizar as mesmas do código anterior)
-    function mostrarSucessoCEP(mensagem) {
-        mostrarMensagemCEP(mensagem, 'success');
+    // Função para mostrar informações úteis (não erro)
+    function mostrarInfoCEP(mensagem) {
+        mostrarMensagemCEP(mensagem, 'info');
     }
     
-    function mostrarErroCEP(mensagem) {
-        mostrarMensagemCEP(mensagem, 'error');
-    }
-    
+    // Função aprimorada para mensagens
     function mostrarMensagemCEP(mensagem, tipo) {
-        // Remover mensagem anterior
         const mensagemAnterior = document.querySelector('.cep-message');
         if (mensagemAnterior) {
             mensagemAnterior.remove();
         }
         
-        // Criar nova mensagem
         const div = document.createElement('div');
         div.className = `cep-message cep-${tipo}`;
         div.innerHTML = mensagem;
         
-        // Estilos aprimorados
+        const cores = {
+            success: { bg: '#d4edda', color: '#155724', border: '#c3e6cb' },
+            error: { bg: '#f8d7da', color: '#721c24', border: '#f5c6cb' },
+            info: { bg: '#d1ecf1', color: '#0c5460', border: '#bee5eb' }
+        };
+        
+        const estilo = cores[tipo] || cores.info;
+        
         div.style.cssText = `
-            padding: 10px 15px;
+            padding: 12px 16px;
             margin-top: 8px;
             border-radius: 6px;
             font-size: 13px;
             font-weight: 500;
-            display: flex;
-            align-items: center;
-            gap: 8px;
+            line-height: 1.4;
+            background-color: ${estilo.bg};
+            color: ${estilo.color};
+            border: 1px solid ${estilo.border};
             animation: slideIn 0.3s ease-out;
-            ${tipo === 'success' 
-                ? 'background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb;' 
-                : 'background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb;'
-            }
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         `;
         
-        // Inserir mensagem
         const cepField = document.getElementById('cep');
-        if (cepField && cepField.parentNode) {
+        if (cepField?.parentNode) {
             cepField.parentNode.insertBefore(div, cepField.nextSibling);
         }
         
-        // Auto-remover após 6 segundos
+        // Auto-remover baseado no tipo
+        const tempoRemocao = tipo === 'error' ? 8000 : tipo === 'info' ? 6000 : 4000;
         setTimeout(() => {
-            if (div && div.parentNode) {
+            if (div?.parentNode) {
                 div.style.animation = 'slideOut 0.3s ease-in';
                 setTimeout(() => div.remove(), 300);
             }
-        }, 6000);
+        }, tempoRemocao);
     }
     
-    // Manter o restante do código existente (validação de senhas, etc.)
-    // ...
+    // Manter as outras funções (preencherCamposEndereco, mostrarCarregandoCEP, etc.)
+    // ... [resto do código anterior]
 });
-
-// CSS para animações (adicionar no <head> se necessário)
-const style = document.createElement('style');
-style.textContent = `
-    @keyframes slideIn {
-        from { opacity: 0; transform: translateY(-10px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-    @keyframes slideOut {
-        from { opacity: 1; transform: translateY(0); }
-        to { opacity: 0; transform: translateY(-10px); }
-    }
-`;
-document.head.appendChild(style);
 </script>
 </body>
 </html>
