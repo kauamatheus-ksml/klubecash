@@ -22,13 +22,18 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION[
 
 $userId = $_SESSION['user_id'];
 
-// Inicializar variáveis para mensagens de feedback
+// Capturar mensagens de feedback da sessão E LIMPAR IMEDIATAMENTE para evitar conflitos
 $personalInfoMessage = $_SESSION['personal_info_message'] ?? '';
 $personalInfoSuccess = $_SESSION['personal_info_success'] ?? false;
 $addressMessage = $_SESSION['address_message'] ?? '';
 $addressSuccess = $_SESSION['address_success'] ?? false;
 $passwordMessage = $_SESSION['password_message'] ?? '';
 $passwordSuccess = $_SESSION['password_success'] ?? false;
+
+// NOVO: Limpar mensagens da sessão imediatamente após capturar
+unset($_SESSION['personal_info_message'], $_SESSION['personal_info_success']);
+unset($_SESSION['address_message'], $_SESSION['address_success']);
+unset($_SESSION['password_message'], $_SESSION['password_success']);
 
 // Função para registrar erros em log e exibir mensagem amigável
 function logError($message, $error) {
@@ -63,13 +68,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['personal_info_message'] = logError('Erro ao atualizar informações pessoais', $e->getMessage());
         }
         
-        // Redirecionar para evitar reenvio
-        header("Location: " . $_SERVER['REQUEST_URI'] . "#personal-info");
+        // CORREÇÃO: Usar URL absoluta e adicionar timestamp para forçar reload
+        $redirectUrl = CLIENT_PROFILE_URL . '?updated=' . time() . '#personal-info';
+        header("Location: " . $redirectUrl);
         exit;
     }
     
-    // Formulário de endereço (mantém o mesmo)
-     if (isset($_POST['form_type']) && $_POST['form_type'] === 'address') {
+    // Formulário de endereço
+    if (isset($_POST['form_type']) && $_POST['form_type'] === 'address') {
         try {
             $updateData = [
                 'endereco' => [
@@ -95,12 +101,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['address_message'] = logError('Erro ao atualizar endereço', $e->getMessage());
         }
         
-        // Redirecionar para evitar reenvio
-        header("Location: " . $_SERVER['REQUEST_URI'] . "#address");
+        // CORREÇÃO: Usar URL absoluta e adicionar timestamp
+        $redirectUrl = CLIENT_PROFILE_URL . '?updated=' . time() . '#address';
+        header("Location: " . $redirectUrl);
         exit;
     }
     
-    // Formulário de alteração de senha (mantém o mesmo)
+    // Formulário de alteração de senha
     if (isset($_POST['form_type']) && $_POST['form_type'] === 'password') {
         try {
             $senhaAtual = $_POST['senha_atual'] ?? '';
@@ -137,14 +144,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['password_message'] = logError('Erro ao atualizar senha', $e->getMessage());
         }
         
-        // Redirecionar para evitar reenvio
-        header("Location: " . $_SERVER['REQUEST_URI'] . "#password");
+        // CORREÇÃO: Usar URL absoluta e adicionar timestamp
+        $redirectUrl = CLIENT_PROFILE_URL . '?updated=' . time() . '#password';
+        header("Location: " . $redirectUrl);
         exit;
     }
 }
 
-// Carregar dados do perfil depois de qualquer atualização
+// CARREGAR DADOS DO PERFIL - Garantir que sempre carregue completamente
+$error = false;
+$errorMessage = '';
+$profileData = [];
+
 try {
+    // NOVO: Adicionar delay mínimo para garantir que a atualização foi processada
+    if (isset($_GET['updated'])) {
+        usleep(100000); // 0.1 segundo de delay
+    }
+    
     $profileResult = ClientController::getProfileData($userId);
     
     if (!$profileResult['status']) {
@@ -172,26 +189,41 @@ try {
                 'total_lojas_utilizadas' => 0
             ];
         }
+        
+        // NOVO: Garantir que dados do perfil existam
+        if (!isset($profileData['perfil']) || !is_array($profileData['perfil'])) {
+            $profileData['perfil'] = [
+                'nome' => '',
+                'email' => '',
+                'cpf' => '',
+                'cpf_editavel' => true
+            ];
+        }
     }
 } catch (Exception $e) {
     $error = true;
     $errorMessage = logError('Erro ao carregar dados do perfil', $e->getMessage());
-    $profileData = [];
+    $profileData = [
+        'perfil' => ['nome' => '', 'email' => '', 'cpf' => '', 'cpf_editavel' => true],
+        'contato' => [],
+        'endereco' => [],
+        'estatisticas' => ['total_cashback' => 0, 'total_transacoes' => 0, 'total_compras' => 0, 'total_lojas_utilizadas' => 0]
+    ];
 }
 
-// Calcular progresso do perfil (ATUALIZADO para incluir CPF)
+// Calcular progresso do perfil
 $profileCompletion = 0;
-$totalSteps = 6; // Mantém 6 passos
+$totalSteps = 6;
 $completedSteps = 0;
 
 if (!empty($profileData['perfil']['nome'])) $completedSteps++;
 
-// MODIFICADO: CPF conta como completo se existe (editável ou não)
+// CPF conta como completo se existe
 if (!empty($profileData['perfil']['cpf'])) {
     $completedSteps++;
-    $cpfPendente = false; // Se já tem CPF, não está mais pendente
+    $cpfPendente = false;
 } else {
-    $cpfPendente = $profileData['perfil']['cpf_editavel']; // Só pendente se ainda pode editar
+    $cpfPendente = isset($profileData['perfil']['cpf_editavel']) ? $profileData['perfil']['cpf_editavel'] : true;
 }
 
 if (!empty($profileData['contato']['telefone']) || !empty($profileData['contato']['celular'])) $completedSteps++;
@@ -199,10 +231,7 @@ if (!empty($profileData['contato']['email_alternativo'])) $completedSteps++;
 if (!empty($profileData['endereco']['cep']) && !empty($profileData['endereco']['logradouro'])) $completedSteps++;
 if (!empty($profileData['endereco']['cidade']) && !empty($profileData['endereco']['estado'])) $completedSteps++;
 
-$profileCompletion = ($completedSteps / $totalSteps) * 100;
-
-// Verificar se CPF está pendente para mostrar alerta
-$cpfPendente = empty($profileData['perfil']['cpf']);
+$profileCompletion = $totalSteps > 0 ? ($completedSteps / $totalSteps) * 100 : 0;
 ?>
 
 <!DOCTYPE html>
@@ -212,11 +241,44 @@ $cpfPendente = empty($profileData['perfil']['cpf']);
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Meu Perfil - Klube Cash</title>
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
-    <link rel="stylesheet" href="../assets/css/views/client/profile.css">
+    <link rel="stylesheet" href="../../assets/css/views/client/profile.css">
     <!-- Font Awesome para ícones -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     
-    <
+    <style>
+        /* NOVO: Estilos para garantir carregamento visual correto */
+        .profile-container {
+            min-height: 70vh;
+        }
+        
+        .loading-fallback {
+            display: none;
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        /* Garantir que o conteúdo seja exibido */
+        .profile-layout {
+            opacity: 1;
+            transition: opacity 0.3s ease;
+        }
+        
+        .profile-layout.loading {
+            opacity: 0.7;
+        }
+        
+        /* Melhorar exibição dos alertas */
+        .alert {
+            margin-bottom: 20px;
+            animation: slideIn 0.3s ease;
+        }
+        
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
 </head>
 <body>
     <!-- Incluir navbar -->
@@ -229,14 +291,27 @@ $cpfPendente = empty($profileData['perfil']['cpf']);
             <p>Mantenha suas informações sempre atualizadas para uma experiência completa no Klube Cash</p>
         </div>
 
-        <?php if (isset($error) && $error): ?>
+        <?php if ($error): ?>
             <div class="alert alert-danger">
                 <i class="fas fa-exclamation-triangle"></i>
                 <?php echo htmlspecialchars($errorMessage); ?>
             </div>
+            
+            <!-- Fallback de loading em caso de erro -->
+            <div class="loading-fallback">
+                <i class="fas fa-sync fa-spin"></i>
+                <p>Recarregando dados do perfil...</p>
+            </div>
+            
+            <script>
+                // NOVO: Tentar recarregar a página se houver erro
+                setTimeout(function() {
+                    window.location.reload();
+                }, 3000);
+            </script>
         <?php else: ?>
 
-        <!-- Alerta de CPF pendente (NOVO) -->
+        <!-- Alerta de CPF pendente -->
         <?php if ($cpfPendente): ?>
             <div class="cpf-alert">
                 <h3><i class="fas fa-exclamation-triangle"></i> Complete seu perfil</h3>
@@ -270,7 +345,7 @@ $cpfPendente = empty($profileData['perfil']['cpf']);
         </div>
 
         <!-- Layout principal -->
-        <div class="profile-layout">
+        <div class="profile-layout" id="profileLayout">
             <!-- Card de informações do usuário -->
             <div class="user-info-card">
                 <div class="user-avatar">
@@ -279,20 +354,42 @@ $cpfPendente = empty($profileData['perfil']['cpf']);
                 <h2 class="user-name"><?php echo htmlspecialchars($profileData['perfil']['nome'] ?? 'Usuário'); ?></h2>
                 <p class="user-email"><?php echo htmlspecialchars($profileData['perfil']['email'] ?? ''); ?></p>
                 
-                <!-- Mostrar CPF formatado se disponível (NOVO) -->
+                <!-- Mostrar CPF formatado se disponível -->
                 <?php if (!empty($profileData['perfil']['cpf'])): ?>
                     <p class="user-cpf" style="color: var(--medium-gray); font-size: 0.9rem; margin-bottom: 25px;">
-                        <i class="fas fa-id-card"></i> CPF: <?php echo Validator::formataCPF($profileData['perfil']['cpf']); ?>
+                        <i class="fas fa-id-card"></i> CPF: <?php 
+                        // Formatação manual do CPF para exibição
+                        $cpf = $profileData['perfil']['cpf'];
+                        if (strlen($cpf) === 11) {
+                            echo substr($cpf, 0, 3) . '.' . substr($cpf, 3, 3) . '.' . substr($cpf, 6, 3) . '-' . substr($cpf, 9, 2);
+                        } else {
+                            echo $cpf;
+                        }
+                        ?>
                     </p>
                 <?php endif; ?>
                 
-                
+                <!-- Estatísticas do usuário -->
+                <div class="user-stats">
+                    <div class="stat-item">
+                        <div class="stat-value">R$ <?php echo number_format($profileData['estatisticas']['total_cashback'] ?? 0, 2, ',', '.'); ?></div>
+                        <div class="stat-label">Total Cashback</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value"><?php echo number_format($profileData['estatisticas']['total_transacoes'] ?? 0); ?></div>
+                        <div class="stat-label">Transações</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value"><?php echo number_format($profileData['estatisticas']['total_lojas_utilizadas'] ?? 0); ?></div>
+                        <div class="stat-label">Lojas</div>
+                    </div>
+                </div>
             </div>
 
             <!-- Seção de formulários -->
             <div class="form-section">
-                <!-- Formulário de informações pessoais (ATUALIZADO) -->
-                <div class="form-card" id="personal-info"><div class="form-card" id="personal-info">
+                <!-- Formulário de informações pessoais -->
+                <div class="form-card" id="personal-info">
                     <div class="form-card-header">
                         <h3 class="form-card-title">
                             <i class="fas fa-user"></i>
@@ -319,60 +416,37 @@ $cpfPendente = empty($profileData['perfil']['cpf']);
                                        required placeholder="Digite seu nome completo">
                             </div>
                             
-                            <!-- MODIFICADO: Campo CPF com verificação de edição -->
-                            <div class="form-group <?php echo ($cpfPendente && $profileData['perfil']['cpf_editavel']) ? 'cpf-required' : ''; ?>">
+                            <!-- Campo CPF com verificação de edição -->
+                            <div class="form-group <?php echo ($cpfPendente && ($profileData['perfil']['cpf_editavel'] ?? true)) ? 'cpf-required' : ''; ?>">
                                 <label class="form-label" for="cpf">
-                                    CPF 
-                                    <?php if ($cpfPendente && $profileData['perfil']['cpf_editavel']): ?>
+                                    CPF
+                                    <?php if ($cpfPendente): ?>
                                         <span class="required">*</span>
-                                    <?php endif; ?>
-                                    <?php if (!$profileData['perfil']['cpf_editavel']): ?>
-                                        <span class="cpf-verified"><i class="fas fa-check-circle"></i> Verificado</span>
                                     <?php endif; ?>
                                 </label>
                                 <input type="text" id="cpf" name="cpf" class="form-control" 
-                                    value="<?php echo htmlspecialchars($profileData['perfil']['cpf'] ?? ''); ?>" 
-                                    placeholder="000.000.000-00"
-                                    maxlength="14"
-                                    <?php echo !$profileData['perfil']['cpf_editavel'] ? 'disabled' : ''; ?>
-                                    <?php echo ($cpfPendente && $profileData['perfil']['cpf_editavel']) ? 'required' : ''; ?>>
-                                
-                                <?php if (!$profileData['perfil']['cpf_editavel']): ?>
-                                    <p class="form-help cpf-fixed">
-                                        <i class="fas fa-lock"></i>
-                                        CPF verificado e validado. Não pode ser alterado por segurança.
-                                    </p>
-                                <?php else: ?>
-                                    <p class="form-help">
-                                        <i class="fas fa-shield-alt"></i>
-                                        Seu CPF é necessário para maior segurança nas transações
-                                    </p>
+                                       value="<?php echo htmlspecialchars($profileData['perfil']['cpf'] ?? ''); ?>"
+                                       placeholder="000.000.000-00"
+                                       maxlength="14"
+                                       <?php echo (!($profileData['perfil']['cpf_editavel'] ?? true)) ? 'readonly' : ''; ?>>
+                                <?php if (!($profileData['perfil']['cpf_editavel'] ?? true)): ?>
+                                    <small class="form-text text-muted">
+                                        <i class="fas fa-lock"></i> CPF já validado e não pode ser alterado
+                                    </small>
                                 <?php endif; ?>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label class="form-label" for="email">E-mail Principal</label>
-                                <input type="email" id="email" class="form-control" 
-                                       value="<?php echo htmlspecialchars($profileData['perfil']['email'] ?? ''); ?>" 
-                                       disabled>
-                                <p class="form-help">
-                                    <i class="fas fa-info-circle"></i>
-                                    O e-mail principal não pode ser alterado por segurança
-                                </p>
                             </div>
                             
                             <div class="form-row">
                                 <div class="form-group">
                                     <label class="form-label" for="telefone">Telefone</label>
                                     <input type="tel" id="telefone" name="telefone" class="form-control" 
-                                           value="<?php echo htmlspecialchars($profileData['contato']['telefone'] ?? ''); ?>"
+                                           value="<?php echo htmlspecialchars($profileData['contato']['telefone'] ?? ''); ?>" 
                                            placeholder="(00) 0000-0000">
                                 </div>
-                                
                                 <div class="form-group">
                                     <label class="form-label" for="celular">Celular</label>
                                     <input type="tel" id="celular" name="celular" class="form-control" 
-                                           value="<?php echo htmlspecialchars($profileData['contato']['celular'] ?? ''); ?>"
+                                           value="<?php echo htmlspecialchars($profileData['contato']['celular'] ?? ''); ?>" 
                                            placeholder="(00) 00000-0000">
                                 </div>
                             </div>
@@ -380,23 +454,21 @@ $cpfPendente = empty($profileData['perfil']['cpf']);
                             <div class="form-group">
                                 <label class="form-label" for="email_alternativo">E-mail Alternativo</label>
                                 <input type="email" id="email_alternativo" name="email_alternativo" class="form-control" 
-                                       value="<?php echo htmlspecialchars($profileData['contato']['email_alternativo'] ?? ''); ?>"
-                                       placeholder="email.alternativo@exemplo.com">
-                                <p class="form-help">
-                                    <i class="fas fa-info-circle"></i>
-                                    Usado para recuperação de conta e comunicações importantes
-                                </p>
+                                       value="<?php echo htmlspecialchars($profileData['contato']['email_alternativo'] ?? ''); ?>" 
+                                       placeholder="seuemail@exemplo.com">
                             </div>
                             
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-save"></i>
-                                Salvar Informações
-                            </button>
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-save"></i>
+                                    Salvar Alterações
+                                </button>
+                            </div>
                         </form>
                     </div>
                 </div>
 
-                <!-- Formulário de endereço (mantém o mesmo) -->
+                <!-- Formulário de endereço -->
                 <div class="form-card" id="address">
                     <div class="form-card-header">
                         <h3 class="form-card-title">
@@ -415,77 +487,102 @@ $cpfPendente = empty($profileData['perfil']['cpf']);
                         <form action="" method="POST" id="addressForm">
                             <input type="hidden" name="form_type" value="address">
                             
-                            <div class="form-group">
-                                <label class="form-label" for="cep">CEP</label>
-                                <input type="text" id="cep" name="cep" class="form-control" 
-                                       value="<?php echo htmlspecialchars($profileData['endereco']['cep'] ?? ''); ?>"
-                                       placeholder="00000-000" maxlength="9">
-                                <p class="form-help">
-                                    <i class="fas fa-magic"></i>
-                                    Digite o CEP para preencher automaticamente o endereço
-                                </p>
-                            </div>
-                            
                             <div class="form-row">
-                                <div class="form-group" style="grid-column: span 2;">
+                                <div class="form-group col-md-4">
+                                    <label class="form-label" for="cep">CEP</label>
+                                    <input type="text" id="cep" name="cep" class="form-control" 
+                                           value="<?php echo htmlspecialchars($profileData['endereco']['cep'] ?? ''); ?>" 
+                                           placeholder="00000-000" maxlength="9">
+                                </div>
+                                <div class="form-group col-md-8">
                                     <label class="form-label" for="logradouro">Logradouro</label>
                                     <input type="text" id="logradouro" name="logradouro" class="form-control" 
-                                           value="<?php echo htmlspecialchars($profileData['endereco']['logradouro'] ?? ''); ?>"
+                                           value="<?php echo htmlspecialchars($profileData['endereco']['logradouro'] ?? ''); ?>" 
                                            placeholder="Rua, Avenida, etc.">
                                 </div>
-                                
-                                <div class="form-group">
+                            </div>
+                            
+                            <div class="form-row">
+                                <div class="form-group col-md-3">
                                     <label class="form-label" for="numero">Número</label>
                                     <input type="text" id="numero" name="numero" class="form-control" 
-                                           value="<?php echo htmlspecialchars($profileData['endereco']['numero'] ?? ''); ?>"
+                                           value="<?php echo htmlspecialchars($profileData['endereco']['numero'] ?? ''); ?>" 
                                            placeholder="123">
+                                </div>
+                                <div class="form-group col-md-9">
+                                    <label class="form-label" for="complemento">Complemento</label>
+                                    <input type="text" id="complemento" name="complemento" class="form-control" 
+                                           value="<?php echo htmlspecialchars($profileData['endereco']['complemento'] ?? ''); ?>" 
+                                           placeholder="Apartamento, Bloco, etc.">
                                 </div>
                             </div>
                             
                             <div class="form-group">
-                                <label class="form-label" for="complemento">Complemento</label>
-                                <input type="text" id="complemento" name="complemento" class="form-control" 
-                                       value="<?php echo htmlspecialchars($profileData['endereco']['complemento'] ?? ''); ?>"
-                                       placeholder="Apartamento, Bloco, etc. (opcional)">
+                                <label class="form-label" for="bairro">Bairro</label>
+                                <input type="text" id="bairro" name="bairro" class="form-control" 
+                                       value="<?php echo htmlspecialchars($profileData['endereco']['bairro'] ?? ''); ?>" 
+                                       placeholder="Nome do bairro">
                             </div>
                             
                             <div class="form-row">
-                                <div class="form-group">
-                                    <label class="form-label" for="bairro">Bairro</label>
-                                    <input type="text" id="bairro" name="bairro" class="form-control" 
-                                           value="<?php echo htmlspecialchars($profileData['endereco']['bairro'] ?? ''); ?>"
-                                           placeholder="Centro">
-                                </div>
-                                
-                                <div class="form-group">
+                                <div class="form-group col-md-8">
                                     <label class="form-label" for="cidade">Cidade</label>
                                     <input type="text" id="cidade" name="cidade" class="form-control" 
-                                           value="<?php echo htmlspecialchars($profileData['endereco']['cidade'] ?? ''); ?>"
-                                           placeholder="São Paulo">
+                                           value="<?php echo htmlspecialchars($profileData['endereco']['cidade'] ?? ''); ?>" 
+                                           placeholder="Nome da cidade">
                                 </div>
-                                
-                                <div class="form-group">
+                                <div class="form-group col-md-4">
                                     <label class="form-label" for="estado">Estado</label>
-                                    <input type="text" id="estado" name="estado" class="form-control" 
-                                           value="<?php echo htmlspecialchars($profileData['endereco']['estado'] ?? ''); ?>"
-                                           placeholder="SP" maxlength="2">
+                                    <select id="estado" name="estado" class="form-control">
+                                        <option value="">Selecione</option>
+                                        <!-- Lista de estados brasileiros -->
+                                        <option value="AC" <?php echo ($profileData['endereco']['estado'] ?? '') === 'AC' ? 'selected' : ''; ?>>Acre</option>
+                                        <option value="AL" <?php echo ($profileData['endereco']['estado'] ?? '') === 'AL' ? 'selected' : ''; ?>>Alagoas</option>
+                                        <option value="AP" <?php echo ($profileData['endereco']['estado'] ?? '') === 'AP' ? 'selected' : ''; ?>>Amapá</option>
+                                        <option value="AM" <?php echo ($profileData['endereco']['estado'] ?? '') === 'AM' ? 'selected' : ''; ?>>Amazonas</option>
+                                        <option value="BA" <?php echo ($profileData['endereco']['estado'] ?? '') === 'BA' ? 'selected' : ''; ?>>Bahia</option>
+                                        <option value="CE" <?php echo ($profileData['endereco']['estado'] ?? '') === 'CE' ? 'selected' : ''; ?>>Ceará</option>
+                                        <option value="DF" <?php echo ($profileData['endereco']['estado'] ?? '') === 'DF' ? 'selected' : ''; ?>>Distrito Federal</option>
+                                        <option value="ES" <?php echo ($profileData['endereco']['estado'] ?? '') === 'ES' ? 'selected' : ''; ?>>Espírito Santo</option>
+                                        <option value="GO" <?php echo ($profileData['endereco']['estado'] ?? '') === 'GO' ? 'selected' : ''; ?>>Goiás</option>
+                                        <option value="MA" <?php echo ($profileData['endereco']['estado'] ?? '') === 'MA' ? 'selected' : ''; ?>>Maranhão</option>
+                                        <option value="MT" <?php echo ($profileData['endereco']['estado'] ?? '') === 'MT' ? 'selected' : ''; ?>>Mato Grosso</option>
+                                        <option value="MS" <?php echo ($profileData['endereco']['estado'] ?? '') === 'MS' ? 'selected' : ''; ?>>Mato Grosso do Sul</option>
+                                        <option value="MG" <?php echo ($profileData['endereco']['estado'] ?? '') === 'MG' ? 'selected' : ''; ?>>Minas Gerais</option>
+                                        <option value="PA" <?php echo ($profileData['endereco']['estado'] ?? '') === 'PA' ? 'selected' : ''; ?>>Pará</option>
+                                        <option value="PB" <?php echo ($profileData['endereco']['estado'] ?? '') === 'PB' ? 'selected' : ''; ?>>Paraíba</option>
+                                        <option value="PR" <?php echo ($profileData['endereco']['estado'] ?? '') === 'PR' ? 'selected' : ''; ?>>Paraná</option>
+                                        <option value="PE" <?php echo ($profileData['endereco']['estado'] ?? '') === 'PE' ? 'selected' : ''; ?>>Pernambuco</option>
+                                        <option value="PI" <?php echo ($profileData['endereco']['estado'] ?? '') === 'PI' ? 'selected' : ''; ?>>Piauí</option>
+                                        <option value="RJ" <?php echo ($profileData['endereco']['estado'] ?? '') === 'RJ' ? 'selected' : ''; ?>>Rio de Janeiro</option>
+                                        <option value="RN" <?php echo ($profileData['endereco']['estado'] ?? '') === 'RN' ? 'selected' : ''; ?>>Rio Grande do Norte</option>
+                                        <option value="RS" <?php echo ($profileData['endereco']['estado'] ?? '') === 'RS' ? 'selected' : ''; ?>>Rio Grande do Sul</option>
+                                        <option value="RO" <?php echo ($profileData['endereco']['estado'] ?? '') === 'RO' ? 'selected' : ''; ?>>Rondônia</option>
+                                        <option value="RR" <?php echo ($profileData['endereco']['estado'] ?? '') === 'RR' ? 'selected' : ''; ?>>Roraima</option>
+                                        <option value="SC" <?php echo ($profileData['endereco']['estado'] ?? '') === 'SC' ? 'selected' : ''; ?>>Santa Catarina</option>
+                                        <option value="SP" <?php echo ($profileData['endereco']['estado'] ?? '') === 'SP' ? 'selected' : ''; ?>>São Paulo</option>
+                                        <option value="SE" <?php echo ($profileData['endereco']['estado'] ?? '') === 'SE' ? 'selected' : ''; ?>>Sergipe</option>
+                                        <option value="TO" <?php echo ($profileData['endereco']['estado'] ?? '') === 'TO' ? 'selected' : ''; ?>>Tocantins</option>
+                                    </select>
                                 </div>
                             </div>
                             
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-save"></i>
-                                Salvar Endereço
-                            </button>
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-save"></i>
+                                    Salvar Endereço
+                                </button>
+                            </div>
                         </form>
                     </div>
                 </div>
 
-                <!-- Formulário de alteração de senha (mantém o mesmo) -->
+                <!-- Formulário de alteração de senha -->
                 <div class="form-card" id="password">
                     <div class="form-card-header">
                         <h3 class="form-card-title">
-                            <i class="fas fa-shield-alt"></i>
-                            Segurança da Conta
+                            <i class="fas fa-lock"></i>
+                            Alterar Senha
                         </h3>
                     </div>
                     <div class="form-card-body">
@@ -500,268 +597,137 @@ $cpfPendente = empty($profileData['perfil']['cpf']);
                             <input type="hidden" name="form_type" value="password">
                             
                             <div class="form-group">
-                                <label class="form-label" for="senha_atual">Senha Atual <span class="required">*</span></label>
+                                <label class="form-label" for="senha_atual">
+                                    Senha Atual <span class="required">*</span>
+                                </label>
                                 <input type="password" id="senha_atual" name="senha_atual" class="form-control" 
                                        required placeholder="Digite sua senha atual">
                             </div>
                             
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label class="form-label" for="nova_senha">Nova Senha <span class="required">*</span></label>
-                                    <input type="password" id="nova_senha" name="nova_senha" class="form-control" 
-                                           required placeholder="Digite a nova senha">
-                                    <p class="form-help">
-                                        <i class="fas fa-key"></i>
-                                        Mínimo de <?php echo PASSWORD_MIN_LENGTH; ?> caracteres
-                                    </p>
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label class="form-label" for="confirmar_senha">Confirmar Nova Senha <span class="required">*</span></label>
-                                    <input type="password" id="confirmar_senha" name="confirmar_senha" class="form-control" 
-                                           required placeholder="Digite novamente a nova senha">
-                                </div>
+                            <div class="form-group">
+                                <label class="form-label" for="nova_senha">
+                                    Nova Senha <span class="required">*</span>
+                                </label>
+                                <input type="password" id="nova_senha" name="nova_senha" class="form-control" 
+                                       required placeholder="Digite sua nova senha" 
+                                       minlength="<?php echo PASSWORD_MIN_LENGTH; ?>">
+                                <small class="form-text text-muted">
+                                    A senha deve ter pelo menos <?php echo PASSWORD_MIN_LENGTH; ?> caracteres
+                                </small>
                             </div>
                             
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-lock"></i>
-                                Alterar Senha
-                            </button>
+                            <div class="form-group">
+                                <label class="form-label" for="confirmar_senha">
+                                    Confirmar Nova Senha <span class="required">*</span>
+                                </label>
+                                <input type="password" id="confirmar_senha" name="confirmar_senha" class="form-control" 
+                                       required placeholder="Confirme sua nova senha">
+                            </div>
+                            
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-key"></i>
+                                    Alterar Senha
+                                </button>
+                            </div>
                         </form>
                     </div>
                 </div>
             </div>
         </div>
+
         <?php endif; ?>
     </div>
-    
+
+    <!-- Scripts -->
     <script>
+        // NOVO: Script para garantir que a página carregue corretamente
         document.addEventListener('DOMContentLoaded', function() {
-            const hash = window.location.hash;
-            if (hash) {
-                const element = document.querySelector(hash);
-                if (element) {
-                    // Pequeno delay para garantir que a página carregou
-                    setTimeout(() => {
-                        element.scrollIntoView({ 
-                            behavior: 'smooth', 
-                            block: 'center' 
-                        });
-                    }, 100);
-                }
+            // Garantir que o layout seja exibido
+            const profileLayout = document.getElementById('profileLayout');
+            if (profileLayout) {
+                profileLayout.classList.remove('loading');
             }
-        });
-        // Script aprimorado para preenchimento automático de endereço via CEP
-        document.getElementById('cep').addEventListener('blur', function() {
-            const cep = this.value.replace(/\D/g, '');
             
-            if (cep.length !== 8) {
-                return;
-            }
-
-            // Mostrar loading
-            this.style.opacity = '0.6';
-            this.disabled = true;
-            
-            fetch(`https://viacep.com.br/ws/${cep}/json/`)
-                .then(response => response.json())
-                .then(data => {
-                    if (!data.erro) {
-                        document.getElementById('logradouro').value = data.logradouro;
-                        document.getElementById('bairro').value = data.bairro;
-                        document.getElementById('cidade').value = data.localidade;
-                        document.getElementById('estado').value = data.uf;
-                        document.getElementById('numero').focus();
-                        
-                        // Mostrar feedback visual
-                        showNotification('✅ Endereço preenchido automaticamente!', 'success');
-                    } else {
-                        showNotification('❌ CEP não encontrado', 'error');
-                    }
-                })
-                .catch(error => {
-                    console.error('Erro:', error);
-                    showNotification('⚠️ Erro ao buscar CEP', 'warning');
-                })
-                .finally(() => {
-                    // Remover loading
-                    this.style.opacity = '1';
-                    this.disabled = false;
+            // Aplicar máscaras nos campos
+            const cpfField = document.getElementById('cpf');
+            if (cpfField) {
+                cpfField.addEventListener('input', function(e) {
+                    let value = e.target.value.replace(/\D/g, '');
+                    value = value.replace(/(\d{3})(\d)/, '$1.$2');
+                    value = value.replace(/(\d{3})(\d)/, '$1.$2');
+                    value = value.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+                    e.target.value = value;
                 });
-        });
-
-        // Aplicar máscara no CEP
-        document.getElementById('cep').addEventListener('input', function() {
-            let value = this.value.replace(/\D/g, '');
-            if (value.length > 5) {
-                value = value.substring(0, 5) + '-' + value.substring(5, 8);
-            }
-            this.value = value;
-        });
-
-        // NOVO: Aplicar máscara no CPF
-        document.getElementById('cpf').addEventListener('input', function() {
-            // Se o campo está desabilitado, não aplicar máscara
-            if (this.disabled) {
-                return;
             }
             
-            let value = this.value.replace(/\D/g, '');
-            
-            if (value.length <= 11) {
-                // Aplicar máscara: 000.000.000-00
-                value = value.replace(/(\d{3})(\d)/, '$1.$2');
-                value = value.replace(/(\d{3})(\d)/, '$1.$2');
-                value = value.replace(/(\d{3})(\d{1,2})/, '$1-$2');
+            const telefoneField = document.getElementById('telefone');
+            if (telefoneField) {
+                telefoneField.addEventListener('input', function(e) {
+                    let value = e.target.value.replace(/\D/g, '');
+                    value = value.replace(/(\d{2})(\d)/, '($1) $2');
+                    value = value.replace(/(\d{4})(\d)/, '$1-$2');
+                    e.target.value = value;
+                });
             }
             
-            this.value = value;
-        });
-
-        // NOVO: Validação de CPF em tempo real
-        document.getElementById('cpf').addEventListener('blur', function() {
-            // Se o campo está desabilitado, não validar
-            if (this.disabled) {
-                return;
+            const celularField = document.getElementById('celular');
+            if (celularField) {
+                celularField.addEventListener('input', function(e) {
+                    let value = e.target.value.replace(/\D/g, '');
+                    value = value.replace(/(\d{2})(\d)/, '($1) $2');
+                    value = value.replace(/(\d{5})(\d)/, '$1-$2');
+                    e.target.value = value;
+                });
             }
             
-            const cpf = this.value.replace(/\D/g, '');
-            
-            if (cpf.length === 0) {
-                return; // Campo vazio é permitido se não for obrigatório
+            const cepField = document.getElementById('cep');
+            if (cepField) {
+                cepField.addEventListener('input', function(e) {
+                    let value = e.target.value.replace(/\D/g, '');
+                    value = value.replace(/(\d{5})(\d)/, '$1-$2');
+                    e.target.value = value;
+                });
+                
+                // Buscar endereço por CEP
+                cepField.addEventListener('blur', function(e) {
+                    const cep = e.target.value.replace(/\D/g, '');
+                    if (cep.length === 8) {
+                        fetch(`https://viacep.com.br/ws/${cep}/json/`)
+                            .then(response => response.json())
+                            .then(data => {
+                                if (!data.erro) {
+                                    document.getElementById('logradouro').value = data.logradouro || '';
+                                    document.getElementById('bairro').value = data.bairro || '';
+                                    document.getElementById('cidade').value = data.localidade || '';
+                                    document.getElementById('estado').value = data.uf || '';
+                                }
+                            })
+                            .catch(error => console.log('Erro ao buscar CEP:', error));
+                    }
+                });
             }
             
-            if (!validarCPF(cpf)) {
-                this.style.borderColor = 'var(--danger-color)';
-                showNotification('❌ CPF inválido', 'error');
-            } else {
-                this.style.borderColor = 'var(--success-color)';
-                showNotification('✅ CPF válido', 'success');
-            }
-        });
-
-        // NOVO: Função para validar CPF
-        function validarCPF(cpf) {
-            if (cpf.length !== 11) return false;
+            // Validação de senha em tempo real
+            const novaSenhaField = document.getElementById('nova_senha');
+            const confirmarSenhaField = document.getElementById('confirmar_senha');
             
-            // Eliminar CPFs conhecidos como inválidos
-            if (/^(\d)\1{10}$/.test(cpf)) return false;
-            
-            // Validar 1º dígito
-            let soma = 0;
-            for (let i = 0; i < 9; i++) {
-                soma += parseInt(cpf.charAt(i)) * (10 - i);
-            }
-            let resto = (soma * 10) % 11;
-            if (resto === 10 || resto === 11) resto = 0;
-            if (resto !== parseInt(cpf.charAt(9))) return false;
-            
-            // Validar 2º dígito
-            soma = 0;
-            for (let i = 0; i < 10; i++) {
-                soma += parseInt(cpf.charAt(i)) * (11 - i);
-            }
-            resto = (soma * 10) % 11;
-            if (resto === 10 || resto === 11) resto = 0;
-            if (resto !== parseInt(cpf.charAt(10))) return false;
-            
-            return true;
-        }
-
-        // Validação em tempo real da senha
-        document.getElementById('nova_senha').addEventListener('input', function() {
-            const password = this.value;
-            const minLength = <?php echo PASSWORD_MIN_LENGTH; ?>;
-            
-            if (password.length > 0 && password.length < minLength) {
-                this.style.borderColor = 'var(--danger-color)';
-            } else if (password.length >= minLength) {
-                this.style.borderColor = 'var(--success-color)';
-            } else {
-                this.style.borderColor = '#e9ecef';
-            }
-        });
-
-        // Validação de confirmação de senha
-        document.getElementById('confirmar_senha').addEventListener('input', function() {
-            const password = document.getElementById('nova_senha').value;
-            const confirm = this.value;
-            
-            if (confirm.length > 0) {
-                if (password === confirm) {
-                    this.style.borderColor = 'var(--success-color)';
-                } else {
-                    this.style.borderColor = 'var(--danger-color)';
+            if (novaSenhaField && confirmarSenhaField) {
+                function validatePasswords() {
+                    const novaSenha = novaSenhaField.value;
+                    const confirmarSenha = confirmarSenhaField.value;
+                    
+                    if (confirmarSenha && novaSenha !== confirmarSenha) {
+                        confirmarSenhaField.setCustomValidity('As senhas não coincidem');
+                    } else {
+                        confirmarSenhaField.setCustomValidity('');
+                    }
                 }
-            } else {
-                this.style.borderColor = '#e9ecef';
+                
+                novaSenhaField.addEventListener('input', validatePasswords);
+                confirmarSenhaField.addEventListener('input', validatePasswords);
             }
         });
-
-        // Função para mostrar notificações
-        function showNotification(message, type = 'info') {
-            const notification = document.createElement('div');
-            notification.className = `notification notification-${type}`;
-            notification.style.cssText = `
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                padding: 15px 20px;
-                border-radius: 10px;
-                color: white;
-                font-weight: 500;
-                z-index: 9999;
-                transform: translateX(400px);
-                transition: transform 0.3s ease;
-                ${type === 'success' ? 'background: var(--success-color);' : ''}
-                ${type === 'error' ? 'background: var(--danger-color);' : ''}
-                ${type === 'warning' ? 'background: var(--warning-color); color: var(--dark-gray);' : ''}
-            `;
-            notification.textContent = message;
-            
-            document.body.appendChild(notification);
-            
-            // Animar entrada
-            setTimeout(() => {
-                notification.style.transform = 'translateX(0)';
-            }, 100);
-            
-            // Remover após 3 segundos
-            setTimeout(() => {
-                notification.style.transform = 'translateX(400px)';
-                setTimeout(() => {
-                    document.body.removeChild(notification);
-                }, 300);
-            }, 3000);
-        }
-
-        // Loading nos formulários
-        document.querySelectorAll('form').forEach(form => {
-            form.addEventListener('submit', function(e) {
-                const submitBtn = this.querySelector('button[type="submit"]');
-                if (submitBtn) {
-                    submitBtn.classList.add('loading');
-                    submitBtn.disabled = true;
-                    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
-                }
-            });
-        });
-
-        // Aplicar máscaras nos telefones
-        function phoneMask(input) {
-            input.addEventListener('input', function() {
-                let value = this.value.replace(/\D/g, '');
-                if (value.length <= 10) {
-                    value = value.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
-                } else {
-                    value = value.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
-                }
-                this.value = value;
-            });
-        }
-
-        phoneMask(document.getElementById('telefone'));
-        phoneMask(document.getElementById('celular'));
     </script>
 </body>
 </html>
