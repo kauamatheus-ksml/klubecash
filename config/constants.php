@@ -216,10 +216,7 @@ define('ADMIN_EMAIL_MARKETING_URL', SITE_URL . '/admin/email-marketing');
 define('ADMIN_EMAIL_TEMPLATES_URL', SITE_URL . '/admin/email-templates');
 define('ADMIN_EMAIL_CAMPAIGNS_URL', SITE_URL . '/admin/email-campanhas');
 
-// Configurações de envio em lote
-define('EMAIL_BATCH_SIZE', 50);
-define('EMAIL_SEND_DELAY', 100000);
-define('EMAIL_MAX_RETRIES', 3);
+
 
 // === PERFORMANCE CONFIGS ===
 define('CACHE_DURATION', 3600);
