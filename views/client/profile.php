@@ -316,7 +316,7 @@ $profileCompletion = $totalSteps > 0 ? ($completedSteps / $totalSteps) * 100 : 0
                     </p>
                 <?php endif; ?>
                 
-                <!-- Estatísticas do usuário -->
+                <!-- Estatísticas do usuário 
                 <div class="user-stats">
                     <div class="stat-item">
                         <div class="stat-value">R$ <?php echo number_format($profileData['estatisticas']['total_cashback'] ?? 0, 2, ',', '.'); ?></div>
@@ -330,7 +330,7 @@ $profileCompletion = $totalSteps > 0 ? ($completedSteps / $totalSteps) * 100 : 0
                         <div class="stat-value"><?php echo number_format($profileData['estatisticas']['total_lojas_utilizadas'] ?? 0); ?></div>
                         <div class="stat-label">Lojas</div>
                     </div>
-                </div>
+                </div> -->
             </div>
 
             <!-- Seção de formulários -->
