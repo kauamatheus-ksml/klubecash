@@ -587,92 +587,251 @@ $profileCompletion = $totalSteps > 0 ? ($completedSteps / $totalSteps) * 100 : 0
 
     <!-- Scripts simplificados e corrigidos -->
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Aplicar máscara no CPF
-            const cpfField = document.getElementById('cpf');
-            if (cpfField && !cpfField.readOnly) {
-                cpfField.addEventListener('input', function(e) {
-                    let value = e.target.value.replace(/\D/g, '');
-                    value = value.replace(/(\d{3})(\d)/, '$1.$2');
-                    value = value.replace(/(\d{3})(\d)/, '$1.$2');
-                    value = value.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
-                    e.target.value = value;
-                });
-            }
+document.addEventListener('DOMContentLoaded', function() {
+    // Aplicar máscara no CPF
+    const cpfField = document.getElementById('cpf');
+    if (cpfField && !cpfField.readOnly) {
+        cpfField.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            value = value.replace(/(\d{3})(\d)/, '$1.$2');
+            value = value.replace(/(\d{3})(\d)/, '$1.$2');
+            value = value.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+            e.target.value = value;
+        });
+    }
+    
+    // Aplicar máscaras em telefones
+    const telefoneField = document.getElementById('telefone');
+    if (telefoneField) {
+        telefoneField.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            value = value.replace(/(\d{2})(\d)/, '($1) $2');
+            value = value.replace(/(\d{4})(\d)/, '$1-$2');
+            e.target.value = value;
+        });
+    }
+    
+    const celularField = document.getElementById('celular');
+    if (celularField) {
+        celularField.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            value = value.replace(/(\d{2})(\d)/, '($1) $2');
+            value = value.replace(/(\d{5})(\d)/, '$1-$2');
+            e.target.value = value;
+        });
+    }
+    
+    // SEÇÃO APRIMORADA: Aplicar máscara no CEP e buscar endereço automaticamente
+    const cepField = document.getElementById('cep');
+    if (cepField) {
+        // Aplicar máscara de CEP enquanto digita
+        cepField.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, ''); // Remove tudo que não é número
+            value = value.replace(/(\d{5})(\d)/, '$1-$2'); // Adiciona o hífen após 5 dígitos
+            e.target.value = value;
+        });
+        
+        // Buscar endereço quando o usuário sair do campo CEP
+        cepField.addEventListener('blur', function(e) {
+            const cep = e.target.value.replace(/\D/g, ''); // Remove máscara para validação
             
-            // Aplicar máscaras em telefones
-            const telefoneField = document.getElementById('telefone');
-            if (telefoneField) {
-                telefoneField.addEventListener('input', function(e) {
-                    let value = e.target.value.replace(/\D/g, '');
-                    value = value.replace(/(\d{2})(\d)/, '($1) $2');
-                    value = value.replace(/(\d{4})(\d)/, '$1-$2');
-                    e.target.value = value;
-                });
-            }
-            
-            const celularField = document.getElementById('celular');
-            if (celularField) {
-                celularField.addEventListener('input', function(e) {
-                    let value = e.target.value.replace(/\D/g, '');
-                    value = value.replace(/(\d{2})(\d)/, '($1) $2');
-                    value = value.replace(/(\d{5})(\d)/, '$1-$2');
-                    e.target.value = value;
-                });
-            }
-            
-            // Aplicar máscara no CEP e buscar endereço
-            const cepField = document.getElementById('cep');
-            if (cepField) {
-                cepField.addEventListener('input', function(e) {
-                    let value = e.target.value.replace(/\D/g, '');
-                    value = value.replace(/(\d{5})(\d)/, '$1-$2');
-                    e.target.value = value;
-                });
+            // Verificar se o CEP tem 8 dígitos
+            if (cep.length === 8) {
+                // Mostrar indicador de carregamento
+                mostrarCarregandoCEP(true);
                 
-                cepField.addEventListener('blur', function(e) {
-                    const cep = e.target.value.replace(/\D/g, '');
-                    if (cep.length === 8) {
-                        fetch(`https://viacep.com.br/ws/${cep}/json/`)
-                            .then(response => response.json())
-                            .then(data => {
-                                if (!data.erro) {
-                                    const logradouroField = document.getElementById('logradouro');
-                                    const bairroField = document.getElementById('bairro');
-                                    const cidadeField = document.getElementById('cidade');
-                                    const estadoField = document.getElementById('estado');
-                                    
-                                    if (logradouroField) logradouroField.value = data.logradouro || '';
-                                    if (bairroField) bairroField.value = data.bairro || '';
-                                    if (cidadeField) cidadeField.value = data.localidade || '';
-                                    if (estadoField) estadoField.value = data.uf || '';
-                                }
-                            })
-                            .catch(error => console.log('Erro ao buscar CEP:', error));
-                    }
-                });
-            }
-            
-            // Validação de senhas
-            const novaSenhaField = document.getElementById('nova_senha');
-            const confirmarSenhaField = document.getElementById('confirmar_senha');
-            
-            if (novaSenhaField && confirmarSenhaField) {
-                function validatePasswords() {
-                    const novaSenha = novaSenhaField.value;
-                    const confirmarSenha = confirmarSenhaField.value;
-                    
-                    if (confirmarSenha && novaSenha !== confirmarSenha) {
-                        confirmarSenhaField.setCustomValidity('As senhas não coincidem');
-                    } else {
-                        confirmarSenhaField.setCustomValidity('');
-                    }
-                }
-                
-                novaSenhaField.addEventListener('input', validatePasswords);
-                confirmarSenhaField.addEventListener('input', validatePasswords);
+                // Fazer requisição para API do ViaCEP
+                fetch(`https://viacep.com.br/ws/${cep}/json/`)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Erro na consulta do CEP');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        // Verificar se o CEP foi encontrado
+                        if (data.erro) {
+                            mostrarErroCEP('CEP não encontrado. Verifique se está correto.');
+                            limparCamposEndereco();
+                        } else {
+                            // Preencher campos automaticamente
+                            preencherCamposEndereco(data);
+                            mostrarSucessoCEP('Endereço encontrado e preenchido automaticamente!');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Erro ao buscar CEP:', error);
+                        mostrarErroCEP('Erro ao consultar CEP. Tente novamente.');
+                        limparCamposEndereco();
+                    })
+                    .finally(() => {
+                        // Esconder indicador de carregamento
+                        mostrarCarregandoCEP(false);
+                    });
+            } else if (cep.length > 0) {
+                // CEP incompleto ou inválido
+                mostrarErroCEP('CEP deve ter 8 dígitos');
+                limparCamposEndereco();
             }
         });
-    </script>
+    }
+    
+    // Função para preencher os campos de endereço com os dados da API
+    function preencherCamposEndereco(data) {
+        const logradouroField = document.getElementById('logradouro');
+        const bairroField = document.getElementById('bairro');
+        const cidadeField = document.getElementById('cidade');
+        const estadoField = document.getElementById('estado');
+        
+        // Preencher cada campo se ele existir e se o dado da API não estiver vazio
+        if (logradouroField && data.logradouro) {
+            logradouroField.value = data.logradouro;
+            logradouroField.style.backgroundColor = '#e8f5e8'; // Destaque verde claro
+        }
+        
+        if (bairroField && data.bairro) {
+            bairroField.value = data.bairro;
+            bairroField.style.backgroundColor = '#e8f5e8';
+        }
+        
+        if (cidadeField && data.localidade) {
+            cidadeField.value = data.localidade;
+            cidadeField.style.backgroundColor = '#e8f5e8';
+        }
+        
+        if (estadoField && data.uf) {
+            estadoField.value = data.uf;
+            estadoField.style.backgroundColor = '#e8f5e8';
+        }
+        
+        // Remover destaque após 3 segundos
+        setTimeout(() => {
+            [logradouroField, bairroField, cidadeField, estadoField].forEach(field => {
+                if (field) field.style.backgroundColor = '';
+            });
+        }, 3000);
+        
+        // Focar no campo número para facilitar continuação do preenchimento
+        const numeroField = document.getElementById('numero');
+        if (numeroField) numeroField.focus();
+    }
+    
+    // Função para limpar campos de endereço quando CEP é inválido
+    function limparCamposEndereco() {
+        const campos = ['logradouro', 'bairro', 'cidade'];
+        campos.forEach(campoId => {
+            const campo = document.getElementById(campoId);
+            if (campo) {
+                campo.value = '';
+                campo.style.backgroundColor = '#ffe8e8'; // Destaque vermelho claro
+            }
+        });
+        
+        const estadoField = document.getElementById('estado');
+        if (estadoField) {
+            estadoField.value = '';
+            estadoField.style.backgroundColor = '#ffe8e8';
+        }
+        
+        // Remover destaque após 3 segundos
+        setTimeout(() => {
+            const campos = ['logradouro', 'bairro', 'cidade', 'estado'];
+            campos.forEach(campoId => {
+                const campo = document.getElementById(campoId);
+                if (campo) campo.style.backgroundColor = '';
+            });
+        }, 3000);
+    }
+    
+    // Função para mostrar indicador de carregamento
+    function mostrarCarregandoCEP(mostrar) {
+        const cepField = document.getElementById('cep');
+        if (!cepField) return;
+        
+        if (mostrar) {
+            cepField.style.backgroundImage = 'url("data:image/svg+xml;charset=UTF-8,%3csvg width=\'16\' height=\'16\' xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 100 100\' preserveAspectRatio=\'xMidYMid\' class=\'uil-ring\'%3e%3cpath fill=\'none\' class=\'bk\' d=\'M0 0h100v100H0z\'/%3e%3cdefs%3e%3cfilter id=\'uil-ring-shadow\' x=\'-100%25\' y=\'-100%25\' width=\'300%25\' height=\'300%25\'%3e%3cfeOffset result=\'offOut\' in=\'SourceGraphic\' dx=\'0\' dy=\'0\'/%3e%3cfeGaussianBlur result=\'blurOut\' in=\'offOut\' stdDeviation=\'0\'/%3e%3cfeBlend in=\'SourceGraphic\' in2=\'blurOut\' mode=\'normal\'/%3e%3c/filter%3e%3c/defs%3e%3cpath d=\'M10 50s0 .8.1 2.2c0 1.3.2 3.1.5 5.1.6 4 1.7 9.4 3.7 15.3 4 11.9 11.1 26.8 23.3 35.9 6.1 4.6 13.4 7.2 21.4 7.2s15.3-2.6 21.4-7.2c12.2-9.1 19.3-24 23.3-35.9 2-5.9 3.1-11.3 3.7-15.3.3-2 .5-3.8.5-5.1 0-1.4.1-2.2.1-2.2s0-.8-.1-2.2c0-1.3-.2-3.1-.5-5.1-.6-4-1.7-9.4-3.7-15.3-4-11.9-11.1-26.8-23.3-35.9-6.1-4.6-13.4-7.2-21.4-7.2S23.2 7.9 17.1 12.5C4.9 21.6-2.2 36.5-6.2 48.4c-2 5.9-3.1 11.3-3.7 15.3-.3 2-.5 3.8-.5 5.1 0 1.4-.1 2.2-.1 2.2z\' fill=\'%23ff7a00\' filter=\'url(%23uil-ring-shadow)\'%3e%3canimateTransform attributeName=\'transform\' type=\'rotate\' from=\'0 50 50\' to=\'360 50 50\' repeatCount=\'indefinite\' dur=\'1s\'/%3e%3c/path%3e%3c/svg%3e")';
+            cepField.style.backgroundRepeat = 'no-repeat';
+            cepField.style.backgroundPosition = 'right 10px center';
+            cepField.style.backgroundSize = '16px 16px';
+            cepField.disabled = true;
+        } else {
+            cepField.style.backgroundImage = '';
+            cepField.disabled = false;
+        }
+    }
+    
+    // Função para mostrar mensagem de sucesso
+    function mostrarSucessoCEP(mensagem) {
+        mostrarMensagemCEP(mensagem, 'success');
+    }
+    
+    // Função para mostrar mensagem de erro
+    function mostrarErroCEP(mensagem) {
+        mostrarMensagemCEP(mensagem, 'error');
+    }
+    
+    // Função genérica para mostrar mensagens relacionadas ao CEP
+    function mostrarMensagemCEP(mensagem, tipo) {
+        // Remover mensagem anterior se existir
+        const mensagemAnterior = document.querySelector('.cep-message');
+        if (mensagemAnterior) {
+            mensagemAnterior.remove();
+        }
+        
+        // Criar nova mensagem
+        const div = document.createElement('div');
+        div.className = `cep-message cep-${tipo}`;
+        div.innerHTML = `<i class="fas ${tipo === 'success' ? 'fa-check-circle' : 'fa-exclamation-triangle'}"></i> ${mensagem}`;
+        
+        // Estilos inline para a mensagem
+        div.style.cssText = `
+            padding: 8px 12px;
+            margin-top: 5px;
+            border-radius: 4px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            ${tipo === 'success' 
+                ? 'background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb;' 
+                : 'background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb;'
+            }
+        `;
+        
+        // Inserir após o campo CEP
+        const cepField = document.getElementById('cep');
+        if (cepField && cepField.parentNode) {
+            cepField.parentNode.insertBefore(div, cepField.nextSibling);
+        }
+        
+        // Remover mensagem após 5 segundos
+        setTimeout(() => {
+            if (div && div.parentNode) {
+                div.remove();
+            }
+        }, 5000);
+    }
+    
+    // Validação de senhas (mantida como estava)
+    const novaSenhaField = document.getElementById('nova_senha');
+    const confirmarSenhaField = document.getElementById('confirmar_senha');
+    
+    if (novaSenhaField && confirmarSenhaField) {
+        function validatePasswords() {
+            const novaSenha = novaSenhaField.value;
+            const confirmarSenha = confirmarSenhaField.value;
+            
+            if (confirmarSenha && novaSenha !== confirmarSenha) {
+                confirmarSenhaField.setCustomValidity('As senhas não coincidem');
+            } else {
+                confirmarSenhaField.setCustomValidity('');
+            }
+        }
+        
+        novaSenhaField.addEventListener('input', validatePasswords);
+        confirmarSenhaField.addEventListener('input', validatePasswords);
+    }
+});
+</script>
 </body>
 </html>
