@@ -823,450 +823,293 @@ class ClientController {
      * @return array Resultado da operação
      */
     public static function updateProfile($userId, $data) {
-    try {
-        // Registrar os dados recebidos para diagnóstico
-        error_log('Tentando atualizar perfil para usuário ID: ' . $userId);
-        error_log('Dados recebidos: ' . print_r($data, true));
-        
-        // Verificar se é um cliente válido
-        if (!self::validateClient($userId)) {
-            return ['status' => false, 'message' => 'Cliente não encontrado ou inativo.'];
-        }
-        
-        $db = Database::getConnection();
-        
-        // NOVO: Verificar se a coluna CPF existe na tabela usuarios
         try {
-            $checkColumnStmt = $db->prepare("SHOW COLUMNS FROM usuarios LIKE 'cpf'");
-            $checkColumnStmt->execute();
-            $cpfColumnExists = $checkColumnStmt->rowCount() > 0;
-            error_log('Coluna CPF existe na tabela usuarios: ' . ($cpfColumnExists ? 'SIM' : 'NÃO'));
+            // Registrar os dados recebidos para diagnóstico
+            error_log('Tentando atualizar perfil para usuário ID: ' . $userId);
+            error_log('Dados recebidos: ' . print_r($data, true));
             
-            if (!$cpfColumnExists) {
-                error_log('ATENÇÃO: Coluna CPF não existe! Criando coluna...');
-                $db->exec("ALTER TABLE usuarios ADD COLUMN cpf VARCHAR(14) NULL AFTER telefone");
-                error_log('Coluna CPF criada com sucesso');
-            }
-        } catch (Exception $e) {
-            error_log('Erro ao verificar/criar coluna CPF: ' . $e->getMessage());
-        }
-        
-        // Verificar se as tabelas necessárias existem
-        self::ensureTablesExist($db);
-        
-        // Iniciar transação
-        $db->beginTransaction();
-        
-        // Atualizar dados básicos (MODIFICADO para incluir CPF)
-        $updateBasicData = false;
-        $basicFields = [];
-        $basicParams = [':user_id' => $userId];
-        
-        if (isset($data['nome']) && !empty($data['nome'])) {
-            error_log('Atualizando nome do usuário: ' . $data['nome']);
-            $basicFields[] = 'nome = :nome';
-            $basicParams[':nome'] = $data['nome'];
-            $updateBasicData = true;
-        }
-        
-        // NOVO: Processar CPF com logs detalhados
-        if (isset($data['cpf'])) {
-            error_log('CPF recebido no data: ' . var_export($data['cpf'], true));
-            
-            // Verificar se CPF pode ser editado
-            if (!self::canEditCPF($userId)) {
-                error_log('Tentativa de alterar CPF já validado - operação negada');
-                $db->rollBack();
-                return ['status' => false, 'message' => 'CPF já foi validado e não pode ser alterado. Entre em contato com o suporte se necessário.'];
+            // Verificar se é um cliente válido
+            if (!self::validateClient($userId)) {
+                return ['status' => false, 'message' => 'Cliente não encontrado ou inativo.'];
             }
             
-            $cpf = preg_replace('/\D/', '', $data['cpf']); // Remove caracteres não numéricos
-            error_log('CPF após limpeza: ' . var_export($cpf, true));
+            $db = Database::getConnection();
             
-            if (!empty($cpf)) {
-                error_log('Processando CPF não vazio: ' . $cpf);
+            // Verificar se a coluna CPF existe na tabela usuarios
+            try {
+                $checkColumnStmt = $db->prepare("SHOW COLUMNS FROM usuarios LIKE 'cpf'");
+                $checkColumnStmt->execute();
+                $cpfColumnExists = $checkColumnStmt->rowCount() > 0;
+                error_log('Coluna CPF existe na tabela usuarios: ' . ($cpfColumnExists ? 'SIM' : 'NÃO'));
                 
-                // Validar CPF usando a classe Validator
-                $cpfValido = Validator::validaCPF($cpf);
-                error_log('CPF é válido: ' . ($cpfValido ? 'SIM' : 'NÃO'));
-                
-                if (!$cpfValido) {
-                    $db->rollBack();
-                    return ['status' => false, 'message' => 'CPF informado é inválido.'];
+                if (!$cpfColumnExists) {
+                    error_log('ATENÇÃO: Coluna CPF não existe! Criando coluna...');
+                    $db->exec("ALTER TABLE usuarios ADD COLUMN cpf VARCHAR(14) NULL AFTER telefone");
+                    error_log('Coluna CPF criada com sucesso');
                 }
-                
-                // Verificar se o CPF já existe para outro usuário
-                $checkCpfStmt = $db->prepare("SELECT id, nome FROM usuarios WHERE cpf = :cpf AND id != :user_id");
-                $checkCpfStmt->bindParam(':cpf', $cpf);
-                $checkCpfStmt->bindParam(':user_id', $userId);
-                $checkCpfStmt->execute();
-                
-                if ($checkCpfStmt->rowCount() > 0) {
-                    $existingUser = $checkCpfStmt->fetch(PDO::FETCH_ASSOC);
-                    error_log('CPF já existe para outro usuário: ID ' . $existingUser['id'] . ' - ' . $existingUser['nome']);
-                    $db->rollBack();
-                    return ['status' => false, 'message' => 'Este CPF já está cadastrado para outro usuário.'];
-                }
-                
-                $basicFields[] = 'cpf = :cpf';
-                $basicParams[':cpf'] = $cpf;
+            } catch (Exception $e) {
+                error_log('Erro ao verificar/criar coluna CPF: ' . $e->getMessage());
+            }
+            
+            // Verificar se as tabelas necessárias existem
+            self::ensureTablesExist($db);
+            
+            // CORREÇÃO PRINCIPAL: Buscar CPF atual do usuário ANTES de processar
+            $currentCpfStmt = $db->prepare("SELECT cpf FROM usuarios WHERE id = :user_id");
+            $currentCpfStmt->bindParam(':user_id', $userId);
+            $currentCpfStmt->execute();
+            $currentUserData = $currentCpfStmt->fetch(PDO::FETCH_ASSOC);
+            $currentCpf = $currentUserData['cpf'] ?? '';
+            
+            error_log('CPF atual no banco: ' . var_export($currentCpf, true));
+            
+            // Iniciar transação
+            $db->beginTransaction();
+            
+            // Atualizar dados básicos
+            $updateBasicData = false;
+            $basicFields = [];
+            $basicParams = [':user_id' => $userId];
+            
+            if (isset($data['nome']) && !empty($data['nome'])) {
+                error_log('Atualizando nome do usuário: ' . $data['nome']);
+                $basicFields[] = 'nome = :nome';
+                $basicParams[':nome'] = $data['nome'];
                 $updateBasicData = true;
-                error_log('CPF validado e será atualizado: ' . $cpf);
-            }
-        } else {
-            error_log('CPF não foi enviado nos dados');
-        }
-        
-        // Executar atualização dos dados básicos se houver campos para atualizar
-        if ($updateBasicData && !empty($basicFields)) {
-            $sql = "UPDATE usuarios SET " . implode(', ', $basicFields) . " WHERE id = :user_id";
-            error_log('SQL de atualização básica: ' . $sql);
-            error_log('Parâmetros: ' . print_r($basicParams, true));
-            
-            $updateStmt = $db->prepare($sql);
-            foreach ($basicParams as $key => $value) {
-                $updateStmt->bindValue($key, $value);
-                error_log("Binding $key = " . var_export($value, true));
             }
             
-            $executeResult = $updateStmt->execute();
-            error_log('Resultado da execução: ' . ($executeResult ? 'SUCESSO' : 'FALHA'));
-            
-            if (!$executeResult) {
-                $errorInfo = $updateStmt->errorInfo();
-                error_log('Erro SQL: ' . print_r($errorInfo, true));
-                $db->rollBack();
-                return ['status' => false, 'message' => 'Erro ao atualizar dados básicos: ' . $errorInfo[2]];
-            }
-            
-            $affectedRows = $updateStmt->rowCount();
-            error_log('Linhas afetadas: ' . $affectedRows);
-            
-            // NOVO: Verificar se o CPF foi realmente salvo
+            // CORREÇÃO: Processar CPF apenas se foi REALMENTE alterado
             if (isset($data['cpf'])) {
-                $verifyStmt = $db->prepare("SELECT cpf FROM usuarios WHERE id = :user_id");
-                $verifyStmt->bindParam(':user_id', $userId);
-                $verifyStmt->execute();
-                $savedData = $verifyStmt->fetch(PDO::FETCH_ASSOC);
-                error_log('CPF salvo no banco: ' . var_export($savedData['cpf'], true));
-            }
-            
-            error_log('Dados básicos atualizados com sucesso');
-        } else {
-            error_log('Nenhum dado básico para atualizar');
-        }
-        
-        // Atualizar senha se fornecida (MANTÉM O MESMO CÓDIGO)
-        if (isset($data['senha_atual']) && isset($data['nova_senha']) && !empty($data['senha_atual']) && !empty($data['nova_senha'])) {
-            error_log('Tentando atualizar senha');
-            // Verificar senha atual
-            $checkStmt = $db->prepare("SELECT senha_hash FROM usuarios WHERE id = :user_id");
-            $checkStmt->bindParam(':user_id', $userId);
-            $checkStmt->execute();
-            $user = $checkStmt->fetch(PDO::FETCH_ASSOC);
-            
-            if (!password_verify($data['senha_atual'], $user['senha_hash'])) {
-                $db->rollBack();
-                return ['status' => false, 'message' => 'Senha atual incorreta.'];
-            }
-            
-            // Validar nova senha
-            if (strlen($data['nova_senha']) < PASSWORD_MIN_LENGTH) {
-                $db->rollBack();
-                return ['status' => false, 'message' => 'A nova senha deve ter no mínimo ' . PASSWORD_MIN_LENGTH . ' caracteres.'];
-            }
-            
-            // Atualizar senha
-            $senha_hash = password_hash($data['nova_senha'], PASSWORD_DEFAULT);
-            $updatePassStmt = $db->prepare("UPDATE usuarios SET senha_hash = :senha_hash WHERE id = :user_id");
-            $updatePassStmt->bindParam(':senha_hash', $senha_hash);
-            $updatePassStmt->bindParam(':user_id', $userId);
-            $updatePassStmt->execute();
-            error_log('Senha atualizada com sucesso');
-        }
-        
-        // Atualizar/inserir endereço se fornecido (MANTÉM O MESMO CÓDIGO)
-        if (isset($data['endereco']) && !empty($data['endereco'])) {
-            error_log('Processando dados de endereço');
-            
-            // Verificar se todos os campos necessários estão presentes
-            $requiredFields = ['cep', 'logradouro', 'numero', 'bairro', 'cidade', 'estado'];
-            $missingFields = [];
-            
-            foreach ($requiredFields as $field) {
-                if (!isset($data['endereco'][$field]) || empty($data['endereco'][$field])) {
-                    $missingFields[] = $field;
-                }
-            }
-            
-            if (!empty($missingFields)) {
-                error_log('Campos de endereço faltando: ' . implode(', ', $missingFields));
-                // Continuar mesmo com campos faltantes, preenchendo com vazios
-                foreach ($missingFields as $field) {
-                    $data['endereco'][$field] = '';
-                }
-            }
-            
-            // Verificar se já existe endereço
-            $checkAddrStmt = $db->prepare("SELECT id FROM usuarios_endereco WHERE usuario_id = :user_id LIMIT 1");
-            $checkAddrStmt->bindParam(':user_id', $userId);
-            $checkAddrStmt->execute();
-            
-            if ($checkAddrStmt->rowCount() > 0) {
-                // Atualizar endereço existente
-                error_log('Atualizando endereço existente');
-                $addrId = $checkAddrStmt->fetch(PDO::FETCH_ASSOC)['id'];
-                $updateAddrStmt = $db->prepare("
-                    UPDATE usuarios_endereco 
-                    SET 
-                        cep = :cep,
-                        logradouro = :logradouro,
-                        numero = :numero,
-                        complemento = :complemento,
-                        bairro = :bairro,
-                        cidade = :cidade,
-                        estado = :estado,
-                        principal = :principal
-                    WHERE id = :id
-                ");
-                $updateAddrStmt->bindParam(':id', $addrId);
-            } else {
-                // Inserir novo endereço
-                error_log('Inserindo novo endereço');
-                $updateAddrStmt = $db->prepare("
-                    INSERT INTO usuarios_endereco 
-                    (usuario_id, cep, logradouro, numero, complemento, bairro, cidade, estado, principal)
-                    VALUES
-                    (:user_id, :cep, :logradouro, :numero, :complemento, :bairro, :cidade, :estado, :principal)
-                ");
-                $updateAddrStmt->bindParam(':user_id', $userId);
-            }
-            
-            // Garantir que os valores existam
-            $cep = isset($data['endereco']['cep']) ? $data['endereco']['cep'] : '';
-            $logradouro = isset($data['endereco']['logradouro']) ? $data['endereco']['logradouro'] : '';
-            $numero = isset($data['endereco']['numero']) ? $data['endereco']['numero'] : '';
-            $complemento = isset($data['endereco']['complemento']) ? $data['endereco']['complemento'] : '';
-            $bairro = isset($data['endereco']['bairro']) ? $data['endereco']['bairro'] : '';
-            $cidade = isset($data['endereco']['cidade']) ? $data['endereco']['cidade'] : '';
-            $estado = isset($data['endereco']['estado']) ? $data['endereco']['estado'] : '';
-            $principal = isset($data['endereco']['principal']) ? $data['endereco']['principal'] : 1;
-            
-            // Bind dos parâmetros comuns
-            $updateAddrStmt->bindParam(':cep', $cep);
-            $updateAddrStmt->bindParam(':logradouro', $logradouro);
-            $updateAddrStmt->bindParam(':numero', $numero);
-            $updateAddrStmt->bindParam(':complemento', $complemento);
-            $updateAddrStmt->bindParam(':bairro', $bairro);
-            $updateAddrStmt->bindParam(':cidade', $cidade);
-            $updateAddrStmt->bindParam(':estado', $estado);
-            $updateAddrStmt->bindParam(':principal', $principal);
-            
-            try {
-                $updateAddrStmt->execute();
-                error_log('Endereço salvo com sucesso');
-            } catch (PDOException $e) {
-                error_log('Erro ao salvar endereço: ' . $e->getMessage());
-                throw $e; // Relançar para ser capturado pelo catch externo
-            }
-        }
-        
-        // Atualizar/inserir contato se fornecido (MANTÉM O MESMO CÓDIGO)
-        if (isset($data['contato']) && !empty($data['contato'])) {
-            error_log('Processando dados de contato');
-            
-            // Verificar se já existe contato
-            $checkContactStmt = $db->prepare("SELECT id FROM usuarios_contato WHERE usuario_id = :user_id LIMIT 1");
-            $checkContactStmt->bindParam(':user_id', $userId);
-            $checkContactStmt->execute();
-            
-            if ($checkContactStmt->rowCount() > 0) {
-                // Atualizar contato existente
-                error_log('Atualizando contato existente');
-                $contactId = $checkContactStmt->fetch(PDO::FETCH_ASSOC)['id'];
-                $updateContactStmt = $db->prepare("
-                    UPDATE usuarios_contato 
-                    SET 
-                        telefone = :telefone,
-                        celular = :celular,
-                        email_alternativo = :email_alternativo
-                    WHERE id = :id
-                ");
-                $updateContactStmt->bindParam(':id', $contactId);
-            } else {
-                // Inserir novo contato
-                error_log('Inserindo novo contato');
-                $updateContactStmt = $db->prepare("
-                    INSERT INTO usuarios_contato 
-                    (usuario_id, telefone, celular, email_alternativo)
-                    VALUES
-                    (:user_id, :telefone, :celular, :email_alternativo)
-                ");
-                $updateContactStmt->bindParam(':user_id', $userId);
-            }
-            
-            // Garantir que os valores existam
-            $telefone = isset($data['contato']['telefone']) ? $data['contato']['telefone'] : '';
-            $celular = isset($data['contato']['celular']) ? $data['contato']['celular'] : '';
-            $email_alternativo = isset($data['contato']['email_alternativo']) ? $data['contato']['email_alternativo'] : '';
-            
-            // Bind dos parâmetros comuns
-            $updateContactStmt->bindParam(':telefone', $telefone);
-            $updateContactStmt->bindParam(':celular', $celular);
-            $updateContactStmt->bindParam(':email_alternativo', $email_alternativo);
-            
-            try {
-                $updateContactStmt->execute();
-                error_log('Contato salvo com sucesso');
-            } catch (PDOException $e) {
-                error_log('Erro ao salvar contato: ' . $e->getMessage());
-                throw $e; // Relançar para ser capturado pelo catch externo
-            }
-        }
-        
-        // Verificar se o perfil está completo após a atualização (MODIFICADO para incluir CPF)
-        $profileComplete = true;
-        $missingItems = [];
-        
-        // NOVO: Verificar dados obrigatórios incluindo CPF
-        $userDataStmt = $db->prepare("
-            SELECT nome, cpf, telefone 
-            FROM usuarios 
-            WHERE id = :user_id
-        ");
-        $userDataStmt->bindParam(':user_id', $userId);
-        $userDataStmt->execute();
-        $userData = $userDataStmt->fetch(PDO::FETCH_ASSOC);
-        
-        error_log('Dados do usuário após atualização: ' . print_r($userData, true));
-        
-        if (empty($userData['nome'])) {
-            $profileComplete = false;
-            $missingItems[] = 'Nome completo';
-            error_log('Perfil incompleto: Falta nome');
-        }
-        
-        // NOVO: Verificar se tem CPF
-        if (empty($userData['cpf'])) {
-            $profileComplete = false;
-            $missingItems[] = 'CPF';
-            error_log('Perfil incompleto: Falta CPF - Valor atual: ' . var_export($userData['cpf'], true));
-        } else {
-            error_log('CPF presente no perfil: ' . $userData['cpf']);
-        }
-        
-        // Verificar se tem endereço
-        $checkAddrStmt = $db->prepare("
-            SELECT id FROM usuarios_endereco 
-            WHERE usuario_id = :user_id 
-            AND cep IS NOT NULL AND cep != ''
-            AND cidade IS NOT NULL AND cidade != ''
-            LIMIT 1
-        ");
-        $checkAddrStmt->bindParam(':user_id', $userId);
-        $checkAddrStmt->execute();
-        if ($checkAddrStmt->rowCount() == 0) {
-            $profileComplete = false;
-            $missingItems[] = 'Endereço completo';
-            error_log('Perfil incompleto: Falta endereço');
-        }
-        
-        // Verificar se tem contato (telefone principal OU contato adicional)
-        $hasPhone = !empty($userData['telefone']);
-        
-        if (!$hasPhone) {
-            $checkContactStmt = $db->prepare("
-                SELECT id FROM usuarios_contato 
-                WHERE usuario_id = :user_id 
-                AND (
-                    (telefone IS NOT NULL AND telefone != '') OR 
-                    (celular IS NOT NULL AND celular != '')
-                )
-                LIMIT 1
-            ");
-            $checkContactStmt->bindParam(':user_id', $userId);
-            $checkContactStmt->execute();
-            
-            if ($checkContactStmt->rowCount() == 0) {
-                $profileComplete = false;
-                $missingItems[] = 'Telefone de contato';
-                error_log('Perfil incompleto: Falta telefone');
-            }
-        }
-        
-        // Log do status do perfil
-        if ($profileComplete) {
-            error_log('Perfil completo! Todos os dados obrigatórios preenchidos');
-        } else {
-            error_log('Perfil incompleto. Faltam: ' . implode(', ', $missingItems));
-        }
-        
-        // Se o perfil estiver completo, marcar notificações relacionadas como lidas (MODIFICADO para incluir CPF)
-        if ($profileComplete) {
-            error_log('Perfil completo! Marcando notificações como lidas');
-            
-            // Verificar se a tabela de notificações tem a coluna 'lida'
-            $tableColumnsStmt = $db->prepare("SHOW COLUMNS FROM notificacoes LIKE 'lida'");
-            $tableColumnsStmt->execute();
-            
-            if ($tableColumnsStmt->rowCount() > 0) {
-                $updateNotificationsStmt = $db->prepare("
-                    UPDATE notificacoes 
-                    SET lida = 1, data_leitura = NOW() 
-                    WHERE usuario_id = :user_id 
-                    AND (
-                        titulo LIKE '%perfil%' OR 
-                        mensagem LIKE '%perfil%' OR 
-                        mensagem LIKE '%dados cadastrais%' OR
-                        mensagem LIKE '%CPF%' OR
-                        mensagem LIKE '%complete%'
-                    )
-                    AND lida = 0
-                ");
-                $updateNotificationsStmt->bindParam(':user_id', $userId);
-                $updateNotificationsStmt->execute();
+                $newCpf = preg_replace('/\D/', '', $data['cpf']); // Remove caracteres não numéricos
+                $currentCpfClean = preg_replace('/\D/', '', $currentCpf); // Limpar CPF atual também
                 
-                $affectedRows = $updateNotificationsStmt->rowCount();
-                error_log("$affectedRows notificações de perfil marcadas como lidas");
+                error_log('CPF enviado no formulário (limpo): ' . var_export($newCpf, true));
+                error_log('CPF atual no banco (limpo): ' . var_export($currentCpfClean, true));
+                
+                // NOVA LÓGICA: Só aplicar restrições se o CPF foi REALMENTE alterado
+                if ($newCpf !== $currentCpfClean) {
+                    error_log('CPF foi alterado, aplicando validações...');
+                    
+                    // Verificar se CPF pode ser editado
+                    if (!self::canEditCPF($userId)) {
+                        error_log('Tentativa de alterar CPF já validado - operação negada');
+                        $db->rollBack();
+                        return ['status' => false, 'message' => 'CPF já foi validado e não pode ser alterado. Entre em contato com o suporte se necessário.'];
+                    }
+                    
+                    if (!empty($newCpf)) {
+                        error_log('Processando novo CPF: ' . $newCpf);
+                        
+                        // Validar CPF usando a classe Validator
+                        $cpfValido = Validator::validaCPF($newCpf);
+                        error_log('CPF é válido: ' . ($cpfValido ? 'SIM' : 'NÃO'));
+                        
+                        if (!$cpfValido) {
+                            $db->rollBack();
+                            return ['status' => false, 'message' => 'CPF informado é inválido.'];
+                        }
+                        
+                        // Verificar se o CPF já existe para outro usuário
+                        $checkCpfStmt = $db->prepare("SELECT id, nome FROM usuarios WHERE cpf = :cpf AND id != :user_id");
+                        $checkCpfStmt->bindParam(':cpf', $newCpf);
+                        $checkCpfStmt->bindParam(':user_id', $userId);
+                        $checkCpfStmt->execute();
+                        
+                        if ($checkCpfStmt->rowCount() > 0) {
+                            $existingUser = $checkCpfStmt->fetch(PDO::FETCH_ASSOC);
+                            error_log('CPF já existe para outro usuário: ID ' . $existingUser['id'] . ' - ' . $existingUser['nome']);
+                            $db->rollBack();
+                            return ['status' => false, 'message' => 'Este CPF já está cadastrado para outro usuário.'];
+                        }
+                        
+                        $basicFields[] = 'cpf = :cpf';
+                        $basicParams[':cpf'] = $newCpf;
+                        $updateBasicData = true;
+                        error_log('CPF validado e será atualizado: ' . $newCpf);
+                    }
+                } else {
+                    error_log('CPF não foi alterado, mantendo valor atual');
+                    // CPF não foi alterado, não fazer nada
+                }
             } else {
-                error_log("Coluna 'lida' não encontrada na tabela notificacoes");
+                error_log('CPF não foi enviado nos dados');
             }
-        }
-        
-        // Confirmar transação
-        $db->commit();
-        error_log('Transação concluída com sucesso - Perfil atualizado');
-        
-        // NOVO: Mensagem personalizada baseada no status do perfil
-        if ($profileComplete) {
-            return ['status' => true, 'message' => 'Perfil atualizado com sucesso! Seu perfil está completo.'];
-        } else {
-            $message = 'Perfil atualizado com sucesso.';
-            if (!empty($missingItems)) {
-                $message .= ' Para completar 100% do seu perfil, ainda falta: ' . implode(', ', $missingItems) . '.';
+            
+            // Executar atualização dos dados básicos se houver campos para atualizar
+            if ($updateBasicData && !empty($basicFields)) {
+                $sql = "UPDATE usuarios SET " . implode(', ', $basicFields) . " WHERE id = :user_id";
+                error_log('SQL de atualização básica: ' . $sql);
+                error_log('Parâmetros: ' . print_r($basicParams, true));
+                
+                $updateStmt = $db->prepare($sql);
+                foreach ($basicParams as $key => $value) {
+                    $updateStmt->bindValue($key, $value);
+                    error_log("Binding $key = " . var_export($value, true));
+                }
+                
+                $executeResult = $updateStmt->execute();
+                error_log('Resultado da execução: ' . ($executeResult ? 'SUCESSO' : 'FALHA'));
+                
+                if (!$executeResult) {
+                    $errorInfo = $updateStmt->errorInfo();
+                    error_log('Erro na atualização básica: ' . print_r($errorInfo, true));
+                    $db->rollBack();
+                    return ['status' => false, 'message' => 'Erro ao atualizar dados básicos: ' . ($errorInfo[2] ?? 'Erro desconhecido')];
+                }
+                
+                error_log('Dados básicos atualizados com sucesso');
+            } else {
+                error_log('Nenhum dado básico para atualizar');
             }
-            return ['status' => true, 'message' => $message];
-        }
-        
-    } catch (PDOException $e) {
-        // Reverter transação em caso de erro
-        if (isset($db) && $db->inTransaction()) {
-            $db->rollBack();
-        }
-        
-        // Log detalhado do erro
-        error_log('ERRO DETALHADO ao atualizar perfil: ' . $e->getMessage());
-        error_log('Código do erro: ' . $e->getCode());
-        error_log('Trace: ' . $e->getTraceAsString());
-        
-        // Em ambiente de desenvolvimento, mostrar erro detalhado
-        if (defined('DEBUG_MODE') && DEBUG_MODE) {
-            return ['status' => false, 'message' => 'Erro ao atualizar perfil: ' . $e->getMessage()];
-        } else {
-            return ['status' => false, 'message' => 'Erro ao atualizar perfil. Tente novamente.'];
+            
+            // Atualizar dados de contato
+            if (isset($data['contato']) && is_array($data['contato'])) {
+                error_log('Processando dados de contato...');
+                
+                $telefone = $data['contato']['telefone'] ?? '';
+                $celular = $data['contato']['celular'] ?? '';
+                $emailAlternativo = $data['contato']['email_alternativo'] ?? '';
+                
+                // Verificar se já existe registro de contato
+                $checkContatoStmt = $db->prepare("SELECT id FROM usuarios_contato WHERE usuario_id = :user_id");
+                $checkContatoStmt->bindParam(':user_id', $userId);
+                $checkContatoStmt->execute();
+                
+                if ($checkContatoStmt->rowCount() > 0) {
+                    // Atualizar registro existente
+                    $updateContatoStmt = $db->prepare("
+                        UPDATE usuarios_contato 
+                        SET telefone = :telefone, celular = :celular, email_alternativo = :email_alternativo 
+                        WHERE usuario_id = :user_id
+                    ");
+                } else {
+                    // Inserir novo registro
+                    $updateContatoStmt = $db->prepare("
+                        INSERT INTO usuarios_contato (usuario_id, telefone, celular, email_alternativo) 
+                        VALUES (:user_id, :telefone, :celular, :email_alternativo)
+                    ");
+                }
+                
+                $updateContatoStmt->bindParam(':user_id', $userId);
+                $updateContatoStmt->bindParam(':telefone', $telefone);
+                $updateContatoStmt->bindParam(':celular', $celular);
+                $updateContatoStmt->bindParam(':email_alternativo', $emailAlternativo);
+                
+                $contatoResult = $updateContatoStmt->execute();
+                
+                if (!$contatoResult) {
+                    $errorInfo = $updateContatoStmt->errorInfo();
+                    error_log('Erro ao atualizar contato: ' . print_r($errorInfo, true));
+                    $db->rollBack();
+                    return ['status' => false, 'message' => 'Erro ao atualizar dados de contato: ' . ($errorInfo[2] ?? 'Erro desconhecido')];
+                }
+                
+                error_log('Dados de contato atualizados com sucesso');
+            }
+            
+            // Atualizar endereço (se fornecido)
+            if (isset($data['endereco']) && is_array($data['endereco'])) {
+                error_log('Processando dados de endereço...');
+                
+                $cep = $data['endereco']['cep'] ?? '';
+                $logradouro = $data['endereco']['logradouro'] ?? '';
+                $numero = $data['endereco']['numero'] ?? '';
+                $complemento = $data['endereco']['complemento'] ?? '';
+                $bairro = $data['endereco']['bairro'] ?? '';
+                $cidade = $data['endereco']['cidade'] ?? '';
+                $estado = $data['endereco']['estado'] ?? '';
+                $principal = $data['endereco']['principal'] ?? 1;
+                
+                // Verificar se já existe endereço principal
+                $checkEnderecoStmt = $db->prepare("SELECT id FROM usuarios_endereco WHERE usuario_id = :user_id AND principal = 1");
+                $checkEnderecoStmt->bindParam(':user_id', $userId);
+                $checkEnderecoStmt->execute();
+                
+                if ($checkEnderecoStmt->rowCount() > 0) {
+                    // Atualizar endereço existente
+                    $updateEnderecoStmt = $db->prepare("
+                        UPDATE usuarios_endereco 
+                        SET cep = :cep, logradouro = :logradouro, numero = :numero, 
+                            complemento = :complemento, bairro = :bairro, cidade = :cidade, estado = :estado 
+                        WHERE usuario_id = :user_id AND principal = 1
+                    ");
+                } else {
+                    // Inserir novo endereço
+                    $updateEnderecoStmt = $db->prepare("
+                        INSERT INTO usuarios_endereco (usuario_id, cep, logradouro, numero, complemento, bairro, cidade, estado, principal) 
+                        VALUES (:user_id, :cep, :logradouro, :numero, :complemento, :bairro, :cidade, :estado, :principal)
+                    ");
+                    $updateEnderecoStmt->bindParam(':principal', $principal);
+                }
+                
+                $updateEnderecoStmt->bindParam(':user_id', $userId);
+                $updateEnderecoStmt->bindParam(':cep', $cep);
+                $updateEnderecoStmt->bindParam(':logradouro', $logradouro);
+                $updateEnderecoStmt->bindParam(':numero', $numero);
+                $updateEnderecoStmt->bindParam(':complemento', $complemento);
+                $updateEnderecoStmt->bindParam(':bairro', $bairro);
+                $updateEnderecoStmt->bindParam(':cidade', $cidade);
+                $updateEnderecoStmt->bindParam(':estado', $estado);
+                
+                $enderecoResult = $updateEnderecoStmt->execute();
+                
+                if (!$enderecoResult) {
+                    $errorInfo = $updateEnderecoStmt->errorInfo();
+                    error_log('Erro ao atualizar endereço: ' . print_r($errorInfo, true));
+                    $db->rollBack();
+                    return ['status' => false, 'message' => 'Erro ao atualizar dados de endereço: ' . ($errorInfo[2] ?? 'Erro desconhecido')];
+                }
+                
+                error_log('Dados de endereço atualizados com sucesso');
+            }
+            
+            // Atualizar senha (se fornecida)
+            if (isset($data['senha_atual']) && isset($data['nova_senha'])) {
+                error_log('Processando alteração de senha...');
+                
+                // Verificar senha atual
+                $checkSenhaStmt = $db->prepare("SELECT senha_hash FROM usuarios WHERE id = :user_id");
+                $checkSenhaStmt->bindParam(':user_id', $userId);
+                $checkSenhaStmt->execute();
+                $userData = $checkSenhaStmt->fetch(PDO::FETCH_ASSOC);
+                
+                if (!$userData || !password_verify($data['senha_atual'], $userData['senha_hash'])) {
+                    $db->rollBack();
+                    return ['status' => false, 'message' => 'Senha atual incorreta.'];
+                }
+                
+                // Atualizar para nova senha
+                $novaSenhaHash = password_hash($data['nova_senha'], PASSWORD_DEFAULT);
+                $updateSenhaStmt = $db->prepare("UPDATE usuarios SET senha_hash = :senha_hash WHERE id = :user_id");
+                $updateSenhaStmt->bindParam(':senha_hash', $novaSenhaHash);
+                $updateSenhaStmt->bindParam(':user_id', $userId);
+                
+                $senhaResult = $updateSenhaStmt->execute();
+                
+                if (!$senhaResult) {
+                    $errorInfo = $updateSenhaStmt->errorInfo();
+                    error_log('Erro ao atualizar senha: ' . print_r($errorInfo, true));
+                    $db->rollBack();
+                    return ['status' => false, 'message' => 'Erro ao atualizar senha: ' . ($errorInfo[2] ?? 'Erro desconhecido')];
+                }
+                
+                error_log('Senha atualizada com sucesso');
+            }
+            
+            // Confirmar transação
+            $db->commit();
+            error_log('Transação confirmada com sucesso');
+            
+            return ['status' => true, 'message' => 'Perfil atualizado com sucesso!'];
+            
+        } catch (Exception $e) {
+            if (isset($db)) {
+                $db->rollBack();
+            }
+            error_log('Erro ao atualizar perfil: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro interno do servidor. Tente novamente.'];
         }
     }
-}
    public static function getProfileCompletionStatus($userId) {
     try {
         $db = Database::getConnection();
