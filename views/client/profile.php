@@ -8,6 +8,7 @@ require_once '../../config/database.php';
 require_once '../../config/constants.php';
 require_once '../../controllers/AuthController.php';
 require_once '../../controllers/ClientController.php';
+require_once '../../utils/Validator.php';
 
 // Iniciar sessão se não estiver iniciada
 if (session_status() === PHP_SESSION_NONE) {
@@ -21,14 +22,6 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION[
 }
 
 $userId = $_SESSION['user_id'];
-
-// Inicializar variáveis para mensagens de feedback
-$personalInfoMessage = $_SESSION['personal_info_message'] ?? '';
-$personalInfoSuccess = $_SESSION['personal_info_success'] ?? false;
-$addressMessage = $_SESSION['address_message'] ?? '';
-$addressSuccess = $_SESSION['address_success'] ?? false;
-$passwordMessage = $_SESSION['password_message'] ?? '';
-$passwordSuccess = $_SESSION['password_success'] ?? false;
 
 // Função para registrar erros em log e exibir mensagem amigável
 function logError($message, $error) {
@@ -63,13 +56,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['personal_info_message'] = logError('Erro ao atualizar informações pessoais', $e->getMessage());
         }
         
-        // Redirecionar para evitar reenvio
-        header("Location: " . $_SERVER['REQUEST_URI'] . "#personal-info");
+        // Redirecionar para evitar reenvio e recarregar dados
+        header("Location: " . CLIENT_PROFILE_URL . "?updated=1#personal-info");
         exit;
     }
     
-    // Formulário de endereço (mantém o mesmo)
-     if (isset($_POST['form_type']) && $_POST['form_type'] === 'address') {
+    // Formulário de endereço
+    if (isset($_POST['form_type']) && $_POST['form_type'] === 'address') {
         try {
             $updateData = [
                 'endereco' => [
@@ -79,14 +72,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'complemento' => $_POST['complemento'] ?? '',
                     'bairro' => $_POST['bairro'] ?? '',
                     'cidade' => $_POST['cidade'] ?? '',
-                    'estado' => $_POST['estado'] ?? '',
-                    'principal' => 1
+                    'estado' => $_POST['estado'] ?? ''
                 ]
             ];
             
             $result = ClientController::updateProfile($userId, $updateData);
             
-            // Armazenar mensagem na sessão
             $_SESSION['address_success'] = $result['status'];
             $_SESSION['address_message'] = $result['message'];
             
@@ -95,55 +86,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['address_message'] = logError('Erro ao atualizar endereço', $e->getMessage());
         }
         
-        // Redirecionar para evitar reenvio
-        header("Location: " . $_SERVER['REQUEST_URI'] . "#address");
+        header("Location: " . CLIENT_PROFILE_URL . "?updated=1#address-info");
         exit;
     }
     
-    // Formulário de alteração de senha (mantém o mesmo)
+    // Formulário de alteração de senha
     if (isset($_POST['form_type']) && $_POST['form_type'] === 'password') {
         try {
-            $senhaAtual = $_POST['senha_atual'] ?? '';
-            $novaSenha = $_POST['nova_senha'] ?? '';
-            $confirmarSenha = $_POST['confirmar_senha'] ?? '';
+            $currentPassword = $_POST['current_password'] ?? '';
+            $newPassword = $_POST['new_password'] ?? '';
+            $confirmPassword = $_POST['confirm_password'] ?? '';
             
-            // Validação básica
-            if (empty($senhaAtual) || empty($novaSenha) || empty($confirmarSenha)) {
-                $passwordSuccess = false;
-                $passwordMessage = 'Por favor, preencha todos os campos de senha.';
-            } else if ($novaSenha !== $confirmarSenha) {
-                $passwordSuccess = false;
-                $passwordMessage = 'As senhas não são iguais. Verifique e tente novamente.';
-            } else if (strlen($novaSenha) < PASSWORD_MIN_LENGTH) {
-                $passwordSuccess = false;
-                $passwordMessage = 'Sua nova senha deve ter pelo menos ' . PASSWORD_MIN_LENGTH . ' caracteres.';
-            } else {
-                $updateData = [
-                    'senha_atual' => $senhaAtual,
-                    'nova_senha' => $novaSenha
-                ];
-                
-                $result = ClientController::updateProfile($userId, $updateData);
-                $passwordSuccess = $result['status'];
-                $passwordMessage = $result['message'];
+            if ($newPassword !== $confirmPassword) {
+                throw new Exception('A confirmação da senha não confere.');
             }
             
-            // Armazenar mensagem na sessão
-            $_SESSION['password_success'] = $passwordSuccess;
-            $_SESSION['password_message'] = $passwordMessage;
+            $result = ClientController::changePassword($userId, $currentPassword, $newPassword);
+            
+            $_SESSION['password_success'] = $result['status'];
+            $_SESSION['password_message'] = $result['message'];
             
         } catch (Exception $e) {
             $_SESSION['password_success'] = false;
-            $_SESSION['password_message'] = logError('Erro ao atualizar senha', $e->getMessage());
+            $_SESSION['password_message'] = $e->getMessage();
         }
         
-        // Redirecionar para evitar reenvio
-        header("Location: " . $_SERVER['REQUEST_URI'] . "#password");
+        header("Location: " . CLIENT_PROFILE_URL . "?updated=1#password");
         exit;
     }
 }
 
-// Carregar dados do perfil depois de qualquer atualização
+// Obter mensagens da sessão e limpar
+$personalInfoMessage = $_SESSION['personal_info_message'] ?? '';
+$personalInfoSuccess = $_SESSION['personal_info_success'] ?? false;
+$addressMessage = $_SESSION['address_message'] ?? '';
+$addressSuccess = $_SESSION['address_success'] ?? false;
+$passwordMessage = $_SESSION['password_message'] ?? '';
+$passwordSuccess = $_SESSION['password_success'] ?? false;
+
+// Limpar mensagens da sessão após obter
+unset($_SESSION['personal_info_message'], $_SESSION['personal_info_success']);
+unset($_SESSION['address_message'], $_SESSION['address_success']);
+unset($_SESSION['password_message'], $_SESSION['password_success']);
+
+// Carregar dados do perfil
+$error = false;
+$errorMessage = '';
+$profileData = [];
+
 try {
     $profileResult = ClientController::getProfileData($userId);
     
@@ -156,12 +146,34 @@ try {
         $profileData = $profileResult['data'];
         
         // Garantir que as chaves existam para evitar erros
+        if (!isset($profileData['perfil']) || !is_array($profileData['perfil'])) {
+            $profileData['perfil'] = [
+                'nome' => '',
+                'email' => '',
+                'cpf' => '',
+                'telefone' => '',
+                'cpf_editavel' => true
+            ];
+        }
+        
         if (!isset($profileData['contato']) || !is_array($profileData['contato'])) {
-            $profileData['contato'] = [];
+            $profileData['contato'] = [
+                'telefone' => '',
+                'celular' => '',
+                'email_alternativo' => ''
+            ];
         }
         
         if (!isset($profileData['endereco']) || !is_array($profileData['endereco'])) {
-            $profileData['endereco'] = [];
+            $profileData['endereco'] = [
+                'cep' => '',
+                'logradouro' => '',
+                'numero' => '',
+                'complemento' => '',
+                'bairro' => '',
+                'cidade' => '',
+                'estado' => ''
+            ];
         }
         
         if (!isset($profileData['estatisticas']) || !is_array($profileData['estatisticas'])) {
@@ -172,28 +184,28 @@ try {
                 'total_lojas_utilizadas' => 0
             ];
         }
+        
+        // Verificar se CPF pode ser editado
+        $profileData['perfil']['cpf_editavel'] = empty($profileData['perfil']['cpf']);
     }
 } catch (Exception $e) {
     $error = true;
     $errorMessage = logError('Erro ao carregar dados do perfil', $e->getMessage());
-    $profileData = [];
+    $profileData = [
+        'perfil' => ['nome' => '', 'email' => '', 'cpf' => '', 'cpf_editavel' => true],
+        'contato' => ['telefone' => '', 'celular' => '', 'email_alternativo' => ''],
+        'endereco' => ['cep' => '', 'logradouro' => '', 'numero' => '', 'complemento' => '', 'bairro' => '', 'cidade' => '', 'estado' => ''],
+        'estatisticas' => ['total_cashback' => 0, 'total_transacoes' => 0, 'total_compras' => 0, 'total_lojas_utilizadas' => 0]
+    ];
 }
 
-// Calcular progresso do perfil (ATUALIZADO para incluir CPF)
+// Calcular progresso do perfil
 $profileCompletion = 0;
-$totalSteps = 6; // Mantém 6 passos
+$totalSteps = 6;
 $completedSteps = 0;
 
 if (!empty($profileData['perfil']['nome'])) $completedSteps++;
-
-// MODIFICADO: CPF conta como completo se existe (editável ou não)
-if (!empty($profileData['perfil']['cpf'])) {
-    $completedSteps++;
-    $cpfPendente = false; // Se já tem CPF, não está mais pendente
-} else {
-    $cpfPendente = $profileData['perfil']['cpf_editavel']; // Só pendente se ainda pode editar
-}
-
+if (!empty($profileData['perfil']['cpf'])) $completedSteps++;
 if (!empty($profileData['contato']['telefone']) || !empty($profileData['contato']['celular'])) $completedSteps++;
 if (!empty($profileData['contato']['email_alternativo'])) $completedSteps++;
 if (!empty($profileData['endereco']['cep']) && !empty($profileData['endereco']['logradouro'])) $completedSteps++;
@@ -201,7 +213,7 @@ if (!empty($profileData['endereco']['cidade']) && !empty($profileData['endereco'
 
 $profileCompletion = ($completedSteps / $totalSteps) * 100;
 
-// Verificar se CPF está pendente para mostrar alerta
+// Verificar se CPF está pendente
 $cpfPendente = empty($profileData['perfil']['cpf']);
 ?>
 
@@ -211,649 +223,308 @@ $cpfPendente = empty($profileData['perfil']['cpf']);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Meu Perfil - Klube Cash</title>
-    <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
+    <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico">
     
-    <!-- Font Awesome para ícones -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- CSS -->
+    <link href="../../assets/css/client.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     
     <style>
-        /* Mantém todo o CSS existente e adiciona apenas estes estilos para o alerta de CPF */
-        
-        /* Alerta de CPF pendente */
-        .cpf-alert {
-            background: linear-gradient(135deg, #FF7A00, #FF9500);
-            color: white;
-            padding: 20px;
-            border-radius: var(--border-radius);
-            margin-bottom: 30px;
-            text-align: center;
-            box-shadow: var(--shadow-medium);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .cpf-alert::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-            animation: shimmer 2s infinite;
-        }
-
-        @keyframes shimmer {
-            0% { left: -100%; }
-            100% { left: 100%; }
-        }
-
-        .cpf-alert h3 {
-            margin-bottom: 10px;
-            font-size: 1.3rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-        }
-
-        .cpf-alert p {
-            margin: 0;
-            opacity: 0.95;
-        }
-
-        /* Destaque para o campo CPF quando necessário */
-        .cpf-required .form-control {
-            border-color: var(--warning-color);
-            background-color: #FFF9E6;
-        }
-
-        .cpf-required .form-label::after {
-            content: ' (Obrigatório)';
-            color: var(--warning-color);
-            font-weight: 700;
-            font-size: 0.85rem;
-        }
-
-        /* === Mantém todo o CSS existente do arquivo original === */
-        :root {
-            --primary-color: #FF7A00;
-            --primary-light: #FFF4E8;
-            --primary-dark: #E06E00;
-            --white: #FFFFFF;
-            --light-gray: #F8F9FA;
-            --medium-gray: #6C757D;
-            --dark-gray: #343A40;
-            --success-color: #28A745;
-            --danger-color: #DC3545;
-            --warning-color: #FFC107;
-            --info-color: #17A2B8;
-            --border-radius: 16px;
-            --shadow-light: 0 2px 10px rgba(0, 0, 0, 0.05);
-            --shadow-medium: 0 4px 20px rgba(0, 0, 0, 0.1);
-            --shadow-strong: 0 8px 30px rgba(0, 0, 0, 0.15);
-            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            --gradient-primary: linear-gradient(135deg, #FF7A00 0%, #FF9500 100%);
-            --gradient-light: linear-gradient(135deg, #FFF4E8 0%, #FFE8CC 100%);
-        }
-
-        * {
+        /* Garantir que a página sempre carregue com o layout completo */
+        body {
             margin: 0;
             padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f8f9fa;
             min-height: 100vh;
-            line-height: 1.6;
-            color: var(--dark-gray);
         }
-
-        /* Container principal */
+        
         .profile-container {
-            max-width: 1400px;
+            max-width: 1200px;
             margin: 0 auto;
-            padding: 20px;
-            margin-top: 80px;
+            padding: 2rem 1rem;
+            margin-top: 80px; /* Espaço para navbar fixa */
         }
-
-        /* Header do perfil */
+        
         .profile-header {
             text-align: center;
-            margin-bottom: 40px;
-            position: relative;
+            margin-bottom: 2rem;
         }
-
+        
         .profile-header h1 {
-            font-size: clamp(2rem, 4vw, 3rem);
-            background: var(--gradient-primary);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 10px;
-            font-weight: 700;
-        }
-
-        .profile-header p {
-            font-size: 1.1rem;
-            color: var(--medium-gray);
-            max-width: 600px;
-            margin: 0 auto;
-        }
-
-        /* Indicador de progresso */
-        .progress-section {
-            background: var(--white);
-            border-radius: var(--border-radius);
-            padding: 30px;
-            margin-bottom: 30px;
-            box-shadow: var(--shadow-medium);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .progress-section::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 4px;
-            background: var(--gradient-primary);
-        }
-
-        .progress-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-            gap: 15px;
-        }
-
-        .progress-title {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            font-size: 1.3rem;
-            font-weight: 600;
-        }
-
-        .progress-title i {
-            color: var(--primary-color);
-            font-size: 1.5rem;
-        }
-
-        .progress-percentage {
+            color: #1a1a1a;
+            margin-bottom: 0.5rem;
             font-size: 2rem;
-            font-weight: 700;
-            color: var(--primary-color);
         }
-
-        .progress-bar-container {
-            width: 100%;
-            height: 12px;
-            background: var(--light-gray);
-            border-radius: 6px;
-            overflow: hidden;
-            margin-bottom: 15px;
+        
+        .profile-header p {
+            color: #666;
+            font-size: 1.1rem;
         }
-
-        .progress-bar {
-            height: 100%;
-            background: var(--gradient-primary);
-            border-radius: 6px;
-            transition: var(--transition);
-            position: relative;
+        
+        .alert {
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
         }
-
-        .progress-bar::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
-            animation: progress-shine 2s infinite;
+        
+        .alert-success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
         }
-
-        @keyframes progress-shine {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(100%); }
+        
+        .alert-danger {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
         }
-
-        .progress-text {
-            color: var(--medium-gray);
-            font-size: 0.95rem;
+        
+        .cpf-alert {
+            background: linear-gradient(135deg, #ff6b35, #f7931e);
+            color: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            text-align: center;
         }
-
-        /* Layout principal */
-        .profile-layout {
+        
+        .main-content {
             display: grid;
-            grid-template-columns: 350px 1fr;
-            gap: 30px;
+            grid-template-columns: 300px 1fr;
+            gap: 2rem;
             align-items: start;
         }
-
-        /* Card de informações do usuário */
-        .user-info-card {
-            background: var(--white);
-            border-radius: var(--border-radius);
-            padding: 40px 30px;
-            box-shadow: var(--shadow-medium);
-            text-align: center;
+        
+        .profile-sidebar {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
             position: sticky;
             top: 100px;
         }
-
+        
         .user-avatar {
-            width: 120px;
-            height: 120px;
+            width: 80px;
+            height: 80px;
             border-radius: 50%;
-            background: var(--gradient-primary);
+            background: linear-gradient(135deg, #ff6b35, #f7931e);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 3rem;
-            color: var(--white);
-            font-weight: 700;
-            margin: 0 auto 25px;
-            position: relative;
-            box-shadow: var(--shadow-medium);
+            color: white;
+            font-size: 2rem;
+            font-weight: bold;
+            margin: 0 auto 1rem;
         }
-
-        .user-avatar::after {
-            content: '';
-            position: absolute;
-            inset: -4px;
-            border-radius: 50%;
-            background: var(--gradient-primary);
-            z-index: -1;
-            opacity: 0.3;
-        }
-
+        
         .user-name {
-            font-size: 1.5rem;
+            text-align: center;
+            font-size: 1.25rem;
             font-weight: 600;
-            margin-bottom: 8px;
-            color: var(--dark-gray);
+            margin-bottom: 0.5rem;
+            color: #1a1a1a;
         }
-
+        
         .user-email {
-            color: var(--medium-gray);
-            margin-bottom: 25px;
+            text-align: center;
+            color: #666;
+            margin-bottom: 1rem;
         }
-
-        .user-stats {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-            margin-top: 30px;
+        
+        .user-cpf {
+            text-align: center;
+            color: #666;
+            font-size: 0.9rem;
+            margin-bottom: 1.5rem;
         }
-
-        .stat-item {
-            background: var(--primary-light);
-            padding: 20px 15px;
-            border-radius: 12px;
-            border: 2px solid transparent;
-            transition: var(--transition);
+        
+        .progress-section {
+            text-align: center;
+            padding: 1rem 0;
+            border-top: 1px solid #eee;
         }
-
-        .stat-item:hover {
-            border-color: var(--primary-color);
-            transform: translateY(-2px);
+        
+        .progress-label {
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 0.5rem;
         }
-
-        .stat-value {
-            font-size: 1.4rem;
-            font-weight: 700;
-            color: var(--primary-color);
-            display: block;
+        
+        .progress-bar {
+            height: 8px;
+            background: #eee;
+            border-radius: 4px;
+            overflow: hidden;
         }
-
-        .stat-label {
-            font-size: 0.8rem;
-            color: var(--medium-gray);
-            margin-top: 4px;
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff6b35, #f7931e);
+            transition: width 0.3s ease;
         }
-
-        /* Cards de formulário */
+        
+        .progress-percentage {
+            font-weight: 600;
+            color: #ff6b35;
+            margin-top: 0.5rem;
+        }
+        
         .form-section {
             display: flex;
             flex-direction: column;
-            gap: 25px;
+            gap: 1.5rem;
         }
-
+        
         .form-card {
-            background: var(--white);
-            border-radius: var(--border-radius);
-            padding: 0;
-            box-shadow: var(--shadow-medium);
-            overflow: hidden;
-            transition: var(--transition);
-        }
-
-        .form-card:hover {
-            box-shadow: var(--shadow-strong);
-            transform: translateY(-2px);
-        }
-
-        .form-card-header {
-            background: var(--gradient-light);
-            padding: 25px 30px;
-            border-bottom: 1px solid #e9ecef;
-            position: relative;
-        }
-
-        .form-card-header::before {
-            content: '';
-            position: absolute;
-            bottom: 0;
-            left: 30px;
-            right: 30px;
-            height: 2px;
-            background: var(--gradient-primary);
-        }
-
-        .form-card-title {
-            font-size: 1.3rem;
-            font-weight: 600;
-            color: var(--dark-gray);
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin: 0;
-        }
-
-        .form-card-title i {
-            color: var(--primary-color);
-            font-size: 1.4rem;
-        }
-
-        .form-card-body {
-            padding: 30px;
-        }
-
-        /* Alertas */
-        .alert {
-            padding: 16px 20px;
+            background: white;
             border-radius: 12px;
-            margin-bottom: 25px;
-            border: 1px solid;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .form-card-header {
+            background: #f8f9fa;
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .form-card-title {
+            margin: 0;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #1a1a1a;
             display: flex;
             align-items: center;
-            gap: 12px;
-            font-weight: 500;
+            gap: 0.5rem;
         }
-
-        .alert-success {
-            background: #d4edda;
-            color: #155724;
-            border-color: #c3e6cb;
+        
+        .form-card-body {
+            padding: 1.5rem;
         }
-
-        .alert-danger {
-            background: #f8d7da;
-            color: #721c24;
-            border-color: #f5c6cb;
-        }
-
-        .alert i {
-            font-size: 1.2rem;
-        }
-
-        /* Formulários */
+        
         .form-group {
-            margin-bottom: 25px;
+            margin-bottom: 1rem;
         }
-
+        
         .form-label {
             display: block;
-            margin-bottom: 8px;
-            font-weight: 600;
-            color: var(--dark-gray);
-            font-size: 0.95rem;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: #1a1a1a;
         }
-
-        .form-label .required {
-            color: var(--danger-color);
-            margin-left: 4px;
+        
+        .required {
+            color: #dc3545;
         }
-
+        
         .form-control {
             width: 100%;
-            padding: 14px 16px;
-            border: 2px solid #e9ecef;
-            border-radius: 10px;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 6px;
             font-size: 1rem;
-            transition: var(--transition);
-            background: var(--white);
+            transition: border-color 0.3s;
         }
-
+        
         .form-control:focus {
             outline: none;
-            border-color: var(--primary-color);
-            box-shadow: 0 0 0 3px rgba(255, 122, 0, 0.1);
-            transform: translateY(-1px);
+            border-color: #ff6b35;
+            box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
         }
-
-        .form-control:disabled {
-            background: var(--light-gray);
-            color: var(--medium-gray);
-            cursor: not-allowed;
-        }
-
-        .form-row {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-        }
-
-        .form-help {
-            font-size: 0.85rem;
-            color: var(--medium-gray);
-            margin-top: 6px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        /* Botões */
-        .btn {
-            padding: 14px 28px;
-            border-radius: 10px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            border: none;
-            transition: var(--transition);
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            text-decoration: none;
-            min-width: 140px;
-        }
-
-        .btn-primary {
-            background: var(--gradient-primary);
-            color: var(--white);
-            box-shadow: 0 4px 15px rgba(255, 122, 0, 0.3);
-        }
-
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(255, 122, 0, 0.4);
-        }
-
-        .btn i {
-            font-size: 1.1rem;
-        }
-
-        /* Responsividade */
-        @media (max-width: 768px) {
-            .profile-container {
-                padding: 15px;
-                margin-top: 70px;
-            }
-
-            .profile-layout {
-                grid-template-columns: 1fr;
-                gap: 20px;
-            }
-
-            .user-info-card {
-                position: static;
-                padding: 25px 20px;
-            }
-
-            .form-row {
-                grid-template-columns: 1fr;
-                gap: 15px;
-            }
-
-            .progress-header {
-                flex-direction: column;
-                text-align: center;
-            }
-
-            .user-stats {
-                grid-template-columns: 1fr;
-                gap: 10px;
-            }
-
-            .form-card-header,
-            .form-card-body {
-                padding: 20px;
-            }
-        }
-
-        @media (max-width: 480px) {
-            .profile-container {
-                padding: 10px;
-            }
-
-            .progress-section,
-            .form-card-body {
-                padding: 20px 15px;
-            }
-
-            .user-avatar {
-                width: 100px;
-                height: 100px;
-                font-size: 2.5rem;
-            }
-        }
-
-        /* Animações */
-        .form-card {
-            opacity: 0;
-            transform: translateY(20px);
-            animation: slideUp 0.6s ease-out forwards;
-        }
-
-        .form-card:nth-child(1) { animation-delay: 0.1s; }
-        .form-card:nth-child(2) { animation-delay: 0.2s; }
-        .form-card:nth-child(3) { animation-delay: 0.3s; }
-
-        @keyframes slideUp {
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        /* Melhorias de acessibilidade */
-        .form-control:focus-visible {
-            outline: 2px solid var(--primary-color);
-            outline-offset: 2px;
-        }
-
-        .btn:focus-visible {
-            outline: 2px solid var(--primary-color);
-            outline-offset: 2px;
-        }
-
-        /* Estados de carregamento */
-        .btn.loading {
-            pointer-events: none;
-            opacity: 0.7;
-        }
-
-        .btn.loading::after {
-            content: '';
-            width: 16px;
-            height: 16px;
-            border: 2px solid transparent;
-            border-top: 2px solid currentColor;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin-left: 8px;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-        /* Estilos para CPF verificado/fixo */
-        .cpf-verified {
-            color: var(--success-color);
-            font-weight: 600;
-            font-size: 0.9rem;
-            margin-left: 8px;
-        }
-
-        .cpf-verified i {
-            margin-right: 4px;
-        }
-
+        
         .form-control:disabled {
             background-color: #f8f9fa !important;
-            color: var(--medium-gray) !important;
+            color: #6c757d !important;
             cursor: not-allowed;
             border-color: #e9ecef;
             opacity: 0.8;
         }
-
+        
+        .form-help {
+            font-size: 0.875rem;
+            color: #666;
+            margin-top: 0.25rem;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+        
         .form-help.cpf-fixed {
-            color: var(--success-color);
+            color: #28a745;
             font-weight: 500;
         }
-
-        .form-help.cpf-fixed i {
-            color: var(--success-color);
+        
+        .cpf-verified {
+            color: #28a745;
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin-left: 8px;
         }
-
-        /* Destaque visual para campo CPF fixo */
-        .form-group:has(.form-control:disabled) {
-            position: relative;
+        
+        .cpf-verified i {
+            margin-right: 4px;
         }
-
-        .form-group:has(.form-control:disabled)::before {
-            content: '';
-            position: absolute;
-            left: -5px;
-            top: 0;
-            bottom: 0;
-            width: 3px;
-            background: linear-gradient(to bottom, var(--success-color), transparent);
-            border-radius: 2px;
+        
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            justify-content: center;
         }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #ff6b35, #f7931e);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(255, 107, 53, 0.4);
+        }
+        
+        /* Grid responsivo */
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+            
+            .profile-sidebar {
+                position: static;
+            }
+            
+            .profile-container {
+                padding: 1rem;
+                margin-top: 60px;
+            }
+        }
+        
         /* Smooth scroll para ancoragem */
         html {
             scroll-behavior: smooth;
         }
-
+        
         /* Destacar seção ativa temporariamente */
         .form-card:target {
             animation: highlight 2s ease-in-out;
         }
-
+        
         @keyframes highlight {
-            0% { background-color: var(--primary-light); }
-            100% { background-color: var(--white); }
+            0% { background-color: rgba(255, 107, 53, 0.1); }
+            100% { background-color: white; }
         }
     </style>
 </head>
@@ -868,70 +539,52 @@ $cpfPendente = empty($profileData['perfil']['cpf']);
             <p>Mantenha suas informações sempre atualizadas para uma experiência completa no Klube Cash</p>
         </div>
 
-        <?php if (isset($error) && $error): ?>
+        <?php if ($error): ?>
             <div class="alert alert-danger">
                 <i class="fas fa-exclamation-triangle"></i>
                 <?php echo htmlspecialchars($errorMessage); ?>
             </div>
         <?php else: ?>
 
-        <!-- Alerta de CPF pendente (NOVO) -->
+        <!-- Alerta de CPF pendente -->
         <?php if ($cpfPendente): ?>
             <div class="cpf-alert">
                 <h3><i class="fas fa-exclamation-triangle"></i> Complete seu perfil</h3>
-                <p>Para aproveitar todos os benefícios do Klube Cash, é necessário informar seu CPF. Isso garante maior segurança nas suas transações.</p>
+                <p>Para aproveitar todos os benefícios do Klube Cash, é necessário informar seu CPF.</p>
             </div>
         <?php endif; ?>
 
-        <!-- Indicador de progresso -->
-        <div class="progress-section">
-            <div class="progress-header">
-                <div class="progress-title">
-                    <i class="fas fa-chart-line"></i>
-                    <span>Completude do Perfil</span>
-                </div>
-                <div class="progress-percentage"><?php echo round($profileCompletion); ?>%</div>
-            </div>
-            <div class="progress-bar-container">
-                <div class="progress-bar" style="width: <?php echo $profileCompletion; ?>%"></div>
-            </div>
-            <p class="progress-text">
-                <?php if ($profileCompletion == 100): ?>
-                    🎉 Parabéns! Seu perfil está completo
-                <?php elseif ($profileCompletion >= 80): ?>
-                    Quase lá! Faltam poucos detalhes para completar seu perfil
-                <?php elseif ($profileCompletion >= 50): ?>
-                    Bom progresso! Continue preenchendo para melhorar sua experiência
-                <?php else: ?>
-                    Complete seu perfil para aproveitar todos os benefícios do Klube Cash
-                <?php endif; ?>
-            </p>
-        </div>
-
-        <!-- Layout principal -->
-        <div class="profile-layout">
-            <!-- Card de informações do usuário -->
-            <div class="user-info-card">
+        <!-- Conteúdo principal -->
+        <div class="main-content">
+            <!-- Sidebar do perfil -->
+            <div class="profile-sidebar">
                 <div class="user-avatar">
-                    <?php echo strtoupper(substr($profileData['perfil']['nome'] ?? 'U', 0, 1)); ?>
+                    <?php echo strtoupper(substr($profileData['perfil']['nome'] ?: 'U', 0, 1)); ?>
                 </div>
-                <h2 class="user-name"><?php echo htmlspecialchars($profileData['perfil']['nome'] ?? 'Usuário'); ?></h2>
-                <p class="user-email"><?php echo htmlspecialchars($profileData['perfil']['email'] ?? ''); ?></p>
+                <h2 class="user-name"><?php echo htmlspecialchars($profileData['perfil']['nome'] ?: 'Usuário'); ?></h2>
+                <p class="user-email"><?php echo htmlspecialchars($profileData['perfil']['email'] ?: ''); ?></p>
                 
-                <!-- Mostrar CPF formatado se disponível (NOVO) -->
+                <!-- Mostrar CPF formatado se disponível -->
                 <?php if (!empty($profileData['perfil']['cpf'])): ?>
-                    <p class="user-cpf" style="color: var(--medium-gray); font-size: 0.9rem; margin-bottom: 25px;">
+                    <p class="user-cpf">
                         <i class="fas fa-id-card"></i> CPF: <?php echo Validator::formataCPF($profileData['perfil']['cpf']); ?>
                     </p>
                 <?php endif; ?>
                 
-                
+                <!-- Progresso do perfil -->
+                <div class="progress-section">
+                    <div class="progress-label">Perfil completo</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: <?php echo $profileCompletion; ?>%"></div>
+                    </div>
+                    <div class="progress-percentage"><?php echo round($profileCompletion); ?>%</div>
+                </div>
             </div>
 
             <!-- Seção de formulários -->
             <div class="form-section">
-                <!-- Formulário de informações pessoais (ATUALIZADO) -->
-                <div class="form-card" id="personal-info"><div class="form-card" id="personal-info">
+                <!-- Formulário de informações pessoais -->
+                <div class="form-card" id="personal-info">
                     <div class="form-card-header">
                         <h3 class="form-card-title">
                             <i class="fas fa-user"></i>
@@ -954,11 +607,11 @@ $cpfPendente = empty($profileData['perfil']['cpf']);
                                     Nome Completo <span class="required">*</span>
                                 </label>
                                 <input type="text" id="nome" name="nome" class="form-control" 
-                                       value="<?php echo htmlspecialchars($profileData['perfil']['nome'] ?? ''); ?>" 
+                                       value="<?php echo htmlspecialchars($profileData['perfil']['nome'] ?: ''); ?>" 
                                        required placeholder="Digite seu nome completo">
                             </div>
                             
-                            <!-- MODIFICADO: Campo CPF com verificação de edição -->
+                            <!-- Campo CPF com verificação de edição -->
                             <div class="form-group <?php echo ($cpfPendente && $profileData['perfil']['cpf_editavel']) ? 'cpf-required' : ''; ?>">
                                 <label class="form-label" for="cpf">
                                     CPF 
@@ -970,7 +623,7 @@ $cpfPendente = empty($profileData['perfil']['cpf']);
                                     <?php endif; ?>
                                 </label>
                                 <input type="text" id="cpf" name="cpf" class="form-control" 
-                                    value="<?php echo htmlspecialchars($profileData['perfil']['cpf'] ?? ''); ?>" 
+                                    value="<?php echo htmlspecialchars($profileData['perfil']['cpf'] ?: ''); ?>" 
                                     placeholder="000.000.000-00"
                                     maxlength="14"
                                     <?php echo !$profileData['perfil']['cpf_editavel'] ? 'disabled' : ''; ?>
@@ -992,39 +645,33 @@ $cpfPendente = empty($profileData['perfil']['cpf']);
                             <div class="form-group">
                                 <label class="form-label" for="email">E-mail Principal</label>
                                 <input type="email" id="email" class="form-control" 
-                                       value="<?php echo htmlspecialchars($profileData['perfil']['email'] ?? ''); ?>" 
-                                       disabled>
+                                       value="<?php echo htmlspecialchars($profileData['perfil']['email'] ?: ''); ?>" 
+                                       disabled placeholder="Seu e-mail principal não pode ser alterado">
                                 <p class="form-help">
                                     <i class="fas fa-info-circle"></i>
-                                    O e-mail principal não pode ser alterado por segurança
+                                    O e-mail principal não pode ser alterado. Para alterar, entre em contato com o suporte.
                                 </p>
                             </div>
                             
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label class="form-label" for="telefone">Telefone</label>
-                                    <input type="tel" id="telefone" name="telefone" class="form-control" 
-                                           value="<?php echo htmlspecialchars($profileData['contato']['telefone'] ?? ''); ?>"
-                                           placeholder="(00) 0000-0000">
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label class="form-label" for="celular">Celular</label>
-                                    <input type="tel" id="celular" name="celular" class="form-control" 
-                                           value="<?php echo htmlspecialchars($profileData['contato']['celular'] ?? ''); ?>"
-                                           placeholder="(00) 00000-0000">
-                                </div>
+                            <div class="form-group">
+                                <label class="form-label" for="telefone">Telefone</label>
+                                <input type="tel" id="telefone" name="telefone" class="form-control" 
+                                       value="<?php echo htmlspecialchars($profileData['contato']['telefone'] ?: ''); ?>" 
+                                       placeholder="(11) 99999-9999">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label" for="celular">Celular</label>
+                                <input type="tel" id="celular" name="celular" class="form-control" 
+                                       value="<?php echo htmlspecialchars($profileData['contato']['celular'] ?: ''); ?>" 
+                                       placeholder="(11) 99999-9999">
                             </div>
                             
                             <div class="form-group">
                                 <label class="form-label" for="email_alternativo">E-mail Alternativo</label>
                                 <input type="email" id="email_alternativo" name="email_alternativo" class="form-control" 
-                                       value="<?php echo htmlspecialchars($profileData['contato']['email_alternativo'] ?? ''); ?>"
-                                       placeholder="email.alternativo@exemplo.com">
-                                <p class="form-help">
-                                    <i class="fas fa-info-circle"></i>
-                                    Usado para recuperação de conta e comunicações importantes
-                                </p>
+                                       value="<?php echo htmlspecialchars($profileData['contato']['email_alternativo'] ?: ''); ?>" 
+                                       placeholder="email@exemplo.com">
                             </div>
                             
                             <button type="submit" class="btn btn-primary">
@@ -1035,8 +682,8 @@ $cpfPendente = empty($profileData['perfil']['cpf']);
                     </div>
                 </div>
 
-                <!-- Formulário de endereço (mantém o mesmo) -->
-                <div class="form-card" id="address">
+                <!-- Formulário de endereço -->
+                <div class="form-card" id="address-info">
                     <div class="form-card-header">
                         <h3 class="form-card-title">
                             <i class="fas fa-map-marker-alt"></i>
@@ -1057,57 +704,68 @@ $cpfPendente = empty($profileData['perfil']['cpf']);
                             <div class="form-group">
                                 <label class="form-label" for="cep">CEP</label>
                                 <input type="text" id="cep" name="cep" class="form-control" 
-                                       value="<?php echo htmlspecialchars($profileData['endereco']['cep'] ?? ''); ?>"
+                                       value="<?php echo htmlspecialchars($profileData['endereco']['cep'] ?: ''); ?>" 
                                        placeholder="00000-000" maxlength="9">
-                                <p class="form-help">
-                                    <i class="fas fa-magic"></i>
-                                    Digite o CEP para preencher automaticamente o endereço
-                                </p>
                             </div>
                             
-                            <div class="form-row">
-                                <div class="form-group" style="grid-column: span 2;">
-                                    <label class="form-label" for="logradouro">Logradouro</label>
-                                    <input type="text" id="logradouro" name="logradouro" class="form-control" 
-                                           value="<?php echo htmlspecialchars($profileData['endereco']['logradouro'] ?? ''); ?>"
-                                           placeholder="Rua, Avenida, etc.">
-                                </div>
-                                
+                            <div class="form-group">
+                                <label class="form-label" for="logradouro">Logradouro</label>
+                                <input type="text" id="logradouro" name="logradouro" class="form-control" 
+                                       value="<?php echo htmlspecialchars($profileData['endereco']['logradouro'] ?: ''); ?>" 
+                                       placeholder="Rua, Avenida, etc.">
+                            </div>
+                            
+                            <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 1rem;">
                                 <div class="form-group">
                                     <label class="form-label" for="numero">Número</label>
                                     <input type="text" id="numero" name="numero" class="form-control" 
-                                           value="<?php echo htmlspecialchars($profileData['endereco']['numero'] ?? ''); ?>"
+                                           value="<?php echo htmlspecialchars($profileData['endereco']['numero'] ?: ''); ?>" 
                                            placeholder="123">
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label class="form-label" for="complemento">Complemento</label>
+                                    <input type="text" id="complemento" name="complemento" class="form-control" 
+                                           value="<?php echo htmlspecialchars($profileData['endereco']['complemento'] ?: ''); ?>" 
+                                           placeholder="Apto, Bloco, etc.">
                                 </div>
                             </div>
                             
                             <div class="form-group">
-                                <label class="form-label" for="complemento">Complemento</label>
-                                <input type="text" id="complemento" name="complemento" class="form-control" 
-                                       value="<?php echo htmlspecialchars($profileData['endereco']['complemento'] ?? ''); ?>"
-                                       placeholder="Apartamento, Bloco, etc. (opcional)">
+                                <label class="form-label" for="bairro">Bairro</label>
+                                <input type="text" id="bairro" name="bairro" class="form-control" 
+                                       value="<?php echo htmlspecialchars($profileData['endereco']['bairro'] ?: ''); ?>" 
+                                       placeholder="Nome do bairro">
                             </div>
                             
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label class="form-label" for="bairro">Bairro</label>
-                                    <input type="text" id="bairro" name="bairro" class="form-control" 
-                                           value="<?php echo htmlspecialchars($profileData['endereco']['bairro'] ?? ''); ?>"
-                                           placeholder="Centro">
-                                </div>
-                                
+                            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1rem;">
                                 <div class="form-group">
                                     <label class="form-label" for="cidade">Cidade</label>
                                     <input type="text" id="cidade" name="cidade" class="form-control" 
-                                           value="<?php echo htmlspecialchars($profileData['endereco']['cidade'] ?? ''); ?>"
-                                           placeholder="São Paulo">
+                                           value="<?php echo htmlspecialchars($profileData['endereco']['cidade'] ?: ''); ?>" 
+                                           placeholder="Nome da cidade">
                                 </div>
                                 
                                 <div class="form-group">
                                     <label class="form-label" for="estado">Estado</label>
-                                    <input type="text" id="estado" name="estado" class="form-control" 
-                                           value="<?php echo htmlspecialchars($profileData['endereco']['estado'] ?? ''); ?>"
-                                           placeholder="SP" maxlength="2">
+                                    <select id="estado" name="estado" class="form-control">
+                                        <option value="">Selecione...</option>
+                                        <?php
+                                        $estados = [
+                                            'AC' => 'Acre', 'AL' => 'Alagoas', 'AP' => 'Amapá', 'AM' => 'Amazonas',
+                                            'BA' => 'Bahia', 'CE' => 'Ceará', 'DF' => 'Distrito Federal', 'ES' => 'Espírito Santo',
+                                            'GO' => 'Goiás', 'MA' => 'Maranhão', 'MT' => 'Mato Grosso', 'MS' => 'Mato Grosso do Sul',
+                                            'MG' => 'Minas Gerais', 'PA' => 'Pará', 'PB' => 'Paraíba', 'PR' => 'Paraná',
+                                            'PE' => 'Pernambuco', 'PI' => 'Piauí', 'RJ' => 'Rio de Janeiro', 'RN' => 'Rio Grande do Norte',
+                                            'RS' => 'Rio Grande do Sul', 'RO' => 'Rondônia', 'RR' => 'Roraima', 'SC' => 'Santa Catarina',
+                                            'SP' => 'São Paulo', 'SE' => 'Sergipe', 'TO' => 'Tocantins'
+                                        ];
+                                        foreach ($estados as $sigla => $nome) {
+                                            $selected = ($profileData['endereco']['estado'] ?? '') === $sigla ? 'selected' : '';
+                                            echo "<option value='$sigla' $selected>$nome</option>";
+                                        }
+                                        ?>
+                                    </select>
                                 </div>
                             </div>
                             
@@ -1119,12 +777,12 @@ $cpfPendente = empty($profileData['perfil']['cpf']);
                     </div>
                 </div>
 
-                <!-- Formulário de alteração de senha (mantém o mesmo) -->
+                <!-- Formulário de senha -->
                 <div class="form-card" id="password">
                     <div class="form-card-header">
                         <h3 class="form-card-title">
-                            <i class="fas fa-shield-alt"></i>
-                            Segurança da Conta
+                            <i class="fas fa-lock"></i>
+                            Alterar Senha
                         </h3>
                     </div>
                     <div class="form-card-body">
@@ -1139,31 +797,29 @@ $cpfPendente = empty($profileData['perfil']['cpf']);
                             <input type="hidden" name="form_type" value="password">
                             
                             <div class="form-group">
-                                <label class="form-label" for="senha_atual">Senha Atual <span class="required">*</span></label>
-                                <input type="password" id="senha_atual" name="senha_atual" class="form-control" 
+                                <label class="form-label" for="current_password">Senha Atual <span class="required">*</span></label>
+                                <input type="password" id="current_password" name="current_password" class="form-control" 
                                        required placeholder="Digite sua senha atual">
                             </div>
                             
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label class="form-label" for="nova_senha">Nova Senha <span class="required">*</span></label>
-                                    <input type="password" id="nova_senha" name="nova_senha" class="form-control" 
-                                           required placeholder="Digite a nova senha">
-                                    <p class="form-help">
-                                        <i class="fas fa-key"></i>
-                                        Mínimo de <?php echo PASSWORD_MIN_LENGTH; ?> caracteres
-                                    </p>
-                                </div>
-                                
-                                <div class="form-group">
-                                    <label class="form-label" for="confirmar_senha">Confirmar Nova Senha <span class="required">*</span></label>
-                                    <input type="password" id="confirmar_senha" name="confirmar_senha" class="form-control" 
-                                           required placeholder="Digite novamente a nova senha">
-                                </div>
+                            <div class="form-group">
+                                <label class="form-label" for="new_password">Nova Senha <span class="required">*</span></label>
+                                <input type="password" id="new_password" name="new_password" class="form-control" 
+                                       required placeholder="Digite a nova senha" minlength="8">
+                                <p class="form-help">
+                                    <i class="fas fa-info-circle"></i>
+                                    A senha deve ter pelo menos 8 caracteres.
+                                </p>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label" for="confirm_password">Confirmar Nova Senha <span class="required">*</span></label>
+                                <input type="password" id="confirm_password" name="confirm_password" class="form-control" 
+                                       required placeholder="Digite novamente a nova senha">
                             </div>
                             
                             <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-lock"></i>
+                                <i class="fas fa-save"></i>
                                 Alterar Senha
                             </button>
                         </form>
@@ -1171,236 +827,87 @@ $cpfPendente = empty($profileData['perfil']['cpf']);
                 </div>
             </div>
         </div>
+
         <?php endif; ?>
     </div>
-    
+
+    <!-- JavaScript -->
     <script>
+        // Máscaras para campos
         document.addEventListener('DOMContentLoaded', function() {
-            const hash = window.location.hash;
-            if (hash) {
-                const element = document.querySelector(hash);
-                if (element) {
-                    // Pequeno delay para garantir que a página carregou
-                    setTimeout(() => {
-                        element.scrollIntoView({ 
-                            behavior: 'smooth', 
-                            block: 'center' 
-                        });
-                    }, 100);
-                }
-            }
-        });
-        // Script aprimorado para preenchimento automático de endereço via CEP
-        document.getElementById('cep').addEventListener('blur', function() {
-            const cep = this.value.replace(/\D/g, '');
-            
-            if (cep.length !== 8) {
-                return;
-            }
-
-            // Mostrar loading
-            this.style.opacity = '0.6';
-            this.disabled = true;
-            
-            fetch(`https://viacep.com.br/ws/${cep}/json/`)
-                .then(response => response.json())
-                .then(data => {
-                    if (!data.erro) {
-                        document.getElementById('logradouro').value = data.logradouro;
-                        document.getElementById('bairro').value = data.bairro;
-                        document.getElementById('cidade').value = data.localidade;
-                        document.getElementById('estado').value = data.uf;
-                        document.getElementById('numero').focus();
-                        
-                        // Mostrar feedback visual
-                        showNotification('✅ Endereço preenchido automaticamente!', 'success');
-                    } else {
-                        showNotification('❌ CEP não encontrado', 'error');
-                    }
-                })
-                .catch(error => {
-                    console.error('Erro:', error);
-                    showNotification('⚠️ Erro ao buscar CEP', 'warning');
-                })
-                .finally(() => {
-                    // Remover loading
-                    this.style.opacity = '1';
-                    this.disabled = false;
+            // Máscara CPF
+            const cpfInput = document.getElementById('cpf');
+            if (cpfInput && !cpfInput.disabled) {
+                cpfInput.addEventListener('input', function(e) {
+                    let value = e.target.value.replace(/\D/g, '');
+                    value = value.replace(/(\d{3})(\d)/, '$1.$2');
+                    value = value.replace(/(\d{3})(\d)/, '$1.$2');
+                    value = value.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+                    e.target.value = value;
                 });
-        });
+            }
 
-        // Aplicar máscara no CEP
-        document.getElementById('cep').addEventListener('input', function() {
-            let value = this.value.replace(/\D/g, '');
-            if (value.length > 5) {
-                value = value.substring(0, 5) + '-' + value.substring(5, 8);
-            }
-            this.value = value;
-        });
+            // Máscara CEP
+            const cepInput = document.getElementById('cep');
+            if (cepInput) {
+                cepInput.addEventListener('input', function(e) {
+                    let value = e.target.value.replace(/\D/g, '');
+                    value = value.replace(/(\d{5})(\d)/, '$1-$2');
+                    e.target.value = value;
+                });
 
-        // NOVO: Aplicar máscara no CPF
-        document.getElementById('cpf').addEventListener('input', function() {
-            // Se o campo está desabilitado, não aplicar máscara
-            if (this.disabled) {
-                return;
+                // Buscar endereço por CEP
+                cepInput.addEventListener('blur', function() {
+                    const cep = this.value.replace(/\D/g, '');
+                    if (cep.length === 8) {
+                        fetch(`https://viacep.com.br/ws/${cep}/json/`)
+                            .then(response => response.json())
+                            .then(data => {
+                                if (!data.erro) {
+                                    document.getElementById('logradouro').value = data.logradouro || '';
+                                    document.getElementById('bairro').value = data.bairro || '';
+                                    document.getElementById('cidade').value = data.localidade || '';
+                                    document.getElementById('estado').value = data.uf || '';
+                                }
+                            })
+                            .catch(error => console.log('Erro ao buscar CEP:', error));
+                    }
+                });
             }
-            
-            let value = this.value.replace(/\D/g, '');
-            
-            if (value.length <= 11) {
-                // Aplicar máscara: 000.000.000-00
-                value = value.replace(/(\d{3})(\d)/, '$1.$2');
-                value = value.replace(/(\d{3})(\d)/, '$1.$2');
-                value = value.replace(/(\d{3})(\d{1,2})/, '$1-$2');
-            }
-            
-            this.value = value;
-        });
 
-        // NOVO: Validação de CPF em tempo real
-        document.getElementById('cpf').addEventListener('blur', function() {
-            // Se o campo está desabilitado, não validar
-            if (this.disabled) {
-                return;
-            }
-            
-            const cpf = this.value.replace(/\D/g, '');
-            
-            if (cpf.length === 0) {
-                return; // Campo vazio é permitido se não for obrigatório
-            }
-            
-            if (!validarCPF(cpf)) {
-                this.style.borderColor = 'var(--danger-color)';
-                showNotification('❌ CPF inválido', 'error');
-            } else {
-                this.style.borderColor = 'var(--success-color)';
-                showNotification('✅ CPF válido', 'success');
-            }
-        });
-
-        // NOVO: Função para validar CPF
-        function validarCPF(cpf) {
-            if (cpf.length !== 11) return false;
-            
-            // Eliminar CPFs conhecidos como inválidos
-            if (/^(\d)\1{10}$/.test(cpf)) return false;
-            
-            // Validar 1º dígito
-            let soma = 0;
-            for (let i = 0; i < 9; i++) {
-                soma += parseInt(cpf.charAt(i)) * (10 - i);
-            }
-            let resto = (soma * 10) % 11;
-            if (resto === 10 || resto === 11) resto = 0;
-            if (resto !== parseInt(cpf.charAt(9))) return false;
-            
-            // Validar 2º dígito
-            soma = 0;
-            for (let i = 0; i < 10; i++) {
-                soma += parseInt(cpf.charAt(i)) * (11 - i);
-            }
-            resto = (soma * 10) % 11;
-            if (resto === 10 || resto === 11) resto = 0;
-            if (resto !== parseInt(cpf.charAt(10))) return false;
-            
-            return true;
-        }
-
-        // Validação em tempo real da senha
-        document.getElementById('nova_senha').addEventListener('input', function() {
-            const password = this.value;
-            const minLength = <?php echo PASSWORD_MIN_LENGTH; ?>;
-            
-            if (password.length > 0 && password.length < minLength) {
-                this.style.borderColor = 'var(--danger-color)';
-            } else if (password.length >= minLength) {
-                this.style.borderColor = 'var(--success-color)';
-            } else {
-                this.style.borderColor = '#e9ecef';
-            }
-        });
-
-        // Validação de confirmação de senha
-        document.getElementById('confirmar_senha').addEventListener('input', function() {
-            const password = document.getElementById('nova_senha').value;
-            const confirm = this.value;
-            
-            if (confirm.length > 0) {
-                if (password === confirm) {
-                    this.style.borderColor = 'var(--success-color)';
-                } else {
-                    this.style.borderColor = 'var(--danger-color)';
-                }
-            } else {
-                this.style.borderColor = '#e9ecef';
-            }
-        });
-
-        // Função para mostrar notificações
-        function showNotification(message, type = 'info') {
-            const notification = document.createElement('div');
-            notification.className = `notification notification-${type}`;
-            notification.style.cssText = `
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                padding: 15px 20px;
-                border-radius: 10px;
-                color: white;
-                font-weight: 500;
-                z-index: 9999;
-                transform: translateX(400px);
-                transition: transform 0.3s ease;
-                ${type === 'success' ? 'background: var(--success-color);' : ''}
-                ${type === 'error' ? 'background: var(--danger-color);' : ''}
-                ${type === 'warning' ? 'background: var(--warning-color); color: var(--dark-gray);' : ''}
-            `;
-            notification.textContent = message;
-            
-            document.body.appendChild(notification);
-            
-            // Animar entrada
-            setTimeout(() => {
-                notification.style.transform = 'translateX(0)';
-            }, 100);
-            
-            // Remover após 3 segundos
-            setTimeout(() => {
-                notification.style.transform = 'translateX(400px)';
-                setTimeout(() => {
-                    document.body.removeChild(notification);
-                }, 300);
-            }, 3000);
-        }
-
-        // Loading nos formulários
-        document.querySelectorAll('form').forEach(form => {
-            form.addEventListener('submit', function(e) {
-                const submitBtn = this.querySelector('button[type="submit"]');
-                if (submitBtn) {
-                    submitBtn.classList.add('loading');
-                    submitBtn.disabled = true;
-                    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Salvando...';
+            // Máscara telefone
+            ['telefone', 'celular'].forEach(id => {
+                const input = document.getElementById(id);
+                if (input) {
+                    input.addEventListener('input', function(e) {
+                        let value = e.target.value.replace(/\D/g, '');
+                        if (value.length <= 10) {
+                            value = value.replace(/(\d{2})(\d)/, '($1) $2');
+                            value = value.replace(/(\d{4})(\d)/, '$1-$2');
+                        } else {
+                            value = value.replace(/(\d{2})(\d)/, '($1) $2');
+                            value = value.replace(/(\d{5})(\d)/, '$1-$2');
+                        }
+                        e.target.value = value;
+                    });
                 }
             });
+
+            // Validação de confirmação de senha
+            const passwordForm = document.getElementById('passwordForm');
+            if (passwordForm) {
+                passwordForm.addEventListener('submit', function(e) {
+                    const newPassword = document.getElementById('new_password').value;
+                    const confirmPassword = document.getElementById('confirm_password').value;
+                    
+                    if (newPassword !== confirmPassword) {
+                        e.preventDefault();
+                        alert('A confirmação da senha não confere.');
+                        return;
+                    }
+                });
+            }
         });
-
-        // Aplicar máscaras nos telefones
-        function phoneMask(input) {
-            input.addEventListener('input', function() {
-                let value = this.value.replace(/\D/g, '');
-                if (value.length <= 10) {
-                    value = value.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
-                } else {
-                    value = value.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
-                }
-                this.value = value;
-            });
-        }
-
-        phoneMask(document.getElementById('telefone'));
-        phoneMask(document.getElementById('celular'));
     </script>
 </body>
 </html>
