@@ -22,17 +22,25 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION[
 
 $userId = $_SESSION['user_id'];
 
-// Capturar mensagens de feedback da sessão E LIMPAR IMEDIATAMENTE para evitar conflitos
-$personalInfoMessage = $_SESSION['personal_info_message'] ?? '';
-$personalInfoSuccess = $_SESSION['personal_info_success'] ?? false;
-$addressMessage = $_SESSION['address_message'] ?? '';
-$addressSuccess = $_SESSION['address_success'] ?? false;
-$passwordMessage = $_SESSION['password_message'] ?? '';
-$passwordSuccess = $_SESSION['password_success'] ?? false;
+// CORREÇÃO PRINCIPAL: Capturar e limpar mensagens de forma mais robusta
+$feedbackMessages = [
+    'personal_info' => [
+        'message' => $_SESSION['personal_info_message'] ?? '',
+        'success' => $_SESSION['personal_info_success'] ?? false
+    ],
+    'address' => [
+        'message' => $_SESSION['address_message'] ?? '',
+        'success' => $_SESSION['address_success'] ?? false  
+    ],
+    'password' => [
+        'message' => $_SESSION['password_message'] ?? '',
+        'success' => $_SESSION['password_success'] ?? false
+    ]
+];
 
-// NOVO: Limpar mensagens da sessão imediatamente após capturar
+// Limpar TODAS as mensagens de sessão imediatamente
 unset($_SESSION['personal_info_message'], $_SESSION['personal_info_success']);
-unset($_SESSION['address_message'], $_SESSION['address_success']);
+unset($_SESSION['address_message'], $_SESSION['address_success']); 
 unset($_SESSION['password_message'], $_SESSION['password_success']);
 
 // Função para registrar erros em log e exibir mensagem amigável
@@ -68,9 +76,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['personal_info_message'] = logError('Erro ao atualizar informações pessoais', $e->getMessage());
         }
         
-        // CORREÇÃO: Usar URL absoluta e adicionar timestamp para forçar reload
-        $redirectUrl = CLIENT_PROFILE_URL . '?updated=' . time() . '#personal-info';
-        header("Location: " . $redirectUrl);
+        // CORREÇÃO: Simplificar redirecionamento
+        header("Location: " . CLIENT_PROFILE_URL);
         exit;
     }
     
@@ -101,9 +108,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['address_message'] = logError('Erro ao atualizar endereço', $e->getMessage());
         }
         
-        // CORREÇÃO: Usar URL absoluta e adicionar timestamp
-        $redirectUrl = CLIENT_PROFILE_URL . '?updated=' . time() . '#address';
-        header("Location: " . $redirectUrl);
+        header("Location: " . CLIENT_PROFILE_URL);
         exit;
     }
     
@@ -144,24 +149,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['password_message'] = logError('Erro ao atualizar senha', $e->getMessage());
         }
         
-        // CORREÇÃO: Usar URL absoluta e adicionar timestamp
-        $redirectUrl = CLIENT_PROFILE_URL . '?updated=' . time() . '#password';
-        header("Location: " . $redirectUrl);
+        header("Location: " . CLIENT_PROFILE_URL);
         exit;
     }
 }
 
-// CARREGAR DADOS DO PERFIL - Garantir que sempre carregue completamente
+// Carregar dados do perfil
 $error = false;
 $errorMessage = '';
 $profileData = [];
 
 try {
-    // NOVO: Adicionar delay mínimo para garantir que a atualização foi processada
-    if (isset($_GET['updated'])) {
-        usleep(100000); // 0.1 segundo de delay
-    }
-    
     $profileResult = ClientController::getProfileData($userId);
     
     if (!$profileResult['status']) {
@@ -172,7 +170,7 @@ try {
         $error = false;
         $profileData = $profileResult['data'];
         
-        // Garantir que as chaves existam para evitar erros
+        // Garantir que as chaves existam
         if (!isset($profileData['contato']) || !is_array($profileData['contato'])) {
             $profileData['contato'] = [];
         }
@@ -190,7 +188,6 @@ try {
             ];
         }
         
-        // NOVO: Garantir que dados do perfil existam
         if (!isset($profileData['perfil']) || !is_array($profileData['perfil'])) {
             $profileData['perfil'] = [
                 'nome' => '',
@@ -218,7 +215,6 @@ $completedSteps = 0;
 
 if (!empty($profileData['perfil']['nome'])) $completedSteps++;
 
-// CPF conta como completo se existe
 if (!empty($profileData['perfil']['cpf'])) {
     $completedSteps++;
     $cpfPendente = false;
@@ -244,41 +240,6 @@ $profileCompletion = $totalSteps > 0 ? ($completedSteps / $totalSteps) * 100 : 0
     <link rel="stylesheet" href="../../assets/css/views/client/profile.css">
     <!-- Font Awesome para ícones -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    
-    <style>
-        /* NOVO: Estilos para garantir carregamento visual correto */
-        .profile-container {
-            min-height: 70vh;
-        }
-        
-        .loading-fallback {
-            display: none;
-            text-align: center;
-            padding: 40px;
-            color: #666;
-        }
-        
-        /* Garantir que o conteúdo seja exibido */
-        .profile-layout {
-            opacity: 1;
-            transition: opacity 0.3s ease;
-        }
-        
-        .profile-layout.loading {
-            opacity: 0.7;
-        }
-        
-        /* Melhorar exibição dos alertas */
-        .alert {
-            margin-bottom: 20px;
-            animation: slideIn 0.3s ease;
-        }
-        
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-    </style>
 </head>
 <body>
     <!-- Incluir navbar -->
@@ -296,19 +257,6 @@ $profileCompletion = $totalSteps > 0 ? ($completedSteps / $totalSteps) * 100 : 0
                 <i class="fas fa-exclamation-triangle"></i>
                 <?php echo htmlspecialchars($errorMessage); ?>
             </div>
-            
-            <!-- Fallback de loading em caso de erro -->
-            <div class="loading-fallback">
-                <i class="fas fa-sync fa-spin"></i>
-                <p>Recarregando dados do perfil...</p>
-            </div>
-            
-            <script>
-                // NOVO: Tentar recarregar a página se houver erro
-                setTimeout(function() {
-                    window.location.reload();
-                }, 3000);
-            </script>
         <?php else: ?>
 
         <!-- Alerta de CPF pendente -->
@@ -345,7 +293,7 @@ $profileCompletion = $totalSteps > 0 ? ($completedSteps / $totalSteps) * 100 : 0
         </div>
 
         <!-- Layout principal -->
-        <div class="profile-layout" id="profileLayout">
+        <div class="profile-layout">
             <!-- Card de informações do usuário -->
             <div class="user-info-card">
                 <div class="user-avatar">
@@ -358,7 +306,6 @@ $profileCompletion = $totalSteps > 0 ? ($completedSteps / $totalSteps) * 100 : 0
                 <?php if (!empty($profileData['perfil']['cpf'])): ?>
                     <p class="user-cpf" style="color: var(--medium-gray); font-size: 0.9rem; margin-bottom: 25px;">
                         <i class="fas fa-id-card"></i> CPF: <?php 
-                        // Formatação manual do CPF para exibição
                         $cpf = $profileData['perfil']['cpf'];
                         if (strlen($cpf) === 11) {
                             echo substr($cpf, 0, 3) . '.' . substr($cpf, 3, 3) . '.' . substr($cpf, 6, 3) . '-' . substr($cpf, 9, 2);
@@ -397,10 +344,10 @@ $profileCompletion = $totalSteps > 0 ? ($completedSteps / $totalSteps) * 100 : 0
                         </h3>
                     </div>
                     <div class="form-card-body">
-                        <?php if (!empty($personalInfoMessage)): ?>
-                            <div class="alert <?php echo $personalInfoSuccess ? 'alert-success' : 'alert-danger'; ?>">
-                                <i class="fas <?php echo $personalInfoSuccess ? 'fa-check-circle' : 'fa-exclamation-triangle'; ?>"></i>
-                                <?php echo htmlspecialchars($personalInfoMessage); ?>
+                        <?php if (!empty($feedbackMessages['personal_info']['message'])): ?>
+                            <div class="alert <?php echo $feedbackMessages['personal_info']['success'] ? 'alert-success' : 'alert-danger'; ?>">
+                                <i class="fas <?php echo $feedbackMessages['personal_info']['success'] ? 'fa-check-circle' : 'fa-exclamation-triangle'; ?>"></i>
+                                <?php echo htmlspecialchars($feedbackMessages['personal_info']['message']); ?>
                             </div>
                         <?php endif; ?>
                         
@@ -416,7 +363,7 @@ $profileCompletion = $totalSteps > 0 ? ($completedSteps / $totalSteps) * 100 : 0
                                        required placeholder="Digite seu nome completo">
                             </div>
                             
-                            <!-- Campo CPF com verificação de edição -->
+                            <!-- Campo CPF -->
                             <div class="form-group <?php echo ($cpfPendente && ($profileData['perfil']['cpf_editavel'] ?? true)) ? 'cpf-required' : ''; ?>">
                                 <label class="form-label" for="cpf">
                                     CPF
@@ -477,10 +424,10 @@ $profileCompletion = $totalSteps > 0 ? ($completedSteps / $totalSteps) * 100 : 0
                         </h3>
                     </div>
                     <div class="form-card-body">
-                        <?php if (!empty($addressMessage)): ?>
-                            <div class="alert <?php echo $addressSuccess ? 'alert-success' : 'alert-danger'; ?>">
-                                <i class="fas <?php echo $addressSuccess ? 'fa-check-circle' : 'fa-exclamation-triangle'; ?>"></i>
-                                <?php echo htmlspecialchars($addressMessage); ?>
+                        <?php if (!empty($feedbackMessages['address']['message'])): ?>
+                            <div class="alert <?php echo $feedbackMessages['address']['success'] ? 'alert-success' : 'alert-danger'; ?>">
+                                <i class="fas <?php echo $feedbackMessages['address']['success'] ? 'fa-check-circle' : 'fa-exclamation-triangle'; ?>"></i>
+                                <?php echo htmlspecialchars($feedbackMessages['address']['message']); ?>
                             </div>
                         <?php endif; ?>
                         
@@ -535,7 +482,6 @@ $profileCompletion = $totalSteps > 0 ? ($completedSteps / $totalSteps) * 100 : 0
                                     <label class="form-label" for="estado">Estado</label>
                                     <select id="estado" name="estado" class="form-control">
                                         <option value="">Selecione</option>
-                                        <!-- Lista de estados brasileiros -->
                                         <option value="AC" <?php echo ($profileData['endereco']['estado'] ?? '') === 'AC' ? 'selected' : ''; ?>>Acre</option>
                                         <option value="AL" <?php echo ($profileData['endereco']['estado'] ?? '') === 'AL' ? 'selected' : ''; ?>>Alagoas</option>
                                         <option value="AP" <?php echo ($profileData['endereco']['estado'] ?? '') === 'AP' ? 'selected' : ''; ?>>Amapá</option>
@@ -586,10 +532,10 @@ $profileCompletion = $totalSteps > 0 ? ($completedSteps / $totalSteps) * 100 : 0
                         </h3>
                     </div>
                     <div class="form-card-body">
-                        <?php if (!empty($passwordMessage)): ?>
-                            <div class="alert <?php echo $passwordSuccess ? 'alert-success' : 'alert-danger'; ?>">
-                                <i class="fas <?php echo $passwordSuccess ? 'fa-check-circle' : 'fa-exclamation-triangle'; ?>"></i>
-                                <?php echo htmlspecialchars($passwordMessage); ?>
+                        <?php if (!empty($feedbackMessages['password']['message'])): ?>
+                            <div class="alert <?php echo $feedbackMessages['password']['success'] ? 'alert-success' : 'alert-danger'; ?>">
+                                <i class="fas <?php echo $feedbackMessages['password']['success'] ? 'fa-check-circle' : 'fa-exclamation-triangle'; ?>"></i>
+                                <?php echo htmlspecialchars($feedbackMessages['password']['message']); ?>
                             </div>
                         <?php endif; ?>
                         
@@ -639,19 +585,12 @@ $profileCompletion = $totalSteps > 0 ? ($completedSteps / $totalSteps) * 100 : 0
         <?php endif; ?>
     </div>
 
-    <!-- Scripts -->
+    <!-- Scripts simplificados e corrigidos -->
     <script>
-        // NOVO: Script para garantir que a página carregue corretamente
         document.addEventListener('DOMContentLoaded', function() {
-            // Garantir que o layout seja exibido
-            const profileLayout = document.getElementById('profileLayout');
-            if (profileLayout) {
-                profileLayout.classList.remove('loading');
-            }
-            
-            // Aplicar máscaras nos campos
+            // Aplicar máscara no CPF
             const cpfField = document.getElementById('cpf');
-            if (cpfField) {
+            if (cpfField && !cpfField.readOnly) {
                 cpfField.addEventListener('input', function(e) {
                     let value = e.target.value.replace(/\D/g, '');
                     value = value.replace(/(\d{3})(\d)/, '$1.$2');
@@ -661,6 +600,7 @@ $profileCompletion = $totalSteps > 0 ? ($completedSteps / $totalSteps) * 100 : 0
                 });
             }
             
+            // Aplicar máscaras em telefones
             const telefoneField = document.getElementById('telefone');
             if (telefoneField) {
                 telefoneField.addEventListener('input', function(e) {
@@ -681,6 +621,7 @@ $profileCompletion = $totalSteps > 0 ? ($completedSteps / $totalSteps) * 100 : 0
                 });
             }
             
+            // Aplicar máscara no CEP e buscar endereço
             const cepField = document.getElementById('cep');
             if (cepField) {
                 cepField.addEventListener('input', function(e) {
@@ -689,7 +630,6 @@ $profileCompletion = $totalSteps > 0 ? ($completedSteps / $totalSteps) * 100 : 0
                     e.target.value = value;
                 });
                 
-                // Buscar endereço por CEP
                 cepField.addEventListener('blur', function(e) {
                     const cep = e.target.value.replace(/\D/g, '');
                     if (cep.length === 8) {
@@ -697,10 +637,15 @@ $profileCompletion = $totalSteps > 0 ? ($completedSteps / $totalSteps) * 100 : 0
                             .then(response => response.json())
                             .then(data => {
                                 if (!data.erro) {
-                                    document.getElementById('logradouro').value = data.logradouro || '';
-                                    document.getElementById('bairro').value = data.bairro || '';
-                                    document.getElementById('cidade').value = data.localidade || '';
-                                    document.getElementById('estado').value = data.uf || '';
+                                    const logradouroField = document.getElementById('logradouro');
+                                    const bairroField = document.getElementById('bairro');
+                                    const cidadeField = document.getElementById('cidade');
+                                    const estadoField = document.getElementById('estado');
+                                    
+                                    if (logradouroField) logradouroField.value = data.logradouro || '';
+                                    if (bairroField) bairroField.value = data.bairro || '';
+                                    if (cidadeField) cidadeField.value = data.localidade || '';
+                                    if (estadoField) estadoField.value = data.uf || '';
                                 }
                             })
                             .catch(error => console.log('Erro ao buscar CEP:', error));
@@ -708,7 +653,7 @@ $profileCompletion = $totalSteps > 0 ? ($completedSteps / $totalSteps) * 100 : 0
                 });
             }
             
-            // Validação de senha em tempo real
+            // Validação de senhas
             const novaSenhaField = document.getElementById('nova_senha');
             const confirmarSenhaField = document.getElementById('confirmar_senha');
             
