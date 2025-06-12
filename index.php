@@ -929,7 +929,7 @@ try {
         <!-- CTA -->
         <section class="cta">
             <div class="container">
-                <h2>Pronto para Começar a ECONOMIZAR Dinheiro?</h2>
+                <h2>Pronto para Começar a economizar Dinheiro?</h2>
                 <p>Junte-se a milhares de brasileiros que já descobriram o segredo de transformar gastos em ganhos.</p>
                 <a href="<?php echo REGISTER_URL; ?>" class="btn btn-primary">
                     Quero Meu Cashback Agora!
