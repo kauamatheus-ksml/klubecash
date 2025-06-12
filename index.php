@@ -851,7 +851,7 @@ try {
                     <div class="card fade-in">
                         <div class="card-icon">🔒</div>
                         <h3>100% Seguro</h3>
-                        <p>Plataforma criptografada e dados protegidos. Sua segurança é nossa prioridade máxima.</p>
+                        <p>Plataforma criptografada e dados protegidos. Sua segurança é nossa prioridade máxima, e conformidade com a LGPD.</p>
                     </div>
                     
                     <div class="card fade-in">
