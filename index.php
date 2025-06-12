@@ -868,7 +868,7 @@ try {
                     
                     <div class="card fade-in">
                         <div class="card-icon">❤️</div>
-                        <h3>Sem Fidelidade</h3>
+                        <h3>Pagou, usou</h3>
                         <p>Use quando quiser, como quiser. Sem contratos longos ou obrigações chatas.</p>
                     </div>
                     
