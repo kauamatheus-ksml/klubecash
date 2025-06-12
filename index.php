@@ -904,9 +904,9 @@ try {
                                     <?php if (!empty($store['categoria'])): ?>
                                         <span class="partner-category"><?php echo htmlspecialchars($store['categoria']); ?></span>
                                     <?php endif; ?>
-                                    <div class="partner-cashback">
+                                    <!--<div class="partner-cashback">
                                         Cashback: <?php echo number_format($store['porcentagem_cashback'] ?? 5, 1); ?>%
-                                    </div>
+                                    </div>-->
                                 </div>
                             </div>
                         <?php endforeach; ?>
