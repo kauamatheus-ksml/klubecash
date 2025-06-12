@@ -857,7 +857,7 @@ try {
                     <div class="card fade-in">
                         <div class="card-icon">⚡</div>
                         <h3>Instantâneo</h3>
-                        <p>Cashback processado rapidamente. Você vê o retorno do seu dinheiro em tempo real.</p>
+                        <p>Cashback processado rapidamente. Você vê o retorno do seu crédito em tempo real.</p>
                     </div>
                     
                     <div class="card fade-in">
