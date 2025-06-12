@@ -874,8 +874,8 @@ try {
                     
                     <div class="card fade-in">
                         <div class="card-icon">🏪</div>
-                        <h3>Milhares de Lojas</h3>
-                        <p>Rede gigante de parceiros em todas as categorias que você imaginar.</p>
+                        <h3>Diversas Categorias em Expansão</h3>
+                        <p>A cada dia, mais lojas estão chegando para ampliar suas escolhas.</p>
                     </div>
                 </div>
             </div>
