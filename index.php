@@ -845,7 +845,7 @@ try {
                     <div class="card fade-in">
                         <div class="card-icon">💰</div>
                         <h3>Cashback Real</h3>
-                        <p>Dinheiro de verdade na sua conta, não pontos que expiram ou vales que complicam sua vida.</p>
+                        <p>Crédito real que você terá na sua conta, não pontos que expiram ou vales que complicam sua vida.</p>
                     </div>
                     
                     <div class="card fade-in">
