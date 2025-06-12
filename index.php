@@ -824,7 +824,7 @@ try {
                     <div class="card fade-in">
                         <div class="card-icon">3</div>
                         <h3>Receba Seu Cashback</h3>
-                        <p>Uma porcentagem do valor das suas compras volta para sua conta Klube Cash. É dinheiro real que você pode usar!</p>
+                        <p>Uma porcentagem do valor das suas compras volta para sua conta Klube Cash. É crédito real que você pode usar!</p>
                     </div>
                 </div>
             </div>
