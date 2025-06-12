@@ -106,6 +106,7 @@ if (!isset($activeMenu)) {
                 Histórico de Pagamentos
             </a>
         </li>
+        <!--
         <li>
             <a href="<?php echo STORE_PAYMENT_URL; ?>" class="sidebar-nav-item <?php echo ($activeMenu == 'payment') ? 'active' : ''; ?>">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -115,6 +116,7 @@ if (!isset($activeMenu)) {
                 Realizar Pagamento
             </a>
         </li>
+        -->
         <li>
             <a href="<?php echo SITE_URL; ?>/store/perfil" class="sidebar-nav-item <?php echo ($activeMenu == 'profile') ? 'active' : ''; ?>">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
