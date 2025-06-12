@@ -802,7 +802,7 @@ try {
             <div class="container">
                 <div class="section-header">
                     <span class="section-badge">Processo Simples</span>
-                    <h2 class="section-title">Como o Klube Cash Funciona?</h2>
+                    <h2 class="section-title">Como a Klube Cash Funciona?</h2>
                     <p class="section-description">
                         Três passos simples para começar a receber dinheiro de volta em todas as suas compras.
                     </p>
