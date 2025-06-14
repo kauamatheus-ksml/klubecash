@@ -1,5 +1,6 @@
 <?php
-// views/stores/profile.php - VERSÃO CORRIGIDA
+// views/stores/profile.php
+// Página de perfil da loja completamente refatorada
 require_once '../../config/database.php';
 require_once '../../config/constants.php';
 require_once '../../controllers/AuthController.php';
@@ -18,54 +19,33 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION[
 // Obter ID do usuário logado
 $userId = $_SESSION['user_id'];
 
-// CORREÇÃO 1: Melhor tratamento de erro na busca da loja
+// Obter dados da loja associada ao usuário
 $db = Database::getConnection();
 
-// Função para buscar dados atualizados da loja COM TRATAMENTO DE ERRO
+// Função para buscar dados atualizados da loja
 function buscarDadosLoja($db, $userId) {
-    try {
-        $storeQuery = $db->prepare("
-            SELECT l.*, le.*, u.email as usuario_email, u.nome as usuario_nome
-            FROM lojas l
-            LEFT JOIN lojas_endereco le ON l.id = le.loja_id
-            LEFT JOIN usuarios u ON l.usuario_id = u.id
-            WHERE l.usuario_id = :usuario_id
-        ");
-        $storeQuery->bindParam(':usuario_id', $userId, PDO::PARAM_INT);
-        $storeQuery->execute();
-        
-        $result = $storeQuery->fetch(PDO::FETCH_ASSOC);
-        
-        // VALIDAÇÃO CRÍTICA: Verificar se a loja foi encontrada e se tem ID válido
-        if (!$result || !isset($result['id']) || empty($result['id'])) {
-            error_log("Loja não encontrada para usuário ID: " . $userId);
-            return false;
-        }
-        
-        return $result;
-    } catch (PDOException $e) {
-        error_log("Erro ao buscar dados da loja: " . $e->getMessage());
-        return false;
-    }
+    $storeQuery = $db->prepare("
+        SELECT l.*, le.*, u.email as usuario_email, u.nome as usuario_nome
+        FROM lojas l
+        LEFT JOIN lojas_endereco le ON l.id = le.loja_id
+        LEFT JOIN usuarios u ON l.usuario_id = u.id
+        WHERE l.usuario_id = :usuario_id
+    ");
+    $storeQuery->bindParam(':usuario_id', $userId);
+    $storeQuery->execute();
+    return $storeQuery->fetch(PDO::FETCH_ASSOC);
 }
 
-// Buscar dados iniciais COM VALIDAÇÃO
+// Buscar dados iniciais
 $store = buscarDadosLoja($db, $userId);
 
-// CORREÇÃO 2: Verificação mais robusta
-if (!$store || !isset($store['id']) || empty($store['id'])) {
-    error_log("Erro crítico: Loja não encontrada ou ID inválido para usuário " . $userId);
-    header('Location: ' . LOGIN_URL . '?error=' . urlencode('Sua conta não está associada a nenhuma loja válida. Entre em contato com o suporte.'));
+// Verificar se o usuário tem uma loja associada
+if (!$store) {
+    header('Location: ' . LOGIN_URL . '?error=' . urlencode('Sua conta não está associada a nenhuma loja. Entre em contato com o suporte.'));
     exit;
 }
 
-// CORREÇÃO 3: Garantir que $storeId é um inteiro válido
-$storeId = (int)$store['id'];
-if ($storeId <= 0) {
-    error_log("Erro crítico: ID da loja inválido: " . $store['id']);
-    header('Location: ' . LOGIN_URL . '?error=' . urlencode('ID da loja inválido. Entre em contato com o suporte.'));
-    exit;
-}
+$storeId = $store['id'];
 
 // Variáveis para mensagens
 $success = '';
@@ -76,14 +56,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     
     try {
-        // CORREÇÃO 4: Validar novamente o storeId antes de qualquer operação
-        if ($storeId <= 0) {
-            throw new Exception('ID da loja inválido. Não é possível continuar.');
-        }
-        
         switch ($action) {
             case 'update_contact':
-                // Atualizar informações de contato
+                // Atualizar informações de contato (telefone e website apenas)
                 $telefone = preg_replace('/\D/', '', trim($_POST['telefone'] ?? ''));
                 $website = trim($_POST['website'] ?? '');
                 $descricao = trim($_POST['descricao'] ?? '');
@@ -101,21 +76,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     throw new Exception('Website deve ser uma URL válida.');
                 }
                 
-                // CORREÇÃO 5: Usar prepared statement com bind explicito
+                // Atualizar no banco
                 $updateStmt = $db->prepare("
                     UPDATE lojas 
                     SET telefone = :telefone, website = :website, descricao = :descricao
                     WHERE id = :id
                 ");
-                
-                $updateStmt->bindParam(':telefone', $telefone, PDO::PARAM_STR);
-                $updateStmt->bindParam(':website', $website, PDO::PARAM_STR);
-                $updateStmt->bindParam(':descricao', $descricao, PDO::PARAM_STR);
-                $updateStmt->bindParam(':id', $storeId, PDO::PARAM_INT);
-                
-                if (!$updateStmt->execute()) {
-                    throw new Exception('Erro ao atualizar informações de contato.');
-                }
+                $updateStmt->execute([
+                    ':telefone' => $telefone,
+                    ':website' => $website,
+                    ':descricao' => $descricao,
+                    ':id' => $storeId
+                ]);
                 
                 $success = 'Informações de contato atualizadas com sucesso!';
                 // Recarregar dados
@@ -123,9 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 break;
                 
             case 'update_address':
-                // CORREÇÃO 6: Validação completa do endereço com logging
-                error_log("Iniciando atualização de endereço para loja ID: " . $storeId);
-                
+                // Atualizar endereço
                 $cep = preg_replace('/\D/', '', trim($_POST['cep'] ?? ''));
                 $logradouro = trim($_POST['logradouro'] ?? '');
                 $numero = trim($_POST['numero'] ?? '');
@@ -143,60 +113,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     throw new Exception('Todos os campos de endereço são obrigatórios, exceto complemento.');
                 }
                 
-                // Verificar se já existe endereço COM LOGGING
+                // Verificar se já existe endereço
                 $checkAddressStmt = $db->prepare("SELECT id FROM lojas_endereco WHERE loja_id = :loja_id");
-                $checkAddressStmt->bindParam(':loja_id', $storeId, PDO::PARAM_INT);
-                $checkAddressStmt->execute();
+                $checkAddressStmt->execute([':loja_id' => $storeId]);
                 
-                $enderecoExiste = $checkAddressStmt->rowCount() > 0;
-                error_log("Endereço existe para loja $storeId: " . ($enderecoExiste ? 'SIM' : 'NÃO'));
-                
-                if ($enderecoExiste) {
-                    // ATUALIZAR endereço existente
+                if ($checkAddressStmt->rowCount() > 0) {
+                    // Atualizar endereço existente
                     $updateAddressStmt = $db->prepare("
                         UPDATE lojas_endereco 
                         SET cep = :cep, logradouro = :logradouro, numero = :numero, 
                             complemento = :complemento, bairro = :bairro, cidade = :cidade, estado = :estado
                         WHERE loja_id = :loja_id
                     ");
-                    
-                    error_log("Executando UPDATE de endereço para loja ID: " . $storeId);
                 } else {
-                    // INSERIR novo endereço
+                    // Inserir novo endereço
                     $updateAddressStmt = $db->prepare("
                         INSERT INTO lojas_endereco (loja_id, cep, logradouro, numero, complemento, bairro, cidade, estado)
                         VALUES (:loja_id, :cep, :logradouro, :numero, :complemento, :bairro, :cidade, :estado)
                     ");
-                    
-                    error_log("Executando INSERT de endereço para loja ID: " . $storeId);
                 }
                 
-                // CORREÇÃO 7: Bind explícito de todos os parâmetros com tipos corretos
-                $updateAddressStmt->bindParam(':loja_id', $storeId, PDO::PARAM_INT);
-                $updateAddressStmt->bindParam(':cep', $cep, PDO::PARAM_STR);
-                $updateAddressStmt->bindParam(':logradouro', $logradouro, PDO::PARAM_STR);
-                $updateAddressStmt->bindParam(':numero', $numero, PDO::PARAM_STR);
-                $updateAddressStmt->bindParam(':complemento', $complemento, PDO::PARAM_STR);
-                $updateAddressStmt->bindParam(':bairro', $bairro, PDO::PARAM_STR);
-                $updateAddressStmt->bindParam(':cidade', $cidade, PDO::PARAM_STR);
-                $updateAddressStmt->bindParam(':estado', $estado, PDO::PARAM_STR);
+                $updateAddressStmt->execute([
+                    ':loja_id' => $storeId,
+                    ':cep' => $cep,
+                    ':logradouro' => $logradouro,
+                    ':numero' => $numero,
+                    ':complemento' => $complemento,
+                    ':bairro' => $bairro,
+                    ':cidade' => $cidade,
+                    ':estado' => $estado
+                ]);
                 
-                // Executar com tratamento de erro melhorado
-                if (!$updateAddressStmt->execute()) {
-                    $errorInfo = $updateAddressStmt->errorInfo();
-                    error_log("Erro SQL ao salvar endereço: " . implode(' - ', $errorInfo));
-                    throw new Exception('Erro ao salvar endereço no banco de dados.');
-                }
-                
-                error_log("Endereço salvo com sucesso para loja ID: " . $storeId);
                 $success = 'Endereço atualizado com sucesso!';
-                
                 // Recarregar dados
                 $store = buscarDadosLoja($db, $userId);
                 break;
                 
             case 'change_password':
-                // Alterar senha (sem mudanças, já estava funcionando)
+                // Alterar senha
                 $senhaAtual = $_POST['senha_atual'] ?? '';
                 $novaSenha = $_POST['nova_senha'] ?? '';
                 $confirmarSenha = $_POST['confirmar_senha'] ?? '';
@@ -216,8 +170,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 // Verificar senha atual
                 $checkPasswordStmt = $db->prepare("SELECT senha_hash FROM usuarios WHERE id = :id");
-                $checkPasswordStmt->bindParam(':id', $userId, PDO::PARAM_INT);
-                $checkPasswordStmt->execute();
+                $checkPasswordStmt->execute([':id' => $userId]);
                 
                 if ($checkPasswordStmt->rowCount() === 0) {
                     throw new Exception('Usuário não encontrado.');
@@ -232,12 +185,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Atualizar senha
                 $newPasswordHash = password_hash($novaSenha, PASSWORD_DEFAULT, ['cost' => 12]);
                 $updatePasswordStmt = $db->prepare("UPDATE usuarios SET senha_hash = :senha_hash WHERE id = :id");
-                $updatePasswordStmt->bindParam(':senha_hash', $newPasswordHash, PDO::PARAM_STR);
-                $updatePasswordStmt->bindParam(':id', $userId, PDO::PARAM_INT);
-                
-                if (!$updatePasswordStmt->execute()) {
-                    throw new Exception('Erro ao atualizar senha.');
-                }
+                $updatePasswordStmt->execute([
+                    ':senha_hash' => $newPasswordHash,
+                    ':id' => $userId
+                ]);
                 
                 $success = 'Senha alterada com sucesso!';
                 break;
@@ -248,7 +199,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
     } catch (Exception $e) {
         $error = $e->getMessage();
-        error_log("Erro no profile da loja: " . $e->getMessage());
     } catch (PDOException $e) {
         $error = 'Erro interno. Tente novamente em alguns instantes.';
         error_log('Erro PDO no profile da loja: ' . $e->getMessage());
@@ -267,334 +217,7 @@ $activeMenu = 'profile';
     <title>Perfil da Loja - Klube Cash</title>
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
     
-    <style>
-        /* ... (todo o CSS anterior permanece igual) ... */
-        /* Variáveis CSS para padronização */
-        :root {
-            --primary-color: #FF7A00;
-            --primary-dark: #E06E00;
-            --primary-light: #FFF0E6;
-            --secondary-color: #2A3F54;
-            --success-color: #28A745;
-            --warning-color: #FFC107;
-            --danger-color: #DC3545;
-            --info-color: #17A2B8;
-            --light-gray: #F8F9FA;
-            --medium-gray: #6C757D;
-            --dark-gray: #343A40;
-            --white: #FFFFFF;
-            --shadow-sm: 0 2px 8px rgba(0,0,0,0.04);
-            --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
-            --border-radius: 12px;
-            --transition: all 0.3s ease;
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #F5F7FA;
-            color: var(--dark-gray);
-            line-height: 1.6;
-        }
-
-        /* Layout principal */
-        .main-content {
-            margin-left: 250px;
-            padding: 2rem;
-            min-height: 100vh;
-        }
-
-        /* Cabeçalho da página */
-        .page-header {
-            margin-bottom: 2rem;
-            padding-bottom: 1rem;
-            border-bottom: 2px solid var(--primary-light);
-        }
-
-        .page-title {
-            font-size: 2rem;
-            font-weight: 700;
-            color: var(--secondary-color);
-            margin-bottom: 0.5rem;
-        }
-
-        .page-subtitle {
-            color: var(--medium-gray);
-            font-size: 1.1rem;
-        }
-
-        /* Sistema de alertas melhorado */
-        .alert {
-            background-color: var(--white);
-            border-radius: var(--border-radius);
-            padding: 1rem 1.25rem;
-            margin-bottom: 1.5rem;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            box-shadow: var(--shadow-md);
-            border-left: 4px solid;
-            animation: slideIn 0.3s ease-out;
-        }
-
-        .alert.success {
-            border-color: var(--success-color);
-            background-color: #D4EDDA;
-            color: #155724;
-        }
-
-        .alert.error {
-            border-color: var(--danger-color);
-            background-color: #F8D7DA;
-            color: #721C24;
-        }
-
-        .alert-icon {
-            flex-shrink: 0;
-        }
-
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateY(-10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        /* Cards melhorados */
-        .card {
-            background-color: var(--white);
-            border-radius: var(--border-radius);
-            box-shadow: var(--shadow-md);
-            margin-bottom: 2rem;
-            overflow: hidden;
-            transition: var(--transition);
-        }
-
-        .card:hover {
-            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
-        }
-
-        .card-header {
-            background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
-            color: var(--white);
-            padding: 1.5rem;
-            border-bottom: none;
-        }
-
-        .card-title {
-            font-size: 1.25rem;
-            font-weight: 600;
-            margin: 0;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .card-body {
-            padding: 1.5rem;
-        }
-
-        /* Grid de informações */
-        .info-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 2rem;
-        }
-
-        .info-item {
-            background: linear-gradient(145deg, #f8f9fa, #e9ecef);
-            padding: 1.25rem;
-            border-radius: 10px;
-            border-left: 4px solid var(--primary-color);
-            transition: var(--transition);
-        }
-
-        .info-item:hover {
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-md);
-        }
-
-        .info-label {
-            font-size: 0.875rem;
-            color: var(--medium-gray);
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .info-value {
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: var(--dark-gray);
-            word-break: break-word;
-        }
-
-        /* Status badges melhorados */
-        .status-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.5rem 1rem;
-            border-radius: 25px;
-            font-size: 0.875rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .status-aprovado {
-            background-color: var(--success-color);
-            color: var(--white);
-        }
-
-        .status-pendente {
-            background-color: var(--warning-color);
-            color: #856404;
-        }
-
-        .status-rejeitado {
-            background-color: var(--danger-color);
-            color: var(--white);
-        }
-
-        /* Formulários melhorados */
-        .form-section {
-            margin-bottom: 2rem;
-        }
-
-        .form-group {
-            margin-bottom: 1.5rem;
-        }
-
-        .form-label {
-            display: block;
-            margin-bottom: 0.5rem;
-            font-weight: 600;
-            color: var(--dark-gray);
-            font-size: 0.95rem;
-        }
-
-        .form-input, .form-textarea, .form-select {
-            width: 100%;
-            padding: 0.875rem 1rem;
-            border: 2px solid #E1E5E9;
-            border-radius: 8px;
-            font-size: 1rem;
-            transition: var(--transition);
-            background-color: var(--white);
-        }
-
-        .form-input:focus, .form-textarea:focus, .form-select:focus {
-            outline: none;
-            border-color: var(--primary-color);
-            box-shadow: 0 0 0 3px rgba(255, 122, 0, 0.1);
-            transform: translateY(-1px);
-        }
-
-        .form-help {
-            display: block;
-            margin-top: 0.25rem;
-            color: var(--medium-gray);
-            font-size: 0.875rem;
-        }
-
-        .form-row {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 1rem;
-        }
-
-        /* Botões melhorados */
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.875rem 1.5rem;
-            border: none;
-            border-radius: var(--border-radius);
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            text-decoration: none;
-            transition: var(--transition);
-            text-align: center;
-            justify-content: center;
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
-            color: var(--white);
-        }
-
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(255, 122, 0, 0.3);
-        }
-
-        .btn-secondary {
-            background-color: var(--medium-gray);
-            color: var(--white);
-        }
-
-        .btn-secondary:hover {
-            background-color: #5A6C7D;
-            transform: translateY(-2px);
-        }
-
-        /* Seções de formulário */
-        .form-sections {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-            gap: 2rem;
-        }
-
-        /* Responsividade */
-        @media (max-width: 991.98px) {
-            .main-content {
-                margin-left: 0;
-                padding: 1rem;
-            }
-
-            .form-sections {
-                grid-template-columns: 1fr;
-            }
-
-            .info-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .form-row {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        @media (max-width: 767.98px) {
-            .page-title {
-                font-size: 1.5rem;
-            }
-
-            .card-body {
-                padding: 1rem;
-            }
-        }
-
-        /* Loader para ações */
-        .btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-    </style>
+    
 </head>
 <body>
     <!-- Incluir sidebar da loja -->
@@ -895,85 +518,85 @@ $activeMenu = 'profile';
     </div>
     
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Máscara para CEP (apenas formatação, sem busca automática)
-            const cepInput = document.getElementById('cep');
-            if (cepInput) {
-                cepInput.addEventListener('input', function(e) {
-                    let value = e.target.value.replace(/\D/g, '');
-                    value = value.replace(/(\d{5})(\d)/, '$1-$2');
-                    e.target.value = value;
-                });
-            }
-            
-            // Máscara para telefone
-            const telefoneInput = document.getElementById('telefone');
-            if (telefoneInput) {
-                telefoneInput.addEventListener('input', function(e) {
-                    let value = e.target.value.replace(/\D/g, '');
-                    if (value.length <= 10) {
-                        value = value.replace(/(\d{2})(\d)/, '($1) $2');
-                        value = value.replace(/(\d{4})(\d)/, '$1-$2');
-                    } else {
-                        value = value.replace(/(\d{2})(\d)/, '($1) $2');
-                        value = value.replace(/(\d{5})(\d)/, '$1-$2');
-                    }
-                    e.target.value = value;
-                });
-            }
-            
-            // Validação de confirmação de senha
-            const passwordForm = document.querySelector('input[name="action"][value="change_password"]').closest('form');
-            if (passwordForm) {
-                passwordForm.addEventListener('submit', function(e) {
-                    const novaSenha = document.getElementById('nova_senha').value;
-                    const confirmarSenha = document.getElementById('confirmar_senha').value;
-                    
-                    if (novaSenha !== confirmarSenha) {
-                        e.preventDefault();
-                        alert('A confirmação de senha não confere.');
-                        return false;
-                    }
-                    
-                    if (novaSenha.length < 8) {
-                        e.preventDefault();
-                        alert('A nova senha deve ter pelo menos 8 caracteres.');
-                        return false;
-                    }
-                });
-            }
-            
-            // Loading nos botões ao submeter formulário
-            const forms = document.querySelectorAll('form');
-            forms.forEach(form => {
-                form.addEventListener('submit', function() {
-                    const btn = form.querySelector('button[type="submit"]');
-                    if (btn) {
-                        const originalText = btn.innerHTML;
-                        btn.innerHTML = '<span>Salvando...</span>';
-                        btn.disabled = true;
-                        
-                        // Restaurar após 5 segundos (caso não recarregue a página)
-                        setTimeout(() => {
-                            btn.innerHTML = originalText;
-                            btn.disabled = false;
-                        }, 5000);
-                    }
-                });
+    document.addEventListener('DOMContentLoaded', function() {
+        // Máscara para CEP (apenas formatação, sem busca automática)
+        const cepInput = document.getElementById('cep');
+        if (cepInput) {
+            cepInput.addEventListener('input', function(e) {
+                let value = e.target.value.replace(/\D/g, '');
+                value = value.replace(/(\d{5})(\d)/, '$1-$2');
+                e.target.value = value;
             });
-            
-            // Auto-hide dos alertas após 5 segundos
-            const alerts = document.querySelectorAll('.alert');
-            alerts.forEach(alert => {
-                setTimeout(() => {
-                    alert.style.opacity = '0';
-                    alert.style.transform = 'translateY(-20px)';
+        }
+        
+        // Máscara para telefone
+        const telefoneInput = document.getElementById('telefone');
+        if (telefoneInput) {
+            telefoneInput.addEventListener('input', function(e) {
+                let value = e.target.value.replace(/\D/g, '');
+                if (value.length <= 10) {
+                    value = value.replace(/(\d{2})(\d)/, '($1) $2');
+                    value = value.replace(/(\d{4})(\d)/, '$1-$2');
+                } else {
+                    value = value.replace(/(\d{2})(\d)/, '($1) $2');
+                    value = value.replace(/(\d{5})(\d)/, '$1-$2');
+                }
+                e.target.value = value;
+            });
+        }
+        
+        // Validação de confirmação de senha
+        const passwordForm = document.querySelector('input[name="action"][value="change_password"]').closest('form');
+        if (passwordForm) {
+            passwordForm.addEventListener('submit', function(e) {
+                const novaSenha = document.getElementById('nova_senha').value;
+                const confirmarSenha = document.getElementById('confirmar_senha').value;
+                
+                if (novaSenha !== confirmarSenha) {
+                    e.preventDefault();
+                    alert('A confirmação de senha não confere.');
+                    return false;
+                }
+                
+                if (novaSenha.length < 8) {
+                    e.preventDefault();
+                    alert('A nova senha deve ter pelo menos 8 caracteres.');
+                    return false;
+                }
+            });
+        }
+        
+        // Loading nos botões ao submeter formulário
+        const forms = document.querySelectorAll('form');
+        forms.forEach(form => {
+            form.addEventListener('submit', function() {
+                const btn = form.querySelector('button[type="submit"]');
+                if (btn) {
+                    const originalText = btn.innerHTML;
+                    btn.innerHTML = '<span>Salvando...</span>';
+                    btn.disabled = true;
+                    
+                    // Restaurar após 5 segundos (caso não recarregue a página)
                     setTimeout(() => {
-                        alert.remove();
-                    }, 300);
-                }, 5000);
+                        btn.innerHTML = originalText;
+                        btn.disabled = false;
+                    }, 5000);
+                }
             });
         });
+        
+        // Auto-hide dos alertas após 5 segundos
+        const alerts = document.querySelectorAll('.alert');
+        alerts.forEach(alert => {
+            setTimeout(() => {
+                alert.style.opacity = '0';
+                alert.style.transform = 'translateY(-20px)';
+                setTimeout(() => {
+                    alert.remove();
+                }, 300);
+            }, 5000);
+        });
+    });
     </script>
 </body>
 </html>
