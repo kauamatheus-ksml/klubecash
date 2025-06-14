@@ -258,13 +258,7 @@ RewriteRule ^store/upload-lote/?$ views/stores/batch-upload.php [L,QSA]
 RewriteRule ^store/pagamento/?$ views/stores/payment.php [L,QSA]
 RewriteRule ^store/historico-pagamentos/?$ views/stores/payment-history.php [L,QSA]
 RewriteRule ^store/perfil/?$ views/stores/profile.php [L,QSA]
-# Nova rota principal - Financeiro (substitui as 3 páginas antigas)
-RewriteRule ^store/financeiro/?$ views/stores/financeiro.php [L]
-# === APIs PARA A NOVA PÁGINA FINANCEIRO ===
-RewriteRule ^api/store/financeiro/transacoes/?$ api/stores/financeiro-transacoes.php [L]
-RewriteRule ^api/store/financeiro/comissoes/?$ api/stores/financeiro-comissoes.php [L]
-RewriteRule ^api/store/financeiro/historico/?$ api/stores/financeiro-historico.php [L]
-RewriteRule ^api/store/financeiro/dashboard/?$ api/stores/financeiro-dashboard.php [L]
+
 # NOVA ROTA OPENPIX
 RewriteRule ^api/openpix/?$ api/openpix.php [L]
 # NOVO WEBHOOK OPENPIX
