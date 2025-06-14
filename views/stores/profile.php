@@ -1,6 +1,5 @@
 <?php
-// views/stores/profile.php
-// Página de perfil da loja completamente refatorada
+// views/stores/profile.php - VERSÃO CORRIGIDA
 require_once '../../config/database.php';
 require_once '../../config/constants.php';
 require_once '../../controllers/AuthController.php';
@@ -19,33 +18,54 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION[
 // Obter ID do usuário logado
 $userId = $_SESSION['user_id'];
 
-// Obter dados da loja associada ao usuário
+// CORREÇÃO 1: Melhor tratamento de erro na busca da loja
 $db = Database::getConnection();
 
-// Função para buscar dados atualizados da loja
+// Função para buscar dados atualizados da loja COM TRATAMENTO DE ERRO
 function buscarDadosLoja($db, $userId) {
-    $storeQuery = $db->prepare("
-        SELECT l.*, le.*, u.email as usuario_email, u.nome as usuario_nome
-        FROM lojas l
-        LEFT JOIN lojas_endereco le ON l.id = le.loja_id
-        LEFT JOIN usuarios u ON l.usuario_id = u.id
-        WHERE l.usuario_id = :usuario_id
-    ");
-    $storeQuery->bindParam(':usuario_id', $userId);
-    $storeQuery->execute();
-    return $storeQuery->fetch(PDO::FETCH_ASSOC);
+    try {
+        $storeQuery = $db->prepare("
+            SELECT l.*, le.*, u.email as usuario_email, u.nome as usuario_nome
+            FROM lojas l
+            LEFT JOIN lojas_endereco le ON l.id = le.loja_id
+            LEFT JOIN usuarios u ON l.usuario_id = u.id
+            WHERE l.usuario_id = :usuario_id
+        ");
+        $storeQuery->bindParam(':usuario_id', $userId, PDO::PARAM_INT);
+        $storeQuery->execute();
+        
+        $result = $storeQuery->fetch(PDO::FETCH_ASSOC);
+        
+        // VALIDAÇÃO CRÍTICA: Verificar se a loja foi encontrada e se tem ID válido
+        if (!$result || !isset($result['id']) || empty($result['id'])) {
+            error_log("Loja não encontrada para usuário ID: " . $userId);
+            return false;
+        }
+        
+        return $result;
+    } catch (PDOException $e) {
+        error_log("Erro ao buscar dados da loja: " . $e->getMessage());
+        return false;
+    }
 }
 
-// Buscar dados iniciais
+// Buscar dados iniciais COM VALIDAÇÃO
 $store = buscarDadosLoja($db, $userId);
 
-// Verificar se o usuário tem uma loja associada
-if (!$store) {
-    header('Location: ' . LOGIN_URL . '?error=' . urlencode('Sua conta não está associada a nenhuma loja. Entre em contato com o suporte.'));
+// CORREÇÃO 2: Verificação mais robusta
+if (!$store || !isset($store['id']) || empty($store['id'])) {
+    error_log("Erro crítico: Loja não encontrada ou ID inválido para usuário " . $userId);
+    header('Location: ' . LOGIN_URL . '?error=' . urlencode('Sua conta não está associada a nenhuma loja válida. Entre em contato com o suporte.'));
     exit;
 }
 
-$storeId = $store['id'];
+// CORREÇÃO 3: Garantir que $storeId é um inteiro válido
+$storeId = (int)$store['id'];
+if ($storeId <= 0) {
+    error_log("Erro crítico: ID da loja inválido: " . $store['id']);
+    header('Location: ' . LOGIN_URL . '?error=' . urlencode('ID da loja inválido. Entre em contato com o suporte.'));
+    exit;
+}
 
 // Variáveis para mensagens
 $success = '';
@@ -56,9 +76,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     
     try {
+        // CORREÇÃO 4: Validar novamente o storeId antes de qualquer operação
+        if ($storeId <= 0) {
+            throw new Exception('ID da loja inválido. Não é possível continuar.');
+        }
+        
         switch ($action) {
             case 'update_contact':
-                // Atualizar informações de contato (telefone e website apenas)
+                // Atualizar informações de contato
                 $telefone = preg_replace('/\D/', '', trim($_POST['telefone'] ?? ''));
                 $website = trim($_POST['website'] ?? '');
                 $descricao = trim($_POST['descricao'] ?? '');
@@ -76,18 +101,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     throw new Exception('Website deve ser uma URL válida.');
                 }
                 
-                // Atualizar no banco
+                // CORREÇÃO 5: Usar prepared statement com bind explicito
                 $updateStmt = $db->prepare("
                     UPDATE lojas 
                     SET telefone = :telefone, website = :website, descricao = :descricao
                     WHERE id = :id
                 ");
-                $updateStmt->execute([
-                    ':telefone' => $telefone,
-                    ':website' => $website,
-                    ':descricao' => $descricao,
-                    ':id' => $storeId
-                ]);
+                
+                $updateStmt->bindParam(':telefone', $telefone, PDO::PARAM_STR);
+                $updateStmt->bindParam(':website', $website, PDO::PARAM_STR);
+                $updateStmt->bindParam(':descricao', $descricao, PDO::PARAM_STR);
+                $updateStmt->bindParam(':id', $storeId, PDO::PARAM_INT);
+                
+                if (!$updateStmt->execute()) {
+                    throw new Exception('Erro ao atualizar informações de contato.');
+                }
                 
                 $success = 'Informações de contato atualizadas com sucesso!';
                 // Recarregar dados
@@ -95,7 +123,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 break;
                 
             case 'update_address':
-                // Atualizar endereço
+                // CORREÇÃO 6: Validação completa do endereço com logging
+                error_log("Iniciando atualização de endereço para loja ID: " . $storeId);
+                
                 $cep = preg_replace('/\D/', '', trim($_POST['cep'] ?? ''));
                 $logradouro = trim($_POST['logradouro'] ?? '');
                 $numero = trim($_POST['numero'] ?? '');
@@ -113,44 +143,60 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     throw new Exception('Todos os campos de endereço são obrigatórios, exceto complemento.');
                 }
                 
-                // Verificar se já existe endereço
+                // Verificar se já existe endereço COM LOGGING
                 $checkAddressStmt = $db->prepare("SELECT id FROM lojas_endereco WHERE loja_id = :loja_id");
-                $checkAddressStmt->execute([':loja_id' => $storeId]);
+                $checkAddressStmt->bindParam(':loja_id', $storeId, PDO::PARAM_INT);
+                $checkAddressStmt->execute();
                 
-                if ($checkAddressStmt->rowCount() > 0) {
-                    // Atualizar endereço existente
+                $enderecoExiste = $checkAddressStmt->rowCount() > 0;
+                error_log("Endereço existe para loja $storeId: " . ($enderecoExiste ? 'SIM' : 'NÃO'));
+                
+                if ($enderecoExiste) {
+                    // ATUALIZAR endereço existente
                     $updateAddressStmt = $db->prepare("
                         UPDATE lojas_endereco 
                         SET cep = :cep, logradouro = :logradouro, numero = :numero, 
                             complemento = :complemento, bairro = :bairro, cidade = :cidade, estado = :estado
                         WHERE loja_id = :loja_id
                     ");
+                    
+                    error_log("Executando UPDATE de endereço para loja ID: " . $storeId);
                 } else {
-                    // Inserir novo endereço
+                    // INSERIR novo endereço
                     $updateAddressStmt = $db->prepare("
                         INSERT INTO lojas_endereco (loja_id, cep, logradouro, numero, complemento, bairro, cidade, estado)
                         VALUES (:loja_id, :cep, :logradouro, :numero, :complemento, :bairro, :cidade, :estado)
                     ");
+                    
+                    error_log("Executando INSERT de endereço para loja ID: " . $storeId);
                 }
                 
-                $updateAddressStmt->execute([
-                    ':loja_id' => $storeId,
-                    ':cep' => $cep,
-                    ':logradouro' => $logradouro,
-                    ':numero' => $numero,
-                    ':complemento' => $complemento,
-                    ':bairro' => $bairro,
-                    ':cidade' => $cidade,
-                    ':estado' => $estado
-                ]);
+                // CORREÇÃO 7: Bind explícito de todos os parâmetros com tipos corretos
+                $updateAddressStmt->bindParam(':loja_id', $storeId, PDO::PARAM_INT);
+                $updateAddressStmt->bindParam(':cep', $cep, PDO::PARAM_STR);
+                $updateAddressStmt->bindParam(':logradouro', $logradouro, PDO::PARAM_STR);
+                $updateAddressStmt->bindParam(':numero', $numero, PDO::PARAM_STR);
+                $updateAddressStmt->bindParam(':complemento', $complemento, PDO::PARAM_STR);
+                $updateAddressStmt->bindParam(':bairro', $bairro, PDO::PARAM_STR);
+                $updateAddressStmt->bindParam(':cidade', $cidade, PDO::PARAM_STR);
+                $updateAddressStmt->bindParam(':estado', $estado, PDO::PARAM_STR);
                 
+                // Executar com tratamento de erro melhorado
+                if (!$updateAddressStmt->execute()) {
+                    $errorInfo = $updateAddressStmt->errorInfo();
+                    error_log("Erro SQL ao salvar endereço: " . implode(' - ', $errorInfo));
+                    throw new Exception('Erro ao salvar endereço no banco de dados.');
+                }
+                
+                error_log("Endereço salvo com sucesso para loja ID: " . $storeId);
                 $success = 'Endereço atualizado com sucesso!';
+                
                 // Recarregar dados
                 $store = buscarDadosLoja($db, $userId);
                 break;
                 
             case 'change_password':
-                // Alterar senha
+                // Alterar senha (sem mudanças, já estava funcionando)
                 $senhaAtual = $_POST['senha_atual'] ?? '';
                 $novaSenha = $_POST['nova_senha'] ?? '';
                 $confirmarSenha = $_POST['confirmar_senha'] ?? '';
@@ -170,7 +216,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 // Verificar senha atual
                 $checkPasswordStmt = $db->prepare("SELECT senha_hash FROM usuarios WHERE id = :id");
-                $checkPasswordStmt->execute([':id' => $userId]);
+                $checkPasswordStmt->bindParam(':id', $userId, PDO::PARAM_INT);
+                $checkPasswordStmt->execute();
                 
                 if ($checkPasswordStmt->rowCount() === 0) {
                     throw new Exception('Usuário não encontrado.');
@@ -185,10 +232,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Atualizar senha
                 $newPasswordHash = password_hash($novaSenha, PASSWORD_DEFAULT, ['cost' => 12]);
                 $updatePasswordStmt = $db->prepare("UPDATE usuarios SET senha_hash = :senha_hash WHERE id = :id");
-                $updatePasswordStmt->execute([
-                    ':senha_hash' => $newPasswordHash,
-                    ':id' => $userId
-                ]);
+                $updatePasswordStmt->bindParam(':senha_hash', $newPasswordHash, PDO::PARAM_STR);
+                $updatePasswordStmt->bindParam(':id', $userId, PDO::PARAM_INT);
+                
+                if (!$updatePasswordStmt->execute()) {
+                    throw new Exception('Erro ao atualizar senha.');
+                }
                 
                 $success = 'Senha alterada com sucesso!';
                 break;
@@ -199,6 +248,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
     } catch (Exception $e) {
         $error = $e->getMessage();
+        error_log("Erro no profile da loja: " . $e->getMessage());
     } catch (PDOException $e) {
         $error = 'Erro interno. Tente novamente em alguns instantes.';
         error_log('Erro PDO no profile da loja: ' . $e->getMessage());
@@ -218,6 +268,7 @@ $activeMenu = 'profile';
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
     
     <style>
+        /* ... (todo o CSS anterior permanece igual) ... */
         /* Variáveis CSS para padronização */
         :root {
             --primary-color: #FF7A00;
@@ -844,85 +895,85 @@ $activeMenu = 'profile';
     </div>
     
     <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Máscara para CEP (apenas formatação, sem busca automática)
-        const cepInput = document.getElementById('cep');
-        if (cepInput) {
-            cepInput.addEventListener('input', function(e) {
-                let value = e.target.value.replace(/\D/g, '');
-                value = value.replace(/(\d{5})(\d)/, '$1-$2');
-                e.target.value = value;
-            });
-        }
-        
-        // Máscara para telefone
-        const telefoneInput = document.getElementById('telefone');
-        if (telefoneInput) {
-            telefoneInput.addEventListener('input', function(e) {
-                let value = e.target.value.replace(/\D/g, '');
-                if (value.length <= 10) {
-                    value = value.replace(/(\d{2})(\d)/, '($1) $2');
-                    value = value.replace(/(\d{4})(\d)/, '$1-$2');
-                } else {
-                    value = value.replace(/(\d{2})(\d)/, '($1) $2');
+        document.addEventListener('DOMContentLoaded', function() {
+            // Máscara para CEP (apenas formatação, sem busca automática)
+            const cepInput = document.getElementById('cep');
+            if (cepInput) {
+                cepInput.addEventListener('input', function(e) {
+                    let value = e.target.value.replace(/\D/g, '');
                     value = value.replace(/(\d{5})(\d)/, '$1-$2');
-                }
-                e.target.value = value;
-            });
-        }
-        
-        // Validação de confirmação de senha
-        const passwordForm = document.querySelector('input[name="action"][value="change_password"]').closest('form');
-        if (passwordForm) {
-            passwordForm.addEventListener('submit', function(e) {
-                const novaSenha = document.getElementById('nova_senha').value;
-                const confirmarSenha = document.getElementById('confirmar_senha').value;
-                
-                if (novaSenha !== confirmarSenha) {
-                    e.preventDefault();
-                    alert('A confirmação de senha não confere.');
-                    return false;
-                }
-                
-                if (novaSenha.length < 8) {
-                    e.preventDefault();
-                    alert('A nova senha deve ter pelo menos 8 caracteres.');
-                    return false;
-                }
-            });
-        }
-        
-        // Loading nos botões ao submeter formulário
-        const forms = document.querySelectorAll('form');
-        forms.forEach(form => {
-            form.addEventListener('submit', function() {
-                const btn = form.querySelector('button[type="submit"]');
-                if (btn) {
-                    const originalText = btn.innerHTML;
-                    btn.innerHTML = '<span>Salvando...</span>';
-                    btn.disabled = true;
+                    e.target.value = value;
+                });
+            }
+            
+            // Máscara para telefone
+            const telefoneInput = document.getElementById('telefone');
+            if (telefoneInput) {
+                telefoneInput.addEventListener('input', function(e) {
+                    let value = e.target.value.replace(/\D/g, '');
+                    if (value.length <= 10) {
+                        value = value.replace(/(\d{2})(\d)/, '($1) $2');
+                        value = value.replace(/(\d{4})(\d)/, '$1-$2');
+                    } else {
+                        value = value.replace(/(\d{2})(\d)/, '($1) $2');
+                        value = value.replace(/(\d{5})(\d)/, '$1-$2');
+                    }
+                    e.target.value = value;
+                });
+            }
+            
+            // Validação de confirmação de senha
+            const passwordForm = document.querySelector('input[name="action"][value="change_password"]').closest('form');
+            if (passwordForm) {
+                passwordForm.addEventListener('submit', function(e) {
+                    const novaSenha = document.getElementById('nova_senha').value;
+                    const confirmarSenha = document.getElementById('confirmar_senha').value;
                     
-                    // Restaurar após 5 segundos (caso não recarregue a página)
+                    if (novaSenha !== confirmarSenha) {
+                        e.preventDefault();
+                        alert('A confirmação de senha não confere.');
+                        return false;
+                    }
+                    
+                    if (novaSenha.length < 8) {
+                        e.preventDefault();
+                        alert('A nova senha deve ter pelo menos 8 caracteres.');
+                        return false;
+                    }
+                });
+            }
+            
+            // Loading nos botões ao submeter formulário
+            const forms = document.querySelectorAll('form');
+            forms.forEach(form => {
+                form.addEventListener('submit', function() {
+                    const btn = form.querySelector('button[type="submit"]');
+                    if (btn) {
+                        const originalText = btn.innerHTML;
+                        btn.innerHTML = '<span>Salvando...</span>';
+                        btn.disabled = true;
+                        
+                        // Restaurar após 5 segundos (caso não recarregue a página)
+                        setTimeout(() => {
+                            btn.innerHTML = originalText;
+                            btn.disabled = false;
+                        }, 5000);
+                    }
+                });
+            });
+            
+            // Auto-hide dos alertas após 5 segundos
+            const alerts = document.querySelectorAll('.alert');
+            alerts.forEach(alert => {
+                setTimeout(() => {
+                    alert.style.opacity = '0';
+                    alert.style.transform = 'translateY(-20px)';
                     setTimeout(() => {
-                        btn.innerHTML = originalText;
-                        btn.disabled = false;
-                    }, 5000);
-                }
+                        alert.remove();
+                    }, 300);
+                }, 5000);
             });
         });
-        
-        // Auto-hide dos alertas após 5 segundos
-        const alerts = document.querySelectorAll('.alert');
-        alerts.forEach(alert => {
-            setTimeout(() => {
-                alert.style.opacity = '0';
-                alert.style.transform = 'translateY(-20px)';
-                setTimeout(() => {
-                    alert.remove();
-                }, 300);
-            }, 5000);
-        });
-    });
     </script>
 </body>
 </html>
