@@ -59,6 +59,35 @@ if (!isset($activeMenu)) {
                 Dashboard
             </a>
         </li>
+        <a href="<?php echo STORE_FINANCIAL_URL; ?>" class="sidebar-nav-item <?php echo ($activeMenu == 'financial') ? 'active' : ''; ?>">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="1" x2="12" y2="23"></line>
+                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                </svg>
+                Financeiro
+                <!-- Badge de notificação se houver pendentes -->
+                <?php 
+                // Verificar se há comissões pendentes
+                $db = Database::getConnection();
+                $userId = $_SESSION['user_id'];
+                $storeQuery = $db->prepare("SELECT id FROM lojas WHERE usuario_id = :usuario_id");
+                $storeQuery->bindParam(':usuario_id', $userId);
+                $storeQuery->execute();
+                
+                if ($storeQuery->rowCount() > 0) {
+                    $store = $storeQuery->fetch(PDO::FETCH_ASSOC);
+                    $storeId = $store['id'];
+                    
+                    $pendingQuery = $db->prepare("SELECT COUNT(*) as total FROM transacoes_cashback WHERE loja_id = :loja_id AND status = 'pendente'");
+                    $pendingQuery->bindParam(':loja_id', $storeId);
+                    $pendingQuery->execute();
+                    $pending = $pendingQuery->fetch(PDO::FETCH_ASSOC);
+                    
+                    if ($pending['total'] > 0): ?>
+                        <span class="sidebar-badge"><?php echo $pending['total']; ?></span>
+                    <?php endif;
+                }
+                ?>
         <li>
             <a href="<?php echo STORE_REGISTER_TRANSACTION_URL; ?>" class="sidebar-nav-item <?php echo ($activeMenu == 'register-transaction') ? 'active' : ''; ?>">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
