@@ -109,114 +109,67 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             break;
             
         case 'update_address':
-            // Atualizar endereço da loja - VERSÃO COM DEBUG
-            try {
-                // Log inicial para debug
-                error_log("=== INÍCIO UPDATE ADDRESS ===");
-                error_log("POST recebido: " . print_r($_POST, true));
-                error_log("Store ID: " . $storeId);
-                
-                // Limpar e validar dados de entrada
-                $cep = preg_replace('/\D/', '', $_POST['cep'] ?? '');
-                $logradouro = trim($_POST['logradouro'] ?? '');
-                $numero = trim($_POST['numero'] ?? '');
-                $complemento = trim($_POST['complemento'] ?? '');
-                $bairro = trim($_POST['bairro'] ?? '');
-                $cidade = trim($_POST['cidade'] ?? '');
-                $estado = trim($_POST['estado'] ?? '');
-                
-                // Log dos dados processados
-                error_log("Dados processados:");
-                error_log("CEP: '$cep' (length: " . strlen($cep) . ")");
-                error_log("Logradouro: '$logradouro'");
-                error_log("Número: '$numero'");
-                error_log("Complemento: '$complemento'");
-                error_log("Bairro: '$bairro'");
-                error_log("Cidade: '$cidade'");
-                error_log("Estado: '$estado'");
-                
-                // Validações obrigatórias
-                if (strlen($cep) != 8) {
-                    $error = 'CEP deve ter exatamente 8 dígitos.';
-                    error_log("ERRO: CEP inválido - '$cep' tem " . strlen($cep) . " dígitos");
-                } elseif (empty($logradouro)) {
-                    $error = 'Logradouro é obrigatório.';
-                    error_log("ERRO: Logradouro vazio");
-                } elseif (empty($numero)) {
-                    $error = 'Número é obrigatório.';
-                    error_log("ERRO: Número vazio");
-                } elseif (empty($bairro)) {
-                    $error = 'Bairro é obrigatório.';
-                    error_log("ERRO: Bairro vazio");
-                } elseif (empty($cidade)) {
-                    $error = 'Cidade é obrigatória.';
-                    error_log("ERRO: Cidade vazia");
-                } elseif (empty($estado)) {
-                    $error = 'Estado é obrigatório.';
-                    error_log("ERRO: Estado vazio");
-                } elseif (strlen($estado) != 2) {
-                    $error = 'Estado deve ter 2 caracteres (ex: MG, SP).';
-                    error_log("ERRO: Estado com tamanho incorreto - '$estado' tem " . strlen($estado) . " caracteres");
-                } else {
-                    error_log("Validações OK - prosseguindo com o banco de dados");
-                    
-                    // Verificar se já existe um endereço para esta loja
-                    $checkAddressStmt = $db->prepare("SELECT id FROM lojas_endereco WHERE loja_id = ? LIMIT 1");
-                    $checkAddressStmt->execute([$storeId]);
-                    
-                    $addressExists = $checkAddressStmt->rowCount() > 0;
-                    error_log("Endereço existe? " . ($addressExists ? 'SIM' : 'NÃO'));
-                    
-                    if ($addressExists) {
-                        // Atualizar endereço existente
-                        $sql = "UPDATE lojas_endereco SET cep = ?, logradouro = ?, numero = ?, complemento = ?, bairro = ?, cidade = ?, estado = ? WHERE loja_id = ?";
-                        $params = [$cep, $logradouro, $numero, $complemento, $bairro, $cidade, $estado, $storeId];
-                        error_log("SQL UPDATE: $sql");
-                    } else {
-                        // Inserir novo endereço
-                        $sql = "INSERT INTO lojas_endereco (loja_id, cep, logradouro, numero, complemento, bairro, cidade, estado) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
-                        $params = [$storeId, $cep, $logradouro, $numero, $complemento, $bairro, $cidade, $estado];
-                        error_log("SQL INSERT: $sql");
-                    }
-                    
-                    error_log("Parâmetros: " . print_r($params, true));
-                    
-                    // Executar a query
-                    $stmt = $db->prepare($sql);
-                    $result = $stmt->execute($params);
-                    
-                    error_log("Resultado da execução: " . ($result ? 'SUCESSO' : 'FALHA'));
-                    
-                    if ($result) {
-                        // Atualizar dados em memória para exibir os valores corretos na tela
-                        $store['cep'] = $cep;
-                        $store['logradouro'] = $logradouro;
-                        $store['numero'] = $numero;
-                        $store['complemento'] = $complemento;
-                        $store['bairro'] = $bairro;
-                        $store['cidade'] = $cidade;
-                        $store['estado'] = $estado;
-                        
-                        $success = 'Endereço atualizado com sucesso!';
-                        error_log("SUCCESS: Endereço da loja {$storeId} atualizado com sucesso");
-                    } else {
-                        $error = 'Erro ao salvar endereço no banco de dados. Tente novamente.';
-                        $errorInfo = $stmt->errorInfo();
-                        error_log("ERRO SQL: " . print_r($errorInfo, true));
-                    }
-                }
-            } catch (PDOException $e) {
-                $error = 'Erro ao processar dados do endereço. Tente novamente.';
-                error_log('ERRO PDO ao atualizar endereço da loja ' . $storeId . ': ' . $e->getMessage());
-                error_log('Stack trace: ' . $e->getTraceAsString());
-            } catch (Exception $e) {
-                $error = 'Erro inesperado ao atualizar endereço. Tente novamente.';
-                error_log('ERRO GERAL ao atualizar endereço da loja ' . $storeId . ': ' . $e->getMessage());
-                error_log('Stack trace: ' . $e->getTraceAsString());
+    // Atualizar endereço da loja
+    try {
+        // Capturar e limpar dados
+        $cep = preg_replace('/\D/', '', $_POST['cep'] ?? '');
+        $logradouro = trim($_POST['logradouro'] ?? '');
+        $numero = trim($_POST['numero'] ?? '');
+        $complemento = trim($_POST['complemento'] ?? '');
+        $bairro = trim($_POST['bairro'] ?? '');
+        $cidade = trim($_POST['cidade'] ?? '');
+        $estado = trim($_POST['estado'] ?? '');
+        
+        // Validar dados essenciais
+        if (strlen($cep) != 8) {
+            $error = 'CEP deve ter exatamente 8 dígitos.';
+        } elseif (empty($logradouro)) {
+            $error = 'Logradouro é obrigatório.';
+        } elseif (empty($numero)) {
+            $error = 'Número é obrigatório.';
+        } elseif (empty($bairro)) {
+            $error = 'Bairro é obrigatório.';
+        } elseif (empty($cidade)) {
+            $error = 'Cidade é obrigatória.';
+        } elseif (empty($estado)) {
+            $error = 'Estado é obrigatório.';
+        } else {
+            // Verificar se endereço já existe
+            $checkStmt = $db->prepare("SELECT id FROM lojas_endereco WHERE loja_id = ?");
+            $checkStmt->execute([$storeId]);
+            
+            if ($checkStmt->rowCount() > 0) {
+                // UPDATE - atualizar endereço existente
+                $sql = "UPDATE lojas_endereco SET cep = ?, logradouro = ?, numero = ?, complemento = ?, bairro = ?, cidade = ?, estado = ? WHERE loja_id = ?";
+                $params = [$cep, $logradouro, $numero, $complemento, $bairro, $cidade, $estado, $storeId];
+            } else {
+                // INSERT - criar novo endereço
+                $sql = "INSERT INTO lojas_endereco (loja_id, cep, logradouro, numero, complemento, bairro, cidade, estado) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+                $params = [$storeId, $cep, $logradouro, $numero, $complemento, $bairro, $cidade, $estado];
             }
             
-            error_log("=== FIM UPDATE ADDRESS ===");
-            break;
+            // Executar a operação
+            $stmt = $db->prepare($sql);
+            if ($stmt->execute($params)) {
+                // Sucesso - atualizar dados em memória
+                $store['cep'] = $cep;
+                $store['logradouro'] = $logradouro;
+                $store['numero'] = $numero;
+                $store['complemento'] = $complemento;
+                $store['bairro'] = $bairro;
+                $store['cidade'] = $cidade;
+                $store['estado'] = $estado;
+                
+                $success = 'Endereço atualizado com sucesso!';
+            } else {
+                $error = 'Erro ao salvar no banco de dados. Tente novamente.';
+            }
+        }
+    } catch (Exception $e) {
+        $error = 'Erro ao processar endereço. Tente novamente.';
+        error_log('Erro em update_address: ' . $e->getMessage());
+    }
+    break;
             
         case 'change_password':
             // Alterar senha
