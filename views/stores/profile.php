@@ -844,119 +844,85 @@ $activeMenu = 'profile';
     </div>
     
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Máscara para CEP
-            const cepInput = document.getElementById('cep');
-            if (cepInput) {
-                cepInput.addEventListener('input', function(e) {
-                    let value = e.target.value.replace(/\D/g, '');
-                    value = value.replace(/(\d{5})(\d)/, '$1-$2');
-                    e.target.value = value;
-                });
-                
-                // Buscar endereço por CEP usando ViaCEP
-                cepInput.addEventListener('blur', function(e) {
-                    const cep = e.target.value.replace(/\D/g, '');
-                    if (cep.length === 8) {
-                        // Mostrar loading no botão
-                        const btn = e.target.closest('form').querySelector('button[type="submit"]');
-                        const originalText = btn.innerHTML;
-                        btn.innerHTML = '<span>Buscando CEP...</span>';
-                        btn.disabled = true;
-                        
-                        fetch(`https://viacep.com.br/ws/${cep}/json/`)
-                            .then(response => response.json())
-                            .then(data => {
-                                if (!data.erro) {
-                                    document.getElementById('logradouro').value = data.logradouro || '';
-                                    document.getElementById('bairro').value = data.bairro || '';
-                                    document.getElementById('cidade').value = data.localidade || '';
-                                    document.getElementById('estado').value = data.uf || '';
-                                } else {
-                                    alert('CEP não encontrado. Verifique se o CEP está correto.');
-                                }
-                            })
-                            .catch(error => {
-                                console.log('Erro ao buscar CEP:', error);
-                                alert('Erro ao buscar CEP. Tente novamente.');
-                            })
-                            .finally(() => {
-                                // Restaurar botão
-                                btn.innerHTML = originalText;
-                                btn.disabled = false;
-                            });
-                    }
-                });
-            }
-            
-            // Máscara para telefone
-            const telefoneInput = document.getElementById('telefone');
-            if (telefoneInput) {
-                telefoneInput.addEventListener('input', function(e) {
-                    let value = e.target.value.replace(/\D/g, '');
-                    if (value.length <= 10) {
-                        value = value.replace(/(\d{2})(\d)/, '($1) $2');
-                        value = value.replace(/(\d{4})(\d)/, '$1-$2');
-                    } else {
-                        value = value.replace(/(\d{2})(\d)/, '($1) $2');
-                        value = value.replace(/(\d{5})(\d)/, '$1-$2');
-                    }
-                    e.target.value = value;
-                });
-            }
-            
-            // Validação de confirmação de senha
-            const passwordForm = document.querySelector('input[name="action"][value="change_password"]').closest('form');
-            if (passwordForm) {
-                passwordForm.addEventListener('submit', function(e) {
-                    const novaSenha = document.getElementById('nova_senha').value;
-                    const confirmarSenha = document.getElementById('confirmar_senha').value;
-                    
-                    if (novaSenha !== confirmarSenha) {
-                        e.preventDefault();
-                        alert('A confirmação de senha não confere.');
-                        return false;
-                    }
-                    
-                    if (novaSenha.length < 8) {
-                        e.preventDefault();
-                        alert('A nova senha deve ter pelo menos 8 caracteres.');
-                        return false;
-                    }
-                });
-            }
-            
-            // Loading nos botões ao submeter formulário
-            const forms = document.querySelectorAll('form');
-            forms.forEach(form => {
-                form.addEventListener('submit', function() {
-                    const btn = form.querySelector('button[type="submit"]');
-                    if (btn) {
-                        const originalText = btn.innerHTML;
-                        btn.innerHTML = '<span>Salvando...</span>';
-                        btn.disabled = true;
-                        
-                        // Restaurar após 5 segundos (caso não recarregue a página)
-                        setTimeout(() => {
-                            btn.innerHTML = originalText;
-                            btn.disabled = false;
-                        }, 5000);
-                    }
-                });
+    document.addEventListener('DOMContentLoaded', function() {
+        // Máscara para CEP (apenas formatação, sem busca automática)
+        const cepInput = document.getElementById('cep');
+        if (cepInput) {
+            cepInput.addEventListener('input', function(e) {
+                let value = e.target.value.replace(/\D/g, '');
+                value = value.replace(/(\d{5})(\d)/, '$1-$2');
+                e.target.value = value;
             });
-            
-            // Auto-hide dos alertas após 5 segundos
-            const alerts = document.querySelectorAll('.alert');
-            alerts.forEach(alert => {
-                setTimeout(() => {
-                    alert.style.opacity = '0';
-                    alert.style.transform = 'translateY(-20px)';
+        }
+        
+        // Máscara para telefone
+        const telefoneInput = document.getElementById('telefone');
+        if (telefoneInput) {
+            telefoneInput.addEventListener('input', function(e) {
+                let value = e.target.value.replace(/\D/g, '');
+                if (value.length <= 10) {
+                    value = value.replace(/(\d{2})(\d)/, '($1) $2');
+                    value = value.replace(/(\d{4})(\d)/, '$1-$2');
+                } else {
+                    value = value.replace(/(\d{2})(\d)/, '($1) $2');
+                    value = value.replace(/(\d{5})(\d)/, '$1-$2');
+                }
+                e.target.value = value;
+            });
+        }
+        
+        // Validação de confirmação de senha
+        const passwordForm = document.querySelector('input[name="action"][value="change_password"]').closest('form');
+        if (passwordForm) {
+            passwordForm.addEventListener('submit', function(e) {
+                const novaSenha = document.getElementById('nova_senha').value;
+                const confirmarSenha = document.getElementById('confirmar_senha').value;
+                
+                if (novaSenha !== confirmarSenha) {
+                    e.preventDefault();
+                    alert('A confirmação de senha não confere.');
+                    return false;
+                }
+                
+                if (novaSenha.length < 8) {
+                    e.preventDefault();
+                    alert('A nova senha deve ter pelo menos 8 caracteres.');
+                    return false;
+                }
+            });
+        }
+        
+        // Loading nos botões ao submeter formulário
+        const forms = document.querySelectorAll('form');
+        forms.forEach(form => {
+            form.addEventListener('submit', function() {
+                const btn = form.querySelector('button[type="submit"]');
+                if (btn) {
+                    const originalText = btn.innerHTML;
+                    btn.innerHTML = '<span>Salvando...</span>';
+                    btn.disabled = true;
+                    
+                    // Restaurar após 5 segundos (caso não recarregue a página)
                     setTimeout(() => {
-                        alert.remove();
-                    }, 300);
-                }, 5000);
+                        btn.innerHTML = originalText;
+                        btn.disabled = false;
+                    }, 5000);
+                }
             });
         });
+        
+        // Auto-hide dos alertas após 5 segundos
+        const alerts = document.querySelectorAll('.alert');
+        alerts.forEach(alert => {
+            setTimeout(() => {
+                alert.style.opacity = '0';
+                alert.style.transform = 'translateY(-20px)';
+                setTimeout(() => {
+                    alert.remove();
+                }, 300);
+            }, 5000);
+        });
+    });
     </script>
 </body>
 </html>
