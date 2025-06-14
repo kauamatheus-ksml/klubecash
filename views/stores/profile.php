@@ -274,7 +274,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             break;
     }
 }
-
+// === BOTÃO DE DEBUG TEMPORÁRIO ===
+$showDebugButton = true; 
 // Definir menu ativo
 $activeMenu = 'profile';
 ?>
@@ -642,17 +643,7 @@ $activeMenu = 'profile';
                 </div>
             </div>
         </div>
-        <?php if ($showDebugButton): ?>
-            <!-- Botão de Debug Temporário - REMOVER EM PRODUÇÃO -->
-            <div style="position: fixed; top: 10px; right: 10px; z-index: 9999;">
-                <a href="debug_endereco.php" 
-                style="background: #dc3545; color: white; padding: 8px 12px; 
-                        border-radius: 5px; text-decoration: none; font-size: 12px;
-                        box-shadow: 0 2px 5px rgba(0,0,0,0.2); font-weight: bold;">
-                    🔬 DEBUG ENDEREÇO
-                </a>
-            </div>
-        <?php endif; ?>
+        
         <!-- Formulários editáveis -->
         <div class="form-grid">
             <!-- Informações de contato -->
