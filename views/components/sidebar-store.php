@@ -59,35 +59,7 @@ if (!isset($activeMenu)) {
                 Dashboard
             </a>
         </li>
-        <a href="<?php echo STORE_FINANCIAL_URL; ?>" class="sidebar-nav-item <?php echo ($activeMenu == 'financial') ? 'active' : ''; ?>">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="12" y1="1" x2="12" y2="23"></line>
-                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-                </svg>
-                Financeiro
-                <!-- Badge de notificação se houver pendentes -->
-                <?php 
-                // Verificar se há comissões pendentes
-                $db = Database::getConnection();
-                $userId = $_SESSION['user_id'];
-                $storeQuery = $db->prepare("SELECT id FROM lojas WHERE usuario_id = :usuario_id");
-                $storeQuery->bindParam(':usuario_id', $userId);
-                $storeQuery->execute();
-                
-                if ($storeQuery->rowCount() > 0) {
-                    $store = $storeQuery->fetch(PDO::FETCH_ASSOC);
-                    $storeId = $store['id'];
-                    
-                    $pendingQuery = $db->prepare("SELECT COUNT(*) as total FROM transacoes_cashback WHERE loja_id = :loja_id AND status = 'pendente'");
-                    $pendingQuery->bindParam(':loja_id', $storeId);
-                    $pendingQuery->execute();
-                    $pending = $pendingQuery->fetch(PDO::FETCH_ASSOC);
-                    
-                    if ($pending['total'] > 0): ?>
-                        <span class="sidebar-badge"><?php echo $pending['total']; ?></span>
-                    <?php endif;
-                }
-                ?>
+        
         <li>
             <a href="<?php echo STORE_REGISTER_TRANSACTION_URL; ?>" class="sidebar-nav-item <?php echo ($activeMenu == 'register-transaction') ? 'active' : ''; ?>">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -97,6 +69,47 @@ if (!isset($activeMenu)) {
                 Registrar Venda
             </a>
         </li>
+        
+        <!-- NOVA ABA CONSOLIDADA: FINANCEIRO -->
+        <!-- Substitui as antigas abas: Transações, Comissões Pendentes e Histórico de Pagamentos -->
+        <li>
+            <a href="<?php echo STORE_FINANCIAL_URL; ?>" class="sidebar-nav-item <?php echo ($activeMenu == 'financial') ? 'active' : ''; ?>">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="1" x2="12" y2="23"></line>
+                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                </svg>
+                Financeiro
+                <?php 
+                // Verificar se há comissões pendentes para mostrar badge de notificação
+                try {
+                    $db = Database::getConnection();
+                    $userId = $_SESSION['user_id'];
+                    $storeQuery = $db->prepare("SELECT id FROM lojas WHERE usuario_id = :usuario_id");
+                    $storeQuery->bindParam(':usuario_id', $userId);
+                    $storeQuery->execute();
+                    
+                    if ($storeQuery->rowCount() > 0) {
+                        $store = $storeQuery->fetch(PDO::FETCH_ASSOC);
+                        $storeId = $store['id'];
+                        
+                        $pendingQuery = $db->prepare("SELECT COUNT(*) as total FROM transacoes_cashback WHERE loja_id = :loja_id AND status = 'pendente'");
+                        $pendingQuery->bindParam(':loja_id', $storeId);
+                        $pendingQuery->execute();
+                        $pending = $pendingQuery->fetch(PDO::FETCH_ASSOC);
+                        
+                        if ($pending['total'] > 0): ?>
+                            <span class="sidebar-badge"><?php echo $pending['total']; ?></span>
+                        <?php endif;
+                    }
+                } catch (Exception $e) {
+                    // Em caso de erro, não mostrar o badge
+                }
+                ?>
+            </a>
+        </li>
+        
+        <!-- ABAS ANTIGAS COMENTADAS - MANTIDAS PARA REFERÊNCIA E POSSÍVEL REATIVAÇÃO FUTURA -->
+        <!-- 
         <li>
             <a href="<?php echo STORE_TRANSACTIONS_URL; ?>" class="sidebar-nav-item <?php echo ($activeMenu == 'transactions') ? 'active' : ''; ?>">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -107,6 +120,8 @@ if (!isset($activeMenu)) {
                 Transações
             </a>
         </li>
+        -->
+        
         <!--<li>
             <a href="<?php echo STORE_BATCH_UPLOAD_URL; ?>" class="sidebar-nav-item <?php echo ($activeMenu == 'batch-upload') ? 'active' : ''; ?>">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -117,6 +132,8 @@ if (!isset($activeMenu)) {
                 Upload em Lote
             </a>
         </li>-->
+        
+        <!-- 
         <li>
             <a href="<?php echo STORE_PENDING_TRANSACTIONS_URL; ?>" class="sidebar-nav-item <?php echo ($activeMenu == 'pending-commissions') ? 'active' : ''; ?>">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -126,6 +143,9 @@ if (!isset($activeMenu)) {
                 Comissões Pendentes
             </a>
         </li>
+        -->
+        
+        <!-- 
         <li>
             <a href="<?php echo STORE_PAYMENT_HISTORY_URL; ?>" class="sidebar-nav-item <?php echo ($activeMenu == 'payment-history') ? 'active' : ''; ?>">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -135,6 +155,8 @@ if (!isset($activeMenu)) {
                 Histórico de Pagamentos
             </a>
         </li>
+        -->
+        
         <!--
         <li>
             <a href="<?php echo STORE_PAYMENT_URL; ?>" class="sidebar-nav-item <?php echo ($activeMenu == 'payment') ? 'active' : ''; ?>">
@@ -146,6 +168,7 @@ if (!isset($activeMenu)) {
             </a>
         </li>
         -->
+        
         <li>
             <a href="<?php echo SITE_URL; ?>/store/perfil" class="sidebar-nav-item <?php echo ($activeMenu == 'profile') ? 'active' : ''; ?>">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
