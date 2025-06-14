@@ -317,57 +317,7 @@ class TransactionController {
             return ['status' => false, 'message' => 'Erro ao buscar histórico de pagamentos.'];
         }
     }
-    /**
-    * Obtém visão geral financeira da loja
-    */
-    public static function getStoreFinancialOverview($storeId) {
-        try {
-            $db = Database::getConnection();
-            
-            // Buscar totais gerais
-            $totalsQuery = "
-                SELECT 
-                    COUNT(*) as total_transacoes,
-                    SUM(valor_total) as total_vendas,
-                    SUM(CASE WHEN status = 'pendente' THEN valor_cashback ELSE 0 END) as comissoes_pendentes,
-                    SUM(CASE WHEN status = 'aprovado' THEN valor_cashback ELSE 0 END) as comissoes_pagas,
-                    SUM(valor_saldo_usado) as total_saldo_usado,
-                    COUNT(CASE WHEN status = 'pendente' THEN 1 END) as transacoes_pendentes
-                FROM transacoes_cashback
-                WHERE loja_id = :loja_id
-            ";
-            
-            $stmt = $db->prepare($totalsQuery);
-            $stmt->bindParam(':loja_id', $storeId);
-            $stmt->execute();
-            $totals = $stmt->fetch(PDO::FETCH_ASSOC);
-            
-            // Buscar últimas transações
-            $recentQuery = "
-                SELECT 
-                    t.*, 
-                    u.nome as cliente_nome
-                FROM transacoes_cashback t
-                JOIN usuarios u ON t.usuario_id = u.id
-                WHERE t.loja_id = :loja_id
-                ORDER BY t.data_transacao DESC
-                LIMIT 5
-            ";
-            
-            $stmt = $db->prepare($recentQuery);
-            $stmt->bindParam(':loja_id', $storeId);
-            $stmt->execute();
-            $recent = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            
-            $totals['ultimas_transacoes'] = $recent;
-            
-            return $totals;
-            
-        } catch (PDOException $e) {
-            error_log('Erro ao obter overview financeiro: ' . $e->getMessage());
-            return [];
-        }
-    }
+
     /**
     * Obtém detalhes completos de uma transação específica
     * 
