@@ -14,7 +14,7 @@ if (isset($_GET['voltar'])) {
 require_once '../../config/database.php';
 require_once '../../config/constants.php';
 
-session_start();
+
 
 ?>
 <!DOCTYPE html>
