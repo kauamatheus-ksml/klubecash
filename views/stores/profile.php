@@ -299,7 +299,7 @@ if (isset($_SESSION['profile_error'])) {
 // Recarregar dados da loja após possíveis alterações
 $store = buscarDadosLoja($db, $userId);
 $storeId = (int)$store['id'];
-
+ 
 // Definir menu ativo
 $activeMenu = 'profile';
 ?>
