@@ -68,76 +68,61 @@ if (!isset($activeMenu)) {
                 Registrar Venda
             </a>
         </li>
+        
+        <!-- NOVA OPÇÃO FINANCEIRO (CONSOLIDADA) -->
         <li>
-            <a href="<?php echo STORE_TRANSACTIONS_URL; ?>" class="sidebar-nav-item <?php echo ($activeMenu == 'transactions') ? 'active' : ''; ?>">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-                    <line x1="8" y1="21" x2="16" y2="21"></line>
-                    <line x1="12" y1="17" x2="12" y2="21"></line>
-                </svg>
-                Transações
-            </a>
-        </li>
-        <!--<li>
-            <a href="<?php echo STORE_BATCH_UPLOAD_URL; ?>" class="sidebar-nav-item <?php echo ($activeMenu == 'batch-upload') ? 'active' : ''; ?>">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                    <polyline points="17 8 12 3 7 8"></polyline>
-                    <line x1="12" y1="3" x2="12" y2="15"></line>
-                </svg>
-                Upload em Lote
-            </a>
-        </li>-->
-        <li>
-            <a href="<?php echo STORE_PENDING_TRANSACTIONS_URL; ?>" class="sidebar-nav-item <?php echo ($activeMenu == 'pending-commissions') ? 'active' : ''; ?>">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <polyline points="12 6 12 12 16 14"></polyline>
-                </svg>
-                Comissões Pendentes
-            </a>
-        </li>
-        <li>
-            <a href="<?php echo STORE_PAYMENT_HISTORY_URL; ?>" class="sidebar-nav-item <?php echo ($activeMenu == 'payment-history') ? 'active' : ''; ?>">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
-                    <line x1="1" y1="10" x2="23" y2="10"></line>
-                </svg>
-                Histórico de Pagamentos
-            </a>
-        </li>
-        <!--
-        <li>
-            <a href="<?php echo STORE_PAYMENT_URL; ?>" class="sidebar-nav-item <?php echo ($activeMenu == 'payment') ? 'active' : ''; ?>">
+            <a href="<?php echo STORE_FINANCIAL_URL; ?>" class="sidebar-nav-item <?php echo ($activeMenu == 'financial') ? 'active' : ''; ?>">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <line x1="12" y1="1" x2="12" y2="23"></line>
                     <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
                 </svg>
-                Realizar Pagamento
+                Financeiro
+                <!-- Badge de notificação se houver pendentes -->
+                <?php 
+                // Verificar se há comissões pendentes
+                $db = Database::getConnection();
+                $userId = $_SESSION['user_id'];
+                $storeQuery = $db->prepare("SELECT id FROM lojas WHERE usuario_id = :usuario_id");
+                $storeQuery->bindParam(':usuario_id', $userId);
+                $storeQuery->execute();
+                
+                if ($storeQuery->rowCount() > 0) {
+                    $store = $storeQuery->fetch(PDO::FETCH_ASSOC);
+                    $storeId = $store['id'];
+                    
+                    $pendingQuery = $db->prepare("SELECT COUNT(*) as total FROM transacoes_cashback WHERE loja_id = :loja_id AND status = 'pendente'");
+                    $pendingQuery->bindParam(':loja_id', $storeId);
+                    $pendingQuery->execute();
+                    $pending = $pendingQuery->fetch(PDO::FETCH_ASSOC);
+                    
+                    if ($pending['total'] > 0): ?>
+                        <span class="sidebar-badge"><?php echo $pending['total']; ?></span>
+                    <?php endif;
+                }
+                ?>
             </a>
         </li>
-        -->
+        
         <li>
             <a href="<?php echo SITE_URL; ?>/store/perfil" class="sidebar-nav-item <?php echo ($activeMenu == 'profile') ? 'active' : ''; ?>">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                     <circle cx="12" cy="7" r="4"></circle>
                 </svg>
-                Meu Perfil
+                Perfil
+            </a>
+        </li>
+        <li>
+            <a href="<?php echo SITE_URL; ?>/auth/logout.php" class="sidebar-nav-item">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                    <polyline points="16 17 21 12 16 7"></polyline>
+                    <line x1="21" y1="12" x2="9" y2="12"></line>
+                </svg>
+                Sair
             </a>
         </li>
     </ul>
-    
-    <div class="sidebar-footer">
-        <a href="<?php echo SITE_URL; ?>/controllers/AuthController.php?action=logout" class="logout-btn">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                <polyline points="16 17 21 12 16 7"></polyline>
-                <line x1="21" y1="12" x2="9" y2="12"></line>
-            </svg>
-            Sair
-        </a>
-    </div>
 </div>
 
 <!-- Script para responsividade da Sidebar -->

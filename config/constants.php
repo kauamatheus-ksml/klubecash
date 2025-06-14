@@ -127,6 +127,7 @@ define('ADMIN_BALANCE_URL', SITE_URL . '/admin/saldo');
 // === URLs DA LOJA ===
 define('STORE_REGISTER_URL', SITE_URL . '/lojas/cadastro');
 define('STORE_DASHBOARD_URL', SITE_URL . '/store/dashboard');
+define('STORE_FINANCIAL_URL', SITE_URL . '/store/financeiro');
 define('STORE_TRANSACTIONS_URL', SITE_URL . '/store/transacoes');
 define('STORE_PENDING_TRANSACTIONS_URL', SITE_URL . '/store/transacoes-pendentes');
 define('STORE_REGISTER_TRANSACTION_URL', SITE_URL . '/store/registrar-transacao');
@@ -136,6 +137,7 @@ define('STORE_PAYMENT_HISTORY_URL', SITE_URL . '/store/historico-pagamentos');
 define('STORE_PROFILE_URL', SITE_URL . '/store/perfil');
 define('STORE_PAYMENT_PIX_URL', SITE_URL . '/store/pagamento-pix');
 define('STORE_SALDOS_URL', SITE_URL . '/store/saldos');
+define('STORE_PENDING_TRANSACTIONS_URL', SITE_URL . '/store/transacoes-pendentes'); 
 
 // === CONFIGURAÇÕES DE ASSETS ===
 define('ASSETS_VERSION', '2.1.0'); // Para cache busting
