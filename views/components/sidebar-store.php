@@ -68,6 +68,14 @@ if (!isset($activeMenu)) {
                 Registrar Venda
             </a>
         </li>
+        <!-- NOVA PÁGINA UNIFICADA -->
+        <li>
+            <a href="<?php echo STORE_FINANCIAL_URL; ?>" class="<?php echo $activeMenu === 'financial' ? 'active' : ''; ?>">
+                <i class="fas fa-chart-line"></i>
+                <span>Financeiro</span>
+            </a>
+        </li>
+        <!-- PÁGINAS ANTIGAS COMENTADAS - NÃO REMOVER
         <li>
             <a href="<?php echo STORE_TRANSACTIONS_URL; ?>" class="sidebar-nav-item <?php echo ($activeMenu == 'transactions') ? 'active' : ''; ?>">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -77,7 +85,7 @@ if (!isset($activeMenu)) {
                 </svg>
                 Transações
             </a>
-        </li>
+        </li> -->
         <!--<li>
             <a href="<?php echo STORE_BATCH_UPLOAD_URL; ?>" class="sidebar-nav-item <?php echo ($activeMenu == 'batch-upload') ? 'active' : ''; ?>">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -88,7 +96,8 @@ if (!isset($activeMenu)) {
                 Upload em Lote
             </a>
         </li>-->
-        <li>
+        <!-- PÁGINAS ANTIGAS COMENTADAS - NÃO REMOVER
+         <li>
             <a href="<?php echo STORE_PENDING_TRANSACTIONS_URL; ?>" class="sidebar-nav-item <?php echo ($activeMenu == 'pending-commissions') ? 'active' : ''; ?>">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="12" cy="12" r="10"></circle>
@@ -105,7 +114,7 @@ if (!isset($activeMenu)) {
                 </svg>
                 Histórico de Pagamentos
             </a>
-        </li>
+        </li>-->
         <!--
         <li>
             <a href="<?php echo STORE_PAYMENT_URL; ?>" class="sidebar-nav-item <?php echo ($activeMenu == 'payment') ? 'active' : ''; ?>">
