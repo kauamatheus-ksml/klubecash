@@ -317,7 +317,164 @@ class TransactionController {
             return ['status' => false, 'message' => 'Erro ao buscar histórico de pagamentos.'];
         }
     }
+    /**
+     * NOVO MÉTODO: createNewPixPayment
+     * Gera uma nova transação PIX a cada clique, mantendo transações pendentes visíveis
+     */
+    public static function createNewPixPayment($paymentId, $storeId) {
+        try {
+            if (!AuthController::isAuthenticated() || !AuthController::isStore()) {
+                return ['status' => false, 'message' => 'Acesso não autorizado.'];
+            }
+            
+            $db = Database::getConnection();
+            
+            // Verificar se existe pagamento pendente
+            $checkStmt = $db->prepare("
+                SELECT id, valor_total, mp_payment_id, mp_status
+                FROM pagamentos_comissao 
+                WHERE id = ? AND loja_id = ? 
+                AND status IN ('pendente', 'pix_aguardando')
+            ");
+            $checkStmt->execute([$paymentId, $storeId]);
+            $existingPayment = $checkStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$existingPayment) {
+                return ['status' => false, 'message' => 'Pagamento não encontrado ou já processado.'];
+            }
+            
+            // NOVIDADE: Expirar PIX anterior se existir
+            if (!empty($existingPayment['mp_payment_id'])) {
+                $expireOldStmt = $db->prepare("
+                    UPDATE pagamentos_comissao 
+                    SET mp_status = 'expired', 
+                        observacao = CONCAT(IFNULL(observacao, ''), ' | PIX anterior expirado em ', NOW())
+                    WHERE id = ?
+                ");
+                $expireOldStmt->execute([$paymentId]);
+                
+                error_log("PIX anterior expirado: Payment ID {$paymentId}, MP ID: {$existingPayment['mp_payment_id']}");
+            }
+            
+            // Gerar novo PIX via Mercado Pago
+            $pixData = self::generateMercadoPagoPix($existingPayment['valor_total'], $paymentId);
+            
+            if (!$pixData['status']) {
+                return $pixData;
+            }
+            
+            // Atualizar com novos dados do PIX
+            $updateStmt = $db->prepare("
+                UPDATE pagamentos_comissao 
+                SET mp_payment_id = ?, 
+                    mp_qr_code = ?, 
+                    mp_qr_code_base64 = ?,
+                    mp_status = 'pending',
+                    status = 'pix_aguardando',
+                    data_registro = NOW(),
+                    observacao = CONCAT(IFNULL(observacao, ''), ' | Novo PIX gerado em ', NOW())
+                WHERE id = ?
+            ");
+            
+            $updateSuccess = $updateStmt->execute([
+                $pixData['data']['mp_payment_id'],
+                $pixData['data']['qr_code'],
+                $pixData['data']['qr_code_base64'],
+                $paymentId
+            ]);
+            
+            if (!$updateSuccess) {
+                error_log("Erro ao atualizar PIX no banco: " . implode(' | ', $db->errorInfo()));
+                return ['status' => false, 'message' => 'Erro interno. Tente novamente.'];
+            }
+            
+            // Log da nova transação
+            error_log("✅ NOVO PIX GERADO - Payment ID: {$paymentId}, MP ID: {$pixData['data']['mp_payment_id']}, Valor: R$ {$existingPayment['valor_total']}");
+            
+            return [
+                'status' => true,
+                'message' => 'Novo PIX gerado com sucesso!',
+                'data' => [
+                    'payment_id' => $paymentId,
+                    'mp_payment_id' => $pixData['data']['mp_payment_id'],
+                    'qr_code' => $pixData['data']['qr_code'],
+                    'qr_code_base64' => $pixData['data']['qr_code_base64'],
+                    'expires_in' => PIX_EXPIRATION_MINUTES * 60 // em segundos
+                ]
+            ];
+            
+        } catch (Exception $e) {
+            error_log("Erro ao gerar novo PIX: " . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro interno do servidor.'];
+        }
+    }
 
+    /**
+     * MÉTODO AUXILIAR: generateMercadoPagoPix
+     * Integração otimizada com Mercado Pago
+     */
+    private static function generateMercadoPagoPix($amount, $paymentId) {
+        try {
+            $postData = [
+                'transaction_amount' => (float) $amount,
+                'description' => "Comissão Klube Cash - Pagamento #{$paymentId}",
+                'payment_method_id' => 'pix',
+                'external_reference' => "KLUBE_PAYMENT_{$paymentId}_" . time(),
+                'notification_url' => MP_WEBHOOK_URL,
+                'date_of_expiration' => date('c', strtotime('+' . PIX_EXPIRATION_MINUTES . ' minutes')),
+                'payer' => [
+                    'email' => 'loja@klubecash.com',
+                    'identification' => [
+                        'type' => 'CPF',
+                        'number' => '00000000000'
+                    ]
+                ]
+            ];
+            
+            $ch = curl_init();
+            curl_setopt_array($ch, [
+                CURLOPT_URL => 'https://api.mercadopago.com/v1/payments',
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => json_encode($postData),
+                CURLOPT_HTTPHEADER => [
+                    'Authorization: Bearer ' . MP_ACCESS_TOKEN,
+                    'Content-Type: application/json',
+                    'X-Idempotency-Key: KLUBE_' . $paymentId . '_' . time()
+                ],
+                CURLOPT_TIMEOUT => 30
+            ]);
+            
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            
+            if ($httpCode !== 201) {
+                error_log("Erro MP: HTTP {$httpCode} - {$response}");
+                return ['status' => false, 'message' => 'Erro ao gerar PIX. Tente novamente.'];
+            }
+            
+            $data = json_decode($response, true);
+            
+            if (!isset($data['id']) || !isset($data['point_of_interaction']['transaction_data']['qr_code'])) {
+                error_log("Resposta MP inválida: " . $response);
+                return ['status' => false, 'message' => 'Dados PIX inválidos recebidos.'];
+            }
+            
+            return [
+                'status' => true,
+                'data' => [
+                    'mp_payment_id' => $data['id'],
+                    'qr_code' => $data['point_of_interaction']['transaction_data']['qr_code'],
+                    'qr_code_base64' => $data['point_of_interaction']['transaction_data']['qr_code_base64']
+                ]
+            ];
+            
+        } catch (Exception $e) {
+            error_log("Exceção ao gerar PIX: " . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro interno.'];
+        }
+    }
     /**
     * Obtém detalhes completos de uma transação específica
     * 
