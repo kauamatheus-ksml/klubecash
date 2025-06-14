@@ -23,17 +23,7 @@
     box-sizing: border-box;
     font-family: var(--font-family);
 }
-.sidebar-badge {
-    background: #e74c3c;
-    color: white;
-    font-size: 0.7rem;
-    padding: 2px 6px;
-    border-radius: 10px;
-    min-width: 18px;
-    text-align: center;
-    margin-left: auto;
-    font-weight: 600;
-}
+
 /* Sidebar Principal */
 .sidebar {
     width: var(--sidebar-width);

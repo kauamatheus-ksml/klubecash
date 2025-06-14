@@ -258,7 +258,6 @@ RewriteRule ^store/upload-lote/?$ views/stores/batch-upload.php [L,QSA]
 RewriteRule ^store/pagamento/?$ views/stores/payment.php [L,QSA]
 RewriteRule ^store/historico-pagamentos/?$ views/stores/payment-history.php [L,QSA]
 RewriteRule ^store/perfil/?$ views/stores/profile.php [L,QSA]
-RewriteRule ^store/financeiro/?$ views/stores/financial.php [L,QSA]
 
 # NOVA ROTA OPENPIX
 RewriteRule ^api/openpix/?$ api/openpix.php [L]
