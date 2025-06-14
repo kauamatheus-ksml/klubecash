@@ -707,23 +707,7 @@ $activeMenu = 'profile';
                     e.target.value = value;
                 });
                 
-                // Buscar endereço por CEP
-                cepInput.addEventListener('blur', function(e) {
-                    const cep = e.target.value.replace(/\D/g, '');
-                    if (cep.length === 8) {
-                        fetch(`https://viacep.com.br/ws/${cep}/json/`)
-                            .then(response => response.json())
-                            .then(data => {
-                                if (!data.erro) {
-                                    document.getElementById('logradouro').value = data.logradouro || '';
-                                    document.getElementById('bairro').value = data.bairro || '';
-                                    document.getElementById('cidade').value = data.localidade || '';
-                                    document.getElementById('estado').value = data.uf || '';
-                                }
-                            })
-                            .catch(error => console.log('Erro ao buscar CEP:', error));
-                    }
-                });
+                
             }
             
             // Máscara para telefone
