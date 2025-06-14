@@ -61,7 +61,6 @@ if (isset($_GET['metodo_pagamento']) && !empty($_GET['metodo_pagamento'])) {
 // Obter histórico de pagamentos com informações de saldo
 $result = TransactionController::getPaymentHistoryWithBalance($storeId, $filters, $page);
 
-
 // Calcular estatísticas
 $totalPagamentos = 0;
 $totalAprovados = 0;
@@ -76,26 +75,28 @@ if ($result['status'] && isset($result['data']['pagamentos'])) {
         if ($payment['metodo_pagamento'] === 'pix_openpix') {
             // Corrigir valor de vendas
             if ($payment['valor_vendas_originais'] == 0) {
-                $payment['valor_vendas_originais'] = $payment['valor_total'] / 0.10;
+                $payment['valor_vendas_originais'] = $payment['valor_total'] / 0.1;
             }
-            
-            // Para OpenPix, assumir 1 transação por pagamento
-            if ($payment['qtd_transacoes'] == 0) {
-                $payment['qtd_transacoes'] = 1;
-            }
+        }
+        
+        $totalPagamentos++;
+        $valorTotalPagamentos += $payment['valor_total'];
+        $valorTotalVendasOriginais += $payment['valor_vendas_originais'];
+        $totalSaldoUsado += $payment['valor_saldo_usado'] ?? 0;
+        
+        switch ($payment['status']) {
+            case 'aprovado':
+                $totalAprovados++;
+                break;
+            case 'pendente':
+                $totalPendentes++;
+                break;
+            case 'rejeitado':
+                $totalRejeitados++;
+                break;
         }
     }
 }
-
-// Método de pagamento para exibição
-$metodosPagamento = [
-    'pix' => 'PIX',
-    'pix_mercadopago' => 'PIX Mercado Pago',
-    'transferencia' => 'Transferência Bancária',
-    'boleto' => 'Boleto',
-    'cartao' => 'Cartão de Crédito',
-    'outro' => 'Outro'
-];
 ?>
 
 <!DOCTYPE html>
@@ -103,325 +104,925 @@ $metodosPagamento = [
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
-    <title>Histórico de Pagamentos - Klube Cash</title>
+    <title>Histórico de Pagamentos - <?php echo htmlspecialchars($storeName); ?> | Klube Cash</title>
+    
+    <!-- CSS -->
     <link rel="stylesheet" href="../../assets/css/main.css">
-    <link rel="stylesheet" href="../../assets/css/views/stores/payment-history.css">
+    <link rel="stylesheet" href="../../assets/css/store.css">
+    <link rel="stylesheet" href="../../assets/css/responsive.css">
+    
+    <!-- Fontes -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Ícones -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <style>
+        .payment-history-page {
+            padding: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .page-title {
+            color: #2c3e50;
+            font-size: 28px;
+            font-weight: 700;
+            margin: 0;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .stat-card.approved {
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+        }
+
+        .stat-card.pending {
+            background: linear-gradient(135deg, #FF9800 0%, #f57c00 100%);
+        }
+
+        .stat-card.rejected {
+            background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
+        }
+
+        .stat-card.total {
+            background: linear-gradient(135deg, #2196F3 0%, #1976d2 100%);
+        }
+
+        .stat-number {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .filters-section {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+        }
+
+        .filters-title {
+            color: #2c3e50;
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .filters-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .filter-group label {
+            color: #555;
+            font-weight: 500;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .filter-group select,
+        .filter-group input {
+            padding: 12px;
+            border: 2px solid #e1e8ed;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+
+        .filter-group select:focus,
+        .filter-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .filter-actions {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+            font-size: 14px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+            transform: translateY(-2px);
+        }
+
+        .payments-container {
+            background: white;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+        }
+
+        .payments-header {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            padding: 20px 25px;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .payments-title {
+            color: #2c3e50;
+            font-size: 20px;
+            font-weight: 600;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .payment-card {
+            border-bottom: 1px solid #f0f0f0;
+            transition: all 0.3s ease;
+        }
+
+        .payment-card:last-child {
+            border-bottom: none;
+        }
+
+        .payment-card:hover {
+            background-color: #f8f9fa;
+        }
+
+        .payment-header {
+            padding: 20px 25px;
+            cursor: pointer;
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .payment-info {
+            flex: 1;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            align-items: center;
+        }
+
+        .payment-field {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .payment-field label {
+            color: #666;
+            font-size: 12px;
+            font-weight: 500;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+        }
+
+        .payment-field span {
+            color: #2c3e50;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .status-badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .status-badge.aprovado {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-badge.pendente {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status-badge.rejeitado {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .payment-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .btn-small {
+            padding: 8px 16px;
+            font-size: 12px;
+            border-radius: 6px;
+        }
+
+        .btn-info {
+            background: #17a2b8;
+            color: white;
+        }
+
+        .btn-info:hover {
+            background: #138496;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        .payment-details {
+            padding: 0 25px 20px 25px;
+            background: #f8f9fa;
+            display: none;
+        }
+
+        .payment-details.show {
+            display: block;
+        }
+
+        .details-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .detail-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+
+        .detail-card h4 {
+            color: #2c3e50;
+            font-size: 16px;
+            margin: 0 0 15px 0;
+            font-weight: 600;
+        }
+
+        .detail-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .detail-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+
+        .detail-label {
+            color: #666;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .detail-value {
+            color: #2c3e50;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 30px;
+            gap: 10px;
+        }
+
+        .pagination a,
+        .pagination span {
+            padding: 10px 15px;
+            margin: 0 2px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .pagination a {
+            background: #f8f9fa;
+            color: #667eea;
+            border: 1px solid #dee2e6;
+        }
+
+        .pagination a:hover {
+            background: #667eea;
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        .pagination .current {
+            background: #667eea;
+            color: white;
+            border: 1px solid #667eea;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+
+        .empty-state i {
+            font-size: 48px;
+            color: #ccc;
+            margin-bottom: 20px;
+        }
+
+        .empty-state h3 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 2% auto;
+            padding: 0;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        .modal-header {
+            padding: 25px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px 15px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .close {
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            background: none;
+            border: none;
+            color: white;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: background-color 0.3s ease;
+        }
+
+        .close:hover {
+            background-color: rgba(255,255,255,0.1);
+        }
+
+        .modal-body {
+            padding: 25px;
+        }
+
+        .receipt-container {
+            text-align: center;
+        }
+
+        .receipt-image-container {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            display: inline-block;
+            max-width: 100%;
+        }
+
+        .receipt-image-container img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .info-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .info-section h4 {
+            color: #2c3e50;
+            margin: 0 0 15px 0;
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .info-section ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+
+        .info-section li {
+            color: #555;
+            margin-bottom: 8px;
+            line-height: 1.5;
+        }
+
+        .help-section {
+            background: linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%);
+            padding: 25px;
+            border-radius: 15px;
+            margin-top: 30px;
+        }
+
+        .help-title {
+            color: #2c3e50;
+            font-size: 20px;
+            font-weight: 600;
+            margin: 0 0 20px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .expand-icon {
+            transition: transform 0.3s ease;
+            font-size: 18px;
+            color: #667eea;
+        }
+
+        .expanded .expand-icon {
+            transform: rotate(180deg);
+        }
+
+        @media (max-width: 768px) {
+            .payment-history-page {
+                padding: 15px;
+            }
+
+            .page-header {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .filters-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .filter-actions {
+                flex-direction: column;
+            }
+
+            .payment-info {
+                grid-template-columns: 1fr;
+            }
+
+            .payment-actions {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .details-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .modal-content {
+                width: 95%;
+                margin: 5% auto;
+            }
+        }
+    </style>
 </head>
 <body>
-    <?php include_once '../components/sidebar-store.php'; ?>
+    <?php include_once '../../views/components/sidebar.php'; ?>
     
-    <!-- Conteúdo Principal -->
-    <div class="main-content" id="mainContent">
-        <div class="dashboard-wrapper">
-            <!-- Cabeçalho -->
-            <div class="dashboard-header">
-                <h1>Histórico de Pagamentos</h1>
-                <p class="subtitle">Acompanhe todos os pagamentos de comissões realizados para <?php echo htmlspecialchars($storeName); ?></p>
+    <div class="main-content">
+        <?php include_once '../../views/components/navbar.php'; ?>
+        
+        <div class="payment-history-page">
+            <!-- Cabeçalho da Página -->
+            <div class="page-header">
+                <h1 class="page-title">
+                    <i class="fas fa-history"></i>
+                    Histórico de Pagamentos
+                </h1>
             </div>
-            
-            <!-- Cards de estatísticas -->
-            <div class="stats-container">
-                <div class="stat-card">
-                    <div class="stat-card-title">Total de Pagamentos</div>
-                    <div class="stat-card-value"><?php echo number_format($totalPagamentos); ?></div>
-                </div>
-                
-                <div class="stat-card">
-                    <div class="stat-card-title">Pagamentos Aprovados</div>
-                    <div class="stat-card-value"><?php echo number_format($totalAprovados); ?></div>
-                </div>
-                
-                <div class="stat-card">
-                    <div class="stat-card-title">Pagamentos Pendentes</div>
-                    <div class="stat-card-value"><?php echo number_format($totalPendentes); ?></div>
-                </div>
-                
-                <div class="stat-card">
-                    <div class="stat-card-title">Valor Total Pago</div>
-                    <div class="stat-card-value">R$ <?php echo number_format($valorTotalPagamentos, 2, ',', '.'); ?></div>
-                    <div class="stat-card-subtitle">Comissões pagas ao Klube Cash</div>
-                </div>
-                
-                <div class="stat-card">
-                    <div class="stat-card-title">Valor Total de Vendas</div>
-                    <div class="stat-card-value">R$ <?php echo number_format($valorTotalVendasOriginais, 2, ',', '.'); ?></div>
-                    <div class="stat-card-subtitle">Valor original das vendas</div>
-                </div>
-                
-                <div class="stat-card">
-                    <div class="stat-card-title">Total Saldo Usado</div>
-                    <div class="stat-card-value">R$ <?php echo number_format($totalSaldoUsado, 2, ',', '.'); ?></div>
-                    <div class="stat-card-subtitle">Desconto dado aos clientes</div>
-                </div>
-            </div>
-            
-            <!-- Filtros -->
-            <div class="card filter-container">
-                <div class="card-header">
-                    <div class="card-title">Filtros</div>
-                </div>
-                <div class="filter-form">
-                    <form method="GET" action="">
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="status">Status</label>
-                                <select id="status" name="status">
-                                    <option value="">Todos</option>
-                                    <option value="pendente" <?php echo (isset($_GET['status']) && $_GET['status'] === 'pendente') ? 'selected' : ''; ?>>Pendente</option>
-                                    <option value="aprovado" <?php echo (isset($_GET['status']) && $_GET['status'] === 'aprovado') ? 'selected' : ''; ?>>Aprovado</option>
-                                    <option value="rejeitado" <?php echo (isset($_GET['status']) && $_GET['status'] === 'rejeitado') ? 'selected' : ''; ?>>Rejeitado</option>
-                                </select>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label for="metodo_pagamento">Método de Pagamento</label>
-                                <select id="metodo_pagamento" name="metodo_pagamento">
-                                    <option value="">Todos</option>
-                                    <?php foreach ($metodosPagamento as $key => $value): ?>
-                                        <option value="<?php echo $key; ?>" <?php echo (isset($_GET['metodo_pagamento']) && $_GET['metodo_pagamento'] === $key) ? 'selected' : ''; ?>><?php echo $value; ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label for="data_inicio">Data Início</label>
-                                <input type="date" id="data_inicio" name="data_inicio" value="<?php echo isset($_GET['data_inicio']) ? htmlspecialchars($_GET['data_inicio']) : ''; ?>">
-                            </div>
-                            
-                            <div class="form-group">
-                                <label for="data_fim">Data Fim</label>
-                                <input type="date" id="data_fim" name="data_fim" value="<?php echo isset($_GET['data_fim']) ? htmlspecialchars($_GET['data_fim']) : ''; ?>">
-                            </div>
-                            
-                            <div class="form-buttons">
-                                <button type="submit" class="btn btn-primary">Filtrar</button>
-                                <a href="<?php echo STORE_PAYMENT_HISTORY_URL; ?>" class="btn btn-secondary">Limpar</a>
-                            </div>
-                        </div>
-                    </form>
-                </div>
-            </div>
-            
-            <!-- Listagem de Pagamentos -->
-            <div class="card payments-container">
-                <div class="card-header">
-                    <div class="card-title">Histórico de Pagamentos</div>
-                </div>
-                
-                <?php if ($result['status'] && count($result['data']['pagamentos']) > 0): ?>
-                    <div class="table-responsive">
-                        <table class="table">
-                            <thead>
-                                <tr>
-                                    <th>#ID</th>
-                                    <th>Data</th>
-                                    <th>Valor Vendas</th>
-                                    <th>Saldo Usado</th>
-                                    <th>Comissão Paga</th>
-                                    <th>Método</th>
-                                    <th>Status</th>
-                                    <th>Transações</th>
-                                    <th>Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($result['data']['pagamentos'] as $payment): ?>
-                                    <tr>
-                                        <td><?php echo $payment['id']; ?></td>
-                                        <td><?php echo date('d/m/Y H:i', strtotime($payment['data_registro']) - 10800); ?></td>
-                                        <td>
-                                            <div class="valor-detalhado">
-                                                <strong>R$ <?php echo number_format($payment['valor_vendas_originais'], 2, ',', '.'); ?></strong>
-                                                <small class="valor-original">Total vendas</small>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <?php if ($payment['total_saldo_usado'] > 0): ?>
-                                                <span class="saldo-usado">
-                                                    💰 R$ <?php echo number_format($payment['total_saldo_usado'], 2, ',', '.'); ?>
-                                                </span>
-                                            <?php else: ?>
-                                                <span class="sem-saldo">-</span>
-                                            <?php endif; ?>
-                                        </td>
-                                        <td>
-                                            <div class="valor-detalhado">
-                                                <strong>R$ <?php echo number_format($payment['valor_total'], 2, ',', '.'); ?></strong>
-                                                <?php if ($payment['total_saldo_usado'] > 0): ?>
-                                                    <small class="valor-liquido">Valor líquido</small>
-                                                <?php endif; ?>
-                                            </div>
-                                        </td>
-                                        <td><?php echo isset($metodosPagamento[$payment['metodo_pagamento']]) ? $metodosPagamento[$payment['metodo_pagamento']] : $payment['metodo_pagamento']; ?></td>
-                                        <td>
-                                            <span class="status-badge status-<?php echo $payment['status']; ?>">
-                                                <?php 
-                                                    switch($payment['status']) {
-                                                        case 'aprovado':
-                                                            echo 'Aprovado';
-                                                            break;
-                                                        case 'pendente':
-                                                            echo 'Pendente';
-                                                            break;
-                                                        case 'rejeitado':
-                                                            echo 'Rejeitado';
-                                                            break;
-                                                        default:
-                                                            echo ucfirst($payment['status']);
-                                                    }
-                                                ?>
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <div class="transacoes-info">
-                                                <?php echo $payment['qtd_transacoes']; ?> vendas
-                                                <?php if ($payment['qtd_com_saldo'] > 0): ?>
-                                                    <small>(<?php echo $payment['qtd_com_saldo']; ?> c/ saldo)</small>
-                                                <?php endif; ?>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <div class="action-buttons">
-                                                <button class="btn btn-action" onclick="viewPaymentDetails(<?php echo $payment['id']; ?>)">Detalhes</button>
-                                                
-                                                <?php if (!empty($payment['comprovante'])): ?>
-                                                    <button class="btn btn-action" onclick="viewReceipt('<?php echo htmlspecialchars($payment['comprovante']); ?>')">Comprovante</button>
-                                                <?php endif; ?>
-                                                
-                                                <?php 
-                                                // Condição para exibir o botão Pagar/Renovar PIX:
-                                                // - O método de pagamento deve ser PIX do Mercado Pago.
-                                                // - O status NÃO deve ser 'aprovado'. Isso inclui 'pendente', 'pix_aguardando', 'rejeitado', 'cancelado', etc.
-                                                // A página payment-pix.php cuidará da lógica de verificar se o PIX existente expirou e gerar um novo se necessário.
-                                                if ($payment['metodo_pagamento'] === 'pix_mercadopago' && $payment['status'] !== 'aprovado'): 
-                                                ?>
-                                                    <a href="<?php echo STORE_PAYMENT_PIX_URL; ?>?payment_id=<?php echo $payment['id']; ?>" class="btn btn-action btn-warning">
-                                                        <span style="margin-right: 5px;">💰</span>
-                                                        Pagar/Renovar PIX
-                                                    </a>
-                                                <?php endif; ?>
-                                                <?php if ($payment['status'] === 'pix_aguardando' && !empty($payment['mp_payment_id'])): ?>
-                                                    <button class="btn btn-action btn-info" onclick="checkPaymentStatus(<?php echo $payment['id']; ?>, '<?php echo $payment['mp_payment_id']; ?>')">
-                                                        <span style="margin-right: 5px;">🔍</span>
-                                                        Verificar Status
-                                                    </button>
-                                                <?php endif; ?>
 
-                                                <?php if ($payment['status'] === 'aprovado' && !empty($payment['mp_payment_id'])): ?>
-                                                    <button class="btn btn-action btn-warning" onclick="requestRefund(<?php echo $payment['id']; ?>, '<?php echo $payment['valor_total']; ?>', '<?php echo $payment['mp_payment_id']; ?>')">
-                                                        Solicitar Devolução
-                                                    </button>
-                                                <?php endif; ?>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
+            <!-- Estatísticas -->
+            <div class="stats-grid">
+                <div class="stat-card total">
+                    <div class="stat-number"><?php echo $totalPagamentos; ?></div>
+                    <div class="stat-label">Total de Pagamentos</div>
+                </div>
+                <div class="stat-card approved">
+                    <div class="stat-number"><?php echo $totalAprovados; ?></div>
+                    <div class="stat-label">Aprovados</div>
+                </div>
+                <div class="stat-card pending">
+                    <div class="stat-number"><?php echo $totalPendentes; ?></div>
+                    <div class="stat-label">Pendentes</div>
+                </div>
+                <div class="stat-card rejected">
+                    <div class="stat-number"><?php echo $totalRejeitados; ?></div>
+                    <div class="stat-label">Rejeitados</div>
+                </div>
+            </div>
+
+            <!-- Filtros -->
+            <div class="filters-section">
+                <h3 class="filters-title">
+                    <i class="fas fa-filter"></i>
+                    Filtros de Busca
+                </h3>
+                
+                <form method="GET" action="">
+                    <div class="filters-grid">
+                        <div class="filter-group">
+                            <label for="status">Status</label>
+                            <select name="status" id="status">
+                                <option value="">Todos os Status</option>
+                                <option value="pendente" <?php echo (isset($_GET['status']) && $_GET['status'] === 'pendente') ? 'selected' : ''; ?>>Pendente</option>
+                                <option value="aprovado" <?php echo (isset($_GET['status']) && $_GET['status'] === 'aprovado') ? 'selected' : ''; ?>>Aprovado</option>
+                                <option value="rejeitado" <?php echo (isset($_GET['status']) && $_GET['status'] === 'rejeitado') ? 'selected' : ''; ?>>Rejeitado</option>
+                            </select>
+                        </div>
+                        
+                        <div class="filter-group">
+                            <label for="data_inicio">Data Início</label>
+                            <input type="date" name="data_inicio" id="data_inicio" value="<?php echo isset($_GET['data_inicio']) ? htmlspecialchars($_GET['data_inicio']) : ''; ?>">
+                        </div>
+                        
+                        <div class="filter-group">
+                            <label for="data_fim">Data Fim</label>
+                            <input type="date" name="data_fim" id="data_fim" value="<?php echo isset($_GET['data_fim']) ? htmlspecialchars($_GET['data_fim']) : ''; ?>">
+                        </div>
+                        
+                        <div class="filter-group">
+                            <label for="metodo_pagamento">Método</label>
+                            <select name="metodo_pagamento" id="metodo_pagamento">
+                                <option value="">Todos os Métodos</option>
+                                <option value="pix_mercadopago" <?php echo (isset($_GET['metodo_pagamento']) && $_GET['metodo_pagamento'] === 'pix_mercadopago') ? 'selected' : ''; ?>>PIX Mercado Pago</option>
+                                <option value="pix_openpix" <?php echo (isset($_GET['metodo_pagamento']) && $_GET['metodo_pagamento'] === 'pix_openpix') ? 'selected' : ''; ?>>PIX OpenPix</option>
+                                <option value="transferencia" <?php echo (isset($_GET['metodo_pagamento']) && $_GET['metodo_pagamento'] === 'transferencia') ? 'selected' : ''; ?>>Transferência</option>
+                            </select>
+                        </div>
                     </div>
                     
-                    <!-- Paginação -->
-                    <?php if ($result['data']['paginacao']['total_paginas'] > 1): ?>
-                        <div class="pagination">
-                            <div class="pagination-info">
-                                Página <?php echo $result['data']['paginacao']['pagina_atual']; ?> de <?php echo $result['data']['paginacao']['total_paginas']; ?>
-                            </div>
-                            <div class="pagination-links">
-                                <?php if ($result['data']['paginacao']['pagina_atual'] > 1): ?>
-                                    <a href="?page=1<?php echo isset($_GET['status']) ? '&status=' . urlencode($_GET['status']) : ''; ?><?php echo isset($_GET['metodo_pagamento']) ? '&metodo_pagamento=' . urlencode($_GET['metodo_pagamento']) : ''; ?><?php echo isset($_GET['data_inicio']) ? '&data_inicio=' . urlencode($_GET['data_inicio']) : ''; ?><?php echo isset($_GET['data_fim']) ? '&data_fim=' . urlencode($_GET['data_fim']) : ''; ?>" class="page-link">Primeira</a>
-                                    <a href="?page=<?php echo $result['data']['paginacao']['pagina_atual'] - 1; ?><?php echo isset($_GET['status']) ? '&status=' . urlencode($_GET['status']) : ''; ?><?php echo isset($_GET['metodo_pagamento']) ? '&metodo_pagamento=' . urlencode($_GET['metodo_pagamento']) : ''; ?><?php echo isset($_GET['data_inicio']) ? '&data_inicio=' . urlencode($_GET['data_inicio']) : ''; ?><?php echo isset($_GET['data_fim']) ? '&data_fim=' . urlencode($_GET['data_fim']) : ''; ?>" class="page-link">Anterior</a>
-                                <?php endif; ?>
+                    <div class="filter-actions">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-search"></i>
+                            Filtrar
+                        </button>
+                        <a href="<?php echo STORE_PAYMENT_HISTORY_URL; ?>" class="btn btn-secondary">
+                            <i class="fas fa-times"></i>
+                            Limpar Filtros
+                        </a>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Lista de Pagamentos -->
+            <div class="payments-container">
+                <div class="payments-header">
+                    <h3 class="payments-title">
+                        <i class="fas fa-credit-card"></i>
+                        Seus Pagamentos
+                    </h3>
+                </div>
+
+                <?php if ($result['status'] && !empty($result['data']['pagamentos'])): ?>
+                    <?php foreach ($result['data']['pagamentos'] as $payment): ?>
+                        <div class="payment-card">
+                            <div class="payment-header" onclick="togglePaymentDetails(<?php echo $payment['id']; ?>)">
+                                <div class="payment-info">
+                                    <div class="payment-field">
+                                        <label>ID do Pagamento</label>
+                                        <span>#<?php echo $payment['id']; ?></span>
+                                    </div>
+                                    
+                                    <div class="payment-field">
+                                        <label>Data</label>
+                                        <span><?php echo date('d/m/Y H:i', strtotime($payment['data_registro'])); ?></span>
+                                    </div>
+                                    
+                                    <div class="payment-field">
+                                        <label>Valor</label>
+                                        <span>R$ <?php echo number_format($payment['valor_total'], 2, ',', '.'); ?></span>
+                                    </div>
+                                    
+                                    <div class="payment-field">
+                                        <label>Método</label>
+                                        <span>
+                                            <?php
+                                            switch($payment['metodo_pagamento']) {
+                                                case 'pix_mercadopago':
+                                                    echo 'PIX Mercado Pago';
+                                                    break;
+                                                case 'pix_openpix':
+                                                    echo 'PIX OpenPix';
+                                                    break;
+                                                case 'transferencia':
+                                                    echo 'Transferência';
+                                                    break;
+                                                default:
+                                                    echo ucfirst($payment['metodo_pagamento']);
+                                            }
+                                            ?>
+                                        </span>
+                                    </div>
+                                    
+                                    <div class="payment-field">
+                                        <label>Status</label>
+                                        <span class="status-badge <?php echo $payment['status']; ?>">
+                                            <?php echo ucfirst($payment['status']); ?>
+                                        </span>
+                                    </div>
+                                </div>
                                 
-                                <?php if ($result['data']['paginacao']['pagina_atual'] < $result['data']['paginacao']['total_paginas']): ?>
-                                    <a href="?page=<?php echo $result['data']['paginacao']['pagina_atual'] + 1; ?><?php echo isset($_GET['status']) ? '&status=' . urlencode($_GET['status']) : ''; ?><?php echo isset($_GET['metodo_pagamento']) ? '&metodo_pagamento=' . urlencode($_GET['metodo_pagamento']) : ''; ?><?php echo isset($_GET['data_inicio']) ? '&data_inicio=' . urlencode($_GET['data_inicio']) : ''; ?><?php echo isset($_GET['data_fim']) ? '&data_fim=' . urlencode($_GET['data_fim']) : ''; ?>" class="page-link">Próxima</a>
-                                    <a href="?page=<?php echo $result['data']['paginacao']['total_paginas']; ?><?php echo isset($_GET['status']) ? '&status=' . urlencode($_GET['status']) : ''; ?><?php echo isset($_GET['metodo_pagamento']) ? '&metodo_pagamento=' . urlencode($_GET['metodo_pagamento']) : ''; ?><?php echo isset($_GET['data_inicio']) ? '&data_inicio=' . urlencode($_GET['data_inicio']) : ''; ?><?php echo isset($_GET['data_fim']) ? '&data_fim=' . urlencode($_GET['data_fim']) : ''; ?>" class="page-link">Última</a>
-                                <?php endif; ?>
+                                <div class="payment-actions">
+                                    <?php if ($payment['status'] === 'pendente' && $payment['metodo_pagamento'] === 'pix_mercadopago' && !empty($payment['mp_payment_id'])): ?>
+                                        <button class="btn btn-small btn-info" onclick="event.stopPropagation(); checkPaymentStatus(<?php echo $payment['id']; ?>, '<?php echo $payment['mp_payment_id']; ?>')">
+                                            <i class="fas fa-sync"></i>
+                                            Verificar Status
+                                        </button>
+                                    <?php endif; ?>
+                                    
+                                    <?php if (!empty($payment['comprovante'])): ?>
+                                        <button class="btn btn-small btn-info" onclick="event.stopPropagation(); viewReceipt('<?php echo $payment['comprovante']; ?>')">
+                                            <i class="fas fa-file-image"></i>
+                                            Ver Comprovante
+                                        </button>
+                                    <?php endif; ?>
+                                    
+                                    <i class="fas fa-chevron-down expand-icon"></i>
+                                </div>
                             </div>
+                            
+                            <div class="payment-details" id="details-<?php echo $payment['id']; ?>">
+                                <div class="details-grid">
+                                    <div class="detail-card">
+                                        <h4><i class="fas fa-info-circle"></i> Informações do Pagamento</h4>
+                                        <div class="detail-item">
+                                            <span class="detail-label">ID do Pagamento:</span>
+                                            <span class="detail-value">#<?php echo $payment['id']; ?></span>
+                                        </div>
+                                        <div class="detail-item">
+                                            <span class="detail-label">Data de Registro:</span>
+                                            <span class="detail-value"><?php echo date('d/m/Y H:i:s', strtotime($payment['data_registro'])); ?></span>
+                                        </div>
+                                        <?php if ($payment['data_aprovacao']): ?>
+                                            <div class="detail-item">
+                                                <span class="detail-label">Data de Aprovação:</span>
+                                                <span class="detail-value"><?php echo date('d/m/Y H:i:s', strtotime($payment['data_aprovacao'])); ?></span>
+                                            </div>
+                                        <?php endif; ?>
+                                        <div class="detail-item">
+                                            <span class="detail-label">Método de Pagamento:</span>
+                                            <span class="detail-value">
+                                                <?php
+                                                switch($payment['metodo_pagamento']) {
+                                                    case 'pix_mercadopago':
+                                                        echo 'PIX via Mercado Pago';
+                                                        break;
+                                                    case 'pix_openpix':
+                                                        echo 'PIX via OpenPix';
+                                                        break;
+                                                    case 'transferencia':
+                                                        echo 'Transferência Bancária';
+                                                        break;
+                                                    default:
+                                                        echo ucfirst($payment['metodo_pagamento']);
+                                                }
+                                                ?>
+                                            </span>
+                                        </div>
+                                        <?php if (!empty($payment['mp_payment_id'])): ?>
+                                            <div class="detail-item">
+                                                <span class="detail-label">ID Mercado Pago:</span>
+                                                <span class="detail-value"><?php echo $payment['mp_payment_id']; ?></span>
+                                            </div>
+                                        <?php endif; ?>
+                                    </div>
+                                    
+                                    <div class="detail-card">
+                                        <h4><i class="fas fa-calculator"></i> Valores Detalhados</h4>
+                                        <div class="detail-item">
+                                            <span class="detail-label">Valor Total do Pagamento:</span>
+                                            <span class="detail-value">R$ <?php echo number_format($payment['valor_total'], 2, ',', '.'); ?></span>
+                                        </div>
+                                        <div class="detail-item">
+                                            <span class="detail-label">Vendas Originais:</span>
+                                            <span class="detail-value">R$ <?php echo number_format($payment['valor_vendas_originais'], 2, ',', '.'); ?></span>
+                                        </div>
+                                        <?php if (isset($payment['valor_saldo_usado']) && $payment['valor_saldo_usado'] > 0): ?>
+                                            <div class="detail-item">
+                                                <span class="detail-label">Saldo Usado:</span>
+                                                <span class="detail-value">R$ <?php echo number_format($payment['valor_saldo_usado'], 2, ',', '.'); ?></span>
+                                            </div>
+                                        <?php endif; ?>
+                                        <div class="detail-item">
+                                            <span class="detail-label">Quantidade de Transações:</span>
+                                            <span class="detail-value"><?php echo $payment['qtd_transacoes']; ?> transação(ões)</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <?php if ($payment['observacao_admin']): ?>
+                                        <div class="detail-card" style="grid-column: 1 / -1;">
+                                            <h4><i class="fas fa-comment"></i> Observação do Administrador</h4>
+                                            <p style="margin: 0; color: #555; line-height: 1.6;">
+                                                <?php echo nl2br(htmlspecialchars($payment['observacao_admin'])); ?>
+                                            </p>
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                    
+                    <!-- Paginação -->
+                    <?php if (isset($result['data']['pagination']) && $result['data']['pagination']['total_pages'] > 1): ?>
+                        <div class="pagination">
+                            <?php
+                            $pagination = $result['data']['pagination'];
+                            $current_page = $pagination['current_page'];
+                            $total_pages = $pagination['total_pages'];
+                            
+                            // Construir URL com filtros
+                            $query_params = $_GET;
+                            unset($query_params['page']);
+                            $base_url = STORE_PAYMENT_HISTORY_URL . '?' . http_build_query($query_params) . '&page=';
+                            
+                            if ($current_page > 1): ?>
+                                <a href="<?php echo $base_url . ($current_page - 1); ?>">&laquo; Anterior</a>
+                            <?php endif; ?>
+                            
+                            <?php for ($i = max(1, $current_page - 2); $i <= min($total_pages, $current_page + 2); $i++): ?>
+                                <?php if ($i == $current_page): ?>
+                                    <span class="current"><?php echo $i; ?></span>
+                                <?php else: ?>
+                                    <a href="<?php echo $base_url . $i; ?>"><?php echo $i; ?></a>
+                                <?php endif; ?>
+                            <?php endfor; ?>
+                            
+                            <?php if ($current_page < $total_pages): ?>
+                                <a href="<?php echo $base_url . ($current_page + 1); ?>">Próxima &raquo;</a>
+                            <?php endif; ?>
                         </div>
                     <?php endif; ?>
                     
                 <?php else: ?>
                     <div class="empty-state">
-                        <div class="empty-icon">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <rect x="3" y="4" width="18" height="16" rx="2"></rect>
-                                <line x1="2" y1="9" x2="22" y2="9"></line>
-                            </svg>
-                        </div>
+                        <i class="fas fa-credit-card"></i>
                         <h3>Nenhum pagamento encontrado</h3>
-                        <p>Não foram encontrados pagamentos com os filtros selecionados.</p>
-                        <a href="<?php echo STORE_PENDING_TRANSACTIONS_URL; ?>" class="btn btn-primary">Ver Comissões Pendentes</a>
+                        <p>Você ainda não realizou nenhum pagamento ou não há pagamentos que correspondam aos filtros aplicados.</p>
+                        <a href="<?php echo STORE_PAYMENT_URL; ?>" class="btn btn-primary">
+                            <i class="fas fa-plus"></i>
+                            Realizar Primeiro Pagamento
+                        </a>
                     </div>
                 <?php endif; ?>
             </div>
             
-           <!-- Informações sobre Status e Saldo (Dropdown Colapsável) -->
-            <div class="card info-card collapsible-card">
-                <div class="card-header collapsible-header" onclick="toggleInfoSection()">
-                    <div class="card-title">
-                        <span>📋 Informações sobre Pagamentos e Saldo</span>
-                        <span class="dropdown-icon" id="infoDropdownIcon">▼</span>
+            <!-- Seção de Ajuda -->
+            <div class="help-section">
+                <h3 class="help-title">
+                    <i class="fas fa-question-circle"></i>
+                    Como Funciona o Sistema de Pagamentos
+                </h3>
+                
+                <div class="info-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+                    <div class="info-section">
+                        <h4>💳 Métodos de Pagamento:</h4>
+                        <ul>
+                            <li>PIX via Mercado Pago (recomendado para aprovação automática)</li>
+                            <li>PIX via OpenPix (alternativa rápida e segura)</li>
+                            <li>Transferência bancária (requer aprovação manual)</li>
+                        </ul>
                     </div>
-                </div>
-                <div class="collapsible-content" id="infoSectionContent" style="display: none;">
-                    <div class="status-info">
-                        <div class="info-section">
-                            <h4>📊 Status dos Pagamentos:</h4>
-                            <div class="status-item">
-                                <span class="status-badge status-pendente">Pendente</span>
-                                <p>O pagamento foi registrado e está aguardando a análise do administrador.</p>
-                            </div>
-                            <div class="status-item">
-                                <span class="status-badge status-aprovado">Aprovado</span>
-                                <p>O pagamento foi confirmado e o cashback já foi liberado para os clientes.</p>
-                            </div>
-                            <div class="status-item">
-                                <span class="status-badge status-rejeitado">Rejeitado</span>
-                                <p>O pagamento foi rejeitado pelo administrador. Verifique o motivo nos detalhes e faça um novo pagamento.</p>
-                            </div>
-                        </div>
-                        
-                        <div class="info-section">
-                            <h4>💰 Sobre o Uso de Saldo:</h4>
-                            <ul>
-                                <li><strong>Valor Vendas:</strong> Valor original total das vendas incluídas no pagamento</li>
-                                <li><strong>Saldo Usado:</strong> Total de saldo de cashback usado pelos clientes nas vendas</li>
-                                <li><strong>Comissão Paga:</strong> Valor líquido pago ao Klube Cash (sobre valor efetivamente cobrado)</li>
-                                <li><strong>Transações c/ saldo:</strong> Quantidade de vendas onde clientes usaram saldo</li>
-                            </ul>
-                        </div>
-                        
-                        <div class="info-section">
-                            <h4>🔄 Processo de Pagamento:</h4>
-                            <ol>
-                                <li>Você seleciona transações pendentes e realiza o pagamento</li>
-                                <li>A comissão é calculada sobre o valor efetivamente cobrado (descontando saldo usado)</li>
-                                <li>O administrador analisa e aprova/rejeita o pagamento</li>
-                                <li>Após aprovação, o cashback é liberado para os clientes</li>
-                            </ol>
-                        </div>
-                        
-                        <div class="info-section">
-                            <h4>↩️ Solicitação de Devolução:</h4>
-                            <ul>
-                                <li>Você pode solicitar devolução de pagamentos aprovados via PIX Mercado Pago</li>
-                                <li>As devoluções podem ser totais ou parciais</li>
-                                <li>O administrador precisa aprovar a solicitação de devolução</li>
-                                <li>O cashback dos clientes será revertido após devolução aprovada</li>
-                            </ul>
-                        </div>
-                        
-                        <div class="info-section">
-                            <h4>ℹ️ Dicas Importantes:</h4>
-                            <ul>
-                                <li>Mantenha seus comprovantes de pagamento organizados</li>
-                                <li>Realize pagamentos regularmente para liberar o cashback dos clientes</li>
-                                <li>Em caso de rejeição, verifique o motivo e faça um novo pagamento</li>
-                                <li>O valor da comissão é sempre calculado sobre o valor efetivamente pago pelo cliente</li>
-                                <li>Solicite devoluções apenas quando necessário, pois afeta o cashback dos clientes</li>
-                            </ul>
-                        </div>
+                    
+                    <div class="info-section">
+                        <h4>📊 Status dos Pagamentos:</h4>
+                        <ul>
+                            <li><strong>Pendente:</strong> Aguardando confirmação do pagamento</li>
+                            <li><strong>Aprovado:</strong> Pagamento confirmado e cashback liberado</li>
+                            <li><strong>Rejeitado:</strong> Pagamento não foi aceito</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="info-section">
+                        <h4>ℹ️ Dicas Importantes:</h4>
+                        <ul>
+                            <li>Mantenha seus comprovantes de pagamento organizados</li>
+                            <li>Realize pagamentos regularmente para liberar o cashback dos clientes</li>
+                            <li>Em caso de rejeição, verifique o motivo e faça um novo pagamento</li>
+                            <li>O valor da comissão é sempre calculado sobre o valor efetivamente pago pelo cliente</li>
+                        </ul>
                     </div>
                 </div>
             </div>
@@ -456,72 +1057,81 @@ $metodosPagamento = [
         </div>
     </div>
     
-    <!-- Modal de Solicitação de Devolução -->
-    <div id="refundModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Solicitar Devolução PIX</h2>
-                <span class="close" onclick="closeRefundModal()">&times;</span>
-            </div>
-            <div class="modal-body">
-                <div class="refund-info">
-                    <div class="info-alert">
-                        <strong>⚠️ Importante:</strong> Ao solicitar uma devolução, o cashback dos clientes relacionado a este pagamento será revertido após aprovação.
-                    </div>
-                </div>
-                
-                <form id="refundForm">
-                    <input type="hidden" id="refundPaymentId" value="">
-                    <input type="hidden" id="refundMpPaymentId" value="">
-                    
-                    <div class="form-group">
-                        <label>Valor do Pagamento:</label>
-                        <div class="payment-info">
-                            <span id="refundPaymentAmount" class="payment-value"></span>
-                            <small>Valor da comissão paga</small>
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="refundType">Tipo de Devolução:</label>
-                        <select id="refundType" onchange="toggleRefundAmount()">
-                            <option value="total">Devolução Total</option>
-                            <option value="parcial">Devolução Parcial</option>
-                        </select>
-                    </div>
-                    
-                    <div class="form-group" id="amountGroup" style="display: none;">
-                        <label for="refundAmount">Valor a Devolver:</label>
-                        <input type="number" id="refundAmount" step="0.01" min="0.01" placeholder="0,00">
-                        <small class="form-help">Informe o valor em reais (ex: 150.50)</small>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="refundReason">Motivo da Devolução: *</label>
-                        <textarea id="refundReason" rows="4" placeholder="Descreva detalhadamente o motivo da solicitação de devolução..." required></textarea>
-                        <small class="form-help">Este motivo será analisado pelo administrador</small>
-                    </div>
-                    
-                    <div class="refund-consequences">
-                        <h4>Consequências da Devolução:</h4>
-                        <ul>
-                            <li>O cashback dos clientes relacionado será removido</li>
-                            <li>As transações voltarão ao status original</li>
-                            <li>O valor será estornado via PIX após aprovação</li>
-                            <li>O processo pode levar até 3 dias úteis</li>
-                        </ul>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-danger" onclick="submitRefundRequest()">Solicitar Devolução</button>
-                <button class="btn btn-secondary" onclick="closeRefundModal()">Cancelar</button>
-            </div>
-        </div>
-    </div>
-    
     <script>
-        let currentRefundData = null;
+        // Função para alternar detalhes do pagamento
+        function togglePaymentDetails(paymentId) {
+            const details = document.getElementById(`details-${paymentId}`);
+            const card = details.closest('.payment-card');
+            const icon = card.querySelector('.expand-icon');
+            
+            if (details.classList.contains('show')) {
+                details.classList.remove('show');
+                card.classList.remove('expanded');
+                details.style.display = 'none';
+            } else {
+                details.classList.add('show');
+                card.classList.add('expanded');
+                details.style.display = 'block';
+            }
+        }
+
+        // Função para visualizar comprovante
+        function viewReceipt(receiptPath) {
+            const modal = document.getElementById('receiptModal');
+            const img = document.getElementById('receiptImage');
+            
+            img.src = '../../' + receiptPath;
+            modal.style.display = 'block';
+        }
+
+        // Função para mostrar notificação
+        function showNotification(message, type = 'info') {
+            // Implementar sistema de notificações aqui
+            alert(message);
+        }
+
+        // Função para formatar dinheiro
+        function formatMoney(value) {
+            return parseFloat(value).toLocaleString('pt-BR', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+
+        // Fechar modais quando clicar no X ou fora do modal
+        document.addEventListener('DOMContentLoaded', function() {
+            const modals = document.querySelectorAll('.modal');
+            const closes = document.querySelectorAll('.close');
+
+            closes.forEach(close => {
+                close.addEventListener('click', function() {
+                    this.closest('.modal').style.display = 'none';
+                });
+            });
+
+            modals.forEach(modal => {
+                modal.addEventListener('click', function(e) {
+                    if (e.target === this) {
+                        this.style.display = 'none';
+                    }
+                });
+            });
+
+            // Adicionar interatividade aos headers dos cards
+            const paymentHeaders = document.querySelectorAll('.payment-header');
+            paymentHeaders.forEach(header => {
+                header.addEventListener('mouseenter', function() {
+                    this.style.backgroundColor = '#f8f9fa';
+                });
+                
+                header.addEventListener('mouseleave', function() {
+                    if (!card.classList.contains('expanded')) {
+                        this.style.backgroundColor = '';
+                    }
+                });
+            });
+        });
+        
         // Verificar status de pagamento PIX
         async function checkPaymentStatus(paymentId, mpPaymentId) {
             try {
@@ -540,941 +1150,9 @@ $metodosPagamento = [
                 }
             } catch (error) {
                 console.error('Erro ao verificar status:', error);
-                alert('Erro ao verificar status do pagamento. Tente novamente.');
+                alert('Erro ao verificar status do pagamento.');
             }
         }
-
-        // Verificar automaticamente pagamentos pendentes a cada 30 segundos
-        setInterval(function() {
-            const pendingRows = document.querySelectorAll('tr[data-status="pix_aguardando"]');
-            if (pendingRows.length > 0) {
-                console.log('Verificando status de pagamentos pendentes...');
-                // Recarregar a página discretamente para atualizar status
-                if (document.hidden === false) { // Só recarrega se a aba estiver ativa
-                    window.location.reload();
-                }
-            }
-        }, 30000);
-        function toggleInfoSection() {
-            const content = document.getElementById('infoSectionContent');
-            const icon = document.getElementById('infoDropdownIcon');
-            const card = content.closest('.collapsible-card');
-            
-            if (content.style.display === 'none' || content.style.display === '') {
-                // Abrir
-                content.style.display = 'block';
-                content.classList.add('opening');
-                content.classList.remove('closing');
-                icon.classList.add('open');
-                card.classList.add('expanded');
-                
-                // Remover classe de animação após completar
-                setTimeout(() => {
-                    content.classList.remove('opening');
-                }, 400);
-                
-                // Salvar estado no localStorage
-                localStorage.setItem('infoSectionOpen', 'true');
-                
-            } else {
-                // Fechar
-                content.classList.add('closing');
-                content.classList.remove('opening');
-                icon.classList.remove('open');
-                card.classList.remove('expanded');
-                
-                // Ocultar após animação
-                setTimeout(() => {
-                    content.style.display = 'none';
-                    content.classList.remove('closing');
-                }, 400);
-                
-                // Salvar estado no localStorage
-                localStorage.setItem('infoSectionOpen', 'false');
-            }
-        }
-
-        // Restaurar estado do dropdown ao carregar a página
-        document.addEventListener('DOMContentLoaded', function() {
-            const savedState = localStorage.getItem('infoSectionOpen');
-            const content = document.getElementById('infoSectionContent');
-            const icon = document.getElementById('infoDropdownIcon');
-            const card = content.closest('.collapsible-card');
-            
-            if (savedState === 'true') {
-                content.style.display = 'block';
-                icon.classList.add('open');
-                card.classList.add('expanded');
-            }
-            
-            // Adicionar indicador visual ao passar o mouse
-            const header = document.querySelector('.collapsible-header');
-            if (header) {
-                header.addEventListener('mouseenter', function() {
-                    this.style.backgroundColor = '#f8f9fa';
-                });
-                
-                header.addEventListener('mouseleave', function() {
-                    if (!card.classList.contains('expanded')) {
-                        this.style.backgroundColor = '';
-                    }
-                });
-            }
-        });
-        
-        // Função para solicitar devolução
-        function requestRefund(paymentId, amount, mpPaymentId) {
-            currentRefundData = {
-                id: paymentId,
-                amount: amount,
-                mp_payment_id: mpPaymentId
-            };
-            
-            document.getElementById('refundPaymentId').value = paymentId;
-            document.getElementById('refundMpPaymentId').value = mpPaymentId;
-            document.getElementById('refundPaymentAmount').textContent = `R$ ${formatMoney(amount)}`;
-            document.getElementById('refundModal').style.display = 'block';
-        }
-        
-        async function submitRefundRequest() {
-            const paymentId = document.getElementById('refundPaymentId').value;
-            const refundType = document.getElementById('refundType').value;
-            const refundAmount = document.getElementById('refundAmount').value;
-            const reason = document.getElementById('refundReason').value;
-            
-            if (!reason.trim()) {
-                showNotification('Motivo da devolução é obrigatório', 'error');
-                return;
-            }
-            
-            if (refundType === 'parcial' && (!refundAmount || parseFloat(refundAmount) <= 0)) {
-                showNotification('Para devolução parcial, informe um valor válido', 'error');
-                return;
-            }
-            
-            const payload = {
-                payment_id: parseInt(paymentId),
-                reason: reason.trim()
-            };
-            
-            // Se for devolução parcial, incluir o valor
-            if (refundType === 'parcial' && refundAmount) {
-                const amount = parseFloat(refundAmount);
-                const maxAmount = parseFloat(currentRefundData.amount);
-                
-                if (amount > maxAmount) {
-                    showNotification(`Valor da devolução não pode ser maior que R$ ${formatMoney(maxAmount)}`, 'error');
-                    return;
-                }
-                
-                payload.amount = amount;
-            }
-            
-            try {
-                const response = await fetch('../../api/refunds.php?action=request', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                
-                const result = await response.json();
-                
-                if (result.status) {
-                    showNotification('Solicitação de devolução enviada com sucesso! Aguarde a análise do administrador.', 'success');
-                    closeRefundModal();
-                    // Opcional: recarregar a página para atualizar status
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 2000);
-                } else {
-                    showNotification('Erro ao solicitar devolução: ' + result.message, 'error');
-                }
-            } catch (error) {
-                console.error('Erro:', error);
-                showNotification('Erro de conexão. Tente novamente.', 'error');
-            }
-        }
-        
-        function toggleRefundAmount() {
-            const type = document.getElementById('refundType').value;
-            const amountGroup = document.getElementById('amountGroup');
-            
-            if (type === 'parcial') {
-                amountGroup.style.display = 'block';
-                document.getElementById('refundAmount').max = currentRefundData.amount;
-                document.getElementById('refundAmount').placeholder = `Máximo: R$ ${formatMoney(currentRefundData.amount)}`;
-            } else {
-                amountGroup.style.display = 'none';
-                document.getElementById('refundAmount').value = '';
-            }
-        }
-        
-        function closeRefundModal() {
-            document.getElementById('refundModal').style.display = 'none';
-            document.getElementById('refundForm').reset();
-            document.getElementById('amountGroup').style.display = 'none';
-            currentRefundData = null;
-        }
-        
-        function formatMoney(value) {
-            return parseFloat(value).toLocaleString('pt-BR', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-            });
-        }
-        
-        function showNotification(message, type) {
-            // Sistema simples de notificação - você pode melhorar isso
-            const alertClass = type === 'success' ? 'success' : type === 'error' ? 'danger' : 'info';
-            
-            // Criar elemento de notificação
-            const notification = document.createElement('div');
-            notification.className = `alert alert-${alertClass} notification-toast`;
-            notification.innerHTML = `
-                <div class="notification-content">
-                    <span>${message}</span>
-                    <button class="notification-close" onclick="this.parentElement.parentElement.remove()">&times;</button>
-                </div>
-            `;
-            
-            // Adicionar ao body
-            document.body.appendChild(notification);
-            
-            // Remover após 5 segundos
-            setTimeout(() => {
-                if (notification.parentElement) {
-                    notification.remove();
-                }
-            }, 5000);
-        }
-
-document.addEventListener('DOMContentLoaded', function() {
-    // Elementos dos modais - obtendo referências dos elementos DOM
-    const paymentDetailsModal = document.getElementById('paymentDetailsModal');
-    const receiptModal = document.getElementById('receiptModal');
-    const refundModal = document.getElementById('refundModal');
-    const paymentDetailsContent = document.getElementById('paymentDetailsContent');
-    const receiptImage = document.getElementById('receiptImage');
-    
-    // Configuração dos botões de fechar modais
-    const closeButtons = document.getElementsByClassName('close');
-    for (let i = 0; i < closeButtons.length; i++) {
-        closeButtons[i].addEventListener('click', function() {
-            paymentDetailsModal.style.display = 'none';
-            receiptModal.style.display = 'none';
-            refundModal.style.display = 'none';
-        });
-    }
-    
-    // Fechar modal quando clicar fora dela (no backdrop)
-    window.addEventListener('click', function(event) {
-        if (event.target === paymentDetailsModal) {
-            paymentDetailsModal.style.display = 'none';
-        }
-        if (event.target === receiptModal) {
-            receiptModal.style.display = 'none';
-        }
-        if (event.target === refundModal) {
-            refundModal.style.display = 'none';
-        }
-    });
-    
-    // Função principal para visualizar detalhes do pagamento
-    window.viewPaymentDetails = function(paymentId) {
-        // Validação básica do ID do pagamento
-        if (!paymentId || paymentId <= 0) {
-            alert('ID do pagamento inválido');
-            return;
-        }
-        
-        // Abrir modal e mostrar loading
-        paymentDetailsModal.style.display = 'block';
-        paymentDetailsContent.innerHTML = '<div class="loading-state"><div class="spinner"></div><p>Carregando detalhes...</p></div>';
-        
-        // Usar TransactionController para buscar detalhes com informações de saldo
-        fetch('../../controllers/TransactionController.php', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: 'action=payment_details_with_balance&payment_id=' + encodeURIComponent(paymentId)
-        })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (data && data.status) {
-                renderPaymentDetailsWithBalance(data.data);
-            } else {
-                const errorMessage = data && data.message ? data.message : 'Erro desconhecido ao carregar detalhes';
-                paymentDetailsContent.innerHTML = `<div class="error-state"><p class="error">Erro: ${errorMessage}</p></div>`;
-            }
-        })
-        .catch(error => {
-            console.error('Erro na requisição:', error);
-            paymentDetailsContent.innerHTML = `
-                <div class="error-state">
-                    <p class="error">
-                        Erro de conexão. Verifique sua internet e tente novamente.
-                        <br><small>Detalhes técnicos: ${error.message}</small>
-                    </p>
-                </div>
-            `;
-        });
-    };
-    
-    // Função para visualizar comprovante de pagamento
-    window.viewReceipt = function(receiptUrl) {
-        if (!receiptUrl) {
-            alert('Comprovante não disponível');
-            return;
-        }
-        
-        receiptImage.src = '../../uploads/comprovantes/' + encodeURIComponent(receiptUrl);
-        receiptModal.style.display = 'block';
-        
-        receiptImage.onload = function() {
-            if (receiptImage.height > 600) {
-                receiptImage.style.height = '600px';
-                receiptImage.style.width = 'auto';
-            }
-        };
-        
-        receiptImage.onerror = function() {
-            alert('Erro ao carregar o comprovante. Arquivo pode estar corrompido ou não encontrado.');
-            receiptModal.style.display = 'none';
-        };
-    };
-    
-    // Função para renderizar os detalhes do pagamento com informações de saldo
-    function renderPaymentDetailsWithBalance(data) {
-        if (!data || !data.pagamento) {
-            paymentDetailsContent.innerHTML = '<div class="error-state"><p class="error">Dados do pagamento não encontrados.</p></div>';
-            return;
-        }
-        
-        const payment = data.pagamento;
-        const transactions = data.transacoes || [];
-        
-        // Construção do HTML com informações de saldo
-        let html = `
-            <div class="payment-details-container">
-                <!-- Resumo do Pagamento -->
-                <div class="payment-summary">
-                    <h3>💳 Resumo do Pagamento</h3>
-                    <div class="summary-grid">
-                        <div class="summary-item">
-                            <span class="summary-label">ID do Pagamento:</span>
-                            <span class="summary-value">#${escapeHtml(payment.id || 'N/A')}</span>
-                        </div>
-                        <div class="summary-item">
-                            <span class="summary-label">Data do Registro:</span>
-                            <span class="summary-value">${
-                            (() => {
-                                const data = new Date(payment.data_registro);
-                                data.setHours(data.getHours() - 3);
-                                return formatDate(data);
-                            })()
-                            }</span>
-                        </div>
-                        <div class="summary-item">
-                            <span class="summary-label">Status:</span>
-                            <span class="summary-value">
-                                <span class="status-badge status-${payment.status}">${getStatusName(payment.status)}</span>
-                            </span>
-                        </div>
-                        <div class="summary-item">
-                            <span class="summary-label">Método de Pagamento:</span>
-                            <span class="summary-value">${getPaymentMethodName(payment.metodo_pagamento)}</span>
-                        </div>
-                        ${payment.numero_referencia ? `
-                        <div class="summary-item">
-                            <span class="summary-label">Número de Referência:</span>
-                            <span class="summary-value">${escapeHtml(payment.numero_referencia)}</span>
-                        </div>
-                        ` : ''}
-                    </div>
-                </div>
-
-                <!-- Valores Financeiros -->
-                <div class="financial-summary">
-                    <h3>💰 Resumo Financeiro</h3>
-                    <div class="financial-grid">
-                        <div class="financial-item primary">
-                            <div class="financial-label">Valor Total das Vendas</div>
-                            <div class="financial-value">R$ ${formatCurrency(payment.valor_vendas_originais || payment.valor_total)}</div>
-                        </div>
-                        <div class="financial-item warning">
-                            <div class="financial-label">Total Saldo Usado pelos Clientes</div>
-                            <div class="financial-value">R$ ${formatCurrency(payment.total_saldo_usado || 0)}</div>
-                        </div>
-                        <div class="financial-item success">
-                            <div class="financial-label">Comissão Paga ao Klube Cash</div>
-                            <div class="financial-value">R$ ${formatCurrency(payment.valor_total)}</div>
-                        </div>
-                        <div class="financial-item info">
-                            <div class="financial-label">Valor Líquido Cobrado</div>
-                            <div class="financial-value">R$ ${formatCurrency((payment.valor_vendas_originais || payment.valor_total) - (payment.total_saldo_usado || 0))}</div>
-                        </div>
-                    </div>
-                </div>
-        `;
-        
-        // Seção de informações de aprovação/rejeição
-        if (payment.status && payment.status !== 'pendente') {
-            html += `
-                <div class="approval-info">
-                    <h3>${payment.status === 'aprovado' ? '✅ Informações de Aprovação' : '❌ Motivo da Rejeição'}</h3>
-                    <div class="approval-details">
-                        ${payment.data_aprovacao ? `
-                        <div class="approval-item">
-                            <span class="approval-label">Data:</span>
-                            <span class="approval-value">${formatDate(payment.data_aprovacao)}</span>
-                        </div>
-                        ` : ''}
-                        ${payment.observacao_admin ? `
-                        <div class="approval-item">
-                            <span class="approval-label">Observação do Administrador:</span>
-                            <span class="approval-value">${escapeHtml(payment.observacao_admin)}</span>
-                        </div>
-                        ` : ''}
-                    </div>
-                </div>
-            `;
-        }
-        
-        // Lista de transações incluídas no pagamento com informações de saldo
-        html += `
-            <div class="transactions-section">
-                <h3>📋 Transações Incluídas (${transactions.length})</h3>
-                ${transactions.length > 0 ? `
-                <div class="transactions-table-container">
-                    <table class="transactions-table">
-                        <thead>
-                            <tr>
-                                <th>Código</th>
-                                <th>Cliente</th>
-                                <th>Data</th>
-                                <th>Valor Venda</th>
-                                <th>Saldo Usado</th>
-                                <th>Valor Efetivo</th>
-                                <th>Cashback</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${transactions.map(transaction => {
-                                const saldoUsado = parseFloat(transaction.saldo_usado) || 0;
-                                const valorEfetivo = parseFloat(transaction.valor_total) - saldoUsado;
-                                return `
-                                <tr>
-                                    <td>
-                                        <code>${escapeHtml(transaction.codigo_transacao || 'N/A')}</code>
-                                    </td>
-                                    <td>
-                                        <div class="cliente-info">
-                                            <strong>${escapeHtml(transaction.cliente_nome || 'N/A')}</strong>
-                                            <small>${escapeHtml(transaction.cliente_email || '')}</small>
-                                            ${saldoUsado > 0 ? '<span class="balance-indicator">💰</span>' : ''}
-                                        </div>
-                                    </td>
-                                    <td>${formatDate(transaction.data_transacao)}</td>
-                                    <td class="valor-original">R$ ${formatCurrency(transaction.valor_total)}</td>
-                                    <td class="saldo-usado ${saldoUsado > 0 ? 'has-balance' : 'no-balance'}">
-                                        ${saldoUsado > 0 ? 'R$ ' + formatCurrency(saldoUsado) : '-'}
-                                    </td>
-                                    <td class="valor-efetivo">R$ ${formatCurrency(valorEfetivo)}</td>
-                                    <td class="cashback">R$ ${formatCurrency(transaction.valor_cliente)}</td>
-                                </tr>
-                            `}).join('')}
-                        </tbody>
-                    </table>
-                </div>
-                ` : '<div class="no-transactions"><p>Nenhuma transação associada a este pagamento.</p></div>'}
-            </div>
-        `;
-        
-        // Observações da loja sobre o pagamento
-        if (payment.observacao) {
-            html += `
-                <div class="payment-notes">
-                    <h3>📝 Suas Observações</h3>
-                    <div class="notes-content">
-                        <p>${escapeHtml(payment.observacao)}</p>
-                    </div>
-                </div>
-            `;
-        }
-        
-        // Ações disponíveis para pagamentos rejeitados
-        if (payment.status === 'rejeitado') {
-            html += `
-                <div class="payment-actions">
-                    <div class="action-info">
-                        <p><strong>Seu pagamento foi rejeitado.</strong> Você pode realizar um novo pagamento com as transações pendentes.</p>
-                    </div>
-                    <a href="../../store/transacoes-pendentes" class="btn btn-primary">
-                        <i class="icon">💳</i>
-                        Realizar Novo Pagamento
-                    </a>
-                </div>
-            `;
-        }
-        
-        html += '</div>'; // Fechar payment-details-container
-        
-        paymentDetailsContent.innerHTML = html;
-    }
-    
-    // Funções auxiliares para formatação e segurança
-    function formatDate(dateString) {
-        if (!dateString) return 'N/A';
-        
-        try {
-            const date = new Date(dateString);
-            if (isNaN(date.getTime())) return 'Data inválida';
-            
-            return date.toLocaleDateString('pt-BR') + ' às ' + 
-                   date.toLocaleTimeString('pt-BR', {hour: '2-digit', minute:'2-digit'});
-        } catch (error) {
-            console.error('Erro ao formatar data:', error);
-            return 'Erro na data';
-        }
-    }
-    
-    function formatCurrency(value) {
-        const numValue = parseFloat(value) || 0;
-        return numValue.toLocaleString('pt-BR', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-        });
-    }
-    
-    function getPaymentMethodName(method) {
-        const methods = {
-            'pix': 'PIX',
-            'pix_mercadopago': 'PIX Mercado Pago',
-            'transferencia': 'Transferência Bancária',
-            'ted': 'TED',
-            'boleto': 'Boleto',
-            'cartao': 'Cartão de Crédito',
-            'outro': 'Outro'
-        };
-        return methods[method] || 'Método não especificado';
-    }
-    
-    function getStatusName(status) {
-        switch(status) {
-            case 'aprovado': return 'Aprovado';
-            case 'pendente': return 'Pendente';
-            case 'rejeitado': return 'Rejeitado';
-            default: return status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Status desconhecido';
-        }
-    }
-    
-    function escapeHtml(text) {
-        if (!text) return '';
-        
-        const map = {
-            '&': '&amp;',
-            '<': '&lt;',
-            '>': '&gt;',
-            '"': '&quot;',
-            "'": '&#039;'
-        };
-        
-        return String(text).replace(/[&<>"']/g, function(m) { return map[m]; });
-    }
-});
-</script>
-
-<style>
-/* Estilos existentes mantidos... */
-
-/* Estilos adicionais para informações de saldo */
-.stat-card-subtitle {
-    font-size: 0.8rem;
-    color: #6c757d;
-    margin-top: 5px;
-}
-
-.valor-detalhado {
-    display: flex;
-    flex-direction: column;
-}
-
-.valor-original, 
-.valor-liquido {
-    font-size: 0.8rem;
-    color: #6c757d;
-    font-style: italic;
-}
-
-.saldo-usado {
-    color: #28a745;
-    font-weight: 600;
-}
-
-.sem-saldo {
-    color: #6c757d;
-    font-style: italic;
-}
-
-.transacoes-info {
-    display: flex;
-    flex-direction: column;
-}
-
-.balance-used {
-    color: #28a745 !important;
-    font-weight: 600;
-}
-
-.balance-indicator {
-    margin-left: 5px;
-    font-size: 0.8rem;
-}
-
-.info-section {
-    margin-bottom: 25px;
-    padding-bottom: 20px;
-    border-bottom: 1px solid #eee;
-}
-
-.info-section:last-child {
-    border-bottom: none;
-}
-
-.info-section h4 {
-    color: #333;
-    margin-bottom: 15px;
-    font-size: 1.1rem;
-}
-
-.info-section ul {
-    list-style-type: none;
-    padding-left: 0;
-}
-
-.info-section ol {
-    padding-left: 0;
-}
-
-.info-section li {
-    margin-bottom: 10px;
-    padding-left: 20px;
-    position: relative;
-}
-
-.info-section ul li::before {
-    content: "•";
-    color: #FF7A00;
-    font-weight: bold;
-    position: absolute;
-    left: 0;
-}
-
-/* Estilos para seção colapsável */
-.collapsible-card {
-    transition: all 0.3s ease;
-}
-
-.collapsible-header {
-    cursor: pointer;
-    user-select: none;
-    transition: background-color 0.3s ease;
-    position: relative;
-}
-
-.collapsible-header:hover {
-    background-color: #f8f9fa;
-}
-
-.collapsible-header .card-title {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    width: 100%;
-}
-
-.dropdown-icon {
-    font-size: 14px;
-    font-weight: bold;
-    color: var(--primary-color);
-    transition: transform 0.3s ease;
-    margin-left: 10px;
-}
-
-.dropdown-icon.open {
-    transform: rotate(180deg);
-}
-
-.collapsible-content {
-    overflow: hidden;
-    transition: all 0.4s ease;
-    border-top: 1px solid #eee;
-    margin-top: 0;
-}
-
-.collapsible-content.opening {
-    animation: slideDown 0.4s ease-out;
-}
-
-.collapsible-content.closing {
-    animation: slideUp 0.4s ease-out;
-}
-
-@keyframes slideDown {
-    from {
-        opacity: 0;
-        max-height: 0;
-        padding-top: 0;
-        padding-bottom: 0;
-    }
-    to {
-        opacity: 1;
-        max-height: 1000px;
-        padding-top: 20px;
-        padding-bottom: 20px;
-    }
-}
-
-@keyframes slideUp {
-    from {
-        opacity: 1;
-        max-height: 1000px;
-        padding-top: 20px;
-        padding-bottom: 20px;
-    }
-    to {
-        opacity: 0;
-        max-height: 0;
-        padding-top: 0;
-        padding-bottom: 0;
-    }
-}
-
-/* Estilos especiais para quando está expandido */
-.collapsible-card.expanded {
-    border-left: 4px solid var(--primary-color);
-}
-
-.collapsible-card.expanded .collapsible-header {
-    background-color: var(--primary-light);
-}
-
-/* Estilos para o modal de devolução */
-.refund-info {
-    margin-bottom: 20px;
-}
-
-.info-alert {
-    background: #fff3cd;
-    border: 1px solid #ffeaa7;
-    border-radius: 6px;
-    padding: 15px;
-    margin-bottom: 20px;
-    color: #856404;
-}
-
-.payment-info {
-    background: #f8f9fa;
-    border: 1px solid #dee2e6;
-    border-radius: 6px;
-    padding: 15px;
-    margin-top: 5px;
-}
-
-.payment-value {
-    font-size: 1.2rem;
-    font-weight: 600;
-    color: #28a745;
-    display: block;
-}
-
-.payment-info small {
-    color: #6c757d;
-    font-size: 0.8rem;
-}
-
-.form-help {
-    font-size: 0.8rem;
-    color: #6c757d;
-    margin-top: 5px;
-    display: block;
-}
-
-.refund-consequences {
-    background: #f8d7da;
-    border: 1px solid #f5c6cb;
-    border-radius: 6px;
-    padding: 15px;
-    margin-top: 20px;
-}
-
-.refund-consequences h4 {
-    color: #721c24;
-    margin-bottom: 10px;
-}
-
-.refund-consequences ul {
-    margin: 0;
-    padding-left: 20px;
-}
-
-.refund-consequences li {
-    margin-bottom: 5px;
-    color: #721c24;
-}
-
-.action-buttons {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-}
-
-.btn-warning {
-    background-color: #ffc107;
-    border-color: #ffc107;
-    color: #212529;
-}
-
-.btn-warning:hover {
-    background-color: #e0a800;
-    border-color: #d39e00;
-}
-
-/* Sistema de notificações */
-.notification-toast {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 9999;
-    min-width: 300px;
-    max-width: 500px;
-    padding: 15px;
-    border-radius: 6px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    animation: slideInRight 0.3s ease-out;
-}
-
-.notification-content {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.notification-close {
-    background: none;
-    border: none;
-    color: inherit;
-    font-size: 1.2rem;
-    cursor: pointer;
-    margin-left: 10px;
-    opacity: 0.7;
-}
-
-.notification-close:hover {
-    opacity: 1;
-}
-
-.alert-success {
-    color: #155724;
-    background-color: #d4edda;
-    border-color: #c3e6cb;
-}
-
-.alert-danger {
-    color: #721c24;
-    background-color: #f8d7da;
-    border-color: #f5c6cb;
-}
-
-.alert-info {
-    color: #0c5460;
-    background-color: #d1ecf1;
-    border-color: #bee5eb;
-}
-
-@keyframes slideInRight {
-    from {
-        transform: translateX(100%);
-        opacity: 0;
-    }
-    to {
-        transform: translateX(0);
-        opacity: 1;
-    }
-}
-
-/* Ajustes para mobile */
-@media (max-width: 768px) {
-    .action-buttons {
-        flex-direction: column;
-        gap: 5px;
-    }
-    
-    .btn-action {
-        width: 100%;
-        margin-bottom: 5px;
-    }
-    
-    .notification-toast {
-        left: 10px;
-        right: 10px;
-        min-width: auto;
-    }
-    
-    .collapsible-header .card-title {
-        font-size: 16px;
-    }
-    
-    .dropdown-icon {
-        font-size: 12px;
-    }
-    
-    .info-section h4 {
-        font-size: 1rem;
-    }
-}
-/* Botão de continuar pagamento PIX */
-.btn-success {
-    background-color: #28a745;
-    border-color: #28a745;
-    color: white;
-}
-
-.btn-success:hover {
-    background-color: #218838;
-    border-color: #1e7e34;
-}
-
-.action-buttons {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    min-width: 150px;
-}
-
-.action-buttons .btn {
-    width: 100%;
-    font-size: 0.875rem;
-    padding: 0.4rem 0.6rem;
-}
-
-/* Responsivo para mobile */
-@media (max-width: 768px) {
-    .action-buttons {
-        min-width: 120px;
-    }
-    
-    .action-buttons .btn {
-        font-size: 0.8rem;
-        padding: 0.3rem 0.5rem;
-    }
-}
-</style>
+    </script>
 </body>
 </html>
