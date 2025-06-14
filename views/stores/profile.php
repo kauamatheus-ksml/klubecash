@@ -46,198 +46,194 @@ $userQuery->bindParam(':id', $userId);
 $userQuery->execute();
 $user = $userQuery->fetch(PDO::FETCH_ASSOC);
 
-// Inicializar mensagens
+// Processar formulário se enviado
 $success = '';
 $error = '';
 
-// Processar formulário se enviado - ESTRUTURA CORRIGIDA E COMPLETA
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     
-    // SEÇÃO 1: Atualizar informações da loja (funciona independentemente)
-    if ($action === 'update_store_info') {
-        try {
-            // Capturar e limpar dados de entrada
-            $email = trim($_POST['email'] ?? '');
-            $telefone = preg_replace('/\D/', '', $_POST['telefone'] ?? '');
-            $website = trim($_POST['website'] ?? '');
-            $descricao = trim($_POST['descricao'] ?? '');
-            
-            // Validações específicas para informações da loja
-            if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                $error = 'Email inválido ou não informado.';
-            } elseif (empty($telefone) || strlen($telefone) < 10 || strlen($telefone) > 11) {
-                $error = 'Telefone inválido. Digite um telefone com DDD válido.';
-            } else {
-                // Verificar se email já existe em outra loja
-                $checkEmailStmt = $db->prepare("SELECT id FROM lojas WHERE email = :email AND id != :loja_id");
-                $checkEmailStmt->bindParam(':email', $email);
-                $checkEmailStmt->bindParam(':loja_id', $storeId);
-                $checkEmailStmt->execute();
+    switch ($action) {
+        case 'update_store_info':
+            // Atualizar informações da loja
+            try {
+                $email = trim($_POST['email']);
+                $telefone = preg_replace('/\D/', '', $_POST['telefone']); // Remover caracteres não numéricos
+                $website = trim($_POST['website'] ?? '');
+                $descricao = trim($_POST['descricao'] ?? '');
                 
-                if ($checkEmailStmt->rowCount() > 0) {
-                    $error = 'Este email já está sendo usado por outra loja.';
+                // Validações
+                if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                    $error = 'Email inválido.';
+                } elseif (strlen($telefone) < 10 || strlen($telefone) > 11) {
+                    $error = 'Telefone inválido. Digite um telefone com DDD.';
                 } else {
-                    // Executar atualização das informações da loja
-                    $updateStmt = $db->prepare("
-                        UPDATE lojas 
-                        SET email = :email, telefone = :telefone, website = :website, descricao = :descricao
-                        WHERE id = :id
-                    ");
-                    $updateStmt->bindParam(':email', $email);
-                    $updateStmt->bindParam(':telefone', $telefone);
-                    $updateStmt->bindParam(':website', $website);
-                    $updateStmt->bindParam(':descricao', $descricao);
-                    $updateStmt->bindParam(':id', $storeId);
+                    // Verificar se email já existe em outra loja
+                    $checkEmailStmt = $db->prepare("SELECT id FROM lojas WHERE email = :email AND id != :loja_id");
+                    $checkEmailStmt->bindParam(':email', $email);
+                    $checkEmailStmt->bindParam(':loja_id', $storeId);
+                    $checkEmailStmt->execute();
                     
-                    if ($updateStmt->execute()) {
-                        // Atualizar dados em memória para reflexão imediata na interface
-                        $store['email'] = $email;
-                        $store['telefone'] = $telefone;
-                        $store['website'] = $website;
-                        $store['descricao'] = $descricao;
-                        
-                        $success = 'Informações da loja atualizadas com sucesso!';
+                    if ($checkEmailStmt->rowCount() > 0) {
+                        $error = 'Este email já está sendo usado por outra loja.';
                     } else {
-                        $error = 'Erro ao atualizar informações. Tente novamente.';
+                        // Atualizar informações
+                        $updateStmt = $db->prepare("
+                            UPDATE lojas 
+                            SET email = :email, telefone = :telefone, website = :website, descricao = :descricao
+                            WHERE id = :id
+                        ");
+                        $updateStmt->bindParam(':email', $email);
+                        $updateStmt->bindParam(':telefone', $telefone);
+                        $updateStmt->bindParam(':website', $website);
+                        $updateStmt->bindParam(':descricao', $descricao);
+                        $updateStmt->bindParam(':id', $storeId);
+                        
+                        if ($updateStmt->execute()) {
+                            // Atualizar dados em memória
+                            $store['email'] = $email;
+                            $store['telefone'] = $telefone;
+                            $store['website'] = $website;
+                            $store['descricao'] = $descricao;
+                            
+                            $success = 'Informações da loja atualizadas com sucesso!';
+                        } else {
+                            $error = 'Erro ao atualizar informações. Tente novamente.';
+                        }
                     }
                 }
+            } catch (PDOException $e) {
+                $error = 'Erro ao atualizar informações. Tente novamente.';
+                error_log('Erro ao atualizar loja: ' . $e->getMessage());
             }
-        } catch (PDOException $e) {
-            $error = 'Erro ao processar informações da loja. Tente novamente.';
-            error_log('Erro ao atualizar loja: ' . $e->getMessage());
-        }
-    }
-    
-    // SEÇÃO 2: Atualizar endereço da loja (funciona independentemente) - CORRIGIDO E ADICIONADO
-    elseif ($action === 'update_address') {
-        try {
-            // Capturar e limpar dados de endereço
-            $cep = trim($_POST['cep'] ?? '');
-            $logradouro = trim($_POST['logradouro'] ?? '');
-            $numero = trim($_POST['numero'] ?? '');
-            $complemento = trim($_POST['complemento'] ?? '');
-            $bairro = trim($_POST['bairro'] ?? '');
-            $cidade = trim($_POST['cidade'] ?? '');
-            $estado = trim($_POST['estado'] ?? '');
+            break;
             
-            // Validações específicas para endereço
-            if (empty($cep) || empty($logradouro) || empty($numero) || empty($bairro) || empty($cidade) || empty($estado)) {
-                $error = 'Todos os campos de endereço são obrigatórios, exceto complemento.';
-            } else {
-                // Verificar se endereço já existe para esta loja
-                $checkAddressStmt = $db->prepare("SELECT id FROM lojas_endereco WHERE loja_id = :loja_id");
-                $checkAddressStmt->bindParam(':loja_id', $storeId);
-                $checkAddressStmt->execute();
+        case 'update_address':
+            // Atualizar endereço
+            try {
+                $cep = preg_replace('/\D/', '', $_POST['cep']);
+                $logradouro = trim($_POST['logradouro']);
+                $numero = trim($_POST['numero']);
+                $complemento = trim($_POST['complemento'] ?? '');
+                $bairro = trim($_POST['bairro']);
+                $cidade = trim($_POST['cidade']);
+                $estado = trim($_POST['estado']);
                 
-                if ($checkAddressStmt->rowCount() > 0) {
-                    // Atualizar endereço existente
-                    $updateAddressStmt = $db->prepare("
-                        UPDATE lojas_endereco 
-                        SET cep = :cep, logradouro = :logradouro, numero = :numero, 
-                            complemento = :complemento, bairro = :bairro, cidade = :cidade, estado = :estado
-                        WHERE loja_id = :loja_id
-                    ");
+                // Validações
+                if (strlen($cep) != 8) {
+                    $error = 'CEP deve ter 8 dígitos.';
+                } elseif (empty($logradouro) || empty($numero) || empty($bairro) || empty($cidade) || empty($estado)) {
+                    $error = 'Todos os campos de endereço são obrigatórios.';
                 } else {
-                    // Inserir novo endereço
-                    $updateAddressStmt = $db->prepare("
-                        INSERT INTO lojas_endereco (loja_id, cep, logradouro, numero, complemento, bairro, cidade, estado)
-                        VALUES (:loja_id, :cep, :logradouro, :numero, :complemento, :bairro, :cidade, :estado)
-                    ");
-                }
-                
-                // Fazer binding dos parâmetros
-                $updateAddressStmt->bindParam(':loja_id', $storeId);
-                $updateAddressStmt->bindParam(':cep', $cep);
-                $updateAddressStmt->bindParam(':logradouro', $logradouro);
-                $updateAddressStmt->bindParam(':numero', $numero);
-                $updateAddressStmt->bindParam(':complemento', $complemento);
-                $updateAddressStmt->bindParam(':bairro', $bairro);
-                $updateAddressStmt->bindParam(':cidade', $cidade);
-                $updateAddressStmt->bindParam(':estado', $estado);
-                
-                if ($updateAddressStmt->execute()) {
-                    // Atualizar dados em memória para reflexão imediata na interface
-                    $store['cep'] = $cep;
-                    $store['logradouro'] = $logradouro;
-                    $store['numero'] = $numero;
-                    $store['complemento'] = $complemento;
-                    $store['bairro'] = $bairro;
-                    $store['cidade'] = $cidade;
-                    $store['estado'] = $estado;
+                    // Verificar se já existe endereço
+                    $checkAddressStmt = $db->prepare("SELECT id FROM lojas_endereco WHERE loja_id = :loja_id");
+                    $checkAddressStmt->bindParam(':loja_id', $storeId);
+                    $checkAddressStmt->execute();
                     
-                    $success = 'Endereço atualizado com sucesso!';
-                } else {
-                    $error = 'Erro ao salvar endereço. Tente novamente.';
+                    if ($checkAddressStmt->rowCount() > 0) {
+                        // Atualizar endereço existente
+                        $updateAddressStmt = $db->prepare("
+                            UPDATE lojas_endereco 
+                            SET cep = :cep, logradouro = :logradouro, numero = :numero, 
+                                complemento = :complemento, bairro = :bairro, cidade = :cidade, estado = :estado
+                            WHERE loja_id = :loja_id
+                        ");
+                    } else {
+                        // Inserir novo endereço
+                        $updateAddressStmt = $db->prepare("
+                            INSERT INTO lojas_endereco (loja_id, cep, logradouro, numero, complemento, bairro, cidade, estado)
+                            VALUES (:loja_id, :cep, :logradouro, :numero, :complemento, :bairro, :cidade, :estado)
+                        ");
+                        $updateAddressStmt->bindParam(':loja_id', $storeId);
+                    }
+                    
+                    $updateAddressStmt->bindParam(':cep', $cep);
+                    $updateAddressStmt->bindParam(':logradouro', $logradouro);
+                    $updateAddressStmt->bindParam(':numero', $numero);
+                    $updateAddressStmt->bindParam(':complemento', $complemento);
+                    $updateAddressStmt->bindParam(':bairro', $bairro);
+                    $updateAddressStmt->bindParam(':cidade', $cidade);
+                    $updateAddressStmt->bindParam(':estado', $estado);
+                    
+                    if ($updateAddressStmt->execute()) {
+                        // Atualizar dados em memória
+                        $store['cep'] = $cep;
+                        $store['logradouro'] = $logradouro;
+                        $store['numero'] = $numero;
+                        $store['complemento'] = $complemento;
+                        $store['bairro'] = $bairro;
+                        $store['cidade'] = $cidade;
+                        $store['estado'] = $estado;
+                        
+                        $success = 'Endereço atualizado com sucesso!';
+                    } else {
+                        $error = 'Erro ao atualizar endereço. Tente novamente.';
+                    }
                 }
+            } catch (PDOException $e) {
+                $error = 'Erro ao atualizar endereço. Tente novamente.';
+                error_log('Erro ao atualizar endereço: ' . $e->getMessage());
             }
-        } catch (PDOException $e) {
-            $error = 'Erro ao processar endereço. Tente novamente.';
-            error_log('Erro ao atualizar endereço: ' . $e->getMessage());
-        }
-    }
-    
-    // SEÇÃO 3: Alterar senha (funciona independentemente) - CORRIGIDO
-    elseif ($action === 'change_password') {
-        try {
-            // Capturar dados da senha
-            $senhaAtual = $_POST['senha_atual'] ?? '';
-            $novaSenha = $_POST['nova_senha'] ?? '';
-            $confirmarSenha = $_POST['confirmar_senha'] ?? '';
+            break;
             
-            // Validações específicas para alteração de senha
-            if (empty($senhaAtual) || empty($novaSenha) || empty($confirmarSenha)) {
-                $error = 'Todos os campos de senha são obrigatórios.';
-            } elseif ($novaSenha !== $confirmarSenha) {
-                $error = 'A confirmação de senha não confere.';
-            } elseif (strlen($novaSenha) < 8) {
-                $error = 'Nova senha deve ter pelo menos 8 caracteres.';
-            } else {
-                // Verificar senha atual
-                $checkPasswordStmt = $db->prepare("SELECT senha_hash FROM usuarios WHERE id = :id");
-                $checkPasswordStmt->bindParam(':id', $userId);
-                $checkPasswordStmt->execute();
+        case 'change_password':
+            // Alterar senha
+            try {
+                $senhaAtual = $_POST['senha_atual'];
+                $novaSenha = $_POST['nova_senha'];
+                $confirmarSenha = $_POST['confirmar_senha'];
                 
-                if ($checkPasswordStmt->rowCount() > 0) {
-                    $currentPasswordHash = $checkPasswordStmt->fetchColumn();
+                // Validações básicas
+                if (empty($senhaAtual) || empty($novaSenha) || empty($confirmarSenha)) {
+                    $error = 'Todos os campos de senha são obrigatórios.';
+                } elseif ($novaSenha !== $confirmarSenha) {
+                    $error = 'A confirmação de senha não confere.';
+                } elseif (strlen($novaSenha) < 8) {
+                    $error = 'Nova senha deve ter pelo menos 8 caracteres.';
+                } else {
+                    // Verificar senha atual
+                    $checkPasswordStmt = $db->prepare("SELECT senha_hash FROM usuarios WHERE id = :id");
+                    $checkPasswordStmt->bindParam(':id', $userId);
+                    $checkPasswordStmt->execute();
                     
-                    // Verificar se a senha atual está correta
-                    if (password_verify($senhaAtual, $currentPasswordHash)) {
-                        // Gerar hash da nova senha
-                        $newPasswordHash = password_hash($novaSenha, PASSWORD_DEFAULT, ['cost' => 12]);
+                    if ($checkPasswordStmt->rowCount() > 0) {
+                        $currentPasswordHash = $checkPasswordStmt->fetchColumn();
                         
-                        // Atualizar senha no banco de dados
-                        $updatePasswordStmt = $db->prepare("UPDATE usuarios SET senha_hash = :senha_hash WHERE id = :id");
-                        $updatePasswordStmt->bindParam(':senha_hash', $newPasswordHash);
-                        $updatePasswordStmt->bindParam(':id', $userId);
-                        
-                        if ($updatePasswordStmt->execute()) {
-                            $success = 'Senha alterada com sucesso!';
+                        // Verificar se a senha atual está correta
+                        if (password_verify($senhaAtual, $currentPasswordHash)) {
+                            // Gerar hash da nova senha
+                            $newPasswordHash = password_hash($novaSenha, PASSWORD_DEFAULT, ['cost' => 12]);
+                            
+                            // Atualizar senha
+                            $updatePasswordStmt = $db->prepare("UPDATE usuarios SET senha_hash = :senha_hash WHERE id = :id");
+                            $updatePasswordStmt->bindParam(':senha_hash', $newPasswordHash);
+                            $updatePasswordStmt->bindParam(':id', $userId);
+                            
+                            if ($updatePasswordStmt->execute()) {
+                                $success = 'Senha alterada com sucesso!';
+                            } else {
+                                $error = 'Erro ao alterar senha. Tente novamente.';
+                            }
                         } else {
-                            $error = 'Erro ao alterar senha. Tente novamente.';
+                            $error = 'Senha atual incorreta.';
                         }
                     } else {
-                        $error = 'Senha atual incorreta.';
+                        $error = 'Usuário não encontrado.';
                     }
-                } else {
-                    $error = 'Usuário não encontrado.';
                 }
+            } catch (PDOException $e) {
+                $error = 'Erro ao alterar senha. Tente novamente.';
+                error_log('Erro ao alterar senha: ' . $e->getMessage());
             }
-        } catch (PDOException $e) {
-            $error = 'Erro ao alterar senha. Tente novamente.';
-            error_log('Erro ao alterar senha: ' . $e->getMessage());
-        }
-    }
-    
-    // SEÇÃO 4: Tratamento para ações não reconhecidas - APRIMORADO
-    else {
-        $error = 'Ação não reconhecida: ' . htmlspecialchars($action ?: 'vazia');
-        error_log('Ação inválida recebida: ' . ($action ?: 'NULL'));
+            break;
+            
+        default:
+            $error = 'Ação inválida.';
+            break;
     }
 }
 
-// Configurações da interface
-$showDebugButton = true; 
+// Definir menu ativo
 $activeMenu = 'profile';
 ?>
 
@@ -650,72 +646,71 @@ $activeMenu = 'profile';
                 <form method="POST" action="">
                     <input type="hidden" name="action" value="update_address">
                     
-                    <div class="form-group">
-                        <label for="cep">CEP</label>
-                        <input type="text" id="cep" name="cep" value="<?php echo htmlspecialchars($store['cep'] ?? ''); ?>" required maxlength="9" placeholder="00000-000">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="logradouro">Logradouro</label>
-                        <input type="text" id="logradouro" name="logradouro" value="<?php echo htmlspecialchars($store['logradouro'] ?? ''); ?>" required placeholder="Rua, Avenida, etc.">
-                    </div>
-                    
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="numero">Número</label>
-                            <input type="text" id="numero" name="numero" value="<?php echo htmlspecialchars($store['numero'] ?? ''); ?>" required placeholder="123">
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="complemento">Complemento</label>
-                            <input type="text" id="complemento" name="complemento" value="<?php echo htmlspecialchars($store['complemento'] ?? ''); ?>" placeholder="Apto, Sala, etc.">
-                        </div>
-                    </div>
-                    
-                    <!-- CAMPOS QUE ESTAVAM FALTANDO -->
-                    <div class="form-group">
-                        <label for="bairro">Bairro</label>
-                        <input type="text" id="bairro" name="bairro" value="<?php echo htmlspecialchars($store['bairro'] ?? ''); ?>" required placeholder="Nome do bairro">
-                    </div>
-                    
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="cidade">Cidade</label>
-                            <input type="text" id="cidade" name="cidade" value="<?php echo htmlspecialchars($store['cidade'] ?? ''); ?>" required placeholder="Nome da cidade">
+                            <label for="cep">CEP</label>
+                            <input type="text" id="cep" name="cep" value="<?php echo htmlspecialchars($store['cep'] ?? ''); ?>" required>
                         </div>
                         
                         <div class="form-group">
                             <label for="estado">Estado</label>
                             <select id="estado" name="estado" required>
                                 <option value="">Selecione</option>
-                                <option value="AC" <?php echo ($store['estado'] ?? '') === 'AC' ? 'selected' : ''; ?>>Acre</option>
-                                <option value="AL" <?php echo ($store['estado'] ?? '') === 'AL' ? 'selected' : ''; ?>>Alagoas</option>
-                                <option value="AP" <?php echo ($store['estado'] ?? '') === 'AP' ? 'selected' : ''; ?>>Amapá</option>
-                                <option value="AM" <?php echo ($store['estado'] ?? '') === 'AM' ? 'selected' : ''; ?>>Amazonas</option>
-                                <option value="BA" <?php echo ($store['estado'] ?? '') === 'BA' ? 'selected' : ''; ?>>Bahia</option>
-                                <option value="CE" <?php echo ($store['estado'] ?? '') === 'CE' ? 'selected' : ''; ?>>Ceará</option>
-                                <option value="DF" <?php echo ($store['estado'] ?? '') === 'DF' ? 'selected' : ''; ?>>Distrito Federal</option>
-                                <option value="ES" <?php echo ($store['estado'] ?? '') === 'ES' ? 'selected' : ''; ?>>Espírito Santo</option>
-                                <option value="GO" <?php echo ($store['estado'] ?? '') === 'GO' ? 'selected' : ''; ?>>Goiás</option>
-                                <option value="MA" <?php echo ($store['estado'] ?? '') === 'MA' ? 'selected' : ''; ?>>Maranhão</option>
-                                <option value="MT" <?php echo ($store['estado'] ?? '') === 'MT' ? 'selected' : ''; ?>>Mato Grosso</option>
-                                <option value="MS" <?php echo ($store['estado'] ?? '') === 'MS' ? 'selected' : ''; ?>>Mato Grosso do Sul</option>
-                                <option value="MG" <?php echo ($store['estado'] ?? '') === 'MG' ? 'selected' : ''; ?>>Minas Gerais</option>
-                                <option value="PA" <?php echo ($store['estado'] ?? '') === 'PA' ? 'selected' : ''; ?>>Pará</option>
-                                <option value="PB" <?php echo ($store['estado'] ?? '') === 'PB' ? 'selected' : ''; ?>>Paraíba</option>
-                                <option value="PR" <?php echo ($store['estado'] ?? '') === 'PR' ? 'selected' : ''; ?>>Paraná</option>
-                                <option value="PE" <?php echo ($store['estado'] ?? '') === 'PE' ? 'selected' : ''; ?>>Pernambuco</option>
-                                <option value="PI" <?php echo ($store['estado'] ?? '') === 'PI' ? 'selected' : ''; ?>>Piauí</option>
-                                <option value="RJ" <?php echo ($store['estado'] ?? '') === 'RJ' ? 'selected' : ''; ?>>Rio de Janeiro</option>
-                                <option value="RN" <?php echo ($store['estado'] ?? '') === 'RN' ? 'selected' : ''; ?>>Rio Grande do Norte</option>
-                                <option value="RS" <?php echo ($store['estado'] ?? '') === 'RS' ? 'selected' : ''; ?>>Rio Grande do Sul</option>
-                                <option value="RO" <?php echo ($store['estado'] ?? '') === 'RO' ? 'selected' : ''; ?>>Rondônia</option>
-                                <option value="RR" <?php echo ($store['estado'] ?? '') === 'RR' ? 'selected' : ''; ?>>Roraima</option>
-                                <option value="SC" <?php echo ($store['estado'] ?? '') === 'SC' ? 'selected' : ''; ?>>Santa Catarina</option>
-                                <option value="SP" <?php echo ($store['estado'] ?? '') === 'SP' ? 'selected' : ''; ?>>São Paulo</option>
-                                <option value="SE" <?php echo ($store['estado'] ?? '') === 'SE' ? 'selected' : ''; ?>>Sergipe</option>
-                                <option value="TO" <?php echo ($store['estado'] ?? '') === 'TO' ? 'selected' : ''; ?>>Tocantins</option>
+                                <option value="AC" <?php echo (($store['estado'] ?? '') === 'AC') ? 'selected' : ''; ?>>Acre</option>
+                                <option value="AL" <?php echo (($store['estado'] ?? '') === 'AL') ? 'selected' : ''; ?>>Alagoas</option>
+                                <option value="AP" <?php echo (($store['estado'] ?? '') === 'AP') ? 'selected' : ''; ?>>Amapá</option>
+                                <option value="AM" <?php echo (($store['estado'] ?? '') === 'AM') ? 'selected' : ''; ?>>Amazonas</option>
+                                <option value="BA" <?php echo (($store['estado'] ?? '') === 'BA') ? 'selected' : ''; ?>>Bahia</option>
+                                <option value="CE" <?php echo (($store['estado'] ?? '') === 'CE') ? 'selected' : ''; ?>>Ceará</option>
+                                <option value="DF" <?php echo (($store['estado'] ?? '') === 'DF') ? 'selected' : ''; ?>>Distrito Federal</option>
+                                <option value="ES" <?php echo (($store['estado'] ?? '') === 'ES') ? 'selected' : ''; ?>>Espírito Santo</option>
+                                <option value="GO" <?php echo (($store['estado'] ?? '') === 'GO') ? 'selected' : ''; ?>>Goiás</option>
+                                <option value="MA" <?php echo (($store['estado'] ?? '') === 'MA') ? 'selected' : ''; ?>>Maranhão</option>
+                                <option value="MT" <?php echo (($store['estado'] ?? '') === 'MT') ? 'selected' : ''; ?>>Mato Grosso</option>
+                                <option value="MS" <?php echo (($store['estado'] ?? '') === 'MS') ? 'selected' : ''; ?>>Mato Grosso do Sul</option>
+                                <option value="MG" <?php echo (($store['estado'] ?? '') === 'MG') ? 'selected' : ''; ?>>Minas Gerais</option>
+                                <option value="PA" <?php echo (($store['estado'] ?? '') === 'PA') ? 'selected' : ''; ?>>Pará</option>
+                                <option value="PB" <?php echo (($store['estado'] ?? '') === 'PB') ? 'selected' : ''; ?>>Paraíba</option>
+                                <option value="PR" <?php echo (($store['estado'] ?? '') === 'PR') ? 'selected' : ''; ?>>Paraná</option>
+                                <option value="PE" <?php echo (($store['estado'] ?? '') === 'PE') ? 'selected' : ''; ?>>Pernambuco</option>
+                                <option value="PI" <?php echo (($store['estado'] ?? '') === 'PI') ? 'selected' : ''; ?>>Piauí</option>
+                                <option value="RJ" <?php echo (($store['estado'] ?? '') === 'RJ') ? 'selected' : ''; ?>>Rio de Janeiro</option>
+                                <option value="RN" <?php echo (($store['estado'] ?? '') === 'RN') ? 'selected' : ''; ?>>Rio Grande do Norte</option>
+                                <option value="RS" <?php echo (($store['estado'] ?? '') === 'RS') ? 'selected' : ''; ?>>Rio Grande do Sul</option>
+                                <option value="RO" <?php echo (($store['estado'] ?? '') === 'RO') ? 'selected' : ''; ?>>Rondônia</option>
+                                <option value="RR" <?php echo (($store['estado'] ?? '') === 'RR') ? 'selected' : ''; ?>>Roraima</option>
+                                <option value="SC" <?php echo (($store['estado'] ?? '') === 'SC') ? 'selected' : ''; ?>>Santa Catarina</option>
+                                <option value="SP" <?php echo (($store['estado'] ?? '') === 'SP') ? 'selected' : ''; ?>>São Paulo</option>
+                                <option value="SE" <?php echo (($store['estado'] ?? '') === 'SE') ? 'selected' : ''; ?>>Sergipe</option>
+                                <option value="TO" <?php echo (($store['estado'] ?? '') === 'TO') ? 'selected' : ''; ?>>Tocantins</option>
                             </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="cidade">Cidade</label>
+                        <input type="text" id="cidade" name="cidade" value="<?php echo htmlspecialchars($store['cidade'] ?? ''); ?>" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="bairro">Bairro</label>
+                        <input type="text" id="bairro" name="bairro" value="<?php echo htmlspecialchars($store['bairro'] ?? ''); ?>" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="logradouro">Logradouro</label>
+                        <input type="text" id="logradouro" name="logradouro" value="<?php echo htmlspecialchars($store['logradouro'] ?? ''); ?>" required>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="numero">Número</label>
+                            <input type="text" id="numero" name="numero" value="<?php echo htmlspecialchars($store['numero'] ?? ''); ?>" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="complemento">Complemento</label>
+                            <input type="text" id="complemento" name="complemento" value="<?php echo htmlspecialchars($store['complemento'] ?? ''); ?>">
                         </div>
                     </div>
                     
@@ -723,17 +718,7 @@ $activeMenu = 'profile';
                 </form>
             </div>
         </div>
-        <?php if ($showDebugButton): ?>
-        <!-- Botão de Debug Temporário - REMOVER EM PRODUÇÃO -->
-        <div style="position: fixed; top: 10px; right: 10px; z-index: 9999;">
-            <a href="debug_endereco.php" 
-            style="background: #dc3545; color: white; padding: 8px 12px; 
-                    border-radius: 5px; text-decoration: none; font-size: 12px;
-                    box-shadow: 0 2px 5px rgba(0,0,0,0.2); font-weight: bold;">
-                🔬 DEBUG ENDEREÇO
-            </a>
-        </div>
-        <?php endif; ?>
+        
         <!-- Alteração de senha -->
         <div class="card">
             <div class="card-header">
@@ -775,7 +760,23 @@ $activeMenu = 'profile';
                     e.target.value = value;
                 });
                 
-                
+                // Buscar endereço por CEP
+                cepInput.addEventListener('blur', function(e) {
+                    const cep = e.target.value.replace(/\D/g, '');
+                    if (cep.length === 8) {
+                        fetch(`https://viacep.com.br/ws/${cep}/json/`)
+                            .then(response => response.json())
+                            .then(data => {
+                                if (!data.erro) {
+                                    document.getElementById('logradouro').value = data.logradouro || '';
+                                    document.getElementById('bairro').value = data.bairro || '';
+                                    document.getElementById('cidade').value = data.localidade || '';
+                                    document.getElementById('estado').value = data.uf || '';
+                                }
+                            })
+                            .catch(error => console.log('Erro ao buscar CEP:', error));
+                    }
+                });
             }
             
             // Máscara para telefone
