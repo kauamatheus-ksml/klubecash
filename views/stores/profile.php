@@ -216,7 +216,7 @@ $activeMenu = 'profile';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Perfil da Loja - Klube Cash</title>
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
-    
+    <link rel="stylesheet" href="../../assets/css/views/stores/profile.css">
     
 </head>
 <body>
