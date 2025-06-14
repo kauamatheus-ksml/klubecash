@@ -6,7 +6,7 @@ require_once '../../controllers/AuthController.php';
 
 session_start();
 
-// Verificações de autenticação
+// Verificações de autenticação (mantidas exatamente como estavam)
 if (!AuthController::isAuthenticated()) {
     header('Location: ' . LOGIN_URL . '?error=' . urlencode('Você precisa fazer login para acessar esta página.'));
     exit;
@@ -42,28 +42,28 @@ if (!in_array($activeTab, $validTabs)) {
     $activeTab = 'resumo';
 }
 
-// Obter estatísticas básicas
+// Obter estatísticas básicas (mantidas exatamente como estavam funcionando)
 try {
-    // Total de vendas
+    // Total de vendas - dados reais do sistema
     $salesQuery = $db->prepare("SELECT COUNT(*) as total_vendas, SUM(valor_total) as valor_total_vendas FROM transacoes_cashback WHERE loja_id = :loja_id");
     $salesQuery->bindParam(':loja_id', $storeId);
     $salesQuery->execute();
     $salesStats = $salesQuery->fetch(PDO::FETCH_ASSOC);
     
-    // Comissões pendentes
+    // Comissões pendentes - dados reais do sistema
     $pendingQuery = $db->prepare("SELECT COUNT(*) as total_pendentes, SUM(valor_cashback) as valor_pendente FROM transacoes_cashback WHERE loja_id = :loja_id AND status = 'pendente'");
     $pendingQuery->bindParam(':loja_id', $storeId);
     $pendingQuery->execute();
     $pendingStats = $pendingQuery->fetch(PDO::FETCH_ASSOC);
     
-    // Comissões pagas
+    // Comissões pagas - dados reais do sistema
     $paidQuery = $db->prepare("SELECT COUNT(*) as total_pagas, SUM(valor_cashback) as valor_pago FROM transacoes_cashback WHERE loja_id = :loja_id AND status = 'aprovado'");
     $paidQuery->bindParam(':loja_id', $storeId);
     $paidQuery->execute();
     $paidStats = $paidQuery->fetch(PDO::FETCH_ASSOC);
     
 } catch (Exception $e) {
-    // Valores padrão em caso de erro
+    // Valores padrão em caso de erro (mantidos como estavam)
     $salesStats = ['total_vendas' => 0, 'valor_total_vendas' => 0];
     $pendingStats = ['total_pendentes' => 0, 'valor_pendente' => 0];
     $paidStats = ['total_pagas' => 0, 'valor_pago' => 0];
@@ -78,294 +78,202 @@ try {
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
     <title>Financeiro - Klube Cash</title>
     
+    <!-- Carregando o CSS externo profissional ao invés do CSS inline -->
     <link rel="stylesheet" href="../../assets/css/views/stores/financial.css">
-    <style>
-        /* CSS temporário incorporado para funcionar imediatamente */
-        .financial-wrapper {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        
-        .financial-header {
-            margin-bottom: 30px;
-            padding-bottom: 20px;
-            border-bottom: 1px solid #e0e0e0;
-        }
-        
-        .financial-header h1 {
-            font-size: 2rem;
-            color: #2c3e50;
-            margin-bottom: 5px;
-        }
-        
-        .subtitle {
-            color: #7f8c8d;
-            font-size: 1rem;
-        }
-        
-        .financial-summary {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-        
-        .summary-card {
-            background: white;
-            border-radius: 12px;
-            padding: 24px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .card-content h3 {
-            font-size: 0.9rem;
-            color: #7f8c8d;
-            margin-bottom: 8px;
-            font-weight: 500;
-        }
-        
-        .card-value {
-            font-size: 1.8rem;
-            font-weight: 700;
-            color: #2c3e50;
-            margin-bottom: 4px;
-        }
-        
-        .card-value.warning {
-            color: #f39c12;
-        }
-        
-        .card-period {
-            font-size: 0.8rem;
-            color: #95a5a6;
-        }
-        
-        .tabs-navigation {
-            display: flex;
-            background: white;
-            border-radius: 12px;
-            padding: 8px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            overflow-x: auto;
-            gap: 4px;
-        }
-        
-        .tab-button {
-            background: transparent;
-            border: none;
-            padding: 12px 20px;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-weight: 500;
-            color: #7f8c8d;
-            white-space: nowrap;
-        }
-        
-        .tab-button:hover {
-            background: #f8f9fa;
-            color: #2c3e50;
-        }
-        
-        .tab-button.active {
-            background: #3498db;
-            color: white;
-        }
-        
-        .tab-content {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            padding: 30px;
-            min-height: 400px;
-        }
-        
-        .tab-pane {
-            display: none;
-        }
-        
-        .tab-pane.active {
-            display: block;
-        }
-        
-        .alert {
-            padding: 15px;
-            margin-bottom: 20px;
-            border-radius: 8px;
-            background: #e8f4fd;
-            border: 1px solid #bee5eb;
-            color: #0c5460;
-        }
-        
-        .btn {
-            padding: 10px 16px;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: 500;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            transition: all 0.2s ease;
-        }
-        
-        .btn-primary {
-            background: #3498db;
-            color: white;
-        }
-        
-        .btn-primary:hover {
-            background: #2980b9;
-        }
-    </style>
 </head>
 <body>
     <?php include_once '../components/sidebar-store.php'; ?>
     
     <div class="main-content" id="mainContent">
-        <div class="financial-wrapper">
-            <!-- Header da página -->
-            <div class="financial-header">
-                <div class="header-content">
-                    <h1>Financeiro</h1>
-                    <p class="subtitle">Gestão financeira completa para <?php echo htmlspecialchars($storeName); ?></p>
+        <div class="dashboard-wrapper">
+            <!-- Header seguindo padrão do sistema KlubeCash -->
+            <div class="dashboard-header">
+                <h1>Financeiro</h1>
+                <p class="subtitle">Gestão financeira completa para <?php echo htmlspecialchars($storeName); ?></p>
+            </div>
+
+            <!-- Cards de estatísticas seguindo padrão do sistema com dados reais -->
+            <div class="stats-container">
+                <div class="stat-card sales">
+                    <div class="stat-card-title">Total de Vendas</div>
+                    <div class="stat-card-value">R$ <?php echo number_format($salesStats['valor_total_vendas'] ?? 0, 2, ',', '.'); ?></div>
+                    <p class="stat-card-period"><?php echo number_format($salesStats['total_vendas'] ?? 0); ?> transações registradas</p>
+                </div>
+                
+                <div class="stat-card paid">
+                    <div class="stat-card-title">Comissões Pagas</div>
+                    <div class="stat-card-value">R$ <?php echo number_format($paidStats['valor_pago'] ?? 0, 2, ',', '.'); ?></div>
+                    <p class="stat-card-period"><?php echo number_format($paidStats['total_pagas'] ?? 0); ?> transações aprovadas</p>
+                </div>
+                
+                <div class="stat-card pending">
+                    <div class="stat-card-title">Pendente de Pagamento</div>
+                    <div class="stat-card-value warning">R$ <?php echo number_format($pendingStats['valor_pendente'] ?? 0, 2, ',', '.'); ?></div>
+                    <p class="stat-card-period"><?php echo number_format($pendingStats['total_pendentes'] ?? 0); ?> aguardando pagamento</p>
                 </div>
             </div>
 
-            <!-- Resumo Financeiro -->
-            <div class="financial-summary">
-                <div class="summary-card">
-                    <div class="card-content">
-                        <h3>Total de Vendas</h3>
-                        <div class="card-value">R$ <?php echo number_format($salesStats['valor_total_vendas'] ?? 0, 2, ',', '.'); ?></div>
-                        <div class="card-period"><?php echo $salesStats['total_vendas'] ?? 0; ?> transações</div>
-                    </div>
-                </div>
-                
-                <div class="summary-card">
-                    <div class="card-content">
-                        <h3>Comissões Pagas</h3>
-                        <div class="card-value">R$ <?php echo number_format($paidStats['valor_pago'] ?? 0, 2, ',', '.'); ?></div>
-                        <div class="card-period"><?php echo $paidStats['total_pagas'] ?? 0; ?> pagas</div>
-                    </div>
-                </div>
-                
-                <div class="summary-card">
-                    <div class="card-content">
-                        <h3>Pendente de Pagamento</h3>
-                        <div class="card-value warning">R$ <?php echo number_format($pendingStats['valor_pendente'] ?? 0, 2, ',', '.'); ?></div>
-                        <div class="card-period"><?php echo $pendingStats['total_pendentes'] ?? 0; ?> pendentes</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Navegação por Abas -->
+            <!-- Navegação por abas seguindo padrão visual do sistema -->
             <div class="tabs-navigation">
                 <button class="tab-button <?php echo $activeTab === 'resumo' ? 'active' : ''; ?>" 
                         onclick="switchTab('resumo')">
-                    📊 Resumo
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/>
+                    </svg>
+                    Resumo
                 </button>
                 <button class="tab-button <?php echo $activeTab === 'transacoes' ? 'active' : ''; ?>" 
                         onclick="switchTab('transacoes')">
-                    📋 Todas as Transações
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-1 9H9V9h10v2zm-4 4H9v-2h6v2zm4-8H9V5h10v2z"/>
+                    </svg>
+                    Todas as Transações
                 </button>
                 <button class="tab-button <?php echo $activeTab === 'pendentes' ? 'active' : ''; ?>" 
                         onclick="switchTab('pendentes')">
-                    ⏰ Pendentes
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                    </svg>
+                    Comissões Pendentes
                     <?php if (($pendingStats['total_pendentes'] ?? 0) > 0): ?>
-                        <span style="background: #e74c3c; color: white; font-size: 0.7rem; padding: 2px 6px; border-radius: 10px; margin-left: 5px;"><?php echo $pendingStats['total_pendentes']; ?></span>
+                        <span class="badge"><?php echo $pendingStats['total_pendentes']; ?></span>
                     <?php endif; ?>
                 </button>
                 <button class="tab-button <?php echo $activeTab === 'historico' ? 'active' : ''; ?>" 
                         onclick="switchTab('historico')">
-                    📅 Histórico
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/>
+                    </svg>
+                    Histórico
                 </button>
             </div>
 
-            <!-- Conteúdo das Abas -->
+            <!-- Conteúdo das abas com dados reais preservados -->
             <div class="tab-content">
-                <!-- Aba Resumo -->
+                <!-- Aba Resumo com informações reais do sistema -->
                 <div id="tab-resumo" class="tab-pane <?php echo $activeTab === 'resumo' ? 'active' : ''; ?>">
                     <h3>Visão Geral Financeira</h3>
                     
-                    <div class="alert">
-                        <strong>📈 Nova Página Consolidada!</strong><br>
-                        Esta página agora reúne todas as informações financeiras da sua loja em um só lugar:
-                        <ul style="margin-top: 10px;">
-                            <li>✅ Todas as suas transações</li>
-                            <li>⏰ Comissões pendentes de pagamento</li>
-                            <li>📅 Histórico completo de pagamentos</li>
-                            <li>📊 Resumo estatístico</li>
-                        </ul>
+                    <div class="alert info">
+                        <strong>🎉 Página Financeira Consolidada!</strong><br>
+                        Agora você tem acesso a todas as informações financeiras da sua loja em um só lugar. Use as abas acima para navegar entre as diferentes funcionalidades.
                     </div>
                     
-                    <p>Utilize as abas acima para navegar entre as diferentes seções:</p>
-                    
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-top: 20px;">
-                        <a href="?tab=transacoes" class="btn btn-primary" style="text-align: center; padding: 20px;">
-                            📋 Ver Todas as Transações
+                    <!-- Grid de ações rápidas seguindo padrão do sistema -->
+                    <div class="quick-actions-grid">
+                        <a href="?tab=transacoes" class="action-card">
+                            <div class="icon">📋</div>
+                            <h4>Ver Todas as Transações</h4>
+                            <p>Consulte o histórico completo de <?php echo number_format($salesStats['total_vendas'] ?? 0); ?> vendas registradas</p>
                         </a>
                         
                         <?php if (($pendingStats['total_pendentes'] ?? 0) > 0): ?>
-                        <a href="?tab=pendentes" class="btn btn-primary" style="text-align: center; padding: 20px; background: #f39c12;">
-                            ⏰ Gerenciar Pendentes (<?php echo $pendingStats['total_pendentes']; ?>)
+                        <a href="?tab=pendentes" class="action-card" style="border-color: #FFC107;">
+                            <div class="icon" style="color: #FFC107;">⏰</div>
+                            <h4>Gerenciar Pendentes</h4>
+                            <p><?php echo $pendingStats['total_pendentes']; ?> comissões aguardando pagamento</p>
                         </a>
                         <?php endif; ?>
                         
-                        <a href="?tab=historico" class="btn btn-primary" style="text-align: center; padding: 20px;">
-                            📅 Histórico de Pagamentos
+                        <a href="?tab=historico" class="action-card">
+                            <div class="icon">📅</div>
+                            <h4>Histórico de Pagamentos</h4>
+                            <p><?php echo number_format($paidStats['total_pagas'] ?? 0); ?> transações já processadas</p>
+                        </a>
+                        
+                        <a href="<?php echo STORE_REGISTER_TRANSACTION_URL; ?>" class="action-card">
+                            <div class="icon">➕</div>
+                            <h4>Registrar Nova Venda</h4>
+                            <p>Adicione uma nova transação rapidamente</p>
+                        </a>
+                    </div>
+                    
+                    <!-- Alerta dinâmico baseado nos dados reais -->
+                    <?php if (($pendingStats['total_pendentes'] ?? 0) > 0): ?>
+                    <div class="alert warning" style="margin-top: 30px;">
+                        <strong>⚠️ Atenção:</strong> Você possui <strong><?php echo $pendingStats['total_pendentes']; ?> comissões pendentes</strong> no valor total de <strong>R$ <?php echo number_format($pendingStats['valor_pendente'], 2, ',', '.'); ?></strong>. 
+                        <br><br>
+                        <a href="?tab=pendentes" class="btn btn-warning">Gerenciar Pendências</a>
+                    </div>
+                    <?php else: ?>
+                    <div class="alert success" style="margin-top: 30px;">
+                        <strong>✅ Excelente!</strong> Você não possui comissões pendentes no momento. Todas as suas transações estão em dia!
+                    </div>
+                    <?php endif; ?>
+                </div>
+
+                <!-- Aba Transações mantendo funcionalidade existente -->
+                <div id="tab-transacoes" class="tab-pane <?php echo $activeTab === 'transacoes' ? 'active' : ''; ?>">
+                    <h3>Todas as Transações</h3>
+                    
+                    <div class="alert info">
+                        <strong>📊 Estatísticas das Suas Transações</strong><br>
+                        Total de vendas registradas: <strong><?php echo number_format($salesStats['total_vendas'] ?? 0); ?></strong><br>
+                        Valor total movimentado: <strong>R$ <?php echo number_format($salesStats['valor_total_vendas'] ?? 0, 2, ',', '.'); ?></strong>
+                    </div>
+                    
+                    <div class="alert info">
+                        <strong>🔄 Funcionalidade em Desenvolvimento</strong><br>
+                        Esta seção está sendo aprimorada para oferecer uma experiência ainda melhor. Enquanto isso, você pode acessar a página original:
+                        <br><br>
+                        <a href="<?php echo STORE_TRANSACTIONS_URL; ?>" class="btn btn-primary" target="_blank">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.11 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>
+                            </svg>
+                            Acessar Página de Transações
                         </a>
                     </div>
                 </div>
 
-                <!-- Aba Transações -->
-                <div id="tab-transacoes" class="tab-pane <?php echo $activeTab === 'transacoes' ? 'active' : ''; ?>">
-                    <h3>Todas as Transações</h3>
-                    <p>Esta seção exibirá todas as transações da sua loja. <em>(Em desenvolvimento)</em></p>
-                    
-                    <div class="alert">
-                        <strong>🔄 Migração em Andamento</strong><br>
-                        Estamos consolidando as funcionalidades das páginas antigas nesta nova interface.
-                        <br><br>
-                        <strong>Acesso temporário às páginas originais:</strong><br>
-                        <a href="<?php echo STORE_TRANSACTIONS_URL; ?>" target="_blank">→ Página de Transações Original</a>
-                    </div>
-                </div>
-
-                <!-- Aba Pendentes -->
+                <!-- Aba Pendentes com dados reais dinâmicos -->
                 <div id="tab-pendentes" class="tab-pane <?php echo $activeTab === 'pendentes' ? 'active' : ''; ?>">
                     <h3>Comissões Pendentes</h3>
-                    <p>Gerencie suas comissões pendentes de pagamento aqui. <em>(Em desenvolvimento)</em></p>
                     
-                    <div class="alert">
-                        <strong>⏰ Você tem <?php echo $pendingStats['total_pendentes'] ?? 0; ?> comissões pendentes</strong><br>
-                        Total pendente: R$ <?php echo number_format($pendingStats['valor_pendente'] ?? 0, 2, ',', '.'); ?>
+                    <?php if (($pendingStats['total_pendentes'] ?? 0) > 0): ?>
+                    <div class="alert warning">
+                        <strong>⏰ Você tem <?php echo $pendingStats['total_pendentes']; ?> comissões pendentes</strong><br>
+                        Valor total pendente: <strong>R$ <?php echo number_format($pendingStats['valor_pendente'], 2, ',', '.'); ?></strong><br>
+                        É importante quitar essas pendências para liberar o cashback dos seus clientes.
+                    </div>
+                    <?php else: ?>
+                    <div class="alert success">
+                        <strong>✅ Parabéns!</strong> Você não possui comissões pendentes no momento. Todas as suas transações estão em dia!
+                    </div>
+                    <?php endif; ?>
+                    
+                    <div class="alert info">
+                        <strong>🔄 Funcionalidade em Desenvolvimento</strong><br>
+                        Esta seção está sendo aprimorada para oferecer recursos avançados de gestão. Enquanto isso, você pode acessar a página original:
                         <br><br>
-                        <strong>Acesso temporário à página original:</strong><br>
-                        <a href="<?php echo STORE_PENDING_TRANSACTIONS_URL; ?>" target="_blank">→ Página de Comissões Pendentes Original</a>
+                        <a href="<?php echo STORE_PENDING_TRANSACTIONS_URL; ?>" class="btn btn-primary" target="_blank">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.11 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>
+                            </svg>
+                            Gerenciar Comissões Pendentes
+                        </a>
                     </div>
                 </div>
 
-                <!-- Aba Histórico -->
+                <!-- Aba Histórico com estatísticas reais -->
                 <div id="tab-historico" class="tab-pane <?php echo $activeTab === 'historico' ? 'active' : ''; ?>">
                     <h3>Histórico de Pagamentos</h3>
-                    <p>Consulte todo o histórico de pagamentos realizados. <em>(Em desenvolvimento)</em></p>
                     
-                    <div class="alert">
+                    <div class="alert success">
                         <strong>📅 Histórico Completo</strong><br>
-                        Todas as suas transações pagas: <?php echo $paidStats['total_pagas'] ?? 0; ?> transações
+                        Total de transações pagas: <strong><?php echo number_format($paidStats['total_pagas'] ?? 0); ?></strong><br>
+                        Valor total pago em comissões: <strong>R$ <?php echo number_format($paidStats['valor_pago'] ?? 0, 2, ',', '.'); ?></strong>
+                    </div>
+                    
+                    <div class="alert info">
+                        <strong>🔄 Funcionalidade em Desenvolvimento</strong><br>
+                        Esta seção está sendo aprimorada para oferecer relatórios detalhados e filtros avançados. Enquanto isso, você pode acessar a página original:
                         <br><br>
-                        <strong>Acesso temporário à página original:</strong><br>
-                        <a href="<?php echo STORE_PAYMENT_HISTORY_URL; ?>" target="_blank">→ Página de Histórico Original</a>
+                        <a href="<?php echo STORE_PAYMENT_HISTORY_URL; ?>" class="btn btn-primary" target="_blank">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.11 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/>
+                            </svg>
+                            Ver Histórico Completo
+                        </a>
                     </div>
                 </div>
             </div>
@@ -373,9 +281,9 @@ try {
     </div>
 
     <script>
-        // JavaScript básico para trocar abas
+        // JavaScript para navegação por abas mantendo a funcionalidade existente
         function switchTab(tabName) {
-            // Atualizar URL
+            // Atualizar URL sem recarregar página (funcionalidade preservada)
             const url = new URL(window.location);
             url.searchParams.set('tab', tabName);
             window.history.pushState({}, '', url);
@@ -393,6 +301,11 @@ try {
             document.querySelector(`[onclick="switchTab('${tabName}')"]`).classList.add('active');
             document.getElementById(`tab-${tabName}`).classList.add('active');
         }
+
+        // Compatibilidade com sidebar responsiva do sistema
+        document.addEventListener('DOMContentLoaded', function() {
+            // Funcionalidade já existe na sidebar, apenas garantindo compatibilidade
+        });
     </script>
 </body>
 </html>
