@@ -69,6 +69,16 @@ if (!isset($activeMenu)) {
             </a>
         </li>
         <li>
+            <a href="<?php echo STORE_FINANCEIRO_URL; ?>" class="sidebar-nav-item <?php echo ($activeMenu == 'financeiro') ? 'active' : ''; ?>">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+                    <line x1="1" y1="10" x2="23" y2="10"></line>
+                </svg>
+                Financeiro
+            </a>
+        </li>
+        <!-- COMENTAR AS OPÇÕES ANTIGAS (NÃO REMOVER) 
+        <li>
             <a href="<?php echo STORE_TRANSACTIONS_URL; ?>" class="sidebar-nav-item <?php echo ($activeMenu == 'transactions') ? 'active' : ''; ?>">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
@@ -77,7 +87,7 @@ if (!isset($activeMenu)) {
                 </svg>
                 Transações
             </a>
-        </li>
+        </li>-->
         <!--<li>
             <a href="<?php echo STORE_BATCH_UPLOAD_URL; ?>" class="sidebar-nav-item <?php echo ($activeMenu == 'batch-upload') ? 'active' : ''; ?>">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -88,6 +98,7 @@ if (!isset($activeMenu)) {
                 Upload em Lote
             </a>
         </li>-->
+        <!-- COMENTAR AS OPÇÕES ANTIGAS (NÃO REMOVER) 
         <li>
             <a href="<?php echo STORE_PENDING_TRANSACTIONS_URL; ?>" class="sidebar-nav-item <?php echo ($activeMenu == 'pending-commissions') ? 'active' : ''; ?>">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -105,7 +116,7 @@ if (!isset($activeMenu)) {
                 </svg>
                 Histórico de Pagamentos
             </a>
-        </li>
+        </li>-->
         <!--
         <li>
             <a href="<?php echo STORE_PAYMENT_URL; ?>" class="sidebar-nav-item <?php echo ($activeMenu == 'payment') ? 'active' : ''; ?>">
