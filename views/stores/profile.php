@@ -1,5 +1,5 @@
 <?php
-// views/stores/profile.php - VERSÃO CORRIGIDA PARA RESOLVER ERRO loja_id NULL
+// views/stores/profile.php - VERSÃO COM PADRÃO PRG
 require_once '../../config/database.php';
 require_once '../../config/constants.php';
 require_once '../../controllers/AuthController.php';
@@ -21,7 +21,7 @@ $userId = $_SESSION['user_id'];
 // Obter dados da loja associada ao usuário
 $db = Database::getConnection();
 
-// CORREÇÃO 1: Função melhorada para buscar dados da loja com validações
+// Função para buscar dados atualizados da loja com validações
 function buscarDadosLoja($db, $userId) {
     try {
         // Primeiro, buscar os dados básicos da loja e usuário
@@ -38,7 +38,7 @@ function buscarDadosLoja($db, $userId) {
         
         $store = $storeQuery->fetch(PDO::FETCH_ASSOC);
         
-        // VALIDAÇÃO CRÍTICA: Verificar se encontrou a loja e se tem ID válido
+        // Verificar se encontrou a loja e se tem ID válido
         if (!$store || !isset($store['id']) || empty($store['id']) || $store['id'] <= 0) {
             error_log("ERRO: Loja não encontrada ou ID inválido para usuário $userId");
             return false;
@@ -60,9 +60,6 @@ function buscarDadosLoja($db, $userId) {
             $store = array_merge($store, $address);
         }
         
-        // Log de sucesso
-        error_log("Dados da loja carregados com sucesso - ID: " . $store['id']);
-        
         return $store;
         
     } catch (PDOException $e) {
@@ -74,14 +71,14 @@ function buscarDadosLoja($db, $userId) {
 // Buscar dados iniciais com validação robusta
 $store = buscarDadosLoja($db, $userId);
 
-// CORREÇÃO 2: Validação mais rigorosa dos dados da loja
+// Validação mais rigorosa dos dados da loja
 if (!$store || !isset($store['id']) || empty($store['id'])) {
     error_log("ERRO CRÍTICO: Loja não encontrada ou dados inválidos para usuário $userId");
     header('Location: ' . LOGIN_URL . '?error=' . urlencode('Sua conta não está associada a nenhuma loja válida. Entre em contato com o suporte.'));
     exit;
 }
 
-// CORREÇÃO 3: Garantir que storeId é um inteiro válido
+// Garantir que storeId é um inteiro válido
 $storeId = (int)$store['id'];
 if ($storeId <= 0) {
     error_log("ERRO CRÍTICO: ID da loja inválido - valor: " . $store['id']);
@@ -89,204 +86,219 @@ if ($storeId <= 0) {
     exit;
 }
 
-// Log para confirmar que temos um ID válido
-error_log("Loja carregada com sucesso - ID: $storeId, Nome: " . $store['nome_fantasia']);
-
-// Variáveis para mensagens
-$success = '';
-$error = '';
-
 // Processar formulário se enviado
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     
-    // CORREÇÃO 4: Validar storeId antes de qualquer operação
+    // Validar storeId antes de qualquer operação
     if ($storeId <= 0) {
-        $error = 'ID da loja inválido. Não é possível continuar.';
-        error_log("ERRO: Tentativa de operação com storeId inválido: $storeId");
-    } else {
-        try {
-            switch ($action) {
-                case 'update_contact':
-                    // Atualizar informações de contato
-                    $telefone = preg_replace('/\D/', '', trim($_POST['telefone'] ?? ''));
-                    $website = trim($_POST['website'] ?? '');
-                    $descricao = trim($_POST['descricao'] ?? '');
-                    
-                    // Validações
-                    if (empty($telefone)) {
-                        throw new Exception('Telefone é obrigatório.');
-                    }
-                    
-                    if (strlen($telefone) < 10 || strlen($telefone) > 11) {
-                        throw new Exception('Telefone inválido. Digite um telefone com DDD.');
-                    }
-                    
-                    if (!empty($website) && !filter_var($website, FILTER_VALIDATE_URL)) {
-                        throw new Exception('Website deve ser uma URL válida.');
-                    }
-                    
-                    // Atualizar no banco com binding explícito
-                    $updateStmt = $db->prepare("
-                        UPDATE lojas 
-                        SET telefone = :telefone, website = :website, descricao = :descricao
-                        WHERE id = :id
+        $_SESSION['profile_error'] = 'ID da loja inválido. Não é possível continuar.';
+        header('Location: ' . $_SERVER['PHP_SELF']);
+        exit;
+    }
+    
+    try {
+        switch ($action) {
+            case 'update_contact':
+                // Atualizar informações de contato
+                $telefone = preg_replace('/\D/', '', trim($_POST['telefone'] ?? ''));
+                $website = trim($_POST['website'] ?? '');
+                $descricao = trim($_POST['descricao'] ?? '');
+                
+                // Validações
+                if (empty($telefone)) {
+                    throw new Exception('Telefone é obrigatório.');
+                }
+                
+                if (strlen($telefone) < 10 || strlen($telefone) > 11) {
+                    throw new Exception('Telefone inválido. Digite um telefone com DDD.');
+                }
+                
+                if (!empty($website) && !filter_var($website, FILTER_VALIDATE_URL)) {
+                    throw new Exception('Website deve ser uma URL válida.');
+                }
+                
+                // Atualizar no banco com binding explícito
+                $updateStmt = $db->prepare("
+                    UPDATE lojas 
+                    SET telefone = :telefone, website = :website, descricao = :descricao
+                    WHERE id = :id
+                ");
+                
+                $updateStmt->bindParam(':telefone', $telefone, PDO::PARAM_STR);
+                $updateStmt->bindParam(':website', $website, PDO::PARAM_STR);
+                $updateStmt->bindParam(':descricao', $descricao, PDO::PARAM_STR);
+                $updateStmt->bindParam(':id', $storeId, PDO::PARAM_INT);
+                
+                if (!$updateStmt->execute()) {
+                    throw new Exception('Erro ao atualizar informações de contato.');
+                }
+                
+                // SOLUÇÃO PRG: Redirecionar com mensagem de sucesso na sessão
+                $_SESSION['profile_success'] = 'Informações de contato atualizadas com sucesso!';
+                header('Location: ' . $_SERVER['PHP_SELF']);
+                exit;
+                
+            case 'update_address':
+                // Validação e logs detalhados para endereço
+                error_log("INICIANDO atualização de endereço para loja ID: $storeId");
+                
+                $cep = preg_replace('/\D/', '', trim($_POST['cep'] ?? ''));
+                $logradouro = trim($_POST['logradouro'] ?? '');
+                $numero = trim($_POST['numero'] ?? '');
+                $complemento = trim($_POST['complemento'] ?? '');
+                $bairro = trim($_POST['bairro'] ?? '');
+                $cidade = trim($_POST['cidade'] ?? '');
+                $estado = trim($_POST['estado'] ?? '');
+                
+                // Validações
+                if (strlen($cep) != 8) {
+                    throw new Exception('CEP deve ter 8 dígitos.');
+                }
+                
+                if (empty($logradouro) || empty($numero) || empty($bairro) || empty($cidade) || empty($estado)) {
+                    throw new Exception('Todos os campos de endereço são obrigatórios, exceto complemento.');
+                }
+                
+                // Verificar se já existe endereço com log detalhado
+                $checkAddressStmt = $db->prepare("SELECT id FROM lojas_endereco WHERE loja_id = :loja_id");
+                $checkAddressStmt->bindParam(':loja_id', $storeId, PDO::PARAM_INT);
+                
+                if (!$checkAddressStmt->execute()) {
+                    throw new Exception('Erro ao verificar endereço existente.');
+                }
+                
+                $enderecoExiste = $checkAddressStmt->rowCount() > 0;
+                error_log("Endereço existe para loja $storeId: " . ($enderecoExiste ? 'SIM' : 'NÃO'));
+                
+                // Preparar statement com validação de parâmetros
+                if ($enderecoExiste) {
+                    // Atualizar endereço existente
+                    $updateAddressStmt = $db->prepare("
+                        UPDATE lojas_endereco 
+                        SET cep = :cep, logradouro = :logradouro, numero = :numero, 
+                            complemento = :complemento, bairro = :bairro, cidade = :cidade, estado = :estado
+                        WHERE loja_id = :loja_id
                     ");
-                    
-                    $updateStmt->bindParam(':telefone', $telefone, PDO::PARAM_STR);
-                    $updateStmt->bindParam(':website', $website, PDO::PARAM_STR);
-                    $updateStmt->bindParam(':descricao', $descricao, PDO::PARAM_STR);
-                    $updateStmt->bindParam(':id', $storeId, PDO::PARAM_INT);
-                    
-                    if (!$updateStmt->execute()) {
-                        throw new Exception('Erro ao atualizar informações de contato.');
-                    }
-                    
-                    $success = 'Informações de contato atualizadas com sucesso!';
-                    // Recarregar dados
-                    $store = buscarDadosLoja($db, $userId);
-                    break;
-                    
-                case 'update_address':
-                    // CORREÇÃO 5: Validação e logs detalhados para endereço
-                    error_log("INICIANDO atualização de endereço para loja ID: $storeId");
-                    
-                    $cep = preg_replace('/\D/', '', trim($_POST['cep'] ?? ''));
-                    $logradouro = trim($_POST['logradouro'] ?? '');
-                    $numero = trim($_POST['numero'] ?? '');
-                    $complemento = trim($_POST['complemento'] ?? '');
-                    $bairro = trim($_POST['bairro'] ?? '');
-                    $cidade = trim($_POST['cidade'] ?? '');
-                    $estado = trim($_POST['estado'] ?? '');
-                    
-                    // Validações
-                    if (strlen($cep) != 8) {
-                        throw new Exception('CEP deve ter 8 dígitos.');
-                    }
-                    
-                    if (empty($logradouro) || empty($numero) || empty($bairro) || empty($cidade) || empty($estado)) {
-                        throw new Exception('Todos os campos de endereço são obrigatórios, exceto complemento.');
-                    }
-                    
-                    // CORREÇÃO 6: Verificar se já existe endereço com log detalhado
-                    $checkAddressStmt = $db->prepare("SELECT id FROM lojas_endereco WHERE loja_id = :loja_id");
-                    $checkAddressStmt->bindParam(':loja_id', $storeId, PDO::PARAM_INT);
-                    
-                    if (!$checkAddressStmt->execute()) {
-                        throw new Exception('Erro ao verificar endereço existente.');
-                    }
-                    
-                    $enderecoExiste = $checkAddressStmt->rowCount() > 0;
-                    error_log("Endereço existe para loja $storeId: " . ($enderecoExiste ? 'SIM' : 'NÃO'));
-                    
-                    // CORREÇÃO 7: Preparar statement com validação de parâmetros
-                    if ($enderecoExiste) {
-                        // Atualizar endereço existente
-                        $updateAddressStmt = $db->prepare("
-                            UPDATE lojas_endereco 
-                            SET cep = :cep, logradouro = :logradouro, numero = :numero, 
-                                complemento = :complemento, bairro = :bairro, cidade = :cidade, estado = :estado
-                            WHERE loja_id = :loja_id
-                        ");
-                        error_log("Preparando UPDATE para loja ID: $storeId");
-                    } else {
-                        // Inserir novo endereço
-                        $updateAddressStmt = $db->prepare("
-                            INSERT INTO lojas_endereco (loja_id, cep, logradouro, numero, complemento, bairro, cidade, estado)
-                            VALUES (:loja_id, :cep, :logradouro, :numero, :complemento, :bairro, :cidade, :estado)
-                        ");
-                        error_log("Preparando INSERT para loja ID: $storeId");
-                    }
-                    
-                    // CORREÇÃO 8: Binding com validação de tipos e logs
-                    $updateAddressStmt->bindParam(':loja_id', $storeId, PDO::PARAM_INT);
-                    $updateAddressStmt->bindParam(':cep', $cep, PDO::PARAM_STR);
-                    $updateAddressStmt->bindParam(':logradouro', $logradouro, PDO::PARAM_STR);
-                    $updateAddressStmt->bindParam(':numero', $numero, PDO::PARAM_STR);
-                    $updateAddressStmt->bindParam(':complemento', $complemento, PDO::PARAM_STR);
-                    $updateAddressStmt->bindParam(':bairro', $bairro, PDO::PARAM_STR);
-                    $updateAddressStmt->bindParam(':cidade', $cidade, PDO::PARAM_STR);
-                    $updateAddressStmt->bindParam(':estado', $estado, PDO::PARAM_STR);
-                    
-                    // Log dos valores que estão sendo enviados
-                    error_log("Valores sendo enviados - loja_id: $storeId, cep: $cep, cidade: $cidade");
-                    
-                    // Executar com tratamento de erro
-                    if (!$updateAddressStmt->execute()) {
-                        $errorInfo = $updateAddressStmt->errorInfo();
-                        error_log("ERRO SQL ao salvar endereço: " . implode(' - ', $errorInfo));
-                        throw new Exception('Erro ao salvar endereço no banco de dados: ' . $errorInfo[2]);
-                    }
-                    
-                    error_log("Endereço salvo com SUCESSO para loja ID: $storeId");
-                    $success = 'Endereço atualizado com sucesso!';
-                    
-                    // Recarregar dados
-                    $store = buscarDadosLoja($db, $userId);
-                    // Atualizar storeId após recarregar
-                    $storeId = (int)$store['id'];
-                    break;
-                    
-                case 'change_password':
-                    // Alterar senha (sem alterações, já funcionava)
-                    $senhaAtual = $_POST['senha_atual'] ?? '';
-                    $novaSenha = $_POST['nova_senha'] ?? '';
-                    $confirmarSenha = $_POST['confirmar_senha'] ?? '';
-                    
-                    // Validações
-                    if (empty($senhaAtual) || empty($novaSenha) || empty($confirmarSenha)) {
-                        throw new Exception('Todos os campos de senha são obrigatórios.');
-                    }
-                    
-                    if ($novaSenha !== $confirmarSenha) {
-                        throw new Exception('A confirmação de senha não confere.');
-                    }
-                    
-                    if (strlen($novaSenha) < 8) {
-                        throw new Exception('Nova senha deve ter pelo menos 8 caracteres.');
-                    }
-                    
-                    // Verificar senha atual
-                    $checkPasswordStmt = $db->prepare("SELECT senha_hash FROM usuarios WHERE id = :id");
-                    $checkPasswordStmt->bindParam(':id', $userId, PDO::PARAM_INT);
-                    $checkPasswordStmt->execute();
-                    
-                    if ($checkPasswordStmt->rowCount() === 0) {
-                        throw new Exception('Usuário não encontrado.');
-                    }
-                    
-                    $currentPasswordHash = $checkPasswordStmt->fetchColumn();
-                    
-                    if (!password_verify($senhaAtual, $currentPasswordHash)) {
-                        throw new Exception('Senha atual incorreta.');
-                    }
-                    
-                    // Atualizar senha
-                    $newPasswordHash = password_hash($novaSenha, PASSWORD_DEFAULT, ['cost' => 12]);
-                    $updatePasswordStmt = $db->prepare("UPDATE usuarios SET senha_hash = :senha_hash WHERE id = :id");
-                    $updatePasswordStmt->bindParam(':senha_hash', $newPasswordHash, PDO::PARAM_STR);
-                    $updatePasswordStmt->bindParam(':id', $userId, PDO::PARAM_INT);
-                    
-                    if (!$updatePasswordStmt->execute()) {
-                        throw new Exception('Erro ao atualizar senha.');
-                    }
-                    
-                    $success = 'Senha alterada com sucesso!';
-                    break;
-                    
-                default:
-                    throw new Exception('Ação inválida.');
-            }
-            
-        } catch (Exception $e) {
-            $error = $e->getMessage();
-            error_log("Erro na operação $action: " . $e->getMessage());
-        } catch (PDOException $e) {
-            $error = 'Erro interno do banco de dados. Tente novamente.';
-            error_log('Erro PDO no profile da loja: ' . $e->getMessage());
+                    error_log("Preparando UPDATE para loja ID: $storeId");
+                } else {
+                    // Inserir novo endereço
+                    $updateAddressStmt = $db->prepare("
+                        INSERT INTO lojas_endereco (loja_id, cep, logradouro, numero, complemento, bairro, cidade, estado)
+                        VALUES (:loja_id, :cep, :logradouro, :numero, :complemento, :bairro, :cidade, :estado)
+                    ");
+                    error_log("Preparando INSERT para loja ID: $storeId");
+                }
+                
+                // Binding com validação de tipos e logs
+                $updateAddressStmt->bindParam(':loja_id', $storeId, PDO::PARAM_INT);
+                $updateAddressStmt->bindParam(':cep', $cep, PDO::PARAM_STR);
+                $updateAddressStmt->bindParam(':logradouro', $logradouro, PDO::PARAM_STR);
+                $updateAddressStmt->bindParam(':numero', $numero, PDO::PARAM_STR);
+                $updateAddressStmt->bindParam(':complemento', $complemento, PDO::PARAM_STR);
+                $updateAddressStmt->bindParam(':bairro', $bairro, PDO::PARAM_STR);
+                $updateAddressStmt->bindParam(':cidade', $cidade, PDO::PARAM_STR);
+                $updateAddressStmt->bindParam(':estado', $estado, PDO::PARAM_STR);
+                
+                // Executar com tratamento de erro
+                if (!$updateAddressStmt->execute()) {
+                    $errorInfo = $updateAddressStmt->errorInfo();
+                    error_log("ERRO SQL ao salvar endereço: " . implode(' - ', $errorInfo));
+                    throw new Exception('Erro ao salvar endereço no banco de dados: ' . $errorInfo[2]);
+                }
+                
+                error_log("Endereço salvo com SUCESSO para loja ID: $storeId");
+                
+                // SOLUÇÃO PRG: Redirecionar com mensagem de sucesso na sessão
+                $_SESSION['profile_success'] = 'Endereço atualizado com sucesso!';
+                header('Location: ' . $_SERVER['PHP_SELF']);
+                exit;
+                
+            case 'change_password':
+                // Alterar senha
+                $senhaAtual = $_POST['senha_atual'] ?? '';
+                $novaSenha = $_POST['nova_senha'] ?? '';
+                $confirmarSenha = $_POST['confirmar_senha'] ?? '';
+                
+                // Validações
+                if (empty($senhaAtual) || empty($novaSenha) || empty($confirmarSenha)) {
+                    throw new Exception('Todos os campos de senha são obrigatórios.');
+                }
+                
+                if ($novaSenha !== $confirmarSenha) {
+                    throw new Exception('A confirmação de senha não confere.');
+                }
+                
+                if (strlen($novaSenha) < 8) {
+                    throw new Exception('Nova senha deve ter pelo menos 8 caracteres.');
+                }
+                
+                // Verificar senha atual
+                $checkPasswordStmt = $db->prepare("SELECT senha_hash FROM usuarios WHERE id = :id");
+                $checkPasswordStmt->bindParam(':id', $userId, PDO::PARAM_INT);
+                $checkPasswordStmt->execute();
+                
+                if ($checkPasswordStmt->rowCount() === 0) {
+                    throw new Exception('Usuário não encontrado.');
+                }
+                
+                $currentPasswordHash = $checkPasswordStmt->fetchColumn();
+                
+                if (!password_verify($senhaAtual, $currentPasswordHash)) {
+                    throw new Exception('Senha atual incorreta.');
+                }
+                
+                // Atualizar senha
+                $newPasswordHash = password_hash($novaSenha, PASSWORD_DEFAULT, ['cost' => 12]);
+                $updatePasswordStmt = $db->prepare("UPDATE usuarios SET senha_hash = :senha_hash WHERE id = :id");
+                $updatePasswordStmt->bindParam(':senha_hash', $newPasswordHash, PDO::PARAM_STR);
+                $updatePasswordStmt->bindParam(':id', $userId, PDO::PARAM_INT);
+                
+                if (!$updatePasswordStmt->execute()) {
+                    throw new Exception('Erro ao atualizar senha.');
+                }
+                
+                // SOLUÇÃO PRG: Redirecionar com mensagem de sucesso na sessão
+                $_SESSION['profile_success'] = 'Senha alterada com sucesso!';
+                header('Location: ' . $_SERVER['PHP_SELF']);
+                exit;
+                
+            default:
+                throw new Exception('Ação inválida.');
         }
+        
+    } catch (Exception $e) {
+        // SOLUÇÃO PRG: Redirecionar com mensagem de erro na sessão
+        $_SESSION['profile_error'] = $e->getMessage();
+        error_log("Erro na operação $action: " . $e->getMessage());
+        header('Location: ' . $_SERVER['PHP_SELF']);
+        exit;
+    } catch (PDOException $e) {
+        // SOLUÇÃO PRG: Redirecionar com mensagem de erro na sessão
+        $_SESSION['profile_error'] = 'Erro interno do banco de dados. Tente novamente.';
+        error_log('Erro PDO no profile da loja: ' . $e->getMessage());
+        header('Location: ' . $_SERVER['PHP_SELF']);
+        exit;
     }
 }
+
+// SOLUÇÃO PRG: Recuperar mensagens da sessão e limpar
+$success = '';
+$error = '';
+
+if (isset($_SESSION['profile_success'])) {
+    $success = $_SESSION['profile_success'];
+    unset($_SESSION['profile_success']); // Limpar da sessão
+}
+
+if (isset($_SESSION['profile_error'])) {
+    $error = $_SESSION['profile_error'];
+    unset($_SESSION['profile_error']); // Limpar da sessão
+}
+
+// Recarregar dados da loja após possíveis alterações
+$store = buscarDadosLoja($db, $userId);
+$storeId = (int)$store['id'];
 
 // Definir menu ativo
 $activeMenu = 'profile';
