@@ -49,19 +49,6 @@ if (isset($_GET['valor_max']) && !empty($_GET['valor_max'])) {
 
 $result = TransactionController::getPendingTransactionsWithBalance($storeId, $filters, $page);
 
-// NOVO: Buscar pagamentos PIX pendentes (ficam visíveis até aprovação)
-$paymentsQuery = $db->prepare("
-    SELECT p.*, COUNT(DISTINCT t.id) as transactions_count
-    FROM pagamentos_comissao p
-    LEFT JOIN transacoes_cashback t ON FIND_IN_SET(t.id, REPLACE(REPLACE(JSON_EXTRACT(p.transacoes_incluidas, '$.transaction_ids'), '[', ''), ']', ''))
-    WHERE p.loja_id = ? 
-    AND p.status IN ('pendente', 'pix_aguardando', 'pix_expirado')
-    GROUP BY p.id
-    ORDER BY p.data_registro DESC
-");
-$paymentsQuery->execute([$storeId]);
-$pendingPayments = $paymentsQuery->fetchAll(PDO::FETCH_ASSOC);
-
 $totalTransacoes = 0;
 $totalValorVendas = 0;
 $totalValorComissoes = 0;
@@ -94,135 +81,9 @@ if ($result['status'] && isset($result['data']['totais'])) {
     <div class="main-content" id="mainContent">
         <div class="dashboard-wrapper">
             <div class="dashboard-header">
-                <h1>
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="10"/>
-                        <path d="M12 6v6l4 2"/>
-                    </svg>
-                    Comissões Pendentes
-                </h1>
-                <p class="subtitle">Gerenciar comissões pendentes de pagamento para <?php echo htmlspecialchars($storeName); ?> - Transações ficam visíveis até aprovação</p>
+                <h1>Comissões Pendentes</h1>
+                <p class="subtitle">Gerenciar comissões pendentes de pagamento para <?php echo htmlspecialchars($storeName); ?></p>
             </div>
-            
-            <!-- NOVO: Alerta sobre transações pendentes -->
-            <?php if (!empty($pendingPayments)): ?>
-            <div class="alert-section">
-                <div class="alert alert-warning">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                        <line x1="12" y1="9" x2="12" y2="13"/>
-                        <line x1="12" y1="17" x2="12.01" y2="17"/>
-                    </svg>
-                    <div>
-                        <strong>💡 Atenção:</strong> Você tem <?php echo count($pendingPayments); ?> pagamento(s) PIX aguardando confirmação. 
-                        <strong>Transações permanecem visíveis até aprovação.</strong> Clique em "Pagar PIX" para gerar um novo código.
-                    </div>
-                </div>
-            </div>
-            <?php endif; ?>
-
-            <!-- NOVO: Seção de Pagamentos PIX Pendentes -->
-            <?php if (!empty($pendingPayments)): ?>
-            <div class="card payments-pending-section">
-                <div class="card-header">
-                    <div class="card-title">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/>
-                            <line x1="1" y1="10" x2="23" y2="10"/>
-                        </svg>
-                        Pagamentos PIX Aguardando Confirmação
-                    </div>
-                    <span class="payments-count"><?php echo count($pendingPayments); ?> pagamento(s)</span>
-                </div>
-                
-                <div class="payments-grid">
-                    <?php foreach ($pendingPayments as $payment): ?>
-                    <div class="payment-card status-<?php echo $payment['status']; ?>">
-                        <div class="payment-header">
-                            <div class="payment-info">
-                                <h3>Pagamento #<?php echo $payment['id']; ?></h3>
-                                <span class="payment-status <?php echo $payment['status']; ?>">
-                                    <?php
-                                    switch($payment['status']) {
-                                        case 'pix_aguardando': echo '⏳ PIX Aguardando Pagamento'; break;
-                                        case 'pix_expirado': echo '⏰ PIX Expirado'; break;
-                                        case 'pendente': echo '📋 Aguardando Geração PIX'; break;
-                                        default: echo ucfirst($payment['status']);
-                                    }
-                                    ?>
-                                </span>
-                            </div>
-                            <div class="payment-amount">
-                                <span class="amount-label">Valor</span>
-                                <span class="amount-value">R$ <?php echo number_format($payment['valor_total'], 2, ',', '.'); ?></span>
-                            </div>
-                        </div>
-                        
-                        <div class="payment-details">
-                            <div class="detail-row">
-                                <span class="detail-label">Transações incluídas:</span>
-                                <span class="detail-value"><?php echo $payment['transactions_count']; ?> transação(ões)</span>
-                            </div>
-                            <div class="detail-row">
-                                <span class="detail-label">Criado em:</span>
-                                <span class="detail-value"><?php echo date('d/m/Y H:i', strtotime($payment['data_registro'])); ?></span>
-                            </div>
-                            <?php if (!empty($payment['mp_payment_id'])): ?>
-                            <div class="detail-row">
-                                <span class="detail-label">ID Mercado Pago:</span>
-                                <span class="detail-value mp-id"><?php echo $payment['mp_payment_id']; ?></span>
-                            </div>
-                            <?php endif; ?>
-                        </div>
-                        
-                        <div class="payment-actions">
-                            <!-- BOTÃO PRINCIPAL: Sempre disponível para gerar novo PIX -->
-                            <a href="<?php echo STORE_PAYMENT_PIX_URL; ?>?payment_id=<?php echo $payment['id']; ?>" 
-                               class="btn btn-primary btn-pix">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/>
-                                    <line x1="1" y1="10" x2="23" y2="10"/>
-                                </svg>
-                                <?php 
-                                if ($payment['status'] === 'pix_expirado') {
-                                    echo 'Gerar Novo PIX';
-                                } elseif ($payment['status'] === 'pix_aguardando') {
-                                    echo 'Pagar PIX / Gerar Novo';
-                                } else {
-                                    echo 'Gerar PIX';
-                                }
-                                ?>
-                            </a>
-                            
-                            <!-- Botão de verificar status (se já tem PIX) -->
-                            <?php if (!empty($payment['mp_payment_id']) && $payment['status'] === 'pix_aguardando'): ?>
-                            <button onclick="checkPaymentStatus(<?php echo $payment['id']; ?>, '<?php echo $payment['mp_payment_id']; ?>')" 
-                                    class="btn btn-outline btn-check">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <polyline points="23 4 23 10 17 10"/>
-                                    <polyline points="1 20 1 14 7 14"/>
-                                    <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/>
-                                </svg>
-                                Verificar Status
-                            </button>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                    <?php endforeach; ?>
-                </div>
-                
-                <div class="payments-info">
-                    <div class="info-item">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="10"/>
-                            <path d="M12 16v-4"/>
-                            <path d="M12 8h.01"/>
-                        </svg>
-                        <span><strong>Importante:</strong> Cada clique em "Pagar PIX" gera um novo código de pagamento. Pagamentos ficam visíveis até confirmação.</span>
-                    </div>
-                </div>
-            </div>
-            <?php endif; ?>
             
             <div class="stats-container">
                 <div class="stat-card">
@@ -287,10 +148,14 @@ if ($result['status'] && isset($result['data']['totais'])) {
             
             <div class="card transactions-container">
                 <div class="card-header">
-                    <div class="card-title">Transações Aguardando Pagamento de Comissão</div>
+                    <div class="card-title">Transações Pendentes de Pagamento</div>
                     <?php if ($totalTransacoes > 0): ?>
                     <div style="display: flex; gap: 1rem;">
+                        <!--<button id="paySelectedBtn" class="btn btn-primary" disabled>Pagar Selecionadas</button>-->
                         <button id="payPixBtn" class="btn btn-success" disabled>Pagar via PIX</button>
+                        <!--<button type="button" class="btn btn-success" id="btnPixOpenpix">
+                            🔥 Pagar via PIX 2
+                        </button>-->
                     </div>
                     <?php endif; ?>
                 </div>
@@ -436,16 +301,6 @@ if ($result['status'] && isset($result['data']['totais'])) {
                 <div class="collapsible-content" id="infoSectionContent" style="display: none;">
                     <div class="info-content">
                         <div class="info-section">
-                            <h4>🔄 Como funciona o novo sistema de pagamento PIX:</h4>
-                            <ul>
-                                <li><strong>Transações ficam visíveis:</strong> Suas transações pendentes não somem até serem aprovadas</li>
-                                <li><strong>Novo PIX a cada clique:</strong> Cada vez que você clica em "Pagar PIX", um novo código é gerado</li>
-                                <li><strong>Múltiplas tentativas:</strong> Você pode tentar pagar quantas vezes quiser</li>
-                                <li><strong>Aprovação automática:</strong> Assim que o PIX for confirmado, o cashback é liberado instantaneamente</li>
-                            </ul>
-                        </div>
-                        
-                        <div class="info-section">
                             <h4>📊 Como são calculadas as comissões:</h4>
                             <ul>
                                 <li>A comissão é de <strong>10%</strong> calculada apenas sobre o valor efetivamente cobrado do cliente</li>
@@ -475,12 +330,12 @@ if ($result['status'] && isset($result['data']['totais'])) {
                         </div>
                         
                         <div class="info-section">
-                            <h4>🔄 Processo de pagamento melhorado:</h4>
+                            <h4>🔄 Processo de pagamento:</h4>
                             <ul>
                                 <li>Selecione as transações que deseja quitar</li>
-                                <li>Clique em "Pagar via PIX" para gerar um código de pagamento</li>
-                                <li><strong>Pode gerar novos PIX quantas vezes precisar</strong></li>
-                                <li>Após o pagamento ser confirmado, o cashback é liberado automaticamente</li>
+                                <li>O valor total será a soma das comissões de todas as transações selecionadas</li>
+                                <li>Após o pagamento e aprovação, o cashback será liberado para os clientes</li>
+                                <li>Clientes poderão usar o cashback apenas na sua loja</li>
                             </ul>
                         </div>
                         
@@ -490,7 +345,7 @@ if ($result['status'] && isset($result['data']['totais'])) {
                                 <li>Realize pagamentos regularmente para manter o fluxo de cashback dos clientes</li>
                                 <li>Monitore vendas com uso de saldo - indicam clientes fidelizados</li>
                                 <li>O valor da economia gerada aos clientes também beneficia sua loja com mais vendas</li>
-                                <li>Se um PIX expirar, simplesmente clique novamente para gerar um novo</li>
+                                <li>Clientes com saldo disponível tendem a retornar mais à sua loja</li>
                             </ul>
                         </div>
                     </div>
@@ -504,7 +359,9 @@ if ($result['status'] && isset($result['data']['totais'])) {
     document.addEventListener('DOMContentLoaded', function() {
         const selectAllCheckbox = document.getElementById('selectAll');
         const transactionCheckboxes = document.querySelectorAll('.transaction-checkbox');
+        const paySelectedBtn = document.getElementById('paySelectedBtn');
         const payPixBtn = document.getElementById('payPixBtn');
+        const btnPixOpenpix = document.getElementById('btnPixOpenpix');
         const paymentForm = document.getElementById('paymentForm');
         const paymentSummary = document.getElementById('paymentSummary');
         
@@ -546,7 +403,9 @@ if ($result['status'] && isset($result['data']['totais'])) {
             document.getElementById('totalBalanceUsed').textContent = formatCurrency(totalBalanceUsed);
             document.getElementById('totalCommissionValue').textContent = formatCurrency(totalCommission);
             
+            if (paySelectedBtn) paySelectedBtn.disabled = selectedCount === 0;
             if (payPixBtn) payPixBtn.disabled = selectedCount === 0;
+            if (btnPixOpenpix) btnPixOpenpix.disabled = selectedCount === 0;
             
             if (selectedCount > 0) {
                 paymentSummary.style.display = 'block';
@@ -574,6 +433,14 @@ if ($result['status'] && isset($result['data']['totais'])) {
             });
         });
         
+        if (paySelectedBtn) {
+            paySelectedBtn.addEventListener('click', function() {
+                if (document.querySelectorAll('.transaction-checkbox:checked').length > 0) {
+                    paymentForm.submit();
+                }
+            });
+        }
+        
         if (payPixBtn) {
             payPixBtn.addEventListener('click', function() {
                 const selected = document.querySelectorAll('.transaction-checkbox:checked');
@@ -583,7 +450,25 @@ if ($result['status'] && isset($result['data']['totais'])) {
             });
         }
 
-        // NOVO: Função para criar pagamento PIX (gera novo a cada clique)
+        // OpenPix Button Handler
+        if (btnPixOpenpix) {
+            btnPixOpenpix.addEventListener('click', function() {
+                const selectedCheckboxes = document.querySelectorAll('.transaction-checkbox:checked');
+                
+                if (selectedCheckboxes.length === 0) {
+                    alert('Selecione pelo menos uma transação para pagar');
+                    return;
+                }
+                
+                if (selectedCheckboxes.length > 1) {
+                    alert('OpenPix: Selecione apenas uma transação por vez para pagamento via PIX');
+                    return;
+                }
+                
+                createPaymentAndUseOpenPix();
+            });
+        }
+
         async function createPixPayment() {
             const selectedCheckboxes = document.querySelectorAll('.transaction-checkbox:checked');
             let totalCommission = 0;
@@ -597,14 +482,9 @@ if ($result['status'] && isset($result['data']['totais'])) {
                 return;
             }
 
-            // Mostrar loading
-            payPixBtn.disabled = true;
-            payPixBtn.innerHTML = '<span class="loading-spinner"></span> Criando PIX...';
-
             const formData = new FormData(paymentForm);
             formData.append('metodo_pagamento', 'pix_mercadopago');
             formData.append('valor_total', totalCommission.toFixed(2));
-            formData.append('force_new_payment', 'true'); // NOVO: Força criar novo pagamento
 
             try {
                 const response = await fetch('../../api/store-payment.php', {
@@ -616,53 +496,45 @@ if ($result['status'] && isset($result['data']['totais'])) {
                 const result = await response.json();
                 
                 if (result.status) {
-                    // Redirecionar para página de PIX
                     window.location.href = `../../store/pagamento-pix?payment_id=${result.data.payment_id}`;
                 } else {
                     alert('Erro: ' + result.message);
-                    // Restaurar botão
-                    payPixBtn.disabled = false;
-                    payPixBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/>
-                        <line x1="1" y1="10" x2="23" y2="10"/>
-                    </svg> Pagar via PIX`;
                 }
             } catch (error) {
                 console.error('Erro na requisição:', error);
                 alert('Erro de conexão: ' + error.message);
-                // Restaurar botão
-                payPixBtn.disabled = false;
-                payPixBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/>
-                    <line x1="1" y1="10" x2="23" y2="10"/>
-                </svg> Pagar via PIX`;
             }
         }
 
-        // NOVO: Função para verificar status de pagamento PIX
-        async function checkPaymentStatus(paymentId, mpPaymentId) {
-            try {
-                const response = await fetch(`../../api/payment-status.php?payment_id=${paymentId}&mp_payment_id=${mpPaymentId}`);
-                const result = await response.json();
-                
-                if (result.status && result.data.status === 'approved') {
-                    alert('✅ Pagamento PIX confirmado! A página será recarregada para mostrar o status atualizado.');
-                    window.location.reload();
-                } else if (result.data && result.data.status === 'pending') {
-                    alert('⏳ Pagamento PIX ainda está pendente. Continue aguardando ou tente gerar um novo PIX.');
-                } else if (result.data && result.data.status === 'rejected') {
-                    alert('❌ Pagamento PIX foi rejeitado. Gere um novo PIX para tentar novamente.');
+        function createPaymentAndUseOpenPix() {
+            const formData = new FormData();
+            formData.append('action', 'criar_pagamento');
+            formData.append('metodo_pagamento', 'pix_openpix');
+            formData.append('loja_id', '<?php echo $storeId; ?>');
+            
+            document.querySelectorAll('.transaction-checkbox:checked').forEach(checkbox => {
+                formData.append('transacoes[]', checkbox.value);
+            });
+            
+            // CORREÇÃO: Usar caminho absoluto
+            fetch('/api/payments.php', {
+                method: 'POST',
+                body: formData,
+                credentials: 'same-origin'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status) {
+                    openPixIntegration.createCharge(data.payment_id);
                 } else {
-                    alert('ℹ️ Status atual: ' + (result.data ? result.data.status : 'Desconhecido'));
+                    alert('Erro: ' + data.message);
                 }
-            } catch (error) {
-                console.error('Erro ao verificar status:', error);
-                alert('Erro ao verificar status do pagamento. Tente novamente.');
-            }
+            })
+            .catch(error => {
+                alert('Erro de conexão');
+                console.error(error);
+            });
         }
-
-        // Tornar função global para uso nos botões
-        window.checkPaymentStatus = checkPaymentStatus;
         
         updatePaymentSummary();
         
@@ -676,23 +548,6 @@ if ($result['status'] && isset($result['data']['totais'])) {
             icon.classList.add('open');
             card.classList.add('expanded');
         }
-
-        // NOVO: Auto-refresh para verificar status dos pagamentos PIX
-        <?php if (!empty($pendingPayments)): ?>
-        setInterval(() => {
-            // Verificar silenciosamente se algum pagamento foi aprovado
-            fetch(`../../api/payment-status.php?check_all=1&store_id=<?php echo $storeId; ?>`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.has_updates) {
-                        // Mostrar notificação e recarregar página
-                        alert('✅ Novo pagamento aprovado! A página será recarregada.');
-                        window.location.reload();
-                    }
-                })
-                .catch(error => console.log('Status check error:', error));
-        }, <?php echo defined('PIX_AUTO_REFRESH_SECONDS') ? PIX_AUTO_REFRESH_SECONDS * 1000 : 15000; ?>);
-        <?php endif; ?>
     });
 
     function toggleInfoSection() {
@@ -729,210 +584,6 @@ if ($result['status'] && isset($result['data']['totais'])) {
     </script>
     
     <style>
-        /* NOVOS ESTILOS PARA SEÇÃO DE PAGAMENTOS PIX */
-        .alert-section {
-            margin-bottom: 1.5rem;
-        }
-
-        .alert {
-            display: flex;
-            align-items: flex-start;
-            gap: 12px;
-            padding: 1rem 1.25rem;
-            border-radius: 8px;
-            border-left: 4px solid;
-            font-size: 0.95rem;
-            line-height: 1.5;
-        }
-
-        .alert-warning {
-            background-color: #fff3cd;
-            border-left-color: #ffc107;
-            color: #856404;
-        }
-
-        .alert svg {
-            color: #ffc107;
-            flex-shrink: 0;
-            margin-top: 2px;
-        }
-
-        .payments-pending-section {
-            margin-bottom: 2rem;
-        }
-
-        .payments-pending-section .card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .payments-count {
-            background: var(--warning-color);
-            color: white;
-            padding: 0.25rem 0.75rem;
-            border-radius: 1rem;
-            font-size: 0.85rem;
-            font-weight: 600;
-        }
-
-        .payments-grid {
-            display: grid;
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .payment-card {
-            border: 2px solid #e9ecef;
-            border-radius: 12px;
-            padding: 1.5rem;
-            background: white;
-            transition: all 0.3s ease;
-        }
-
-        .payment-card.status-pix_aguardando {
-            border-color: #ffc107;
-            background: linear-gradient(135deg, #fff9e6 0%, #ffffff 100%);
-        }
-
-        .payment-card.status-pix_expirado {
-            border-color: #dc3545;
-            background: linear-gradient(135deg, #ffeaea 0%, #ffffff 100%);
-        }
-
-        .payment-card.status-pendente {
-            border-color: #6c757d;
-            background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
-        }
-
-        .payment-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 1rem;
-        }
-
-        .payment-info h3 {
-            margin: 0 0 0.5rem 0;
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: #333;
-        }
-
-        .payment-status {
-            padding: 0.25rem 0.75rem;
-            border-radius: 1rem;
-            font-size: 0.8rem;
-            font-weight: 600;
-        }
-
-        .payment-status.pix_aguardando {
-            background: #fff3cd;
-            color: #856404;
-        }
-
-        .payment-status.pix_expirado {
-            background: #f8d7da;
-            color: #721c24;
-        }
-
-        .payment-status.pendente {
-            background: #e2e3e5;
-            color: #383d41;
-        }
-
-        .payment-amount {
-            text-align: right;
-        }
-
-        .amount-label {
-            display: block;
-            font-size: 0.8rem;
-            color: #6c757d;
-            margin-bottom: 0.25rem;
-        }
-
-        .amount-value {
-            font-size: 1.25rem;
-            font-weight: 700;
-            color: var(--primary-color);
-        }
-
-        .payment-details {
-            margin-bottom: 1.5rem;
-        }
-
-        .detail-row {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 0.5rem;
-            font-size: 0.9rem;
-        }
-
-        .detail-label {
-            color: #6c757d;
-        }
-
-        .detail-value {
-            font-weight: 500;
-            color: #333;
-        }
-
-        .mp-id {
-            font-family: monospace;
-            font-size: 0.8rem;
-        }
-
-        .payment-actions {
-            display: flex;
-            gap: 0.75rem;
-            flex-wrap: wrap;
-        }
-
-        .btn-pix {
-            flex: 1;
-            min-width: 150px;
-        }
-
-        .btn-check {
-            flex: 0 0 auto;
-        }
-
-        .payments-info {
-            background: #f8f9fa;
-            padding: 1rem;
-            border-radius: 8px;
-            border-left: 4px solid var(--info-color);
-        }
-
-        .info-item {
-            display: flex;
-            align-items: flex-start;
-            gap: 0.75rem;
-        }
-
-        .info-item svg {
-            color: var(--info-color);
-            flex-shrink: 0;
-            margin-top: 2px;
-        }
-
-        /* Loading spinner */
-        .loading-spinner {
-            display: inline-block;
-            width: 16px;
-            height: 16px;
-            border: 2px solid rgba(255,255,255,0.3);
-            border-radius: 50%;
-            border-top-color: white;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        /* Existing styles continuam aqui... */
         .balance-used-badge {
             margin-left: 5px;
             font-size: 0.8rem;
@@ -1124,24 +775,6 @@ if ($result['status'] && isset($result['data']['totais'])) {
         }
 
         @media (max-width: 768px) {
-            .payment-actions {
-                flex-direction: column;
-            }
-            
-            .btn-pix, .btn-check {
-                flex: 1;
-                min-width: auto;
-            }
-            
-            .payment-header {
-                flex-direction: column;
-                gap: 1rem;
-            }
-            
-            .payment-amount {
-                text-align: left;
-            }
-            
             .collapsible-header {
                 padding: 1rem;
             }
@@ -1168,10 +801,100 @@ if ($result['status'] && isset($result['data']['totais'])) {
             }
         }
 
+        @media (max-width: 575.98px) {
+            .collapsible-header .card-title span:first-child {
+                font-size: 0.95rem;
+            }
+            
+            .info-section li {
+                padding-left: 15px;
+            }
+        }
+
+        .collapsible-header::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            width: 0;
+            height: 2px;
+            background-color: var(--primary-color);
+            transition: all 0.3s ease;
+            transform: translateX(-50%);
+        }
+
+        .collapsible-card.expanded .collapsible-header::after {
+            width: 90%;
+        }
+
         .info-section li strong {
             color: var(--primary-color);
             font-weight: 600;
         }
+
+        .info-section h4::before {
+            margin-right: 8px;
+        }
     </style>
+    <script>
+// Teste de sessão
+function testSession() {
+    console.log('=== TESTE DE SESSÃO ===');
+    
+    fetch('/test-session.php', {
+        credentials: 'same-origin'
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log('1. Status da sessão:', data);
+        
+        // Teste API
+        const formData = new FormData();
+        formData.append('action', 'test');
+        
+        return fetch('../../api/payments.php', {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin'
+        });
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log('2. Resposta da API:', data);
+    })
+    .catch(error => {
+        console.error('Erro no teste:', error);
+    });
+}
+
+// Criar botão após DOM carregado
+document.addEventListener('DOMContentLoaded', function() {
+    const testBtn = document.createElement('button');
+    testBtn.innerHTML = '🔍 Testar';
+    testBtn.type = 'button';
+    testBtn.style.cssText = `
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        z-index: 9999;
+        padding: 10px 15px;
+        background: #007bff;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 14px;
+    `;
+    
+    testBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('Botão clicado!');
+        testSession();
+    });
+    
+    document.body.appendChild(testBtn);
+});
+</script>
 </body>
 </html>
