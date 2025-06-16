@@ -1112,7 +1112,13 @@ if (basename($_SERVER['PHP_SELF']) === 'StoreBalancePaymentController.php') {
             $result = StoreBalancePaymentController::getStoreBalanceDetails($lojaId, $filters);
             echo json_encode($result);
             break;
-            
+        case 'get_store_balance_repasse_details':
+            $repasseId = isset($_POST['repasse_id']) ? intval($_POST['repasse_id']) : 0;
+            $storeId = isset($_POST['store_id']) ? intval($_POST['store_id']) : 0;
+            $result = StoreBalancePaymentController::getStoreBalanceRepasseDetails($repasseId, $storeId);
+            echo json_encode($result);
+            break;
+                
         case 'get_pending_movimentacoes':
             $lojaId = isset($_POST['loja_id']) ? intval($_POST['loja_id']) : 0;
             $result = StoreBalancePaymentController::getPendingMovimentacoes($lojaId);
