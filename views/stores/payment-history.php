@@ -69,9 +69,10 @@ if ($activeTab === 'comissoes') {
     $valorTotalPagamentos = 0;
     $valorTotalVendasOriginais = 0;
     $totalSaldoUsado = 0;
-    
-    if ($result['status'] && isset($result['data']['pagamentos'])) {
+
+    if ($result['status'] && isset($result['data']['pagamentos']) && !empty($result['data']['pagamentos'])) {
         foreach ($result['data']['pagamentos'] as &$payment) {
+            // Corrigir valores OpenPix se necessário
             if ($payment['metodo_pagamento'] === 'pix_openpix') {
                 if ($payment['valor_vendas_originais'] == 0) {
                     $payment['valor_vendas_originais'] = $payment['valor_total'] / 0.10;
@@ -84,7 +85,7 @@ if ($activeTab === 'comissoes') {
             // Calcular estatísticas
             $totalPagamentos++;
             $valorTotalPagamentos += floatval($payment['valor_total']);
-            $valorTotalVendasOriginais += floatval($payment['valor_vendas_originais']);
+            $valorTotalVendasOriginais += floatval($payment['valor_vendas_originais'] ?? $payment['valor_total']);
             $totalSaldoUsado += floatval($payment['total_saldo_usado'] ?? 0);
             
             switch($payment['status']) {
@@ -99,6 +100,11 @@ if ($activeTab === 'comissoes') {
                     break;
             }
         }
+    } else {
+        // Debug: verificar se há dados
+        error_log("Dados de pagamentos não encontrados ou vazios");
+        error_log("Result status: " . ($result['status'] ? 'true' : 'false'));
+        error_log("Pagamentos count: " . (isset($result['data']['pagamentos']) ? count($result['data']['pagamentos']) : 'not set'));
     }
 }
 
