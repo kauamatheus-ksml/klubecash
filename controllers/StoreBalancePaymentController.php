@@ -166,7 +166,168 @@ class StoreBalancePaymentController {
             return ['status' => false, 'message' => 'Erro ao carregar pagamentos pendentes.'];
         }
     }
-    
+    /**
+ * Obtém histórico de repasses de saldo para uma loja específica
+ * 
+ * @param int $storeId ID da loja
+ * @param array $filters Filtros adicionais
+ * @param int $page Página atual para paginação
+ * @return array Resultado da operação
+ */
+public static function getStoreBalanceHistory($storeId, $filters = [], $page = 1) {
+    try {
+        $db = Database::getConnection();
+        $limit = ITEMS_PER_PAGE;
+        $offset = ($page - 1) * $limit;
+        
+        // Construir condições WHERE
+        $whereConditions = ["sbp.loja_id = :loja_id"];
+        $params = [':loja_id' => $storeId];
+        
+        // Aplicar filtros
+        if (!empty($filters['status'])) {
+            $whereConditions[] = "sbp.status = :status";
+            $params[':status'] = $filters['status'];
+        }
+        
+        if (!empty($filters['data_inicio'])) {
+            $whereConditions[] = "DATE(sbp.data_criacao) >= :data_inicio";
+            $params[':data_inicio'] = $filters['data_inicio'];
+        }
+        
+        if (!empty($filters['data_fim'])) {
+            $whereConditions[] = "DATE(sbp.data_criacao) <= :data_fim";
+            $params[':data_fim'] = $filters['data_fim'];
+        }
+        
+        $whereClause = "WHERE " . implode(" AND ", $whereConditions);
+        
+        // Query principal para buscar repasses
+        $query = "
+            SELECT 
+                sbp.*,
+                l.nome_fantasia as loja_nome,
+                COUNT(cm.id) as total_transacoes_relacionadas,
+                SUM(cm.valor) as valor_total_saldo_usado
+            FROM store_balance_payments sbp
+            JOIN lojas l ON sbp.loja_id = l.id
+            LEFT JOIN cashback_movimentacoes cm ON cm.pagamento_id = sbp.id
+            {$whereClause}
+            GROUP BY sbp.id
+            ORDER BY sbp.data_criacao DESC
+            LIMIT {$limit} OFFSET {$offset}
+        ";
+        
+        $stmt = $db->prepare($query);
+        $stmt->execute($params);
+        $repasses = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Query para contar total de registros
+        $countQuery = "
+            SELECT COUNT(DISTINCT sbp.id) as total
+            FROM store_balance_payments sbp
+            JOIN lojas l ON sbp.loja_id = l.id
+            {$whereClause}
+        ";
+        
+        $countStmt = $db->prepare($countQuery);
+        $countStmt->execute($params);
+        $totalRecords = $countStmt->fetch(PDO::FETCH_ASSOC)['total'];
+        
+        // Calcular estatísticas
+        $statsQuery = "
+            SELECT 
+                COUNT(*) as total_repasses,
+                SUM(CASE WHEN sbp.status = 'aprovado' THEN sbp.valor_total ELSE 0 END) as valor_total_aprovado,
+                SUM(CASE WHEN sbp.status = 'pendente' THEN sbp.valor_total ELSE 0 END) as valor_total_pendente,
+                SUM(CASE WHEN sbp.status = 'em_processamento' THEN sbp.valor_total ELSE 0 END) as valor_total_processamento,
+                COUNT(CASE WHEN sbp.status = 'aprovado' THEN 1 END) as total_aprovados,
+                COUNT(CASE WHEN sbp.status = 'pendente' THEN 1 END) as total_pendentes,
+                COUNT(CASE WHEN sbp.status = 'em_processamento' THEN 1 END) as total_processamento
+            FROM store_balance_payments sbp
+            WHERE sbp.loja_id = :loja_id
+        ";
+        
+        $statsStmt = $db->prepare($statsQuery);
+        $statsStmt->execute([':loja_id' => $storeId]);
+        $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
+        
+        return [
+            'status' => true,
+            'data' => [
+                'repasses' => $repasses,
+                'estatisticas' => $stats,
+                'paginacao' => [
+                    'pagina_atual' => $page,
+                    'total_registros' => intval($totalRecords),
+                    'registros_por_pagina' => $limit,
+                    'total_paginas' => ceil($totalRecords / $limit)
+                ]
+            ]
+        ];
+        
+    } catch (PDOException $e) {
+        error_log('Erro ao obter histórico de repasses: ' . $e->getMessage());
+        return ['status' => false, 'message' => 'Erro ao obter histórico de repasses.'];
+    }
+}
+
+/**
+ * Obtém detalhes de um repasse específico para a loja
+ * 
+ * @param int $repasseId ID do repasse
+ * @param int $storeId ID da loja (para verificação de segurança)
+ * @return array Detalhes do repasse
+ */
+public static function getStoreBalanceRepasseDetails($repasseId, $storeId) {
+    try {
+        $db = Database::getConnection();
+        
+        // Buscar dados do repasse
+        $repasseStmt = $db->prepare("
+            SELECT sbp.*, l.nome_fantasia as loja_nome
+            FROM store_balance_payments sbp
+            JOIN lojas l ON sbp.loja_id = l.id
+            WHERE sbp.id = ? AND sbp.loja_id = ?
+        ");
+        $repasseStmt->execute([$repasseId, $storeId]);
+        $repasse = $repasseStmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$repasse) {
+            return ['status' => false, 'message' => 'Repasse não encontrado.'];
+        }
+        
+        // Buscar transações relacionadas ao repasse
+        $transacoesStmt = $db->prepare("
+            SELECT 
+                cm.valor as valor_saldo_usado,
+                cm.data_operacao,
+                t.codigo_transacao,
+                t.valor_total as valor_venda,
+                u.nome as cliente_nome,
+                u.email as cliente_email
+            FROM cashback_movimentacoes cm
+            JOIN transacoes_cashback t ON cm.transacao_uso_id = t.id
+            JOIN usuarios u ON cm.usuario_id = u.id
+            WHERE cm.pagamento_id = ?
+            ORDER BY cm.data_operacao DESC
+        ");
+        $transacoesStmt->execute([$repasseId]);
+        $transacoes = $transacoesStmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        return [
+            'status' => true,
+            'data' => [
+                'repasse' => $repasse,
+                'transacoes' => $transacoes
+            ]
+        ];
+        
+    } catch (PDOException $e) {
+        error_log('Erro ao obter detalhes do repasse: ' . $e->getMessage());
+        return ['status' => false, 'message' => 'Erro ao obter detalhes do repasse.'];
+    }
+}
     /**
      * Obtém detalhes do uso de saldo para uma loja
      * 
