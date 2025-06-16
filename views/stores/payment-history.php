@@ -80,6 +80,24 @@ if ($activeTab === 'comissoes') {
                     $payment['qtd_transacoes'] = 1;
                 }
             }
+            
+            // Calcular estatísticas
+            $totalPagamentos++;
+            $valorTotalPagamentos += floatval($payment['valor_total']);
+            $valorTotalVendasOriginais += floatval($payment['valor_vendas_originais']);
+            $totalSaldoUsado += floatval($payment['total_saldo_usado'] ?? 0);
+            
+            switch($payment['status']) {
+                case 'aprovado':
+                    $totalAprovados++;
+                    break;
+                case 'pendente':
+                    $totalPendentes++;
+                    break;
+                case 'rejeitado':
+                    $totalRejeitados++;
+                    break;
+            }
         }
     }
 }
