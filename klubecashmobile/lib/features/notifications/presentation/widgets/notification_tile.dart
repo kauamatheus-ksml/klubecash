@@ -399,7 +399,7 @@ class NotificationTileCompact extends ConsumerWidget {
         iconData = Icons.notifications;
         iconColor = AppColors.primary;
     }
-
+    
     return Container(
       width: 32,
       height: 32,
