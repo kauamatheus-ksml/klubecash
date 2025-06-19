@@ -56,7 +56,7 @@ if (!isset($activeMenu)) {
                     <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
                     <polyline points="9 22 9 12 15 12 15 22"></polyline>
                 </svg>
-                <span>Inicio</span>
+                Inicio 
             </a>
         </li>
         <li>
@@ -65,25 +65,45 @@ if (!isset($activeMenu)) {
                     <line x1="12" y1="5" x2="12" y2="19"></line>
                     <line x1="5" y1="12" x2="19" y2="12"></line>
                 </svg>
-                <span>Registrar Venda</span>
+                Registrar Venda
             </a>
         </li>
+        <?php if ($_SESSION['user_type'] === USER_TYPE_STORE): ?>
+            <li class="<?php echo ($activeMenu === 'funcionarios') ? 'active' : ''; ?>">
+                <a href="/store/funcionarios/">
+                    <i class="fas fa-user-tie"></i>
+                    <span>Funcionários</span>
+                </a>
+            </li>
+        <?php endif; ?>
+        <!--
         <li>
-            <a href="<?php echo SITE_URL; ?>/views/stores/employees.php" class="sidebar-nav-item <?php echo ($activeMenu == 'funcionarios') ? 'active' : ''; ?>">
+            <a href="<?php echo STORE_TRANSACTIONS_URL; ?>" class="sidebar-nav-item <?php echo ($activeMenu == 'transactions') ? 'active' : ''; ?>">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                    <circle cx="12" cy="7" r="4"></circle>
+                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                    <line x1="8" y1="21" x2="16" y2="21"></line>
+                    <line x1="12" y1="17" x2="12" y2="21"></line>
                 </svg>
-                <span>Funcionários</span>
+                Transações
             </a>
-        </li>
+        </li>-->
+        <!--<li>
+            <a href="<?php echo STORE_BATCH_UPLOAD_URL; ?>" class="sidebar-nav-item <?php echo ($activeMenu == 'batch-upload') ? 'active' : ''; ?>">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+                Upload em Lote
+            </a>
+        </li>-->
         <li>
             <a href="<?php echo STORE_PENDING_TRANSACTIONS_URL; ?>" class="sidebar-nav-item <?php echo ($activeMenu == 'pending-commissions') ? 'active' : ''; ?>">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="12" cy="12" r="10"></circle>
                     <polyline points="12 6 12 12 16 14"></polyline>
                 </svg>
-                <span>Comissões Pendentes</span>
+                Comissões Pendentes
             </a>
         </li>
         <li>
@@ -92,32 +112,83 @@ if (!isset($activeMenu)) {
                     <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
                     <line x1="1" y1="10" x2="23" y2="10"></line>
                 </svg>
-                <span>Histórico de Pagamentos</span>
+                Histórico de Pagamentos
             </a>
         </li>
+        <!--
         <li>
-            <a href="<?php echo SITE_URL; ?>/views/stores/profile.php" class="sidebar-nav-item <?php echo ($activeMenu == 'profile') ? 'active' : ''; ?>">
+            <a href="<?php echo STORE_PAYMENT_URL; ?>" class="sidebar-nav-item <?php echo ($activeMenu == 'payment') ? 'active' : ''; ?>">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="1" x2="12" y2="23"></line>
+                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                </svg>
+                Realizar Pagamento
+            </a>
+        </li>
+        -->
+        <li>
+            <a href="<?php echo SITE_URL; ?>/store/perfil" class="sidebar-nav-item <?php echo ($activeMenu == 'profile') ? 'active' : ''; ?>">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                     <circle cx="12" cy="7" r="4"></circle>
                 </svg>
-                <span>Meu Perfil</span>
+                Meu Perfil
             </a>
         </li>
     </ul>
     
-    <!-- Botão de Logout -->
     <div class="sidebar-footer">
-        <a href="<?php echo LOGOUT_URL; ?>" class="logout-btn">
+        <a href="<?php echo SITE_URL; ?>/controllers/AuthController.php?action=logout" class="logout-btn">
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
                 <polyline points="16 17 21 12 16 7"></polyline>
                 <line x1="21" y1="12" x2="9" y2="12"></line>
             </svg>
-            <span>Sair</span>
+            Sair
         </a>
     </div>
 </div>
 
-<!-- JavaScript da Sidebar -->
-<script src="../../assets/js/sidebar.js"></script>
+<!-- Script para responsividade da Sidebar -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Elementos da DOM
+    const sidebarToggle = document.getElementById('sidebarToggle');
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('overlay');
+    const mainContent = document.getElementById('mainContent');
+    
+    // Evento para mostrar/ocultar a sidebar em dispositivos móveis
+    if (sidebarToggle) {
+        sidebarToggle.addEventListener('click', toggleSidebar);
+    }
+    
+    if (overlay) {
+        overlay.addEventListener('click', toggleSidebar);
+    }
+    
+    /**
+     * Alterna a visibilidade da sidebar em dispositivos móveis
+     */
+    function toggleSidebar() {
+        sidebar.classList.toggle('open');
+        overlay.classList.toggle('active');
+    }
+    
+    /**
+     * Verifica o tamanho da tela e ajusta a sidebar conforme necessário
+     */
+    function checkScreenSize() {
+        if (window.innerWidth > 768) {
+            sidebar.classList.remove('open');
+            overlay.classList.remove('active');
+        }
+    }
+    
+    // Verificar o tamanho da tela ao carregar e redimensionar
+    window.addEventListener('resize', checkScreenSize);
+    
+    // Inicializar
+    checkScreenSize();
+});
+</script>
