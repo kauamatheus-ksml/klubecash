@@ -53,6 +53,79 @@ define('USER_TYPE_STORE', 'loja');
 define('USER_TYPE_EMPLOYEE', 'funcionario');
 
 define('PASSWORD_MIN_LENGTH', 8);
+
+
+
+// === PERMISSÕES DO SISTEMA ===
+// Módulos disponíveis
+define('MODULO_DASHBOARD', 'dashboard');
+define('MODULO_TRANSACOES', 'transacoes');
+define('MODULO_COMISSOES', 'comissoes');
+define('MODULO_FUNCIONARIOS', 'funcionarios');
+define('MODULO_RELATORIOS', 'relatorios');
+define('MODULO_CONFIGURACOES', 'configuracoes');
+
+// Ações disponíveis
+define('ACAO_VER', 'ver');
+define('ACAO_CRIAR', 'criar');
+define('ACAO_EDITAR', 'editar');
+define('ACAO_DESATIVAR', 'desativar');
+define('ACAO_PAGAR', 'pagar');
+define('ACAO_UPLOAD_LOTE', 'upload_lote');
+
+// Mapa de permissões legíveis
+define('PERMISSOES_MAPA', [
+    MODULO_DASHBOARD => [
+        'nome' => 'Dashboard',
+        'descricao' => 'Painel principal com resumos e gráficos',
+        'acoes' => [
+            ACAO_VER => 'Visualizar dashboard'
+        ]
+    ],
+    MODULO_TRANSACOES => [
+        'nome' => 'Transações',
+        'descricao' => 'Gerenciar vendas e transações de cashback',
+        'acoes' => [
+            ACAO_VER => 'Visualizar transações',
+            ACAO_CRIAR => 'Registrar novas vendas',
+            ACAO_UPLOAD_LOTE => 'Upload de vendas em lote'
+        ]
+    ],
+    MODULO_COMISSOES => [
+        'nome' => 'Comissões',
+        'descricao' => 'Gerenciar pagamentos de comissões',
+        'acoes' => [
+            ACAO_VER => 'Visualizar comissões',
+            ACAO_PAGAR => 'Realizar pagamentos'
+        ]
+    ],
+    MODULO_FUNCIONARIOS => [
+        'nome' => 'Funcionários',
+        'descricao' => 'Gerenciar equipe da loja',
+        'acoes' => [
+            ACAO_VER => 'Visualizar funcionários',
+            ACAO_CRIAR => 'Cadastrar funcionários',
+            ACAO_EDITAR => 'Editar funcionários',
+            ACAO_DESATIVAR => 'Desativar funcionários'
+        ]
+    ],
+    MODULO_RELATORIOS => [
+        'nome' => 'Relatórios',
+        'descricao' => 'Visualizar relatórios e estatísticas',
+        'acoes' => [
+            ACAO_VER => 'Visualizar relatórios'
+        ]
+    ],
+    MODULO_CONFIGURACOES => [
+        'nome' => 'Configurações',
+        'descricao' => 'Configurações da loja',
+        'acoes' => [
+            ACAO_VER => 'Visualizar configurações',
+            ACAO_EDITAR => 'Editar configurações'
+        ]
+    ]
+]);
+
 // === SUBTIPOS DE FUNCIONÁRIO ===  
 define('EMPLOYEE_TYPE_FINANCIAL', 'financeiro');
 define('EMPLOYEE_TYPE_MANAGER', 'gerente');

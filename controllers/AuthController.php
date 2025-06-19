@@ -13,69 +13,122 @@ require_once __DIR__ . '/../utils/Validator.php';
 class AuthController {
     
     /**
-     * Processa login de usuário
-     * 
-     * @param string $email Email do usuário
-     * @param string $password Senha do usuário
-     * @return array Resultado da operação com status e mensagem
-     */
-    public static function login($email, $password) {
+    * Atualização do método de login para incluir funcionários
+    */
+    public static function login($email, $senha, $remember = false) {
         try {
-            // Validar dados
-            if (empty($email) || empty($password)) {
-                return ['status' => false, 'message' => 'Por favor, preencha todos os campos.'];
-            }
-            
             $db = Database::getConnection();
             
-            // Buscar usuário pelo email
-            $stmt = $db->prepare("SELECT id, nome, senha_hash, tipo, status FROM usuarios WHERE email = :email");
-            $stmt->bindParam(':email', $email);
-            $stmt->execute();
+            // Buscar usuário (incluindo funcionários)
+            $stmt = $db->prepare("
+                SELECT id, nome, email, senha_hash, tipo, status, loja_vinculada_id, subtipo_funcionario
+                FROM usuarios 
+                WHERE email = ? AND tipo IN ('cliente', 'admin', 'loja', 'funcionario')
+            ");
+            $stmt->execute([$email]);
+            
+            if ($stmt->rowCount() === 0) {
+                return ['status' => false, 'message' => 'E-mail ou senha incorretos.'];
+            }
+            
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
             
-            if ($user && password_verify($password, $user['senha_hash'])) {
-                // Verificar status do usuário
-                if ($user['status'] !== USER_ACTIVE) {
-                    return ['status' => false, 'message' => 'Sua conta está ' . $user['status'] . '. Entre em contato com o suporte.'];
-                }
-                
-                // Login bem-sucedido
-                session_start();
-                $_SESSION['user_id'] = $user['id'];
-                $_SESSION['user_name'] = $user['nome'];
-                $_SESSION['user_type'] = $user['tipo'];
-                
-                // Atualizar último login
-                $updateStmt = $db->prepare("UPDATE usuarios SET ultimo_login = NOW() WHERE id = :id");
-                $updateStmt->bindParam(':id', $user['id']);
-                $updateStmt->execute();
-                
-                // Registrar a sessão no banco de dados
-                self::registerSession($user['id']);
-                
-                // Associar usuário à loja se for do tipo loja
-                if ($user['tipo'] === USER_TYPE_STORE) {
-                    self::associateStoreUser($user['id'], $email);
-                }
-
-                return [
-                    'status' => true, 
-                    'message' => 'Login efetuado com sucesso.', 
-                    'user' => [
-                        'id' => $user['id'],
-                        'name' => $user['nome'],
-                        'type' => $user['tipo']
-                    ]
-                ];
-            } else {
-                return ['status' => false, 'message' => 'Email ou senha incorretos.'];
+            // Verificar senha
+            if (!password_verify($senha, $user['senha_hash'])) {
+                return ['status' => false, 'message' => 'E-mail ou senha incorretos.'];
             }
+            
+            // Verificar status
+            if ($user['status'] !== 'ativo') {
+                return ['status' => false, 'message' => 'Sua conta está inativa. Entre em contato com o suporte.'];
+            }
+            
+            // Para funcionários, verificar se a loja está ativa
+            if ($user['tipo'] === 'funcionario') {
+                $storeStmt = $db->prepare("
+                    SELECT status 
+                    FROM lojas 
+                    WHERE id = ? AND status = 'aprovado'
+                ");
+                $storeStmt->execute([$user['loja_vinculada_id']]);
+                
+                if ($storeStmt->rowCount() === 0) {
+                    return ['status' => false, 'message' => 'A loja vinculada não está ativa.'];
+                }
+            }
+            
+            // Iniciar sessão
+            if (session_status() === PHP_SESSION_NONE) {
+                session_start();
+            }
+            
+            $_SESSION['user_id'] = $user['id'];
+            $_SESSION['user_name'] = $user['nome'];
+            $_SESSION['user_email'] = $user['email'];
+            $_SESSION['user_type'] = $user['tipo'];
+            
+            // Para funcionários, adicionar dados específicos
+            if ($user['tipo'] === 'funcionario') {
+                $_SESSION['subtipo_funcionario'] = $user['subtipo_funcionario'];
+                $_SESSION['loja_vinculada_id'] = $user['loja_vinculada_id'];
+                
+                // Carregar permissões na sessão para otimizar
+                require_once __DIR__ . '/../utils/PermissionManager.php';
+                $permissions = PermissionManager::getUserPermissions($user['id']);
+                $_SESSION['funcionario_permissions'] = $permissions['permissions'];
+            }
+            
+            // Atualizar último login
+            $updateStmt = $db->prepare("UPDATE usuarios SET ultimo_login = NOW() WHERE id = ?");
+            $updateStmt->execute([$user['id']]);
+            
+            // Definir URL de redirecionamento
+            $redirectUrl = '/views/client/dashboard.php'; // Padrão para clientes
+            
+            if ($user['tipo'] === 'admin') {
+                $redirectUrl = '/views/admin/dashboard.php';
+            } elseif ($user['tipo'] === 'loja' || $user['tipo'] === 'funcionario') {
+                $redirectUrl = '/views/store/dashboard.php';
+            }
+            
+            return [
+                'status' => true,
+                'message' => 'Login realizado com sucesso!',
+                'redirect_url' => $redirectUrl,
+                'user_type' => $user['tipo']
+            ];
+            
         } catch (PDOException $e) {
             error_log('Erro no login: ' . $e->getMessage());
-            return ['status' => false, 'message' => 'Erro ao processar o login. Tente novamente.'];
+            return ['status' => false, 'message' => 'Erro interno. Tente novamente.'];
         }
     }
+
+    /**
+     * Verifica se o usuário logado tem acesso à área da loja
+     */
+    public static function hasStoreAccess() {
+        if (!isset($_SESSION['user_type'])) {
+            return false;
+        }
+        
+        return in_array($_SESSION['user_type'], ['loja', 'funcionario']);
+    }
+
+    /**
+     * Verifica se é lojista (não funcionário)
+     */
+    public static function isStoreOwner() {
+        return isset($_SESSION['user_type']) && $_SESSION['user_type'] === 'loja';
+    }
+
+    /**
+     * Verifica se é funcionário
+     */
+    public static function isEmployee() {
+        return isset($_SESSION['user_type']) && $_SESSION['user_type'] === 'funcionario';
+    }
+
     // Adicione este código no AuthController.php após o login bem-sucedido
     /**
     * Processa registro via Google OAuth (similar ao login, mas com validações específicas)
@@ -215,6 +268,28 @@ class AuthController {
         } catch (Exception $e) {
             error_log('Erro no registro Google: ' . $e->getMessage());
             return ['status' => false, 'message' => 'Erro ao processar registro com Google. Tente novamente.'];
+        }
+    }
+    /**
+    * Verifica se o usuário é funcionário e obtém dados da loja vinculada
+    */
+    public static function getEmployeeStoreData($userId) {
+        try {
+            $db = Database::getConnection();
+            
+            $stmt = $db->prepare("
+                SELECT u.*, l.id as loja_id, l.nome_fantasia as loja_nome
+                FROM usuarios u
+                INNER JOIN lojas l ON u.loja_vinculada_id = l.id
+                WHERE u.id = ? AND u.tipo = 'funcionario' AND u.status = 'ativo'
+            ");
+            $stmt->execute([$userId]);
+            
+            return $stmt->fetch(PDO::FETCH_ASSOC);
+            
+        } catch (PDOException $e) {
+            error_log('Erro ao obter dados do funcionário: ' . $e->getMessage());
+            return false;
         }
     }
     /**
