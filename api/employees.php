@@ -16,8 +16,8 @@ require_once __DIR__ . '/../controllers/StoreController.php';
 
 session_start();
 
-// Verificar se está logado como loja
-if (!AuthController::isLoggedIn() || !isset($_SESSION['user_type']) || $_SESSION['user_type'] !== USER_TYPE_STORE) {
+// CORREÇÃO PRINCIPAL: Trocar isLoggedIn() por isAuthenticated()
+if (!AuthController::isAuthenticated() || !isset($_SESSION['user_type']) || $_SESSION['user_type'] !== USER_TYPE_STORE) {
     http_response_code(401);
     echo json_encode(['status' => false, 'message' => 'Acesso não autorizado']);
     exit;
@@ -124,7 +124,7 @@ function handlePutRequest() {
         return;
     }
     
-    // CORREÇÃO PRINCIPAL: Passar os dois parâmetros corretamente
+    // Corrigir a chamada do método (passando dois parâmetros)
     $result = StoreController::updateEmployee($employeeId, $data);
     echo json_encode($result);
 }
