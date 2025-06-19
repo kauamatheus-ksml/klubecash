@@ -68,14 +68,15 @@ if (!isset($activeMenu)) {
                 Registrar Venda
             </a>
         </li>
-        <?php if ($_SESSION['user_type'] === USER_TYPE_STORE): ?>
-            <li class="<?php echo ($activeMenu === 'funcionarios') ? 'active' : ''; ?>">
-                <a href="/store/funcionarios/">
-                    <i class="fas fa-user-tie"></i>
-                    <span>Funcionários</span>
-                </a>
-            </li>
-        <?php endif; ?>
+        <li>
+            <a href="<?php echo SITE_URL; ?>/views/stores/employees.php" class="sidebar-nav-item <?php echo ($activeMenu == 'funcionarios') ? 'active' : ''; ?>">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+                <span>Funcionários</span>
+            </a>
+        </li>
         <!--
         <li>
             <a href="<?php echo STORE_TRANSACTIONS_URL; ?>" class="sidebar-nav-item <?php echo ($activeMenu == 'transactions') ? 'active' : ''; ?>">
