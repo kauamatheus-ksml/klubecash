@@ -1,56 +1,230 @@
 <?php
-// views/stores/employees.php
+/**
+ * Página de Gestão de Funcionários - Sistema Klube Cash
+ * 
+ * Esta página foi expandida para trabalhar com um sistema de controle de acesso
+ * granular, permitindo que tanto lojistas quanto funcionários específicos
+ * (do tipo gerente) possam gerenciar a equipe.
+ * 
+ * Localização: views/stores/employees.php
+ * Estrutura: Mantém compatibilidade total com o sistema existente
+ */
+
+// Definir o menu ativo para a sidebar
 $activeMenu = 'funcionarios';
 
+// Incluir dependências necessárias para o funcionamento
 require_once '../../config/database.php';
 require_once '../../config/constants.php';
 require_once '../../controllers/StoreController.php';
 
 // Iniciar sessão apenas se não estiver ativa
+// Esta verificação previne erros de "headers already sent"
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Verificar se é loja
-if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION['user_type'] !== USER_TYPE_STORE) {
-    header("Location: /login?error=acesso_restrito");
+// === SISTEMA DE CONTROLE DE ACESSO EXPANDIDO ===
+// Esta seção substitui a verificação simples anterior por um sistema mais sofisticado
+// que compreende diferentes tipos de usuário e suas permissões específicas
+
+// Primeiro, verificar se o usuário está logado
+// Esta é nossa primeira linha de defesa contra acessos não autorizados
+if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type'])) {
+    header("Location: /login?error=session_expired");
     exit;
 }
 
-// Inicializar variáveis
+// Capturar informações do usuário para análise de permissões
+// Estas variáveis nos ajudam a entender quem está acessando o sistema
+$userType = $_SESSION['user_type'];
+$userId = $_SESSION['user_id'];
+$userName = $_SESSION['user_name'] ?? 'Usuário';
+
+// Definir variáveis de controle que usaremos em toda a página
+// Estas variáveis tornam o código mais legível e fácil de manter
+$isLojista = ($userType === USER_TYPE_STORE);
+$isFuncionario = ($userType === 'funcionario');
+
+// Para funcionários, precisamos verificar o subtipo para determinar permissões
+$subtipoFuncionario = '';
+$isGerente = false;
+
+if ($isFuncionario) {
+    // Capturar o subtipo do funcionário se estiver disponível na sessão
+    $subtipoFuncionario = $_SESSION['subtipo_funcionario'] ?? '';
+    
+    // Determinar se é um gerente (tipo de funcionário com mais permissões)
+    $isGerente = ($subtipoFuncionario === 'gerente');
+}
+
+// Implementar a lógica de controle de acesso
+// Esta é a parte mais importante: determinar quem pode gerenciar funcionários
+$hasAccess = false;
+$accessLevel = '';
+
+if ($isLojista) {
+    // Lojistas sempre têm acesso total a todas as funcionalidades
+    $hasAccess = true;
+    $accessLevel = 'total'; // Acesso total permite criar, editar e desativar funcionários
+    
+} elseif ($isFuncionario && $isGerente) {
+    // Gerentes têm acesso limitado: podem criar e editar, mas não desativar
+    $hasAccess = true;
+    $accessLevel = 'limitado'; // Acesso limitado exclui algumas ações críticas
+    
+} else {
+    // Outros tipos de funcionário (financeiro, vendedor) não têm acesso
+    $hasAccess = false;
+    $accessLevel = 'negado';
+}
+
+// Se não tem acesso, redirecionar com mensagem explicativa
+if (!$hasAccess) {
+    // Redirecionar para o dashboard com uma mensagem clara sobre a restrição
+    header("Location: " . STORE_DASHBOARD_URL . "?error=access_denied&message=" . urlencode("Apenas lojistas e gerentes podem gerenciar funcionários"));
+    exit;
+}
+
+// Registrar o acesso para fins de auditoria (opcional, mas recomendado)
+// Em sistemas empresariais, é importante manter logs de quem acessa funcionalidades sensíveis
+error_log("Acesso à gestão de funcionários - Usuário: {$userName} (ID: {$userId}), Tipo: {$userType}, Nível: {$accessLevel}");
+
+// === FIM DO SISTEMA DE CONTROLE DE ACESSO ===
+
+// === PROCESSAMENTO DE FILTROS E PAGINAÇÃO ===
+// Esta seção mantém toda a funcionalidade original de filtros e paginação
+// mas agora funciona dentro do contexto do novo sistema de permissões
+
+// Inicializar variáveis para paginação
+// A paginação ajuda a melhorar a performance quando há muitos funcionários
 $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
 $filters = [];
 
-// Processar filtros
+// Processar filtros vindos da URL (GET parameters)
+// Os filtros permitem que os usuários encontrem funcionários específicos rapidamente
 if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET)) {
+    
+    // Filtro por subtipo de funcionário (gerente, financeiro, vendedor)
     if (!empty($_GET['subtipo']) && $_GET['subtipo'] !== 'todos') {
         $filters['subtipo'] = $_GET['subtipo'];
     }
+    
+    // Filtro por status (ativo, inativo)
     if (!empty($_GET['status']) && $_GET['status'] !== 'todos') {
         $filters['status'] = $_GET['status'];
     }
+    
+    // Filtro de busca por texto (nome ou email)
     if (!empty($_GET['busca'])) {
+        // Usar trim() para remover espaços em branco desnecessários
         $filters['busca'] = trim($_GET['busca']);
     }
 }
 
+// === CARREGAMENTO DE DADOS COM TRATAMENTO DE ERROS ===
+// Esta seção busca os dados dos funcionários e trata possíveis erros
+// O tratamento robusto de erros é essencial para uma boa experiência do usuário
+
 try {
-    // Obter dados dos funcionários
+    // Chamar o controller para obter dados dos funcionários
+    // O StoreController já existe e funciona, apenas estamos expandindo seu uso
     $result = StoreController::getEmployees($filters, $page);
     
+    // Verificar se a operação foi bem-sucedida
     $hasError = !$result['status'];
     $errorMessage = $hasError ? $result['message'] : '';
     
-    $employees = $hasError ? [] : $result['data']['funcionarios'];
-    $statistics = $hasError ? [] : $result['data']['estatisticas'];
-    $pagination = $hasError ? [] : $result['data']['paginacao'];
+    // Extrair dados do resultado ou definir arrays vazios em caso de erro
+    // Esta abordagem defensiva previne erros de "undefined index"
+    $employees = $hasError ? [] : ($result['data']['funcionarios'] ?? []);
+    $statistics = $hasError ? [] : ($result['data']['estatisticas'] ?? []);
+    $pagination = $hasError ? [] : ($result['data']['paginacao'] ?? []);
+    
+    // Adicionar informações sobre o nível de acesso aos dados
+    // Isso permite que o frontend adapte a interface baseada nas permissões
+    $pageData = [
+        'access_level' => $accessLevel,
+        'is_lojista' => $isLojista,
+        'is_gerente' => $isGerente,
+        'user_name' => $userName,
+        'can_create' => ($accessLevel === 'total' || $accessLevel === 'limitado'),
+        'can_edit' => ($accessLevel === 'total' || $accessLevel === 'limitado'),
+        'can_delete' => ($accessLevel === 'total'), // Apenas lojistas podem desativar
+    ];
+    
 } catch (Exception $e) {
+    // Em caso de exceção, registrar o erro e preparar dados de fallback
+    // O tratamento de exceções é crucial para evitar que a página "quebre"
+    
     $hasError = true;
     $errorMessage = "Erro ao processar a requisição: " . $e->getMessage();
+    
+    // Definir arrays vazios para evitar erros no template
     $employees = [];
     $statistics = [];
     $pagination = [];
+    
+    // Registrar o erro para análise posterior
+    error_log("Erro na página de funcionários - Usuário: {$userName}, Erro: " . $e->getMessage());
+    
+    // Definir dados de página mesmo em caso de erro
+    $pageData = [
+        'access_level' => $accessLevel,
+        'is_lojista' => $isLojista,
+        'is_gerente' => $isGerente,
+        'user_name' => $userName,
+        'can_create' => false, // Em caso de erro, desabilitar ações críticas
+        'can_edit' => false,
+        'can_delete' => false,
+    ];
 }
+
+// === PREPARAÇÃO DE DADOS PARA O TEMPLATE ===
+// Organizar todas as informações que serão utilizadas na renderização da página
+
+// Preparar mensagens contextuais baseadas no tipo de usuário
+if ($isLojista) {
+    $pageTitle = "Gerenciar Funcionários";
+    $pageSubtitle = "Gerencie todos os funcionários da sua loja";
+    $welcomeMessage = "Como lojista, você tem controle total sobre sua equipe.";
+} elseif ($isGerente) {
+    $pageTitle = "Gerenciar Equipe";
+    $pageSubtitle = "Gerencie funcionários (acesso de gerente)";
+    $welcomeMessage = "Como gerente, você pode cadastrar e editar funcionários da equipe.";
+}
+
+// Preparar dados de estatísticas com valores padrão
+// Isso previne erros quando as estatísticas não estão disponíveis
+$stats = [
+    'total_funcionarios' => $statistics['total_funcionarios'] ?? 0,
+    'total_financeiro' => $statistics['total_financeiro'] ?? 0,
+    'total_gerente' => $statistics['total_gerente'] ?? 0,
+    'total_vendedor' => $statistics['total_vendedor'] ?? 0,
+    'funcionarios_ativos' => $statistics['funcionarios_ativos'] ?? 0,
+    'funcionarios_inativos' => $statistics['funcionarios_inativos'] ?? 0,
+];
+
+// Preparar informações de paginação com valores padrão
+$paginationInfo = [
+    'current_page' => $page,
+    'total_pages' => $pagination['total_paginas'] ?? 1,
+    'per_page' => $pagination['por_pagina'] ?? 10,
+    'total_records' => $pagination['total'] ?? 0,
+];
+
+// Definir permissões específicas para uso no JavaScript
+// Estas permissões serão convertidas para JSON e usadas no frontend
+$permissions = [
+    'can_create_employee' => $pageData['can_create'],
+    'can_edit_employee' => $pageData['can_edit'],
+    'can_delete_employee' => $pageData['can_delete'],
+    'can_create_manager' => $isLojista, // Apenas lojistas podem criar outros gerentes
+    'access_level' => $accessLevel,
+    'user_type' => $userType,
+    'subtipo_funcionario' => $subtipoFuncionario,
+];
+
 ?>
 
 <!DOCTYPE html>
