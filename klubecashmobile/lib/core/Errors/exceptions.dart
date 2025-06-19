@@ -4,6 +4,7 @@
 /// Classe base para todas as exceções customizadas da aplicação
 abstract class AppException implements Exception {
   final String message;
+  
   final String? code;
   final dynamic originalError;
 

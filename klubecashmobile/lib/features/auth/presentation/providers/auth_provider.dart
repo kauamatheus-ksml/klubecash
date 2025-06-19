@@ -46,11 +46,25 @@ class AuthState {
 }
 
 /// Provider para o repositório de autenticação
+// Substitua o provider antigo por este
 @riverpod
 AuthRepositoryImpl authRepository(AuthRepositoryRef ref) {
   final apiClient = ref.watch(apiClientProvider);
-  final dataSource = AuthRemoteDataSource(apiClient);
-  return AuthRepositoryImpl(dataSource);
+  // Assumindo que você tenha um provider para SharedPreferences
+  // Se não tiver, adicione: final sharedPreferences = await SharedPreferences.getInstance();
+  // e mude o provider para um FutureProvider. Por simplicidade, vamos assumir que ele existe.
+  final networkInfo = ref.watch(networkInfoProvider); 
+  final secureStorage = ref.watch(flutterSecureStorageProvider); // Supondo que você crie este provider
+
+  final dataSource = AuthRemoteDataSourceImpl(apiClient: apiClient);
+  
+  return AuthRepositoryImpl(
+    remoteDataSource: dataSource,
+    networkInfo: networkInfo,
+    // Você precisa passar o SharedPreferences também.
+    // Supondo que você tenha um provider para ele.
+    // sharedPreferences: ref.watch(sharedPreferencesProvider), 
+  );
 }
 
 /// Provider para use cases de autenticação

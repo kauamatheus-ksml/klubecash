@@ -133,6 +133,20 @@ try {
                         <p>Administradores</p>
                     </div>
                 </div>
+                <div class="stat-card">
+                    <div class="stat-icon employee">
+                        <i class="fas fa-user-tie"></i>
+                    </div>
+                    <div class="stat-content">
+                        <h3><?php echo number_format($statistics['total_funcionarios'] ?? 0); ?></h3>
+                        <p>Funcionários</p>
+                        <small>
+                            Financeiro: <?php echo $statistics['total_funcionarios_financeiro'] ?? 0; ?> |
+                            Gerente: <?php echo $statistics['total_funcionarios_gerente'] ?? 0; ?> |
+                            Vendedor: <?php echo $statistics['total_funcionarios_vendedor'] ?? 0; ?>
+                        </small>
+                    </div>
+                </div>
             </div>
             <?php endif; ?>
             
@@ -161,6 +175,7 @@ try {
                             <option value="cliente" <?php echo (($_GET['tipo'] ?? '') === 'cliente') ? 'selected' : ''; ?>>Clientes</option>
                             <option value="loja" <?php echo (($_GET['tipo'] ?? '') === 'loja') ? 'selected' : ''; ?>>Lojas</option>
                             <option value="admin" <?php echo (($_GET['tipo'] ?? '') === 'admin') ? 'selected' : ''; ?>>Administradores</option>
+                            <option value="funcionario" <?php echo (isset($_GET['tipo']) && $_GET['tipo'] === 'funcionario') ? 'selected' : ''; ?>>Funcionário</option>
                         </select>
                     </div>
                     
@@ -228,7 +243,8 @@ try {
                                     </div>
                                 </th>
                                 <th>Usuário</th>
-                                <th>Tipo</th>
+                                <th>Tipo/Subtipo</th>
+                                <th>Loja Vinculada</th>
                                 <th>Status</th>
                                 <th>Cadastro</th>
                                 <th>Último Login</th>
@@ -238,7 +254,7 @@ try {
                         <tbody>
                             <?php if (empty($users)): ?>
                                 <tr>
-                                    <td colspan="7" class="no-data">
+                                    <td colspan="8" class="no-data">
                                         <div class="no-data-content">
                                             <i class="fas fa-users"></i>
                                             <h4>Nenhum usuário encontrado</h4>
@@ -272,14 +288,37 @@ try {
                                         <td>
                                             <span class="type-badge type-<?php echo $user['tipo']; ?>">
                                                 <?php 
-                                                    $tipos = [
-                                                        'cliente' => 'Cliente',
-                                                        'loja' => 'Loja',
-                                                        'admin' => 'Admin'
-                                                    ];
-                                                    echo $tipos[$user['tipo']] ?? ucfirst($user['tipo']);
+                                                switch($user['tipo']) {
+                                                    case 'cliente':
+                                                        echo 'Cliente';
+                                                        break;
+                                                    case 'admin':
+                                                        echo 'Administrador';
+                                                        break;
+                                                    case 'loja':
+                                                        echo 'Loja';
+                                                        break;
+                                                    case 'funcionario':
+                                                        echo 'Funcionário';
+                                                        if (!empty($user['subtipo_funcionario'])) {
+                                                            echo '<br><small class="text-muted">' . ucfirst($user['subtipo_funcionario']) . '</small>';
+                                                        }
+                                                        break;
+                                                    default:
+                                                        echo ucfirst($user['tipo']);
+                                                }
                                                 ?>
                                             </span>
+                                        </td>
+                                        <td>
+                                            <?php if ($user['tipo'] === 'funcionario' && !empty($user['nome_loja_vinculada'])): ?>
+                                                <span class="text-sm">
+                                                    <i class="fas fa-store text-muted"></i>
+                                                    <?php echo htmlspecialchars($user['nome_loja_vinculada']); ?>
+                                                </span>
+                                            <?php else: ?>
+                                                <span class="text-muted">-</span>
+                                            <?php endif; ?>
                                         </td>
                                         <td>
                                             <?php 
@@ -306,37 +345,37 @@ try {
                                             </span>
                                         </td>
                                         <td>
-    <div class="date-info">
-        <?php
-            // Calcula o timestamp com 3 horas a menos para a data de criação
-            $timestamp_criacao = strtotime($user['data_criacao']) - (3 * 60 * 60);
-        ?>
-        <div class="date-primary">
-            <?php echo date('d/m/Y', $timestamp_criacao); ?>
-        </div>
-        <div class="date-secondary">
-            <?php echo date('H:i', $timestamp_criacao); ?>
-        </div>
-    </div>
-</td>
-<td>
-    <div class="date-info">
-        <?php if ($user['ultimo_login']): ?>
-            <?php
-                // Calcula o timestamp com 3 horas a menos para o último login
-                $timestamp_login = strtotime($user['ultimo_login']) - (3 * 60 * 60);
-            ?>
-            <div class="date-primary">
-                <?php echo date('d/m/Y', $timestamp_login); ?>
-            </div>
-            <div class="date-secondary">
-                <?php echo date('H:i', $timestamp_login); ?>
-            </div>
-        <?php else: ?>
-            <span class="text-muted">Nunca</span>
-        <?php endif; ?>
-    </div>
-</td>
+                                            <div class="date-info">
+                                                <?php
+                                                    // Calcula o timestamp com 3 horas a menos para a data de criação
+                                                    $timestamp_criacao = strtotime($user['data_criacao']) - (3 * 60 * 60);
+                                                ?>
+                                                <div class="date-primary">
+                                                    <?php echo date('d/m/Y', $timestamp_criacao); ?>
+                                                </div>
+                                                <div class="date-secondary">
+                                                    <?php echo date('H:i', $timestamp_criacao); ?>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="date-info">
+                                                <?php if ($user['ultimo_login']): ?>
+                                                    <?php
+                                                        // Calcula o timestamp com 3 horas a menos para o último login
+                                                        $timestamp_login = strtotime($user['ultimo_login']) - (3 * 60 * 60);
+                                                    ?>
+                                                    <div class="date-primary">
+                                                        <?php echo date('d/m/Y', $timestamp_login); ?>
+                                                    </div>
+                                                    <div class="date-secondary">
+                                                        <?php echo date('H:i', $timestamp_login); ?>
+                                                    </div>
+                                                <?php else: ?>
+                                                    <span class="text-muted">Nunca</span>
+                                                <?php endif; ?>
+                                            </div>
+                                        </td>
                                         <td>
                                             <div class="table-actions">
                                                 <button class="action-btn edit" 

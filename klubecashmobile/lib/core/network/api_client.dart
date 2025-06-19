@@ -25,7 +25,15 @@ class ApiClient {
     _dio = dio ?? Dio();
     _configureDio();
   }
+  /// Salva o token de autenticação no armazenamento seguro
+    Future<void> setAuthToken(String token) async {
+      await _secureStorage.write(key: 'auth_token', value: token);
+    }
 
+    /// Limpa o token de autenticação do armazenamento seguro
+    Future<void> clearAuthToken() async {
+      await _secureStorage.delete(key: 'auth_token');
+    }
   /// Getter para acessar a instância do Dio
   Dio get dio => _dio;
 

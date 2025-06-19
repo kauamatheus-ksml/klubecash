@@ -441,12 +441,12 @@ public static function getTransactionDetailsWithBalance($transactionId) {
 }
 
     /**
-     * Gerencia usuários do sistema
-     * 
-     * @param array $filters Filtros para a listagem
-     * @param int $page Página atual
-     * @return array Lista de usuários
-     */
+    * Gerencia usuários do sistema incluindo funcionários vinculados às lojas
+    * 
+    * @param array $filters Filtros para a listagem
+    * @param int $page Página atual
+    * @return array Lista de usuários
+    */
     public static function manageUsers($filters = [], $page = 1) {
         try {
             // Verificar se é um administrador
@@ -456,37 +456,77 @@ public static function getTransactionDetailsWithBalance($transactionId) {
             
             $db = Database::getConnection();
             
-            // Consulta simplificada sem filtros
+            // Construir condições WHERE
+            $whereConditions = [];
+            $params = [];
+            
+            // Aplicar filtros
+            if (!empty($filters['tipo']) && $filters['tipo'] !== 'todos') {
+                $whereConditions[] = "u.tipo = ?";
+                $params[] = $filters['tipo'];
+            }
+            
+            if (!empty($filters['status']) && $filters['status'] !== 'todos') {
+                $whereConditions[] = "u.status = ?";
+                $params[] = $filters['status'];
+            }
+            
+            if (!empty($filters['busca'])) {
+                $whereConditions[] = "(u.nome LIKE ? OR u.email LIKE ?)";
+                $searchTerm = '%' . $filters['busca'] . '%';
+                $params[] = $searchTerm;
+                $params[] = $searchTerm;
+            }
+            
+            $whereClause = empty($whereConditions) ? '' : 'WHERE ' . implode(' AND ', $whereConditions);
+            
+            // Query principal com JOIN para obter informações da loja vinculada
             $query = "
-                SELECT id, nome, email, tipo, status, data_criacao, ultimo_login
-                FROM usuarios
-                ORDER BY data_criacao DESC
+                SELECT 
+                    u.id, 
+                    u.nome, 
+                    u.email, 
+                    u.tipo, 
+                    u.status, 
+                    u.data_criacao, 
+                    u.ultimo_login,
+                    u.subtipo_funcionario,
+                    u.loja_vinculada_id,
+                    l.nome_fantasia as nome_loja_vinculada
+                FROM usuarios u
+                LEFT JOIN lojas l ON u.loja_vinculada_id = l.id
+                $whereClause
+                ORDER BY u.data_criacao DESC
             ";
             
             // Calcular total de registros para paginação
-            $countQuery = "SELECT COUNT(*) as total FROM usuarios";
+            $countQuery = "SELECT COUNT(*) as total FROM usuarios u $whereClause";
             $countStmt = $db->prepare($countQuery);
-            $countStmt->execute();
+            $countStmt->execute($params);
             $totalCount = $countStmt->fetch(PDO::FETCH_ASSOC)['total'];
             
             // Adicionar paginação
-            $perPage = ITEMS_PER_PAGE;
-            $page = max(1, (int)$page); // Garantir que a página é no mínimo 1
+            $perPage = defined('ITEMS_PER_PAGE') ? ITEMS_PER_PAGE : 10;
+            $page = max(1, (int)$page);
             $offset = ($page - 1) * $perPage;
             $query .= " LIMIT $offset, $perPage";
             
             // Executar consulta
             $stmt = $db->prepare($query);
-            $stmt->execute();
+            $stmt->execute($params);
             $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
-            // Estatísticas dos usuários
+            // Estatísticas dos usuários incluindo funcionários
             $statsQuery = "
                 SELECT 
                     COUNT(*) as total_usuarios,
                     SUM(CASE WHEN tipo = 'cliente' THEN 1 ELSE 0 END) as total_clientes,
                     SUM(CASE WHEN tipo = 'admin' THEN 1 ELSE 0 END) as total_admins,
                     SUM(CASE WHEN tipo = 'loja' THEN 1 ELSE 0 END) as total_lojas,
+                    SUM(CASE WHEN tipo = 'funcionario' THEN 1 ELSE 0 END) as total_funcionarios,
+                    SUM(CASE WHEN tipo = 'funcionario' AND subtipo_funcionario = 'financeiro' THEN 1 ELSE 0 END) as total_funcionarios_financeiro,
+                    SUM(CASE WHEN tipo = 'funcionario' AND subtipo_funcionario = 'gerente' THEN 1 ELSE 0 END) as total_funcionarios_gerente,
+                    SUM(CASE WHEN tipo = 'funcionario' AND subtipo_funcionario = 'vendedor' THEN 1 ELSE 0 END) as total_funcionarios_vendedor,
                     SUM(CASE WHEN status = 'ativo' THEN 1 ELSE 0 END) as total_ativos,
                     SUM(CASE WHEN status = 'inativo' THEN 1 ELSE 0 END) as total_inativos,
                     SUM(CASE WHEN status = 'bloqueado' THEN 1 ELSE 0 END) as total_bloqueados

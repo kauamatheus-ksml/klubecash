@@ -50,6 +50,11 @@ define('USER_BLOCKED', 'bloqueado');
 define('USER_TYPE_CLIENT', 'cliente');
 define('USER_TYPE_ADMIN', 'admin');
 define('USER_TYPE_STORE', 'loja');
+define('USER_TYPE_EMPLOYEE', 'funcionario');
+// === SUBTIPOS DE FUNCIONÁRIO ===  
+define('EMPLOYEE_TYPE_FINANCIAL', 'financeiro');
+define('EMPLOYEE_TYPE_MANAGER', 'gerente');
+define('EMPLOYEE_TYPE_SELLER', 'vendedor');
 
 define('STORE_PENDING', 'pendente');
 define('STORE_APPROVED', 'aprovado');

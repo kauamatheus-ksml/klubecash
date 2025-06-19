@@ -6,11 +6,18 @@
 /// Esta classe define a estrutura básica de um usuário,
 /// contendo todas as informações pessoais necessárias
 /// para o funcionamento do app Klube Cash
+/// 
+/// 
+/// 
+
+enum UserType { client, store, admin }
+
 class User {
   final String id;
   final String name;
   final String email;
   final String cpf;
+  final UserType type; // Adicione esta linha
   final String? phone;
   final String? alternativeEmail;
   final String? profilePictureUrl;
@@ -25,6 +32,7 @@ class User {
     required this.name,
     required this.email,
     required this.cpf,
+    this.type = UserType.client, // Adicione esta linha com um valor padrão
     this.phone,
     this.alternativeEmail,
     this.profilePictureUrl,
