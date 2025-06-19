@@ -1,68 +1,19 @@
 <?php
 // views/stores/employees.php
-// Debug para identificar o erro
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
-
-echo "Iniciando página...<br>";
-
-$activeMenu = 'funcionarios';
-
-echo "Carregando dependências...<br>";
-
-require_once '../../config/database.php';
-echo "Database OK<br>";
-
-require_once '../../config/constants.php';
-echo "Constants OK<br>";
-
-require_once '../../controllers/AuthController.php';
-echo "AuthController OK<br>";
-
-// Verificar se StoreController existe
-if (file_exists('../../controllers/StoreController.php')) {
-    echo "StoreController encontrado<br>";
-    require_once '../../controllers/StoreController.php';
-    echo "StoreController carregado<br>";
-} else {
-    die("ERRO: StoreController.php não encontrado em ../../controllers/");
-}
-
-session_start();
-echo "Sessão iniciada<br>";
-
-// Verificar constantes
-if (defined('USER_TYPE_STORE')) {
-    echo "USER_TYPE_STORE definido: " . USER_TYPE_STORE . "<br>";
-} else {
-    die("ERRO: USER_TYPE_STORE não está definido");
-}
-
-// Verificar se é loja
-echo "Tipo de usuário na sessão: " . ($_SESSION['user_type'] ?? 'não definido') . "<br>";
-
-if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION['user_type'] !== USER_TYPE_STORE) {
-    die("ERRO: Acesso negado. Usuário não é uma loja.");
-}
-
-echo "Usuário autorizado como loja<br>";
-
-// Se chegou até aqui, o básico está funcionando
-echo "<h2>Sistema funcionando até aqui!</h2>";
-echo "Agora vou carregar o resto da página...";
-
 $activeMenu = 'funcionarios';
 
 require_once '../../config/database.php';
 require_once '../../config/constants.php';
-require_once '../../controllers/AuthController.php';
 require_once '../../controllers/StoreController.php';
 
-session_start();
+// Iniciar sessão apenas se não estiver ativa
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // Verificar se é loja
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION['user_type'] !== USER_TYPE_STORE) {
-    header("Location: " . LOGIN_URL . "?error=acesso_restrito");
+    header("Location: /login?error=acesso_restrito");
     exit;
 }
 
@@ -115,7 +66,7 @@ try {
     <link rel="stylesheet" href="../../assets/css/layout-fix.css">
 </head>
 <body>
-    <?php include_once '../components/sidebar-store.php'; ?>
+    <?php include_once '../components/sidebar.php'; ?>
     
     <div class="main-content" id="mainContent">
         <div class="page-wrapper">
