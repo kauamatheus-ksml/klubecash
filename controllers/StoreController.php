@@ -593,6 +593,372 @@ class StoreController {
             return ['status' => false, 'message' => 'Erro ao carregar lojas. Tente novamente.'];
         }
     }
+    /**
+     * Valida se o usuário é uma loja
+     */
+    private static function validateStore() {
+        if (!AuthController::isLoggedIn()) {
+            return false;
+        }
+        
+        $userData = AuthController::getUserData();
+        return $userData && $userData['tipo'] === USER_TYPE_STORE;
+    }
+    
+    /**
+     * Obtém o ID da loja vinculada ao usuário logado
+     */
+    private static function getStoreId() {
+        if (!self::validateStore()) {
+            return null;
+        }
+        
+        try {
+            $db = Database::getConnection();
+            $userData = AuthController::getUserData();
+            
+            $stmt = $db->prepare("SELECT id FROM lojas WHERE usuario_id = ?");
+            $stmt->execute([$userData['id']]);
+            
+            $store = $stmt->fetch(PDO::FETCH_ASSOC);
+            return $store ? $store['id'] : null;
+            
+        } catch (PDOException $e) {
+            error_log('Erro ao obter ID da loja: ' . $e->getMessage());
+            return null;
+        }
+    }
+    
+    /**
+     * Lista todos os funcionários de uma loja
+     */
+    public static function getEmployees($filters = [], $page = 1) {
+        try {
+            if (!self::validateStore()) {
+                return ['status' => false, 'message' => 'Acesso restrito a lojistas.'];
+            }
+            
+            $storeId = self::getStoreId();
+            if (!$storeId) {
+                return ['status' => false, 'message' => 'Loja não encontrada.'];
+            }
+            
+            $db = Database::getConnection();
+            
+            // Construir condições WHERE
+            $whereConditions = ["u.loja_vinculada_id = ?"];
+            $params = [$storeId];
+            
+            // Aplicar filtros
+            if (!empty($filters['subtipo']) && $filters['subtipo'] !== 'todos') {
+                $whereConditions[] = "u.subtipo_funcionario = ?";
+                $params[] = $filters['subtipo'];
+            }
+            
+            if (!empty($filters['status']) && $filters['status'] !== 'todos') {
+                $whereConditions[] = "u.status = ?";
+                $params[] = $filters['status'];
+            }
+            
+            if (!empty($filters['busca'])) {
+                $whereConditions[] = "(u.nome LIKE ? OR u.email LIKE ?)";
+                $searchTerm = '%' . $filters['busca'] . '%';
+                $params[] = $searchTerm;
+                $params[] = $searchTerm;
+            }
+            
+            $whereClause = 'WHERE ' . implode(' AND ', $whereConditions);
+            
+            // Query principal
+            $query = "
+                SELECT 
+                    u.id,
+                    u.nome,
+                    u.email,
+                    u.telefone,
+                    u.subtipo_funcionario,
+                    u.status,
+                    u.data_criacao,
+                    u.ultimo_login
+                FROM usuarios u
+                $whereClause
+                ORDER BY u.data_criacao DESC
+            ";
+            
+            // Contar total para paginação
+            $countQuery = "SELECT COUNT(*) as total FROM usuarios u $whereClause";
+            $countStmt = $db->prepare($countQuery);
+            $countStmt->execute($params);
+            $totalCount = $countStmt->fetch(PDO::FETCH_ASSOC)['total'];
+            
+            // Aplicar paginação
+            $perPage = defined('ITEMS_PER_PAGE') ? ITEMS_PER_PAGE : 10;
+            $page = max(1, (int)$page);
+            $offset = ($page - 1) * $perPage;
+            $query .= " LIMIT $offset, $perPage";
+            
+            // Executar query
+            $stmt = $db->prepare($query);
+            $stmt->execute($params);
+            $employees = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            // Estatísticas
+            $statsQuery = "
+                SELECT 
+                    COUNT(*) as total_funcionarios,
+                    SUM(CASE WHEN subtipo_funcionario = 'financeiro' THEN 1 ELSE 0 END) as total_financeiro,
+                    SUM(CASE WHEN subtipo_funcionario = 'gerente' THEN 1 ELSE 0 END) as total_gerente,
+                    SUM(CASE WHEN subtipo_funcionario = 'vendedor' THEN 1 ELSE 0 END) as total_vendedor,
+                    SUM(CASE WHEN status = 'ativo' THEN 1 ELSE 0 END) as total_ativos,
+                    SUM(CASE WHEN status = 'inativo' THEN 1 ELSE 0 END) as total_inativos
+                FROM usuarios
+                WHERE loja_vinculada_id = ? AND tipo = 'funcionario'
+            ";
+            
+            $statsStmt = $db->prepare($statsQuery);
+            $statsStmt->execute([$storeId]);
+            $statistics = $statsStmt->fetch(PDO::FETCH_ASSOC);
+            
+            // Informações de paginação
+            $totalPages = ceil($totalCount / $perPage);
+            
+            return [
+                'status' => true,
+                'data' => [
+                    'funcionarios' => $employees,
+                    'estatisticas' => $statistics,
+                    'paginacao' => [
+                        'total' => $totalCount,
+                        'por_pagina' => $perPage,
+                        'pagina_atual' => $page,
+                        'total_paginas' => $totalPages
+                    ]
+                ]
+            ];
+            
+        } catch (PDOException $e) {
+            error_log('Erro ao listar funcionários: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro ao carregar funcionários.'];
+        }
+    }
+    
+    /**
+     * Cria um novo funcionário
+     */
+    public static function createEmployee($data) {
+        try {
+            if (!self::validateStore()) {
+                return ['status' => false, 'message' => 'Acesso restrito a lojistas.'];
+            }
+            
+            $storeId = self::getStoreId();
+            if (!$storeId) {
+                return ['status' => false, 'message' => 'Loja não encontrada.'];
+            }
+            
+            // Validações
+            $errors = [];
+            
+            if (empty($data['nome']) || !Validator::validaNome($data['nome'])) {
+                $errors[] = 'Nome deve ter pelo menos 3 caracteres.';
+            }
+            
+            if (empty($data['email']) || !Validator::validaEmail($data['email'])) {
+                $errors[] = 'E-mail inválido.';
+            }
+            
+            if (empty($data['subtipo_funcionario']) || !in_array($data['subtipo_funcionario'], [EMPLOYEE_TYPE_FINANCIAL, EMPLOYEE_TYPE_MANAGER, EMPLOYEE_TYPE_SELLER])) {
+                $errors[] = 'Tipo de funcionário inválido.';
+            }
+            
+            if (empty($data['senha']) || !Validator::validaSenha($data['senha'], PASSWORD_MIN_LENGTH)) {
+                $errors[] = 'Senha deve ter pelo menos ' . PASSWORD_MIN_LENGTH . ' caracteres.';
+            }
+            
+            if (!empty($errors)) {
+                return ['status' => false, 'message' => implode(' ', $errors)];
+            }
+            
+            $db = Database::getConnection();
+            
+            // Verificar se email já existe
+            $stmt = $db->prepare("SELECT id FROM usuarios WHERE email = ?");
+            $stmt->execute([$data['email']]);
+            
+            if ($stmt->rowCount() > 0) {
+                return ['status' => false, 'message' => 'Este e-mail já está cadastrado.'];
+            }
+            
+            // Inserir funcionário
+            $senha_hash = password_hash($data['senha'], PASSWORD_DEFAULT);
+            
+            $insertStmt = $db->prepare("
+                INSERT INTO usuarios (
+                    nome, email, telefone, senha_hash, tipo, subtipo_funcionario, 
+                    loja_vinculada_id, status, data_criacao
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
+            ");
+            
+            $success = $insertStmt->execute([
+                $data['nome'],
+                $data['email'],
+                $data['telefone'] ?? '',
+                $senha_hash,
+                USER_TYPE_EMPLOYEE,
+                $data['subtipo_funcionario'],
+                $storeId,
+                USER_ACTIVE
+            ]);
+            
+            if ($success) {
+                return ['status' => true, 'message' => 'Funcionário criado com sucesso!'];
+            } else {
+                return ['status' => false, 'message' => 'Erro ao criar funcionário.'];
+            }
+            
+        } catch (PDOException $e) {
+            error_log('Erro ao criar funcionário: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro interno do servidor.'];
+        }
+    }
+    
+    /**
+     * Atualiza dados de um funcionário
+     */
+    public static function updateEmployee($employeeId, $data) {
+        try {
+            if (!self::validateStore()) {
+                return ['status' => false, 'message' => 'Acesso restrito a lojistas.'];
+            }
+            
+            $storeId = self::getStoreId();
+            if (!$storeId) {
+                return ['status' => false, 'message' => 'Loja não encontrada.'];
+            }
+            
+            $db = Database::getConnection();
+            
+            // Verificar se o funcionário pertence a esta loja
+            $checkStmt = $db->prepare("
+                SELECT id FROM usuarios 
+                WHERE id = ? AND loja_vinculada_id = ? AND tipo = 'funcionario'
+            ");
+            $checkStmt->execute([$employeeId, $storeId]);
+            
+            if ($checkStmt->rowCount() === 0) {
+                return ['status' => false, 'message' => 'Funcionário não encontrado.'];
+            }
+            
+            // Construir campos para atualização
+            $updateFields = [];
+            $params = [];
+            
+            if (!empty($data['nome'])) {
+                $updateFields[] = "nome = ?";
+                $params[] = $data['nome'];
+            }
+            
+            if (!empty($data['email'])) {
+                // Verificar se email já existe em outro usuário
+                $emailCheckStmt = $db->prepare("SELECT id FROM usuarios WHERE email = ? AND id != ?");
+                $emailCheckStmt->execute([$data['email'], $employeeId]);
+                
+                if ($emailCheckStmt->rowCount() > 0) {
+                    return ['status' => false, 'message' => 'Este e-mail já está em uso.'];
+                }
+                
+                $updateFields[] = "email = ?";
+                $params[] = $data['email'];
+            }
+            
+            if (isset($data['telefone'])) {
+                $updateFields[] = "telefone = ?";
+                $params[] = $data['telefone'];
+            }
+            
+            if (!empty($data['subtipo_funcionario'])) {
+                $updateFields[] = "subtipo_funcionario = ?";
+                $params[] = $data['subtipo_funcionario'];
+            }
+            
+            if (!empty($data['status'])) {
+                $updateFields[] = "status = ?";
+                $params[] = $data['status'];
+            }
+            
+            if (!empty($data['senha'])) {
+                $updateFields[] = "senha_hash = ?";
+                $params[] = password_hash($data['senha'], PASSWORD_DEFAULT);
+            }
+            
+            if (empty($updateFields)) {
+                return ['status' => false, 'message' => 'Nenhum dado para atualizar.'];
+            }
+            
+            // Executar atualização
+            $params[] = $employeeId;
+            $updateQuery = "UPDATE usuarios SET " . implode(', ', $updateFields) . " WHERE id = ?";
+            
+            $updateStmt = $db->prepare($updateQuery);
+            $success = $updateStmt->execute($params);
+            
+            if ($success) {
+                return ['status' => true, 'message' => 'Funcionário atualizado com sucesso!'];
+            } else {
+                return ['status' => false, 'message' => 'Erro ao atualizar funcionário.'];
+            }
+            
+        } catch (PDOException $e) {
+            error_log('Erro ao atualizar funcionário: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro interno do servidor.'];
+        }
+    }
+    
+    /**
+     * Remove/desativa um funcionário
+     */
+    public static function deleteEmployee($employeeId) {
+        try {
+            if (!self::validateStore()) {
+                return ['status' => false, 'message' => 'Acesso restrito a lojistas.'];
+            }
+            
+            $storeId = self::getStoreId();
+            if (!$storeId) {
+                return ['status' => false, 'message' => 'Loja não encontrada.'];
+            }
+            
+            $db = Database::getConnection();
+            
+            // Verificar se o funcionário pertence a esta loja
+            $checkStmt = $db->prepare("
+                SELECT id FROM usuarios 
+                WHERE id = ? AND loja_vinculada_id = ? AND tipo = 'funcionario'
+            ");
+            $checkStmt->execute([$employeeId, $storeId]);
+            
+            if ($checkStmt->rowCount() === 0) {
+                return ['status' => false, 'message' => 'Funcionário não encontrado.'];
+            }
+            
+            // Desativar funcionário (não deletar fisicamente)
+            $updateStmt = $db->prepare("UPDATE usuarios SET status = 'inativo' WHERE id = ?");
+            $success = $updateStmt->execute([$employeeId]);
+            
+            if ($success) {
+                return ['status' => true, 'message' => 'Funcionário desativado com sucesso!'];
+            } else {
+                return ['status' => false, 'message' => 'Erro ao desativar funcionário.'];
+            }
+            
+        } catch (PDOException $e) {
+            error_log('Erro ao desativar funcionário: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro interno do servidor.'];
+        }
+    }
+
+
+
 }
 
 // Processar requisições diretas de acesso ao controlador
