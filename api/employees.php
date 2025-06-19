@@ -80,11 +80,17 @@ function handleGetRequest() {
     } else {
         // Listar funcionários
         $page = isset($_GET['page']) ? intval($_GET['page']) : 1;
-        $filters = [];
+       $filters = [];
         
-        if (isset($_GET['subtipo'])) $filters['subtipo'] = $_GET['subtipo'];
-        if (isset($_GET['status'])) $filters['status'] = $_GET['status'];
-        if (isset($_GET['busca'])) $filters['busca'] = $_GET['busca'];
+        if (!empty($_GET['subtipo']) && $_GET['subtipo'] !== 'todos') {
+            $filters['subtipo'] = $_GET['subtipo'];
+        }
+        if (!empty($_GET['status']) && $_GET['status'] !== 'todos') {
+            $filters['status'] = $_GET['status'];
+        }
+        if (!empty($_GET['busca'])) {
+            $filters['busca'] = trim($_GET['busca']);
+        }
         
         $result = StoreController::getEmployees($filters, $page);
         echo json_encode($result);
@@ -95,9 +101,8 @@ function handlePostRequest() {
     $data = json_decode(file_get_contents('php://input'), true);
     
     if (!$data) {
-        http_response_code(400);
-        echo json_encode(['status' => false, 'message' => 'Dados inválidos']);
-        exit;
+        echo json_encode(['status' => false, 'message' => 'Dados não fornecidos']);
+        return;
     }
     
     $result = StoreController::createEmployee($data);
@@ -108,20 +113,19 @@ function handlePutRequest() {
     $employeeId = isset($_GET['id']) ? intval($_GET['id']) : null;
     
     if (!$employeeId) {
-        http_response_code(400);
         echo json_encode(['status' => false, 'message' => 'ID do funcionário não fornecido']);
-        exit;
+        return;
     }
     
     $data = json_decode(file_get_contents('php://input'), true);
     
     if (!$data) {
-        http_response_code(400);
-        echo json_encode(['status' => false, 'message' => 'Dados inválidos']);
-        exit;
+        echo json_encode(['status' => false, 'message' => 'Dados não fornecidos']);
+        return;
     }
     
-    $result = StoreController::updateEmployee($employeeId, $data);
+    $data['id'] = $employeeId;
+    $result = StoreController::updateEmployee($data);
     echo json_encode($result);
 }
 
@@ -129,9 +133,8 @@ function handleDeleteRequest() {
     $employeeId = isset($_GET['id']) ? intval($_GET['id']) : null;
     
     if (!$employeeId) {
-        http_response_code(400);
         echo json_encode(['status' => false, 'message' => 'ID do funcionário não fornecido']);
-        exit;
+        return;
     }
     
     $result = StoreController::deleteEmployee($employeeId);
@@ -141,10 +144,10 @@ function handleDeleteRequest() {
 function getStoreId() {
     try {
         $db = Database::getConnection();
-        $userData = AuthController::getUserData();
+        $userId = $_SESSION['user_id'];
         
         $stmt = $db->prepare("SELECT id FROM lojas WHERE usuario_id = ?");
-        $stmt->execute([$userData['id']]);
+        $stmt->execute([$userId]);
         
         $store = $stmt->fetch(PDO::FETCH_ASSOC);
         return $store ? $store['id'] : null;
