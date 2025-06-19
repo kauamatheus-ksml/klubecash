@@ -10,6 +10,17 @@ require_once '../../controllers/TransactionController.php';
 // Iniciar sessão e verificar autenticação
 session_start();
 
+if (!AuthController::hasStoreAccess()) {
+    header("Location: " . LOGIN_URL . "?error=acesso_restrito");
+    exit;
+}
+
+// Verificar permissão específica para ver dashboard
+if (AuthController::isEmployee() && !PermissionManager::checkAccess(MODULO_DASHBOARD, ACAO_VER)) {
+    header("Location: " . LOGIN_URL . "?error=sem_permissao");
+    exit;
+}
+
 // Verificar se o usuário está logado
 if (!AuthController::isAuthenticated()) {
     header('Location: ' . LOGIN_URL . '?error=' . urlencode('Você precisa fazer login para acessar esta página.'));

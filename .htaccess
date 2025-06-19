@@ -3,6 +3,18 @@
 # Habilitar o motor de reescrita
 RewriteEngine On
 RewriteBase /
+# Redirecionar funcionários para área da loja após login
+RewriteCond %{QUERY_STRING} user_type=funcionario
+RewriteRule ^login\.php$ /views/store/dashboard.php? [R=302,L]
+
+# Proteger API de funcionários
+RewriteCond %{REQUEST_URI} ^/api/funcionarios\.php
+RewriteCond %{REQUEST_METHOD} !^(GET|POST)$
+RewriteRule .* - [F,L]
+
+# Redirecionar acesso negado para página específica
+RewriteCond %{QUERY_STRING} error=sem_permissao
+RewriteRule ^.*$ /views/errors/permission-denied.php? [R=302,L]
 
 # === CONFIGURAÇÕES SEO FUNDAMENTAIS ===
 <IfModule mod_headers.c>

@@ -11,6 +11,18 @@ require_once '../../controllers/CommissionController.php';
 // Iniciar sessão e verificar autenticação
 session_start();
 
+
+// Verificar acesso e permissão para criar transações
+if (!AuthController::hasStoreAccess()) {
+    header("Location: " . LOGIN_URL . "?error=acesso_restrito");
+    exit;
+}
+
+if (AuthController::isEmployee() && !PermissionManager::checkAccess(MODULO_TRANSACOES, ACAO_CRIAR)) {
+    header("Location: " . LOGIN_URL . "?error=sem_permissao");
+    exit;
+}
+
 // Verificar se o usuário está logado
 if (!AuthController::isAuthenticated()) {
     header('Location: ' . LOGIN_URL . '?error=' . urlencode('Você precisa fazer login para acessar esta página.'));
