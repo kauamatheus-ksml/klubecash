@@ -66,7 +66,7 @@ try {
     <link rel="stylesheet" href="../../assets/css/layout-fix.css">
 </head>
 <body>
-    <?php include_once '../components/sidebar.php'; ?>
+    <?php include_once '../components/sidebar-store.php'; ?>
     
     <div class="main-content" id="mainContent">
         <div class="page-wrapper">
