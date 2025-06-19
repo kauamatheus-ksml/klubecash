@@ -57,7 +57,7 @@ if ($isFuncionario) {
     padding: 12px 10px;
     border-bottom: 1px solid rgba(255,255,255,0.15);
     margin-bottom: 15px;
-    background: rgba(0,0,0,0.2);
+    
 }
 
 .user-name {
