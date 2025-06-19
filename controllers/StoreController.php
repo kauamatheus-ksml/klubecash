@@ -792,25 +792,21 @@ class StoreController {
                 return ['status' => false, 'message' => 'Este e-mail já está cadastrado.'];
             }
             
-            // Inserir funcionário
-            $senha_hash = password_hash($data['senha'], PASSWORD_DEFAULT);
+            // Criar novo funcionário
+            $senhaHash = password_hash($data['senha'], PASSWORD_DEFAULT);
             
             $insertStmt = $db->prepare("
-                INSERT INTO usuarios (
-                    nome, email, telefone, senha_hash, tipo, subtipo_funcionario, 
-                    loja_vinculada_id, status, data_criacao
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                INSERT INTO usuarios (nome, email, telefone, senha_hash, tipo, subtipo_funcionario, loja_vinculada_id, status, data_criacao) 
+                VALUES (?, ?, ?, ?, 'funcionario', ?, ?, 'ativo', NOW())
             ");
             
             $success = $insertStmt->execute([
                 $data['nome'],
                 $data['email'],
                 $data['telefone'] ?? '',
-                $senha_hash,
-                USER_TYPE_EMPLOYEE,
+                $senhaHash,
                 $data['subtipo_funcionario'],
-                $storeId,
-                USER_ACTIVE
+                $storeId
             ]);
             
             if ($success) {
