@@ -138,7 +138,7 @@ if ($isFuncionario) {
         
         <!-- Informações do usuário -->
         <div class="user-info">
-            <div class="user-name"><?= htmlspecialchars($userName) ?></div>
+            
             <?php if ($isLoja): ?>
                 <span class="user-badge loja">Lojista</span>
             <?php elseif ($isFuncionario): ?>
