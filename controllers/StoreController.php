@@ -597,12 +597,15 @@ class StoreController {
      * Valida se o usuário é uma loja
      */
     private static function validateStore() {
-        if (!AuthController::isLoggedIn()) {
-            return false;
+        // Verificar se existe sessão
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
         }
         
-        $userData = AuthController::getUserData();
-        return $userData && $userData['tipo'] === USER_TYPE_STORE;
+        // Verificar se está logado e é loja
+        return isset($_SESSION['user_id']) && 
+               isset($_SESSION['user_type']) && 
+               $_SESSION['user_type'] === USER_TYPE_STORE;
     }
     
     /**
@@ -615,10 +618,10 @@ class StoreController {
         
         try {
             $db = Database::getConnection();
-            $userData = AuthController::getUserData();
+            $userId = $_SESSION['user_id'];
             
             $stmt = $db->prepare("SELECT id FROM lojas WHERE usuario_id = ?");
-            $stmt->execute([$userData['id']]);
+            $stmt->execute([$userId]);
             
             $store = $stmt->fetch(PDO::FETCH_ASSOC);
             return $store ? $store['id'] : null;
@@ -646,7 +649,7 @@ class StoreController {
             $db = Database::getConnection();
             
             // Construir condições WHERE
-            $whereConditions = ["u.loja_vinculada_id = ?"];
+            $whereConditions = ["u.loja_vinculada_id = ? AND u.tipo = 'funcionario'"];
             $params = [$storeId];
             
             // Aplicar filtros
@@ -956,6 +959,7 @@ class StoreController {
             return ['status' => false, 'message' => 'Erro interno do servidor.'];
         }
     }
+
 
 
 
