@@ -11,6 +11,8 @@
  * @param string $activeMenu - O ID do menu ativo atual
  */
 require_once '../../config/constants.php';
+require_once '../../controllers/AuthController.php';
+require_once '../../utils/PermissionManager.php';
 // Iniciar sessão apenas se ainda não estiver ativa
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -20,11 +22,26 @@ if (!isset($_SESSION['user_id'])) {
     header('Location: ' . LOGIN_URL);
     exit;
 }
-// Verificar se o usuário é loja
-if ($_SESSION['user_type'] !== 'loja') {
+// Verificar se o usuário tem acesso à área da loja (lojista OU funcionário)
+if (!AuthController::hasStoreAccess()) {
     header('Location: ' . CLIENT_DASHBOARD_URL);
     exit;
 }
+
+// Definir variáveis de controle para permissões
+$isEmployee = AuthController::isEmployee();
+$isStoreOwner = AuthController::isStoreOwner();
+$userName = $_SESSION['user_name'];
+
+// Função helper para verificar permissões
+function canShowMenuItem($modulo, $acao) {
+    global $isEmployee;
+    if (!$isEmployee) {
+        return true; // Lojista tem acesso total
+    }
+    return PermissionManager::checkAccess($modulo, $acao);
+}
+
 // Verificar se $activeMenu está definido, caso contrário definir como 'dashboard'
 if (!isset($activeMenu)) {
     $activeMenu = 'dashboard';
@@ -47,6 +64,25 @@ if (!isset($activeMenu)) {
 <div class="sidebar" id="sidebar">
     <div class="sidebar-header">
         <img src="../../assets/images/logo.png" alt="KlubeCash" class="sidebar-logo">
+        
+        <!-- NOVA SEÇÃO: Informações do usuário -->
+        <div class="user-info">
+            <div class="user-name"><?= htmlspecialchars($userName) ?></div>
+            <?php if ($isStoreOwner): ?>
+                <span class="user-badge owner">Lojista</span>
+            <?php elseif ($isEmployee): ?>
+                <?php 
+                $subtipo = $_SESSION['subtipo_funcionario'] ?? 'funcionario';
+                $badgeClass = match($subtipo) {
+                    'gerente' => 'manager',
+                    'financeiro' => 'financial', 
+                    'vendedor' => 'seller',
+                    default => 'employee'
+                };
+                ?>
+                <span class="user-badge <?= $badgeClass ?>"><?= ucfirst($subtipo) ?></span>
+            <?php endif; ?>
+        </div>
     </div>
     
     <ul class="sidebar-nav">
@@ -75,6 +111,9 @@ if (!isset($activeMenu)) {
                     <circle cx="12" cy="7" r="4"></circle>
                 </svg>
                 <span>Funcionários</span>
+                <?php if ($isEmployee): ?>
+                    <span class="permission-indicator">👑</span>
+                <?php endif; ?>
             </a>
         </li>
         <!--
@@ -137,7 +176,20 @@ if (!isset($activeMenu)) {
             </a>
         </li>
     </ul>
-    
+    <!-- NOVO: Indicador de acesso limitado -->
+    <?php if ($isEmployee): ?>
+    <div style="padding: 10px; background: rgba(255,193,7,0.2); margin: 10px; border-radius: 8px; text-align: center;">
+        <div style="color: #ffc107; font-size: 12px; font-weight: 600;">
+            🔐 ACESSO LIMITADO
+        </div>
+        <div style="color: rgba(255,255,255,0.8); font-size: 10px; margin-top: 2px;">
+            Permissões controladas pelo lojista
+        </div>
+    </div>
+    <?php endif; ?>
+
+    <div class="sidebar-footer">
+        <!-- resto do conteúdo permanece igual -->
     <div class="sidebar-footer">
         <a href="<?php echo SITE_URL; ?>/controllers/AuthController.php?action=logout" class="logout-btn">
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -193,3 +245,62 @@ document.addEventListener('DOMContentLoaded', function() {
     checkScreenSize();
 });
 </script>
+
+<!-- NOVOS ESTILOS PARA PERMISSÕES -->
+<style>
+.user-info {
+    text-align: center;
+    padding: 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    margin-bottom: 10px;
+}
+
+.user-name {
+    color: #fff;
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 5px;
+}
+
+.user-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.user-badge.owner {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.user-badge.manager {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+}
+
+.user-badge.financial {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    color: white;
+}
+
+.user-badge.seller {
+    background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+    color: white;
+}
+
+.permission-indicator {
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 12px;
+}
+
+.sidebar-nav-item {
+    position: relative;
+}
+</style>
