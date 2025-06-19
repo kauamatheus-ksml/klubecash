@@ -80,7 +80,7 @@ function handleGetRequest() {
     } else {
         // Listar funcionários
         $page = isset($_GET['page']) ? intval($_GET['page']) : 1;
-       $filters = [];
+        $filters = [];
         
         if (!empty($_GET['subtipo']) && $_GET['subtipo'] !== 'todos') {
             $filters['subtipo'] = $_GET['subtipo'];

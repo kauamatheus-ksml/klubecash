@@ -408,7 +408,302 @@ try {
             </div>
         </div>
     </div>
+    <script>
+        let currentPage = 1;
+        let isLoading = false;
 
+        function loadEmployees(page = 1, resetTable = true) {
+            if (isLoading) return;
+            isLoading = true;
+            
+            if (resetTable) {
+                currentPage = 1;
+                page = 1;
+            }
+            
+            // Mostrar loading
+            showLoading();
+            
+            // Construir URL com filtros
+            const params = new URLSearchParams({
+                page: page,
+                subtipo: document.getElementById('filterType').value || 'todos',
+                status: document.getElementById('filterStatus').value || 'todos',
+                busca: document.getElementById('searchInput').value || ''
+            });
+            
+            fetch(`/api/employees?${params.toString()}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status) {
+                        updateEmployeeTable(data.data.funcionarios);
+                        updateStatistics(data.data.estatisticas);
+                        updatePagination(data.data.paginacao);
+                    } else {
+                        showError(data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro ao carregar funcionários:', error);
+                    showError('Erro ao carregar dados dos funcionários');
+                })
+                .finally(() => {
+                    hideLoading();
+                    isLoading = false;
+                });
+        }
+
+        function showEmployeeModal(employee = null) {
+            const modal = document.getElementById('employeeModal');
+            const form = document.getElementById('employeeForm');
+            const title = document.getElementById('modalTitle');
+            const passwordGroup = document.getElementById('passwordGroup');
+            
+            // Resetar formulário
+            form.reset();
+            
+            if (employee) {
+                // Editando funcionário
+                title.textContent = 'Editar Funcionário';
+                document.getElementById('employeeName').value = employee.nome || '';
+                document.getElementById('employeeEmail').value = employee.email || '';
+                document.getElementById('employeePhone').value = employee.telefone || '';
+                document.getElementById('employeeType').value = employee.subtipo_funcionario || '';
+                form.dataset.employeeId = employee.id;
+                passwordGroup.style.display = 'none'; // Ocultar senha ao editar
+            } else {
+                // Novo funcionário
+                title.textContent = 'Novo Funcionário';
+                delete form.dataset.employeeId;
+                passwordGroup.style.display = 'block'; // Mostrar senha ao criar
+            }
+            
+            modal.style.display = 'block';
+        }
+
+        function closeEmployeeModal() {
+            document.getElementById('employeeModal').style.display = 'none';
+        }
+
+        function submitEmployeeForm() {
+            const form = document.getElementById('employeeForm');
+            const formData = new FormData(form);
+            const isEditing = !!form.dataset.employeeId;
+            
+            // Converter FormData para objeto
+            const data = {};
+            formData.forEach((value, key) => {
+                data[key] = value;
+            });
+            
+            // Validações básicas
+            if (!data.nome || data.nome.trim().length < 3) {
+                showError('Nome deve ter pelo menos 3 caracteres');
+                return;
+            }
+            
+            if (!data.email || !isValidEmail(data.email)) {
+                showError('E-mail inválido');
+                return;
+            }
+            
+            if (!data.subtipo_funcionario) {
+                showError('Selecione o tipo de funcionário');
+                return;
+            }
+            
+            if (!isEditing && (!data.senha || data.senha.length < 8)) {
+                showError('Senha deve ter pelo menos 8 caracteres');
+                return;
+            }
+            
+            // Determinar URL e método
+            let url = '/api/employees';
+            let method = 'POST';
+            
+            if (isEditing) {
+                url += `?id=${form.dataset.employeeId}`;
+                method = 'PUT';
+                delete data.senha; // Não enviar senha ao editar
+            }
+            
+            // Enviar requisição
+            fetch(url, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.status) {
+                    closeEmployeeModal();
+                    loadEmployees(); // Recarregar lista
+                    showSuccess(result.message);
+                } else {
+                    showError(result.message);
+                }
+            })
+            .catch(error => {
+                console.error('Erro ao salvar funcionário:', error);
+                showError('Erro ao salvar funcionário');
+            });
+        }
+
+        function deleteEmployee(id, name) {
+            if (!confirm(`Tem certeza que deseja desativar o funcionário "${name}"?`)) {
+                return;
+            }
+            
+            fetch(`/api/employees?id=${id}`, {
+                method: 'DELETE'
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.status) {
+                    loadEmployees(); // Recarregar lista
+                    showSuccess(result.message);
+                } else {
+                    showError(result.message);
+                }
+            })
+            .catch(error => {
+                console.error('Erro ao desativar funcionário:', error);
+                showError('Erro ao desativar funcionário');
+            });
+        }
+
+        function updateEmployeeTable(employees) {
+            const tbody = document.querySelector('#employeesTable tbody');
+            
+            if (!employees || employees.length === 0) {
+                tbody.innerHTML = `
+                    <tr class="empty-state">
+                        <td colspan="6">
+                            <div class="empty-message">
+                                <i class="fas fa-users"></i>
+                                <p>Nenhum funcionário encontrado</p>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            tbody.innerHTML = employees.map(employee => `
+                <tr>
+                    <td>
+                        <div class="user-info">
+                            <div class="user-avatar">
+                                <i class="fas fa-user"></i>
+                            </div>
+                            <div class="user-details">
+                                <div class="user-name">${escapeHtml(employee.nome)}</div>
+                                <div class="user-email">${escapeHtml(employee.email)}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="type-badge type-funcionario">
+                            ${getEmployeeTypeLabel(employee.subtipo_funcionario)}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="status-badge status-${employee.status}">
+                            ${getStatusLabel(employee.status)}
+                        </span>
+                    </td>
+                    <td>${formatDate(employee.data_criacao)}</td>
+                    <td>${employee.ultimo_login ? formatDate(employee.ultimo_login) : 'Nunca'}</td>
+                    <td>
+                        <div class="actions">
+                            <button onclick="showEmployeeModal(${JSON.stringify(employee).replace(/"/g, '&quot;')})" 
+                                    class="btn btn-sm btn-outline-primary" title="Editar">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button onclick="deleteEmployee(${employee.id}, '${escapeHtml(employee.nome)}')" 
+                                    class="btn btn-sm btn-outline-danger" title="Desativar">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function getEmployeeTypeLabel(type) {
+            const types = {
+                'financeiro': 'Financeiro',
+                'gerente': 'Gerente',
+                'vendedor': 'Vendedor'
+            };
+            return types[type] || type;
+        }
+
+        function getStatusLabel(status) {
+            const statuses = {
+                'ativo': 'Ativo',
+                'inativo': 'Inativo',
+                'bloqueado': 'Bloqueado'
+            };
+            return statuses[status] || status;
+        }
+
+        function updateStatistics(stats) {
+            if (!stats) return;
+            
+            document.querySelector('.stat-total .stat-number').textContent = stats.total || 0;
+            document.querySelector('.stat-financeiro .stat-number').textContent = stats.financeiro || 0;
+            document.querySelector('.stat-gerentes .stat-number').textContent = stats.gerente || 0;
+            document.querySelector('.stat-vendedores .stat-number').textContent = stats.vendedor || 0;
+        }
+
+        // Funções auxiliares
+        function isValidEmail(email) {
+            return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function formatDate(dateString) {
+            if (!dateString) return '-';
+            const date = new Date(dateString);
+            return date.toLocaleDateString('pt-BR') + '<br><small>' + 
+                date.toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'}) + '</small>';
+        }
+
+        function showLoading() {
+            // Implementar loading
+        }
+
+        function hideLoading() {
+            // Implementar hide loading
+        }
+
+        function showError(message) {
+            alert('Erro: ' + message);
+        }
+
+        function showSuccess(message) {
+            alert('Sucesso: ' + message);
+        }
+
+        // Event listeners para filtros
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('searchInput')?.addEventListener('input', () => {
+                clearTimeout(window.searchTimeout);
+                window.searchTimeout = setTimeout(() => loadEmployees(), 500);
+            });
+            
+            document.getElementById('filterType')?.addEventListener('change', () => loadEmployees());
+            document.getElementById('filterStatus')?.addEventListener('change', () => loadEmployees());
+        });
+    </script>                            
     <!-- Loading Overlay -->
     <div id="loadingOverlay" class="loading-overlay" style="display: none;">
         <div class="loading-spinner">
