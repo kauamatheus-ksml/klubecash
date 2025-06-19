@@ -1,16 +1,9 @@
 <?php
 /**
- * Componente de Sidebar para a área da Loja
+ * Componente de Sidebar para a área da Loja com Sistema de Funcionários
  * 
- * Este componente cria uma sidebar responsiva para todas as páginas
- * do painel da loja parceira.
- * 
- * IMPORTANTE: Lojas não recebem cashback - elas pagam 10% de comissão
- * (5% para cliente + 5% para admin)
- * 
- * NOVO: Funcionários têm acesso limitado baseado em seu tipo
- * 
- * @param string $activeMenu - O ID do menu ativo atual
+ * Estrutura: views/stores/ (confirmada)
+ * Funcionalidade: Controle de visibilidade baseado no tipo de usuário
  */
 require_once '../../config/constants.php';
 
@@ -36,12 +29,12 @@ if (!isset($activeMenu)) {
     $activeMenu = 'dashboard';
 }
 
-// Variáveis de controle simples
+// Variáveis de controle simples e eficazes
 $isLoja = ($_SESSION['user_type'] === 'loja');
 $isFuncionario = ($_SESSION['user_type'] === 'funcionario');
 $userName = $_SESSION['user_name'] ?? 'Usuário';
 
-// Para funcionários, pegar o subtipo
+// Para funcionários, obter subtipo
 $subtipoFuncionario = '';
 if ($isFuncionario) {
     $subtipoFuncionario = $_SESSION['subtipo_funcionario'] ?? 'funcionario';
@@ -50,14 +43,14 @@ if ($isFuncionario) {
 
 <link rel="stylesheet" href="../../assets/css/sidebar-styles.css">
 
-<!-- Estilos adicionais para identificação de usuários -->
+<!-- Estilos para identificação de usuários -->
 <style>
 .user-info {
     text-align: center;
     padding: 12px 10px;
     border-bottom: 1px solid rgba(255,255,255,0.15);
     margin-bottom: 15px;
-    
+    background: rgba(0,0,0,0.2);
 }
 
 .user-name {
@@ -77,25 +70,10 @@ if ($isFuncionario) {
     letter-spacing: 0.5px;
 }
 
-.user-badge.loja {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-}
-
-.user-badge.gerente {
-    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-    color: white;
-}
-
-.user-badge.financeiro {
-    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-    color: white;
-}
-
-.user-badge.vendedor {
-    background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
-    color: white;
-}
+.user-badge.loja { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+.user-badge.gerente { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; }
+.user-badge.financeiro { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; }
+.user-badge.vendedor { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: white; }
 
 .funcionario-warning {
     background: rgba(255,193,7,0.2);
@@ -104,18 +82,6 @@ if ($isFuncionario) {
     border-radius: 8px;
     text-align: center;
     border-left: 3px solid #ffc107;
-}
-
-.funcionario-warning-text {
-    color: #ffc107;
-    font-size: 11px;
-    font-weight: 600;
-    margin-bottom: 2px;
-}
-
-.funcionario-warning-desc {
-    color: rgba(255,255,255,0.8);
-    font-size: 9px;
 }
 </style>
 
@@ -138,7 +104,7 @@ if ($isFuncionario) {
         
         <!-- Informações do usuário -->
         <div class="user-info">
-            
+            <div class="user-name"><?= htmlspecialchars($userName) ?></div>
             <?php if ($isLoja): ?>
                 <span class="user-badge loja">Lojista</span>
             <?php elseif ($isFuncionario): ?>
@@ -226,8 +192,12 @@ if ($isFuncionario) {
     <!-- Aviso para funcionários -->
     <?php if ($isFuncionario): ?>
     <div class="funcionario-warning">
-        <div class="funcionario-warning-text">🔒 ACESSO LIMITADO</div>
-        <div class="funcionario-warning-desc">Algumas funções podem estar restritas</div>
+        <div style="color: #ffc107; font-size: 11px; font-weight: 600; margin-bottom: 2px;">
+            🔒 ACESSO LIMITADO
+        </div>
+        <div style="color: rgba(255,255,255,0.8); font-size: 9px;">
+            Algumas funções podem estar restritas
+        </div>
     </div>
     <?php endif; ?>
     
@@ -243,16 +213,13 @@ if ($isFuncionario) {
     </div>
 </div>
 
-<!-- Script para responsividade da Sidebar -->
+<!-- Script permanece o mesmo -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Elementos da DOM
     const sidebarToggle = document.getElementById('sidebarToggle');
     const sidebar = document.getElementById('sidebar');
     const overlay = document.getElementById('overlay');
-    const mainContent = document.getElementById('mainContent');
     
-    // Evento para mostrar/ocultar a sidebar em dispositivos móveis
     if (sidebarToggle) {
         sidebarToggle.addEventListener('click', toggleSidebar);
     }
@@ -261,17 +228,11 @@ document.addEventListener('DOMContentLoaded', function() {
         overlay.addEventListener('click', toggleSidebar);
     }
     
-    /**
-     * Alterna a visibilidade da sidebar em dispositivos móveis
-     */
     function toggleSidebar() {
         sidebar.classList.toggle('open');
         overlay.classList.toggle('active');
     }
     
-    /**
-     * Verifica o tamanho da tela e ajusta a sidebar conforme necessário
-     */
     function checkScreenSize() {
         if (window.innerWidth > 768) {
             sidebar.classList.remove('open');
@@ -279,10 +240,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Verificar o tamanho da tela ao carregar e redimensionar
     window.addEventListener('resize', checkScreenSize);
-    
-    // Inicializar
     checkScreenSize();
 });
 </script>
