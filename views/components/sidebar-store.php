@@ -68,6 +68,14 @@ if (!isset($activeMenu)) {
                 Registrar Venda
             </a>
         </li>
+        <?php if ($_SESSION['user_type'] === USER_TYPE_STORE): ?>
+            <li class="<?php echo ($activeMenu === 'funcionarios') ? 'active' : ''; ?>">
+                <a href="/store/funcionarios/">
+                    <i class="fas fa-user-tie"></i>
+                    <span>Funcionários</span>
+                </a>
+            </li>
+        <?php endif; ?>
         <!--
         <li>
             <a href="<?php echo STORE_TRANSACTIONS_URL; ?>" class="sidebar-nav-item <?php echo ($activeMenu == 'transactions') ? 'active' : ''; ?>">

@@ -240,6 +240,9 @@ RewriteRule ^admin/comissoes/?$ views/admin/commissions.php [L]
 RewriteRule ^admin/pagamentos/?$ views/admin/payments.php [L]
 RewriteRule ^admin/relatorios/?$ views/admin/reports.php [L]
 
+
+
+
 # PIX e Mercado Pago (OTIMIZADO)
 RewriteRule ^store/pagamento-pix/?$ views/stores/payment-pix.php [L,QSA]
 RewriteRule ^api/mercadopago/?$ api/mercadopago.php [L,QSA]
@@ -257,6 +260,11 @@ RewriteRule ^store/upload-lote/?$ views/stores/batch-upload.php [L,QSA]
 RewriteRule ^store/pagamento/?$ views/stores/payment.php [L,QSA]
 RewriteRule ^store/historico-pagamentos/?$ views/stores/payment-history.php [L,QSA]
 RewriteRule ^store/perfil/?$ views/stores/profile.php [L,QSA]
+
+
+# Funcionários
+RewriteRule ^store/funcionarios/?$ views/stores/employees.php [L,QSA]
+RewriteRule ^api/employees/?$ api/employees.php [L,QSA]
 
 # NOVA ROTA OPENPIX
 RewriteRule ^api/openpix/?$ api/openpix.php [L]
