@@ -260,7 +260,8 @@ RewriteRule ^store/upload-lote/?$ views/stores/batch-upload.php [L,QSA]
 RewriteRule ^store/pagamento/?$ views/stores/payment.php [L,QSA]
 RewriteRule ^store/historico-pagamentos/?$ views/stores/payment-history.php [L,QSA]
 RewriteRule ^store/perfil/?$ views/stores/profile.php [L,QSA]
-
+# Redirecionar API de funcionários
+RewriteRule ^api/employees$ api/employees.php [L,QSA]
 
 # Funcionários
 RewriteRule ^store/funcionarios/?$ views/stores/employees.php [L,QSA]

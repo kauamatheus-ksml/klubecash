@@ -51,6 +51,8 @@ define('USER_TYPE_CLIENT', 'cliente');
 define('USER_TYPE_ADMIN', 'admin');
 define('USER_TYPE_STORE', 'loja');
 define('USER_TYPE_EMPLOYEE', 'funcionario');
+
+define('PASSWORD_MIN_LENGTH', 8);
 // === SUBTIPOS DE FUNCIONÁRIO ===  
 define('EMPLOYEE_TYPE_FINANCIAL', 'financeiro');
 define('EMPLOYEE_TYPE_MANAGER', 'gerente');

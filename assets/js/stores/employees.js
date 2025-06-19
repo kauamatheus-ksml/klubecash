@@ -1,4 +1,4 @@
-// assets/js/stores/employees.js
+// assets/js/stores/employees.js - VERSÃO CORRIGIDA
 
 // Variáveis globais
 let isEditing = false;
@@ -9,7 +9,18 @@ function showEmployeeModal() {
     document.getElementById('employeeModalTitle').innerHTML = '<i class="fas fa-user-plus"></i> Adicionar Funcionário';
     document.getElementById('employeeForm').reset();
     document.getElementById('employeeId').value = '';
-    document.getElementById('employeePassword').required = true;
+    
+    // Tornar senha obrigatória para novo funcionário
+    const passwordField = document.getElementById('employeePassword');
+    if (passwordField) {
+        passwordField.required = true;
+        // Mostrar grupo de senha
+        const passwordGroup = document.getElementById('passwordGroup');
+        if (passwordGroup) {
+            passwordGroup.style.display = 'block';
+        }
+    }
+    
     document.getElementById('employeeModal').style.display = 'flex';
 }
 
@@ -22,7 +33,17 @@ function hideEmployeeModal() {
 function editEmployee(employeeId) {
     isEditing = true;
     document.getElementById('employeeModalTitle').innerHTML = '<i class="fas fa-edit"></i> Editar Funcionário';
-    document.getElementById('employeePassword').required = false;
+    
+    // Tornar senha opcional para edição
+    const passwordField = document.getElementById('employeePassword');
+    if (passwordField) {
+        passwordField.required = false;
+        // Ocultar grupo de senha na edição
+        const passwordGroup = document.getElementById('passwordGroup');
+        if (passwordGroup) {
+            passwordGroup.style.display = 'none';
+        }
+    }
     
     showLoading();
     
@@ -89,7 +110,9 @@ function submitEmployeeForm(event) {
     const data = {};
     
     formData.forEach((value, key) => {
-        data[key] = value;
+        if (value.trim() !== '') { // Não incluir campos vazios
+            data[key] = value;
+        }
     });
     
     // Validações básicas
@@ -108,9 +131,15 @@ function submitEmployeeForm(event) {
         return;
     }
     
+    // Validar senha apenas se for novo funcionário ou se senha foi preenchida
     if (!isEditing && (!data.senha || data.senha.length < 8)) {
         showMessage('Senha deve ter pelo menos 8 caracteres', 'error');
         return;
+    }
+    
+    // Se está editando e senha não foi preenchida, remover do objeto
+    if (isEditing && (!data.senha || data.senha.trim() === '')) {
+        delete data.senha;
     }
     
     showLoading();
@@ -149,8 +178,13 @@ function submitEmployeeForm(event) {
 // Função para alternar visibilidade da senha
 function togglePassword(inputId) {
     const input = document.getElementById(inputId);
+    if (!input) return;
+    
     const button = input.nextElementSibling;
+    if (!button) return;
+    
     const icon = button.querySelector('i');
+    if (!icon) return;
     
     if (input.type === 'password') {
         input.type = 'text';
@@ -177,17 +211,43 @@ function isValidEmail(email) {
 
 // Função para mostrar loading
 function showLoading() {
-    document.getElementById('loadingOverlay').style.display = 'flex';
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    if (loadingOverlay) {
+        loadingOverlay.style.display = 'flex';
+    }
 }
 
 // Função para esconder loading
 function hideLoading() {
-    document.getElementById('loadingOverlay').style.display = 'none';
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    if (loadingOverlay) {
+        loadingOverlay.style.display = 'none';
+    }
 }
 
 // Função para mostrar mensagens
 function showMessage(message, type) {
     const container = document.getElementById('messageContainer');
+    if (!container) {
+        // Se não existe container, criar um temporário
+        const tempDiv = document.createElement('div');
+        tempDiv.style.position = 'fixed';
+        tempDiv.style.top = '20px';
+        tempDiv.style.right = '20px';
+        tempDiv.style.zIndex = '9999';
+        tempDiv.style.padding = '15px';
+        tempDiv.style.borderRadius = '5px';
+        tempDiv.style.color = 'white';
+        tempDiv.style.background = type === 'success' ? '#28a745' : '#dc3545';
+        tempDiv.textContent = message;
+        document.body.appendChild(tempDiv);
+        
+        setTimeout(() => {
+            document.body.removeChild(tempDiv);
+        }, 5000);
+        return;
+    }
+    
     const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
     const icon = type === 'success' ? 'fas fa-check-circle' : 'fas fa-exclamation-triangle';
     
@@ -207,18 +267,27 @@ function showMessage(message, type) {
 // Event listeners
 document.addEventListener('DOMContentLoaded', function() {
     // Fechar modal ao clicar fora
-    document.getElementById('employeeModal').addEventListener('click', function(e) {
-        if (e.target === this) {
-            hideEmployeeModal();
-        }
-    });
+    const modal = document.getElementById('employeeModal');
+    if (modal) {
+        modal.addEventListener('click', function(e) {
+            if (e.target === this) {
+                hideEmployeeModal();
+            }
+        });
+    }
     
     // Submissão automática de filtros
-    document.getElementById('subtipoFilter').addEventListener('change', function() {
-        document.getElementById('filtersForm').submit();
-    });
+    const subtipoFilter = document.getElementById('subtipoFilter');
+    if (subtipoFilter) {
+        subtipoFilter.addEventListener('change', function() {
+            document.getElementById('filtersForm').submit();
+        });
+    }
     
-    document.getElementById('statusFilter').addEventListener('change', function() {
-        document.getElementById('filtersForm').submit();
-    });
+    const statusFilter = document.getElementById('statusFilter');
+    if (statusFilter) {
+        statusFilter.addEventListener('change', function() {
+            document.getElementById('filtersForm').submit();
+        });
+    }
 });

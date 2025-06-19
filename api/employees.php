@@ -1,5 +1,5 @@
 <?php
-// api/employees.php
+// api/employees.php - VERSÃO CORRIGIDA
 header('Content-Type: application/json; charset=UTF-8');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE');
@@ -124,8 +124,8 @@ function handlePutRequest() {
         return;
     }
     
-    $data['id'] = $employeeId;
-    $result = StoreController::updateEmployee($data);
+    // CORREÇÃO PRINCIPAL: Passar os dois parâmetros corretamente
+    $result = StoreController::updateEmployee($employeeId, $data);
     echo json_encode($result);
 }
 
