@@ -295,7 +295,7 @@ app.post('/send-test', async (req, res) => {
         }
 
         // Usar seu próprio número para teste
-        const testPhone = '34991045205'; // Substitua pelo seu número
+        const testPhone = '38991045205'; // Substitua pelo seu número
         const testMessage = `🧪 Teste do Klube Cash WhatsApp Bot
         
 Esta é uma mensagem de teste enviada em ${new Date().toLocaleString('pt-BR')}.
