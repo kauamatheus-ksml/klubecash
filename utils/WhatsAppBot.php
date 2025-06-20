@@ -1,40 +1,30 @@
 <?php
 /**
- * Classe para integração com o Venom Bot WhatsApp
+ * Classe para integração com o Venom Bot WhatsApp - Versão 2.0
  * Sistema de Cashback Klube Cash
  * 
- * Esta classe serve como uma ponte entre o sistema PHP e o bot Node.js
- * Pense nela como um "tradutor" que permite ao PHP conversar com o WhatsApp
+ * Esta versão implementa envio real de mensagens e integração completa
+ * com o sistema de notificações existente
  */
 class WhatsAppBot {
     
-    // Configurações básicas - como o "endereço" do nosso bot
-    private static $botUrl = 'http://localhost:3001';
-    private static $webhookSecret = 'klube-cash-2024';
-    private static $timeout = 10; // segundos para aguardar resposta
+    private static $botUrl;
+    private static $webhookSecret;
+    private static $timeout;
     
     /**
      * Inicializa as configurações usando as constantes do sistema
-     * É como "configurar o GPS" com o endereço correto
+     * Permite configuração flexível através do arquivo constants.php
      */
     private static function initializeConfig() {
-        // Se as constantes estão definidas, usar elas em vez dos valores padrão
-        if (defined('WHATSAPP_BOT_URL')) {
-            self::$botUrl = WHATSAPP_BOT_URL;
-        }
-        if (defined('WHATSAPP_BOT_SECRET')) {
-            self::$webhookSecret = WHATSAPP_BOT_SECRET;
-        }
-        if (defined('WHATSAPP_TIMEOUT')) {
-            self::$timeout = WHATSAPP_TIMEOUT;
-        }
+        self::$botUrl = defined('WHATSAPP_BOT_URL') ? WHATSAPP_BOT_URL : 'http://localhost:3001';
+        self::$webhookSecret = defined('WHATSAPP_BOT_SECRET') ? WHATSAPP_BOT_SECRET : 'klube-cash-2024';
+        self::$timeout = defined('WHATSAPP_TIMEOUT') ? WHATSAPP_TIMEOUT : 30;
     }
     
     /**
-     * Verifica se o bot está conectado e respondendo
-     * É como "bater na porta" para ver se alguém está em casa
-     * 
-     * @return bool true se o bot estiver respondendo
+     * Verifica se o bot está conectado e pronto para enviar mensagens
+     * @return bool true se o bot estiver operacional
      */
     public static function isConnected() {
         try {
@@ -42,67 +32,201 @@ class WhatsAppBot {
             
             $response = self::makeRequest('/status', 'GET');
             
-            // Verificar se a resposta indica que está tudo funcionando
-            return isset($response['status']) && $response['status'] === 'OK';
+            return isset($response['status']) && 
+                   $response['status'] === 'connected' && 
+                   isset($response['bot_ready']) && 
+                   $response['bot_ready'] === true;
             
         } catch (Exception $e) {
-            // Se houver qualquer erro, considerar como desconectado
-            error_log('Erro ao verificar status do bot WhatsApp: ' . $e->getMessage());
+            error_log('WhatsApp Bot - Erro ao verificar status: ' . $e->getMessage());
             return false;
         }
     }
     
     /**
-     * Método de teste para verificar se a integração está funcionando
-     * É como um "teste de som" antes de uma apresentação
+     * Envia mensagem via WhatsApp para um número específico
+     * Esta é a função principal que será usada pelo sistema de notificações
      * 
-     * @param string $phone Número de teste
-     * @param string $message Mensagem de teste
-     * @return array Resultado do teste
+     * @param string $phone Número do telefone (formato brasileiro)
+     * @param string $message Mensagem a ser enviada
+     * @return array Resultado do envio com detalhes
      */
-    public static function sendTestMessage($phone, $message) {
-        // Por enquanto, apenas simula o envio e registra no log
-        // Isso nos permite testar a integração sem enviar mensagens reais
-        
-        $logMessage = "TESTE WhatsApp - Para: $phone, Mensagem: $message";
-        error_log($logMessage);
-        
-        return [
-            'success' => true, 
-            'message' => 'Teste registrado no log do servidor',
-            'phone' => $phone,
-            'test_message' => $message,
-            'timestamp' => date('Y-m-d H:i:s')
-        ];
+    public static function sendMessage($phone, $message) {
+        try {
+            self::initializeConfig();
+            
+            // Verificar se o WhatsApp está habilitado no sistema
+            if (defined('WHATSAPP_ENABLED') && !WHATSAPP_ENABLED) {
+                return [
+                    'success' => false,
+                    'error' => 'WhatsApp está desabilitado no sistema',
+                    'code' => 'WHATSAPP_DISABLED'
+                ];
+            }
+            
+            // Verificar se o bot está conectado
+            if (!self::isConnected()) {
+                return [
+                    'success' => false,
+                    'error' => 'Bot WhatsApp não está conectado',
+                    'code' => 'BOT_DISCONNECTED'
+                ];
+            }
+            
+            // Validar entrada
+            $validation = self::validateInput($phone, $message);
+            if (!$validation['valid']) {
+                return [
+                    'success' => false,
+                    'error' => $validation['error'],
+                    'code' => 'INVALID_INPUT'
+                ];
+            }
+            
+            // Preparar dados para envio
+            $data = [
+                'phone' => $phone,
+                'message' => $message,
+                'secret' => self::$webhookSecret
+            ];
+            
+            // Fazer requisição para o bot
+            $response = self::makeRequest('/send-message', 'POST', $data);
+            
+            // Log do resultado
+            if (isset($response['success']) && $response['success']) {
+                error_log("WhatsApp enviado com sucesso para: $phone");
+                return [
+                    'success' => true,
+                    'messageId' => $response['messageId'] ?? null,
+                    'phone' => $response['phone'] ?? $phone,
+                    'timestamp' => $response['timestamp'] ?? date('Y-m-d H:i:s')
+                ];
+            } else {
+                $error = $response['error'] ?? 'Erro desconhecido';
+                error_log("WhatsApp - Erro ao enviar para $phone: $error");
+                return [
+                    'success' => false,
+                    'error' => $error,
+                    'code' => 'SEND_FAILED'
+                ];
+            }
+            
+        } catch (Exception $e) {
+            error_log('WhatsApp Bot - Erro crítico: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'error' => 'Erro interno: ' . $e->getMessage(),
+                'code' => 'INTERNAL_ERROR'
+            ];
+        }
     }
     
     /**
-     * Faz uma requisição HTTP para o bot Node.js
-     * É como "fazer uma ligação telefônica" para o bot
-     * 
-     * @param string $endpoint Qual "ramal" chamar (ex: /status, /send-message)
-     * @param string $method Tipo de chamada (GET, POST)
-     * @param array $data Dados para enviar (se for POST)
-     * @return array Resposta do bot
-     * @throws Exception Se houver erro na comunicação
+     * Envia teste de mensagem para validar o sistema
+     * @return array Resultado do teste
+     */
+    public static function sendTestMessage() {
+        try {
+            self::initializeConfig();
+            
+            $data = [
+                'secret' => self::$webhookSecret
+            ];
+            
+            $response = self::makeRequest('/send-test', 'POST', $data);
+            return $response;
+            
+        } catch (Exception $e) {
+            return [
+                'success' => false,
+                'error' => 'Erro ao enviar teste: ' . $e->getMessage()
+            ];
+        }
+    }
+    
+    /**
+     * Envia notificação de nova transação de cashback
+     * Template específico para quando uma nova transação é registrada
+     */
+    public static function sendNewTransactionNotification($phone, $transactionData) {
+        $valorCashback = number_format($transactionData['valor_cashback'], 2, ',', '.');
+        $valorUsado = isset($transactionData['valor_usado']) ? 
+                      number_format($transactionData['valor_usado'], 2, ',', '.') : '0,00';
+        $nomeLoja = $transactionData['nome_loja'];
+        
+        $message = "🔔 *Klube Cash - Nova Transação*\n\n";
+        $message .= "Nova transação registrada: Você tem um novo cashback de *R$ {$valorCashback}* pendente da loja *{$nomeLoja}*.";
+        
+        if ($valorUsado !== '0,00') {
+            $message .= " Você usou R$ {$valorUsado} do seu saldo nesta compra.";
+        }
+        
+        $message .= "\n\n✅ O cashback ficará disponível após a aprovação do pagamento pela loja.";
+        $message .= "\n\n💰 Acompanhe seu saldo no app Klube Cash!";
+        
+        return self::sendMessage($phone, $message);
+    }
+    
+    /**
+     * Envia notificação de cashback liberado
+     * Template para quando o cashback fica disponível para uso
+     */
+    public static function sendCashbackReleasedNotification($phone, $transactionData) {
+        $valorCashback = number_format($transactionData['valor_cashback'], 2, ',', '.');
+        $nomeLoja = $transactionData['nome_loja'];
+        
+        $message = "🎉 *Klube Cash - Cashback Liberado!*\n\n";
+        $message .= "Seu cashback de *R$ {$valorCashback}* da loja *{$nomeLoja}* foi liberado e está disponível para uso!";
+        $message .= "\n\n💳 Você pode usar este valor em suas próximas compras na mesma loja.";
+        $message .= "\n\n📱 Confira seu saldo atualizado no app Klube Cash!";
+        
+        return self::sendMessage($phone, $message);
+    }
+    
+    /**
+     * Valida os dados de entrada para envio de mensagem
+     * @param string $phone Número do telefone
+     * @param string $message Mensagem
+     * @return array Resultado da validação
+     */
+    private static function validateInput($phone, $message) {
+        // Validar telefone
+        $cleanPhone = preg_replace('/\D/', '', $phone);
+        if (strlen($cleanPhone) < 10 || strlen($cleanPhone) > 13) {
+            return ['valid' => false, 'error' => 'Número de telefone inválido'];
+        }
+        
+        // Validar mensagem
+        if (empty(trim($message))) {
+            return ['valid' => false, 'error' => 'Mensagem não pode estar vazia'];
+        }
+        
+        if (strlen($message) > 4000) {
+            return ['valid' => false, 'error' => 'Mensagem muito longa (máximo 4000 caracteres)'];
+        }
+        
+        return ['valid' => true];
+    }
+    
+    /**
+     * Executa requisições HTTP para o bot Node.js
+     * Método central de comunicação com tratamento robusto de erros
      */
     private static function makeRequest($endpoint, $method = 'GET', $data = null) {
         $url = self::$botUrl . $endpoint;
         
-        // Inicializar cURL - nossa "linha telefônica"
         $ch = curl_init();
-        
-        // Configurar a "chamada"
         curl_setopt_array($ch, [
             CURLOPT_URL => $url,
-            CURLOPT_RETURNTRANSFER => true, // Queremos a resposta de volta
-            CURLOPT_TIMEOUT => self::$timeout, // Não esperar muito tempo
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => self::$timeout,
             CURLOPT_CUSTOMREQUEST => $method,
-            CURLOPT_FOLLOWLOCATION => false, // Não seguir redirecionamentos
-            CURLOPT_SSL_VERIFYPEER => false, // Para desenvolvimento local
+            CURLOPT_FOLLOWLOCATION => false,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_USERAGENT => 'Klube Cash WhatsApp Bot Client 2.0'
         ]);
         
-        // Se estamos enviando dados (POST), preparar o "envelope"
         if ($data && in_array($method, ['POST', 'PUT', 'PATCH'])) {
             curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
             curl_setopt($ch, CURLOPT_HTTPHEADER, [
@@ -111,47 +235,49 @@ class WhatsAppBot {
             ]);
         }
         
-        // Fazer a "chamada"
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $error = curl_error($ch);
         curl_close($ch);
         
-        // Verificar se houve problemas na "ligação"
         if ($error) {
-            throw new Exception("Erro de comunicação com o bot: $error");
+            throw new Exception("Erro de comunicação: $error");
         }
         
-        // Verificar se o bot "atendeu" corretamente
         if ($httpCode !== 200) {
-            throw new Exception("Bot retornou erro HTTP: $httpCode");
+            throw new Exception("Erro HTTP: $httpCode");
         }
         
-        // "Entender" a resposta do bot
         $decoded = json_decode($response, true);
         if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new Exception("Resposta do bot não é um JSON válido: " . json_last_error_msg());
+            throw new Exception("Resposta inválida do bot: " . json_last_error_msg());
         }
         
         return $decoded;
     }
     
     /**
-     * Obter informações sobre o estado atual da classe
-     * Útil para debug e monitoramento
-     * 
-     * @return array Informações de diagnóstico
+     * Obtém estatísticas detalhadas do bot para monitoramento
+     * @return array Informações completas sobre o estado do sistema
      */
-    public static function getStatus() {
-        self::initializeConfig();
-        
-        return [
-            'bot_url' => self::$botUrl,
-            'timeout' => self::$timeout,
-            'is_connected' => self::isConnected(),
-            'timestamp' => date('Y-m-d H:i:s'),
-            'version' => '1.0.0-beta'
-        ];
+    public static function getDetailedStatus() {
+        try {
+            self::initializeConfig();
+            $response = self::makeRequest('/status', 'GET');
+            
+            return [
+                'bot_url' => self::$botUrl,
+                'timeout' => self::$timeout,
+                'bot_data' => $response,
+                'system_time' => date('Y-m-d H:i:s'),
+                'whatsapp_enabled' => defined('WHATSAPP_ENABLED') ? WHATSAPP_ENABLED : false
+            ];
+        } catch (Exception $e) {
+            return [
+                'error' => $e->getMessage(),
+                'timestamp' => date('Y-m-d H:i:s')
+            ];
+        }
     }
 }
 ?>
