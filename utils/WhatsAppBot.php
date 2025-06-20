@@ -36,20 +36,15 @@ class WhatsAppBot {
             return true; // Sistema funcionando em modo desenvolvimento
         }
         
-        // Verificar se temos as credenciais necessárias para API real
-        if (self::$accessToken === 'TEMP_TOKEN' || self::$phoneNumberId === 'TEMP_ID') {
+        // Código para API real permanece o mesmo...
+        if (self::$phoneNumberId === 'TEMP_ID') {
             return false;
         }
         
         try {
-            // Fazer uma requisição simples para verificar se a API está acessível
             $url = self::$baseUrl . '/' . self::$apiVersion . '/' . self::$phoneNumberId;
-            
             $response = self::makeApiRequest($url, 'GET');
-            
-            // Se chegou aqui sem erro, a API está acessível
             return true;
-            
         } catch (Exception $e) {
             error_log('WhatsApp API - Erro de conexão: ' . $e->getMessage());
             return false;
