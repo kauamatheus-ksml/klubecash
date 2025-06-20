@@ -125,6 +125,11 @@ define('PERMISSOES_MAPA', [
         ]
     ]
 ]);
+// === CONFIGURAÇÕES WHATSAPP BOT ===
+define('WHATSAPP_BOT_URL', 'http://localhost:3001');
+define('WHATSAPP_BOT_SECRET', 'klube-cash-2024');
+define('WHATSAPP_ENABLED', true);
+define('WHATSAPP_TIMEOUT', 30); // Timeout para requisições ao bot
 
 // === SUBTIPOS DE FUNCIONÁRIO ===  
 define('EMPLOYEE_TYPE_FINANCIAL', 'financeiro');
