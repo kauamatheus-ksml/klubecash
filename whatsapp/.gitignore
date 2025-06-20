@@ -1,0 +1,28 @@
+# Arquivos de sessão do Venom Bot - são como "impressões digitais" únicas
+# Estes arquivos contêm informações de autenticação específicas desta máquina
+tokens/
+session/
+*.session
+
+# Dados temporários do navegador criados pelo bot
+Default/
+**/Default/**
+**/Network/**
+**/IndexedDB/**
+
+# Módulos do Node.js - são como "bibliotecas" que podem ser baixadas novamente
+node_modules/
+
+# Logs do sistema - arquivos de registro que mudam constantemente
+*.log
+logs/
+
+# Arquivos de configuração que podem conter informações sensíveis
+.env.local
+.env.production
+
+# Arquivos temporários criados pelo sistema operacional
+.DS_Store      # macOS
+Thumbs.db     # Windows
+*.tmp
+*.temp
