@@ -4,19 +4,25 @@
  * 
  * Esta classe substitui os logs tradicionais do servidor, criando nosso próprio
  * sistema de monitoramento que podemos acessar através de uma interface web.
- * É como ter nosso próprio diário de atividades dentro do sistema.
+ * Versão corrigida com todas as dependências necessárias.
  */
+
+// Incluir todas as dependências necessárias para funcionamento completo
+require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../config/constants.php';
+
 class WhatsAppLogger {
     
     /**
      * Registra uma atividade WhatsApp em nossa base de dados
      * 
-     * Este método é como escrever uma entrada detalhada em um diário.
+     * Este método funciona como escrever uma entrada detalhada em um diário.
      * Cada evento importante é registrado com todas as informações relevantes
      * para que possamos analisar o que aconteceu posteriormente.
      */
     public static function log($type, $phone, $message, $result, $additionalData = []) {
         try {
+            // Agora a classe Database estará disponível devido aos includes acima
             $db = Database::getConnection();
             
             // Criar a tabela de logs se ela não existir
@@ -53,8 +59,7 @@ class WhatsAppLogger {
             return $stmt->execute($logData);
             
         } catch (Exception $e) {
-            // Se houver erro no nosso sistema de log, registrar no log tradicional
-            // É como ter um sistema de backup para o nosso sistema de backup
+            // Se houver erro no nosso sistema de log, usar fallback
             error_log("WhatsAppLogger Error: " . $e->getMessage());
             return false;
         }
