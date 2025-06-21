@@ -87,6 +87,14 @@ public static function sendMessage($phone, $message) {
         
         // NOVO: Registrar no nosso sistema de logs personalizado
         if (!class_exists('WhatsAppLogger')) {
+            // Garantir que as dependências estão carregadas antes do logger
+            if (!class_exists('Database')) {
+                require_once __DIR__ . '/../config/database.php';
+            }
+            if (!defined('SYSTEM_NAME')) {
+                require_once __DIR__ . '/../config/constants.php';
+            }
+            // Agora carregar o logger com segurança
             require_once __DIR__ . '/WhatsAppLogger.php';
         }
         
@@ -162,6 +170,14 @@ public static function sendMessage($phone, $message) {
         
         // Registrar com dados específicos da transação
         if (!class_exists('WhatsAppLogger')) {
+            // Garantir que as dependências estão carregadas antes do logger
+            if (!class_exists('Database')) {
+                require_once __DIR__ . '/../config/database.php';
+            }
+            if (!defined('SYSTEM_NAME')) {
+                require_once __DIR__ . '/../config/constants.php';
+            }
+            // Agora carregar o logger com segurança
             require_once __DIR__ . '/WhatsAppLogger.php';
         }
         
@@ -186,6 +202,14 @@ public static function sendMessage($phone, $message) {
         
         // Registrar com dados específicos do cashback
         if (!class_exists('WhatsAppLogger')) {
+            // Garantir que as dependências estão carregadas antes do logger
+            if (!class_exists('Database')) {
+                require_once __DIR__ . '/../config/database.php';
+            }
+            if (!defined('SYSTEM_NAME')) {
+                require_once __DIR__ . '/../config/constants.php';
+            }
+            // Agora carregar o logger com segurança
             require_once __DIR__ . '/WhatsAppLogger.php';
         }
         
