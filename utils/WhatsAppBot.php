@@ -122,6 +122,49 @@ public static function sendMessage($phone, $message) {
         return $result;
     }
 }
+
+    private static function makeRequest($endpoint, $method = 'GET', $data = null) {
+        $url = self::$botUrl . $endpoint;
+        
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => self::$timeout,
+            CURLOPT_CUSTOMREQUEST => $method,
+            CURLOPT_FOLLOWLOCATION => false,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_USERAGENT => 'Klube Cash WhatsApp Bot Client 2.0'
+        ]);
+        
+        if ($data && in_array($method, ['POST', 'PUT', 'PATCH'])) {
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                'Content-Type: application/json',
+                'Content-Length: ' . strlen(json_encode($data))
+            ]);
+        }
+        
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+        
+        if ($error) {
+            throw new Exception("Erro cURL: $error");
+        }
+        
+        if ($httpCode !== 200) {
+            throw new Exception("Erro HTTP: $httpCode");
+        }
+        
+        $decoded = json_decode($response, true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            throw new Exception("Resposta inválida do bot: " . json_last_error_msg());
+        }
+        
+        return $decoded;
+    }
     private static function sendViaBot($phone, $message) {
         try {
             $data = [
