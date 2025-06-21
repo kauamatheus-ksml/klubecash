@@ -82,7 +82,7 @@ if (class_exists('WhatsAppBot')) {
     // Testar função de envio apenas se existir
     if (method_exists('WhatsAppBot', 'sendTestMessage')) {
         echo "<h4>📤 Testando Função de Envio:</h4>";
-        $resultado_teste = WhatsAppBot::sendTestMessage('5538991045205', 'Teste de integração Klube Cash');
+        $resultado_teste = WhatsAppBot::sendTestMessage('3891045205', 'Teste de integração Klube Cash');
         echo "<p>Resultado: <code>" . json_encode($resultado_teste) . "</code></p>";
     } else {
         echo "<p style='color: orange;'>⚠️ Método sendTestMessage() ainda não implementado (isso é esperado nesta fase)</p>";
