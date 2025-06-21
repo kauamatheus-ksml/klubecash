@@ -369,7 +369,7 @@ public static function sendMessage($phone, $message) {
      * Função de teste que funciona imediatamente
      */
     public static function sendTestMessage($testPhone = null) {
-        $phone = $testPhone ?: '34999999999'; // Número padrão para teste
+        $phone = $testPhone ?: '38991045205'; // Número padrão para teste
         
         $message = "🧪 *Teste Klube Cash WhatsApp*\n\n";
         $message .= "Esta é uma mensagem de teste do sistema de notificações.\n\n";
