@@ -6,8 +6,6 @@
  */
 class WhatsAppBot {
     
-    // Declaração de todas as propriedades estáticas necessárias
-    // Estas são como as "variáveis globais" da classe que podem ser acessadas por todos os métodos
     private static $botUrl;
     private static $webhookSecret;
     private static $timeout;
