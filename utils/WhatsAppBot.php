@@ -85,7 +85,7 @@ public static function sendMessage($phone, $message) {
                 if (self::$accessToken === 'TEMP_TOKEN') {
                     $result = self::simulateMessage($phone, $message);
                 } else {
-                    $result = self::simulateMessage($phone, $message);
+                    $result = self::sendViaBot($phone, $message); // CHAMADA REAL
                 }
             }
         }
@@ -122,7 +122,36 @@ public static function sendMessage($phone, $message) {
         return $result;
     }
 }
-    
+    private static function sendViaBot($phone, $message) {
+        try {
+            $data = [
+                'phone' => $phone,
+                'message' => $message,
+                'secret' => self::$webhookSecret
+            ];
+            
+            $response = self::makeRequest('/send-message', 'POST', $data);
+            
+            if (isset($response['success']) && $response['success']) {
+                return [
+                    'success' => true,
+                    'messageId' => $response['messageId'] ?? null,
+                    'phone' => $phone,
+                    'timestamp' => date('Y-m-d H:i:s')
+                ];
+            } else {
+                return [
+                    'success' => false,
+                    'error' => $response['error'] ?? 'Erro desconhecido'
+                ];
+            }
+        } catch (Exception $e) {
+            return [
+                'success' => false,
+                'error' => $e->getMessage()
+            ];
+        }
+    }
     /**
      * Simula envio de mensagem para desenvolvimento em hospedagem compartilhada
      * Esta função nos permite testar toda a lógica sem depender de APIs externas
