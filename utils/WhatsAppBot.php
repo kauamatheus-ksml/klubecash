@@ -6,7 +6,11 @@
  */
 class WhatsAppBot {
     
-    // Configurações da WhatsApp Business API
+    // Declaração de todas as propriedades estáticas necessárias
+    // Estas são como as "variáveis globais" da classe que podem ser acessadas por todos os métodos
+    private static $botUrl;
+    private static $webhookSecret;
+    private static $timeout;
     private static $accessToken;
     private static $phoneNumberId;
     private static $apiVersion = 'v21.0';
@@ -14,22 +18,21 @@ class WhatsAppBot {
     
     /**
      * Inicializa as configurações usando as constantes do sistema
-     * Versão inteligente que detecta automaticamente o modo de operação
+     * Versão corrigida que declara todas as propriedades necessárias
      */
     private static function initializeConfig() {
-        // Carregar configurações básicas das constantes
+        // Agora podemos usar essas propriedades porque elas foram declaradas acima
         self::$botUrl = defined('WHATSAPP_BOT_URL') ? WHATSAPP_BOT_URL : 'http://localhost:3001';
         self::$webhookSecret = defined('WHATSAPP_BOT_SECRET') ? WHATSAPP_BOT_SECRET : 'klube-cash-2024';
-        self::$timeout = defined('WHATSAPP_TIMEOUT') ? WHATSAPP_TIMEOUT : 10;
+        self::$timeout = defined('WHATSAPP_TIMEOUT') ? WHATSAPP_TIMEOUT : 30;
         
-        // CORREÇÃO CRÍTICA: Detectar se estamos usando conexão real via ngrok
-        // Se a URL do bot contém 'ngrok', significa que estamos em modo produção real
+        // Lógica de detecção automática de modo produção vs simulação
         if (strpos(self::$botUrl, 'ngrok') !== false) {
-            // Configurar para modo produção real - isso fará o sistema sair do modo simulação
+            // Detectamos conexão via ngrok = modo produção real
             self::$accessToken = 'REAL_CONNECTION_VIA_NGROK';
             self::$phoneNumberId = 'PRODUCTION_MODE_ACTIVE';
         } else {
-            // Manter modo simulação apenas para localhost
+            // Conexão local = modo simulação
             self::$accessToken = 'TEMP_TOKEN';
             self::$phoneNumberId = 'TEMP_ID';
         }
