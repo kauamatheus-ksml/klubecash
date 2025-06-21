@@ -169,12 +169,12 @@ async function sendMessage(phone, message) {
         console.log(`   💬 Mensagem: ${message.substring(0, 100)}${message.length > 100 ? '...' : ''}`);
         
         // Verificar se o número é válido no WhatsApp
-        const isValidNumber = await client.checkNumberStatus(formattedPhone);
+        //const isValidNumber = await client.checkNumberStatus(formattedPhone);
         
-        if (!isValidNumber.exists) {
-            throw new Error(`Número ${phone} não possui WhatsApp`);
-        }
-        
+        //if (!isValidNumber.exists) {
+        //    throw new Error(`Número ${phone} não possui WhatsApp`);
+        //}
+        console.log('Pulando verificação de WhatsApp para teste');
         // Enviar a mensagem
         const result = await client.sendText(formattedPhone, message);
         
@@ -295,7 +295,7 @@ app.post('/send-test', async (req, res) => {
         }
 
         // Usar seu próprio número para teste
-        const testPhone = '5538991045205'; // Substitua pelo seu número
+        const testPhone = '38991045205'; // Substitua pelo seu número
         const testMessage = `🧪 Teste do Klube Cash WhatsApp Bot
         
 Esta é uma mensagem de teste enviada em ${new Date().toLocaleString('pt-BR')}.
