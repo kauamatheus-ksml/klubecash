@@ -52,80 +52,63 @@ class WhatsAppBot {
     }
     
     /**
-     * Envia mensagem usando WhatsApp Business API
-     * @param string $phone Número do telefone
-     * @param string $message Mensagem a ser enviada
-     * @return array Resultado do envio
-     */
-    public static function sendMessage($phone, $message) {
-        try {
-            self::initializeConfig();
-            
-            // Verificar se está habilitado
-            if (defined('WHATSAPP_ENABLED') && !WHATSAPP_ENABLED) {
-                return [
-                    'success' => false,
-                    'error' => 'WhatsApp está desabilitado no sistema',
-                    'code' => 'DISABLED'
-                ];
-            }
-            
-            // Para hospedagem compartilhada, vamos simular por enquanto
-            // e registrar no log para desenvolvimento
-            if (self::$accessToken === 'TEMP_TOKEN') {
-                return self::simulateMessage($phone, $message);
-            }
-            
+ * Envia mensagem via WhatsApp com log detalhado
+ * Versão atualizada que registra tudo em nossa própria base de dados
+ */
+public static function sendMessage($phone, $message) {
+    try {
+        self::initializeConfig();
+        
+        // Verificar se está habilitado
+        if (defined('WHATSAPP_ENABLED') && !WHATSAPP_ENABLED) {
+            $result = [
+                'success' => false,
+                'error' => 'WhatsApp está desabilitado no sistema',
+                'code' => 'DISABLED'
+            ];
+        } else {
             // Validar entrada
             $validation = self::validateInput($phone, $message);
             if (!$validation['valid']) {
-                return [
+                $result = [
                     'success' => false,
                     'error' => $validation['error'],
                     'code' => 'VALIDATION_ERROR'
                 ];
-            }
-            
-            // Preparar dados para a API
-            $data = [
-                'messaging_product' => 'whatsapp',
-                'to' => self::formatPhoneNumber($phone),
-                'type' => 'text',
-                'text' => [
-                    'body' => $message
-                ]
-            ];
-            
-            // URL da API
-            $url = self::$baseUrl . '/' . self::$apiVersion . '/' . 
-                   self::$phoneNumberId . '/messages';
-            
-            // Enviar requisição
-            $response = self::makeApiRequest($url, 'POST', $data);
-            
-            if (isset($response['messages']) && !empty($response['messages'])) {
-                $messageId = $response['messages'][0]['id'];
-                error_log("WhatsApp enviado com sucesso - ID: $messageId para: $phone");
-                
-                return [
-                    'success' => true,
-                    'messageId' => $messageId,
-                    'phone' => $phone,
-                    'timestamp' => date('Y-m-d H:i:s')
-                ];
             } else {
-                throw new Exception('Resposta inválida da API do WhatsApp');
+                // Executar envio (simulado ou real)
+                if (self::$accessToken === 'TEMP_TOKEN') {
+                    $result = self::simulateMessage($phone, $message);
+                } else {
+                    $result = self::sendRealMessage($phone, $message);
+                }
             }
-            
-        } catch (Exception $e) {
-            error_log('WhatsApp API - Erro: ' . $e->getMessage());
-            return [
-                'success' => false,
-                'error' => $e->getMessage(),
-                'code' => 'API_ERROR'
-            ];
         }
+        
+        // NOVO: Registrar no nosso sistema de logs personalizado
+        if (!class_exists('WhatsAppLogger')) {
+            require_once __DIR__ . '/WhatsAppLogger.php';
+        }
+        
+        WhatsAppLogger::log('manual_send', $phone, $message, $result);
+        
+        return $result;
+        
+    } catch (Exception $e) {
+        $result = [
+            'success' => false,
+            'error' => 'Erro interno: ' . $e->getMessage(),
+            'code' => 'INTERNAL_ERROR'
+        ];
+        
+        // Registrar erro também
+        if (class_exists('WhatsAppLogger')) {
+            WhatsAppLogger::log('error', $phone ?? 'unknown', $message ?? '', $result);
+        }
+        
+        return $result;
     }
+}
     
     /**
      * Simula envio de mensagem para desenvolvimento em hospedagem compartilhada
@@ -157,12 +140,12 @@ class WhatsAppBot {
     }
     
     /**
-     * Envia notificação de nova transação (template específico)
+     * Envia notificação de nova transação com log personalizado
      */
     public static function sendNewTransactionNotification($phone, $transactionData) {
         $valorCashback = number_format($transactionData['valor_cashback'], 2, ',', '.');
         $valorUsado = isset($transactionData['valor_usado']) ? 
-                      number_format($transactionData['valor_usado'], 2, ',', '.') : '0,00';
+                    number_format($transactionData['valor_usado'], 2, ',', '.') : '0,00';
         $nomeLoja = $transactionData['nome_loja'];
         
         $message = "🔔 *Klube Cash - Nova Transação*\n\n";
@@ -175,11 +158,20 @@ class WhatsAppBot {
         $message .= "\n\n✅ O cashback ficará disponível após a aprovação do pagamento pela loja.";
         $message .= "\n\n💰 Acompanhe seu saldo no app Klube Cash!";
         
-        return self::sendMessage($phone, $message);
+        $result = self::sendMessage($phone, $message);
+        
+        // Registrar com dados específicos da transação
+        if (!class_exists('WhatsAppLogger')) {
+            require_once __DIR__ . '/WhatsAppLogger.php';
+        }
+        
+        WhatsAppLogger::log('nova_transacao', $phone, $message, $result, $transactionData);
+        
+        return $result;
     }
     
     /**
-     * Envia notificação de cashback liberado
+     * Envia notificação de cashback liberado com log personalizado
      */
     public static function sendCashbackReleasedNotification($phone, $transactionData) {
         $valorCashback = number_format($transactionData['valor_cashback'], 2, ',', '.');
@@ -190,7 +182,16 @@ class WhatsAppBot {
         $message .= "\n\n💳 Você pode usar este valor em suas próximas compras na mesma loja.";
         $message .= "\n\n📱 Confira seu saldo atualizado no app Klube Cash!";
         
-        return self::sendMessage($phone, $message);
+        $result = self::sendMessage($phone, $message);
+        
+        // Registrar com dados específicos do cashback
+        if (!class_exists('WhatsAppLogger')) {
+            require_once __DIR__ . '/WhatsAppLogger.php';
+        }
+        
+        WhatsAppLogger::log('cashback_liberado', $phone, $message, $result, $transactionData);
+        
+        return $result;
     }
     
     /**
