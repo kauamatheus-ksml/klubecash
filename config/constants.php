@@ -126,7 +126,7 @@ define('PERMISSOES_MAPA', [
     ]
 ]);
 // === CONFIGURAÇÕES WHATSAPP BOT ===
-define('WHATSAPP_BOT_URL', 'https://a382-2804-690-33ce-3000-c32-7891-4174-5fcb.ngrok-free.app');
+define('WHATSAPP_BOT_URL', 'https://f49c-2804-690-33ce-3000-c32-7891-4174-5fcb.ngrok-free.app');
 define('WHATSAPP_BOT_SECRET', 'klube-cash-2024');
 define('WHATSAPP_ENABLED', true);
 define('WHATSAPP_TIMEOUT', 30);
