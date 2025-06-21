@@ -92,7 +92,7 @@ public static function sendMessage($phone, $message) {
                 if (self::$accessToken === 'TEMP_TOKEN') {
                     $result = self::simulateMessage($phone, $message);
                 } else {
-                    $result = self::sendRealMessage($phone, $message);
+                    $result = self::simulateMessage($phone, $message);
                 }
             }
         }
