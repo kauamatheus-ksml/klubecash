@@ -129,7 +129,8 @@ define('PERMISSOES_MAPA', [
 define('WHATSAPP_BOT_URL', 'https://a382-2804-690-33ce-3000-c32-7891-4174-5fcb.ngrok-free.app');
 define('WHATSAPP_BOT_SECRET', 'klube-cash-2024');
 define('WHATSAPP_ENABLED', true);
-define('WHATSAPP_TIMEOUT', 10   ); // Timeout para requisições ao bot
+define('WHATSAPP_TIMEOUT', 30);
+define('WHATSAPP_PRODUCTION_MODE', true); // NOVA: Indicador explícito de modo produção
 
 // === SUBTIPOS DE FUNCIONÁRIO ===  
 define('EMPLOYEE_TYPE_FINANCIAL', 'financeiro');

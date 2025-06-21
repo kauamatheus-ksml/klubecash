@@ -13,15 +13,23 @@ class WhatsAppBot {
     private static $baseUrl = 'https://graph.facebook.com';
     
     /**
-     * Inicializa as configurações da API
+     * Inicializa as configurações usando as constantes do sistema
+     * Versão inteligente que detecta automaticamente o modo de operação
      */
     private static function initializeConfig() {
-        // Por enquanto usando configurações de teste
-        // Em produção, essas virão do constants.php
-        self::$accessToken = defined('WHATSAPP_ACCESS_TOKEN') ? 
-                           WHATSAPP_ACCESS_TOKEN : 'TEMP_TOKEN';
-        self::$phoneNumberId = defined('WHATSAPP_PHONE_NUMBER_ID') ? 
-                             WHATSAPP_PHONE_NUMBER_ID : 'TEMP_ID';
+        self::$botUrl = defined('WHATSAPP_BOT_URL') ? WHATSAPP_BOT_URL : 'http://localhost:3001';
+        self::$webhookSecret = defined('WHATSAPP_BOT_SECRET') ? WHATSAPP_BOT_SECRET : 'klube-cash-2024';
+        self::$timeout = defined('WHATSAPP_TIMEOUT') ? WHATSAPP_TIMEOUT : 30;
+        
+        // Verificar se estamos explicitamente em modo produção
+        if (defined('WHATSAPP_PRODUCTION_MODE') && WHATSAPP_PRODUCTION_MODE === true) {
+            self::$accessToken = 'PRODUCTION_MODE';
+            self::$phoneNumberId = 'PRODUCTION_MODE';
+        } else {
+            // Manter modo simulação como padrão seguro
+            self::$accessToken = 'TEMP_TOKEN';
+            self::$phoneNumberId = 'TEMP_ID';
+        }
     }
     
     /**
