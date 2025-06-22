@@ -322,7 +322,57 @@ define('LOG_MP_RESPONSES', true); // Log de todas as respostas MP
 define('LOG_WEBHOOK_EVENTS', true); // Log de eventos de webhook
 define('LOG_QUALITY_METRICS', true); // Log de métricas de qualidade
 
+// === CONFIGURAÇÕES PWA ===
+define('PWA_ENABLED', true);
+define('PWA_VERSION', '1.2.0');
+define('PWA_CACHE_VERSION', 'v1.2.0');
 
+// URLs PWA
+define('PWA_MANIFEST_URL', SITE_URL . '/pwa/manifest.json');
+define('PWA_SW_URL', SITE_URL . '/pwa/sw.js');
+define('PWA_OFFLINE_URL', SITE_URL . '/pwa/offline.html');
+
+// Service Worker
+define('SW_CACHE_STATIC', 'klube-cash-static-' . PWA_CACHE_VERSION);
+define('SW_CACHE_DYNAMIC', 'klube-cash-dynamic-' . PWA_CACHE_VERSION);
+define('SW_CACHE_OFFLINE', 'klube-cash-offline-' . PWA_CACHE_VERSION);
+
+// Push Notifications
+define('PUSH_PUBLIC_KEY', 'BEl62iUYgUivyQuW8ndhKJJoJGdnkb...'); // Chave pública VAPID
+define('PUSH_PRIVATE_KEY', 'mNYWFtF...'); // Chave privada VAPID (manter segura)
+define('PUSH_SUBJECT', 'mailto:contato@klubecash.com');
+
+// Configurações de cache offline
+define('OFFLINE_CACHE_DURATION', 24 * 60 * 60); // 24 horas em segundos
+define('STATIC_CACHE_DURATION', 30 * 24 * 60 * 60); // 30 dias em segundos
+
+// URLs que devem funcionar offline
+define('PWA_OFFLINE_PAGES', [
+    '/cliente/dashboard',
+    '/cliente/extrato', 
+    '/cliente/lojas-parceiras',
+    '/cliente/perfil'
+]);
+
+// Recursos críticos para cache
+define('PWA_CRITICAL_RESOURCES', [
+    '/assets/css/main.css',
+    '/assets/css/client.css', 
+    '/assets/css/pwa.css',
+    '/assets/js/main.js',
+    '/assets/js/client.js',
+    '/assets/js/pwa-main.js',
+    '/assets/images/logo.png'
+]);
+
+// Configurações de notificação
+define('NOTIFICATION_ICON', SITE_URL . '/assets/icons/icon-192x192.png');
+define('NOTIFICATION_BADGE', SITE_URL . '/assets/icons/badge-72x72.png');
+define('NOTIFICATION_DEFAULT_TITLE', 'Klube Cash');
+
+// Web App Install Banner
+define('PWA_INSTALL_PROMPT_DELAY', 3); // dias para mostrar prompt
+define('PWA_INSTALL_PROMPT_ENABLED', true);
 
 // === MERCADO PAGO SDK CONFIGURATION ===
 define('MP_SDK_VERSION', 'v2');
