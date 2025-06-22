@@ -1,209 +1,170 @@
 <?php
 // views/client/partner-stores.php
-// VERSÃO CORRIGIDA - SEM DUPLICAÇÃO E COM PRG PARA EVITAR REENVIO DE FORMULÁRIO
-
-// Definir o menu ativo
-$activeMenu = 'lojas';
-
-// Incluir arquivos necessários
-require_once '../../config/database.php';
 require_once '../../config/constants.php';
+require_once '../../config/database.php';
 require_once '../../controllers/AuthController.php';
-require_once '../../controllers/ClientController.php';
 
-// Iniciar sessão
+// Iniciar sessão e verificar autenticação
 session_start();
 
-// Verificar se o usuário está logado e é cliente
-if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION['user_type'] !== USER_TYPE_CLIENT) {
-    header("Location: ../auth/login.php?error=acesso_restrito");
+if (!AuthController::isAuthenticated()) {
+    header('Location: ' . LOGIN_URL . '?error=' . urlencode('Você precisa fazer login para acessar esta página.'));
     exit;
 }
 
-// Obter dados do usuário
-$userId = $_SESSION['user_id'];
-
-// Processar adição/remoção de favoritos (AGORA COM PRG)
-if (isset($_POST['toggle_favorite'])) {
-    $storeId = isset($_POST['store_id']) ? (int)$_POST['store_id'] : 0;
-    $isFavorite = isset($_POST['is_favorite']) ? (int)$_POST['is_favorite'] : 0;
-
-    $favoriteResult = ClientController::toggleFavoriteStore($userId, $storeId, !$isFavorite);
-
-    // Armazenar a mensagem na sessão para exibir após o redirecionamento
-    $_SESSION['favorite_message'] = $favoriteResult['message'];
-    $_SESSION['favorite_message_type'] = $favoriteResult['status'] ? 'success' : 'error'; // Adicionar tipo para CSS
-
-    // Redirecionar para a mesma página via GET
-    $currentQueryString = '';
-    if (!empty($_SERVER['QUERY_STRING'])) {
-        // Remover parâmetros POST se existirem (embora não deveriam após POST)
-        $params = [];
-        parse_str($_SERVER['QUERY_STRING'], $params);
-        unset($params['toggle_favorite']); // Remover o parâmetro do POST para não confundir
-        unset($params['store_id']);
-        unset($params['is_favorite']);
-        $currentQueryString = http_build_query($params);
-    }
-    
-    header("Location: " . strtok($_SERVER["REQUEST_URI"], '?') . (!empty($currentQueryString) ? '?' . $currentQueryString : ''));
+if (!AuthController::isClient()) {
+    header('Location: ' . LOGIN_URL . '?error=' . urlencode('Acesso restrito a clientes.'));
     exit;
 }
 
-// Recuperar mensagem da sessão se existir e limpar
-$favoriteMessage = '';
-$favoriteMessageType = '';
-if (isset($_SESSION['favorite_message'])) {
-    $favoriteMessage = $_SESSION['favorite_message'];
-    $favoriteMessageType = $_SESSION['favorite_message_type'];
-    unset($_SESSION['favorite_message']); // Limpar a mensagem da sessão
-    unset($_SESSION['favorite_message_type']);
-}
+$userId = AuthController::getCurrentUserId();
 
+// Processar filtros
+$filters = [
+    'categoria' => $_GET['categoria'] ?? 'todas',
+    'nome' => trim($_GET['nome'] ?? ''),
+    'cashback_min' => floatval($_GET['cashback_min'] ?? 0),
+    'ordenar' => $_GET['ordenar'] ?? 'nome'
+];
 
-// Definir valores padrão para filtros e paginação
-$page = isset($_GET['page']) ? (int)$_GET['page'] : 1;
-$filters = [];
-
-// Processar filtros se submetidos
-if (isset($_GET['filtrar'])) {
-    if (!empty($_GET['categoria']) && $_GET['categoria'] != 'todas') {
-        $filters['categoria'] = $_GET['categoria'];
-    }
-
-    if (!empty($_GET['nome'])) {
-        $filters['nome'] = $_GET['nome'];
-    }
-
-    if (!empty($_GET['cashback_min'])) {
-        $filters['cashback_min'] = $_GET['cashback_min'];
-    }
-
-    if (!empty($_GET['ordenar']) && $_GET['ordenar'] != 'nome') {
-        $filters['ordenar'] = $_GET['ordenar'];
-    }
-}
+// Parâmetros de paginação
+$page = max(1, intval($_GET['page'] ?? 1));
+$limit = 12;
+$offset = ($page - 1) * $limit;
 
 try {
     $db = Database::getConnection();
-
-    // Obter dados das lojas parceiras
-    $result = ClientController::getPartnerStores($userId, $filters, $page);
-
-    // Verificar se houve erro
-    $hasError = !$result['status'];
-    $errorMessage = $hasError ? $result['message'] : '';
-
-    // Dados para exibição
-    $storesData = $hasError ? [] : $result['data'];
-
-    // Obter estatísticas gerais do saldo do cliente
-    if (!$hasError) {
-        $estatisticasQuery = "
-            SELECT
-                COUNT(DISTINCT cs.loja_id) as lojas_com_saldo,
-                COALESCE(SUM(cs.saldo_disponivel), 0) as total_saldo_disponivel,
-                COALESCE(SUM(cs.total_usado), 0) as total_usado_geral,
-                COUNT(DISTINCT CASE WHEN cs.saldo_disponivel > 0 THEN cs.loja_id END) as lojas_saldo_disponivel
-            FROM cashback_saldos cs
-            WHERE cs.usuario_id = ?
-        ";
-        $estatisticasStmt = $db->prepare($estatisticasQuery);
-        $estatisticasStmt->execute([$userId]);
-        $estatisticasGerais = $estatisticasStmt->fetch(PDO::FETCH_ASSOC);
-
-        // Se não houver dados, definir valores padrão
-        if (!$estatisticasGerais || $estatisticasGerais['lojas_com_saldo'] === null) {
-            $estatisticasGerais = [
-                'lojas_com_saldo' => 0,
-                'total_saldo_disponivel' => 0,
-                'total_usado_geral' => 0,
-                'lojas_saldo_disponivel' => 0
-            ];
-        }
-
-        // ENRIQUECER DADOS DAS LOJAS COM SALDO DO CLIENTE (CORRIGIDO)
-        if (!empty($storesData['lojas'])) {
-            foreach ($storesData['lojas'] as &$loja) {
-                // Buscar saldo específico desta loja para o cliente
-                $saldoQuery = "
-                    SELECT
-                        saldo_disponivel,
-                        total_creditado,
-                        total_usado
-                    FROM cashback_saldos
-                    WHERE usuario_id = ? AND loja_id = ?
-                ";
-
-                $saldoStmt = $db->prepare($saldoQuery);
-                $saldoStmt->execute([$userId, $loja['id']]);
-                $saldoInfo = $saldoStmt->fetch(PDO::FETCH_ASSOC);
-
-                if ($saldoInfo) {
-                    $loja['saldo_disponivel'] = $saldoInfo['saldo_disponivel'];
-                    $loja['total_creditado'] = $saldoInfo['total_creditado'];
-                    $loja['total_usado'] = $saldoInfo['total_usado'];
-                } else {
-                    $loja['saldo_disponivel'] = 0;
-                    $loja['total_creditado'] = 0;
-                    $loja['total_usado'] = 0;
-                }
-
-                // Buscar último uso (CORRIGIDO)
-                $ultimoUsoQuery = "
-                    SELECT MAX(data_operacao) as ultima_data
-                    FROM cashback_movimentacoes
-                    WHERE usuario_id = ? AND loja_id = ? AND tipo_operacao = 'uso'
-                ";
-                $ultimoUsoStmt = $db->prepare($ultimoUsoQuery);
-                $ultimoUsoStmt->execute([$userId, $loja['id']]);
-                $ultimoUsoInfo = $ultimoUsoStmt->fetch(PDO::FETCH_ASSOC);
-                $loja['ultimo_uso'] = $ultimoUsoInfo['ultima_data'] ?? null;
-
-                // Buscar total de usos
-                $totalUsosQuery = "
-                    SELECT COUNT(*) as total_usos
-                    FROM cashback_movimentacoes
-                    WHERE usuario_id = ? AND loja_id = ? AND tipo_operacao = 'uso'
-                ";
-                $totalUsosStmt = $db->prepare($totalUsosQuery);
-                $totalUsosStmt->execute([$userId, $loja['id']]);
-                $totalUsosInfo = $totalUsosStmt->fetch(PDO::FETCH_ASSOC);
-                $loja['total_usos'] = $totalUsosInfo['total_usos'] ?? 0;
-            }
-        }
-    } else {
-        $estatisticasGerais = [
-            'lojas_com_saldo' => 0,
-            'total_saldo_disponivel' => 0,
-            'total_usado_geral' => 0,
-            'lojas_saldo_disponivel' => 0
-        ];
+    
+    // Query base para buscar lojas parceiras ativas
+    $whereConditions = ["l.status = 'aprovado'"];
+    $params = [];
+    
+    // Aplicar filtros
+    if ($filters['categoria'] !== 'todas' && !empty($filters['categoria'])) {
+        $whereConditions[] = "l.categoria = ?";
+        $params[] = $filters['categoria'];
     }
-
+    
+    if (!empty($filters['nome'])) {
+        $whereConditions[] = "(l.nome_fantasia LIKE ? OR l.descricao LIKE ?)";
+        $params[] = '%' . $filters['nome'] . '%';
+        $params[] = '%' . $filters['nome'] . '%';
+    }
+    
+    if ($filters['cashback_min'] > 0) {
+        $whereConditions[] = "l.porcentagem_cashback >= ?";
+        $params[] = $filters['cashback_min'];
+    }
+    
+    // Ordenação
+    $orderBy = match($filters['ordenar']) {
+        'cashback_desc' => 'l.porcentagem_cashback DESC',
+        'cashback_asc' => 'l.porcentagem_cashback ASC',
+        'categoria' => 'l.categoria ASC, l.nome_fantasia ASC',
+        'mais_recentes' => 'l.data_criacao DESC',
+        default => 'l.nome_fantasia ASC'
+    };
+    
+    // Query principal
+    $query = "
+        SELECT 
+            l.id,
+            l.nome_fantasia,
+            l.categoria,
+            l.porcentagem_cashback,
+            l.descricao,
+            l.logo,
+            l.site,
+            l.telefone,
+            l.endereco,
+            l.cidade,
+            l.estado,
+            l.data_criacao,
+            CASE WHEN f.loja_id IS NOT NULL THEN 1 ELSE 0 END as eh_favorita,
+            COUNT(DISTINCT t.id) as total_transacoes
+        FROM lojas l
+        LEFT JOIN favoritos f ON l.id = f.loja_id AND f.usuario_id = ?
+        LEFT JOIN transacoes_cashback t ON l.id = t.loja_id
+        WHERE " . implode(' AND ', $whereConditions) . "
+        GROUP BY l.id, f.loja_id
+        ORDER BY {$orderBy}
+        LIMIT ? OFFSET ?
+    ";
+    
+    // Adicionar user_id no início dos params
+    array_unshift($params, $userId);
+    $params[] = $limit;
+    $params[] = $offset;
+    
+    $stmt = $db->prepare($query);
+    $stmt->execute($params);
+    $lojas = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Query para contar total de lojas (para paginação)
+    $countParams = array_slice($params, 1, -2); // Remove user_id, limit e offset
+    $countQuery = "
+        SELECT COUNT(DISTINCT l.id) as total
+        FROM lojas l
+        WHERE " . implode(' AND ', $whereConditions);
+    
+    $countStmt = $db->prepare($countQuery);
+    $countStmt->execute($countParams);
+    $totalLojas = $countStmt->fetchColumn();
+    
+    // Calcular paginação
+    $totalPages = ceil($totalLojas / $limit);
+    
+    // Buscar categorias disponíveis
+    $categoriesQuery = "SELECT DISTINCT categoria FROM lojas WHERE status = 'aprovado' ORDER BY categoria";
+    $categoriesStmt = $db->prepare($categoriesQuery);
+    $categoriesStmt->execute();
+    $categorias = $categoriesStmt->fetchAll(PDO::FETCH_COLUMN);
+    
+    // Processar favoritos via AJAX
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+        header('Content-Type: application/json');
+        
+        if ($_POST['action'] === 'toggle_favorite') {
+            $lojaId = intval($_POST['loja_id']);
+            
+            // Verificar se já é favorito
+            $checkQuery = "SELECT id FROM favoritos WHERE usuario_id = ? AND loja_id = ?";
+            $checkStmt = $db->prepare($checkQuery);
+            $checkStmt->execute([$userId, $lojaId]);
+            
+            if ($checkStmt->rowCount() > 0) {
+                // Remover dos favoritos
+                $deleteQuery = "DELETE FROM favoritos WHERE usuario_id = ? AND loja_id = ?";
+                $deleteStmt = $db->prepare($deleteQuery);
+                $deleteStmt->execute([$userId, $lojaId]);
+                echo json_encode(['status' => 'removed', 'message' => 'Removido dos favoritos']);
+            } else {
+                // Adicionar aos favoritos
+                $insertQuery = "INSERT INTO favoritos (usuario_id, loja_id, data_criacao) VALUES (?, ?, NOW())";
+                $insertStmt = $db->prepare($insertQuery);
+                $insertStmt->execute([$userId, $lojaId]);
+                echo json_encode(['status' => 'added', 'message' => 'Adicionado aos favoritos']);
+            }
+            exit;
+        }
+    }
+    
 } catch (Exception $e) {
-    error_log('Erro ao carregar lojas parceiras: ' . $e->getMessage());
-    $hasError = true;
-    $errorMessage = 'Erro ao carregar dados das lojas parceiras.';
-    $storesData = [];
-    $estatisticasGerais = [
-        'lojas_com_saldo' => 0,
-        'total_saldo_disponivel' => 0,
-        'total_usado_geral' => 0,
-        'lojas_saldo_disponivel' => 0
-    ];
+    error_log("Erro ao carregar lojas parceiras: " . $e->getMessage());
+    $lojas = [];
+    $totalLojas = 0;
+    $totalPages = 0;
+    $categorias = [];
 }
 
-
-// Função para formatar valor
-function formatCurrency($value) {
-    return 'R$ ' . number_format($value ?: 0, 2, ',', '.');
-}
-
-// Função para formatar data
-function formatDate($date) {
-    if (!$date) return 'Nunca';
-    return date('d/m/Y', strtotime($date));
+// Função helper para gerar URL com filtros
+function buildFilterUrl($newFilters = []) {
+    global $filters;
+    $currentFilters = array_merge($filters, $newFilters);
+    $queryString = http_build_query(array_filter($currentFilters, function($value) {
+        return $value !== '' && $value !== 'todas' && $value !== 'nome';
+    }));
+    return '?' . $queryString;
 }
 ?>
 
@@ -213,432 +174,292 @@ function formatDate($date) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lojas Parceiras - Klube Cash</title>
-    <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
-    <link rel="stylesheet" href="../../assets/css/views/client/partner-stores.css">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="../../assets/css/main.css">
+    <link rel="stylesheet" href="../../assets/css/client.css">
+    <link rel="stylesheet" href="../../assets/css/partner-stores.css">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 </head>
 <body>
-    <?php include_once '../components/navbar.php'; ?>
-
-    <div class="page-wrapper" style="margin-top: 80px;">
-        <div class="hero-section">
-            <div class="container">
-                <div class="hero-content">
-                    <div class="hero-text">
-                        <h1><i class="fas fa-store"></i> Suas Lojas Parceiras</h1>
-                        <p>Descubra onde você pode ganhar e usar seu cashback</p>
-                    </div>
-                    </div>
+    <?php include '../components/client-header.php'; ?>
+    
+    <div class="container">
+        <div class="page-header">
+            <div class="header-content">
+                <h1>🏪 Lojas Parceiras</h1>
+                <p class="header-subtitle">
+                    Descubra onde você pode ganhar cashback e economizar dinheiro
+                </p>
+            </div>
+            
+            <!-- Estatísticas rápidas -->
+            <div class="stats-row">
+                <div class="stat-item">
+                    <span class="stat-number"><?php echo $totalLojas; ?></span>
+                    <span class="stat-label">Lojas Parceiras</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number"><?php echo count($categorias); ?></span>
+                    <span class="stat-label">Categorias</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number">até 15%</span>
+                    <span class="stat-label">de Cashback</span>
+                </div>
             </div>
         </div>
 
-        <div class="container">
-            <?php if (!empty($favoriteMessage)): ?>
-                <div class="toast toast-<?php echo htmlspecialchars($favoriteMessageType); ?>">
-                    <i class="fas <?php echo ($favoriteMessageType == 'success') ? 'fa-check-circle' : 'fa-exclamation-circle'; ?>"></i>
-                    <?php echo htmlspecialchars($favoriteMessage); ?>
-                </div>
-            <?php endif; ?>
-
-            <?php if ($hasError): ?>
-                <div class="toast toast-error">
-                    <i class="fas fa-exclamation-circle"></i>
-                    <?php echo htmlspecialchars($errorMessage); ?>
-                </div>
-            <?php else: ?>
-
-            <div class="filters-bar">
-                <div class="filters-toggle">
-                    <button id="toggleFilters" class="btn-filter-toggle">
-                        <i class="fas fa-filter"></i>
-                        Filtrar Lojas
-                        <i class="fas fa-chevron-down"></i>
+        <!-- Filtros e Busca -->
+        <div class="filters-section">
+            <form method="GET" class="filters-form">
+                <div class="search-box">
+                    <input type="text" 
+                           name="nome" 
+                           placeholder="Buscar lojas..." 
+                           value="<?php echo htmlspecialchars($filters['nome']); ?>"
+                           class="search-input">
+                    <button type="submit" class="search-btn">
+                        <i class="material-icons">search</i>
                     </button>
                 </div>
-
-                <div class="filters-content" id="filtersContent">
-                    <form action="" method="GET" class="filter-form">
-                        <div class="filter-row">
-                            <div class="filter-group">
-                                <label>Buscar Loja</label>
-                                <div class="search-input">
-                                    <i class="fas fa-search"></i>
-                                    <input type="text" name="nome" value="<?php echo $filters['nome'] ?? ''; ?>" placeholder="Digite o nome da loja">
-                                </div>
-                            </div>
-
-                            <div class="filter-group">
-                                <label>Categoria</label>
-                                <select name="categoria" class="filter-select">
-                                    <option value="todas">Todas</option>
-                                    <?php if (!empty($storesData['categorias'])): ?>
-                                        <?php foreach ($storesData['categorias'] as $categoria): ?>
-                                            <option value="<?php echo htmlspecialchars($categoria); ?>" <?php echo (isset($filters['categoria']) && $filters['categoria'] == $categoria) ? 'selected' : ''; ?>>
-                                                <?php echo htmlspecialchars($categoria); ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    <?php endif; ?>
-                                </select>
-                            </div>
-
-                            <div class="filter-group">
-                                <label>Ordenar</label>
-                                <select name="ordenar" class="filter-select">
-                                    <option value="nome">Nome</option>
-                                    <option value="cashback" <?php echo (isset($filters['ordenar']) && $filters['ordenar'] == 'cashback') ? 'selected' : ''; ?>>% Cashback</option>
-                                    <option value="categoria" <?php echo (isset($filters['ordenar']) && $filters['ordenar'] == 'categoria') ? 'selected' : ''; ?>>Categoria</option>
-                                </select>
-                            </div>
-
-                            <div class="filter-actions">
-                                <button type="submit" name="filtrar" value="1" class="btn-apply-filter">
-                                    <i class="fas fa-search"></i>
-                                    Aplicar
-                                </button>
-                                <a href="?" class="btn-clear-filter">
-                                    <i class="fas fa-times"></i>
-                                    Limpar
-                                </a>
-                            </div>
-                        </div>
-                    </form>
-                </div>
-            </div>
-
-            <div class="stores-section">
-                <div class="section-header">
-                    <div class="section-title">
-                        <h2>Suas Lojas Disponíveis</h2>
-                        <span class="store-count"><?php echo $storesData['estatisticas']['total_lojas'] ?? 0; ?> lojas encontradas</span>
+                
+                <div class="filter-row">
+                    <div class="filter-group">
+                        <label>Categoria:</label>
+                        <select name="categoria" onchange="this.form.submit()">
+                            <option value="todas">Todas as categorias</option>
+                            <?php foreach ($categorias as $categoria): ?>
+                                <option value="<?php echo htmlspecialchars($categoria); ?>" 
+                                        <?php echo $filters['categoria'] === $categoria ? 'selected' : ''; ?>>
+                                    <?php echo ucfirst(htmlspecialchars($categoria)); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
                     </div>
-
-                    <?php if (!empty($storesData['lojas'])): ?>
-                    <div class="quick-stats">
-                        <div class="quick-stat">
-                            <span class="stat-number">
-                                <?php echo number_format(($storesData['estatisticas']['media_cashback'] ?? 0) - 5, 1); ?>%
-                            </span>
-                            <span class="stat-desc">Cashback médio</span>
-                        </div>
-                        <div class="quick-stat">
-                            <span class="stat-number">
-                                <?php echo number_format(($storesData['estatisticas']['maior_cashback'] ?? 0) - 5, 1); ?>%
-                            </span>
-                            <span class="stat-desc">Maior cashback</span>
-                        </div>
+                    
+                    <div class="filter-group">
+                        <label>Cashback mínimo:</label>
+                        <select name="cashback_min" onchange="this.form.submit()">
+                            <option value="0">Qualquer valor</option>
+                            <option value="2" <?php echo $filters['cashback_min'] == 2 ? 'selected' : ''; ?>>2% ou mais</option>
+                            <option value="5" <?php echo $filters['cashback_min'] == 5 ? 'selected' : ''; ?>>5% ou mais</option>
+                            <option value="10" <?php echo $filters['cashback_min'] == 10 ? 'selected' : ''; ?>>10% ou mais</option>
+                        </select>
                     </div>
-
+                    
+                    <div class="filter-group">
+                        <label>Ordenar por:</label>
+                        <select name="ordenar" onchange="this.form.submit()">
+                            <option value="nome" <?php echo $filters['ordenar'] === 'nome' ? 'selected' : ''; ?>>Nome A-Z</option>
+                            <option value="cashback_desc" <?php echo $filters['ordenar'] === 'cashback_desc' ? 'selected' : ''; ?>>Maior Cashback</option>
+                            <option value="categoria" <?php echo $filters['ordenar'] === 'categoria' ? 'selected' : ''; ?>>Categoria</option>
+                            <option value="mais_recentes" <?php echo $filters['ordenar'] === 'mais_recentes' ? 'selected' : ''; ?>>Mais Recentes</option>
+                        </select>
+                    </div>
+                    
+                    <?php if (array_filter($filters, function($v, $k) { return $v !== '' && $v !== 'todas' && $k !== 'ordenar'; }, ARRAY_FILTER_USE_BOTH)): ?>
+                        <a href="?" class="clear-filters-btn">
+                            <i class="material-icons">clear</i>
+                            Limpar Filtros
+                        </a>
                     <?php endif; ?>
                 </div>
+            </form>
+        </div>
 
+        <!-- Grade de Lojas -->
+        <div class="stores-section">
+            <?php if (empty($lojas)): ?>
+                <div class="empty-state">
+                    <div class="empty-illustration">
+                        <i class="material-icons">store</i>
+                    </div>
+                    <h3>Nenhuma loja encontrada</h3>
+                    <p>
+                        <?php if (array_filter($filters)): ?>
+                            Tente ajustar os filtros para encontrar mais lojas.
+                        <?php else: ?>
+                            Ainda não temos lojas parceiras cadastradas. Estamos trabalhando para trazer as melhores opções para você!
+                        <?php endif; ?>
+                    </p>
+                    <?php if (array_filter($filters)): ?>
+                        <a href="?" class="btn btn-primary">Ver Todas as Lojas</a>
+                    <?php endif; ?>
+                </div>
+            <?php else: ?>
                 <div class="stores-grid">
-                    <?php if (empty($storesData['lojas'])): ?>
-                        <div class="empty-state">
-                            <div class="empty-icon">
-                                <i class="fas fa-store-slash"></i>
-                            </div>
-                            <h3>Nenhuma loja encontrada</h3>
-                            <p>Tente ajustar os filtros ou remover algumas opções de busca</p>
-                            <a href="?" class="btn-primary">Ver Todas as Lojas</a>
-                        </div>
-                    <?php else: ?>
-                        <?php foreach ($storesData['lojas'] as $loja): ?>
-                            <div class="store-card <?php echo $loja['saldo_disponivel'] > 0 ? 'has-balance' : ''; ?>">
-                                <div class="store-card-header">
-                                    <div class="store-avatar">
-                                        <span><?php echo strtoupper(substr($loja['nome_fantasia'], 0, 2)); ?></span>
-                                    </div>
-
-                                    <div class="store-info">
-                                        <h3 class="store-name"><?php echo htmlspecialchars($loja['nome_fantasia']); ?></h3>
-                                        <span class="store-category">
-                                            <i class="fas fa-tag"></i>
-                                            <?php echo htmlspecialchars($loja['categoria']); ?>
-                                        </span>
-                                    </div>
-
-                                    <form method="POST" class="favorite-form">
-                                        <input type="hidden" name="store_id" value="<?php echo $loja['id']; ?>">
-                                        <input type="hidden" name="is_favorite" value="<?php echo $loja['is_favorite'] ?? 0; ?>">
-                                        <button type="submit" name="toggle_favorite" class="btn-favorite <?php echo (!empty($loja['is_favorite'])) ? 'favorited' : ''; ?>" title="<?php echo (!empty($loja['is_favorite'])) ? 'Remover dos favoritos' : 'Adicionar aos favoritos'; ?>">
-                                            <i class="<?php echo (!empty($loja['is_favorite'])) ? 'fas fa-heart' : 'far fa-heart'; ?>"></i>
-                                        </button>
-                                    </form>
-                                </div>
-
-                                <div class="cashback-highlight">
-                                    <div class="cashback-percentage">
-                                        <span class="percentage">
-                                            <?php echo number_format($loja['porcentagem_cashback'] - 5, 1); ?>%
-                                        </span>
-
-                                        <span class="label">de cashback</span>
-                                    </div>
-                                    <div class="cashback-explanation">
-                                        <i class="fas fa-info-circle"></i>
-                                        <span>Você ganha <?php echo number_format($loja['porcentagem_cashback'] / 2, 1); ?>% do valor da compra</span>
-                                    </div>
-                                </div>
-
-                                <?php if ($loja['saldo_disponivel'] > 0): ?>
-                                    <div class="balance-status available">
-                                        <div class="balance-icon">
-                                            <i class="fas fa-coins"></i>
-                                        </div>
-                                        <div class="balance-info">
-                                            <span class="balance-label">Saldo Disponível</span>
-                                            <span class="balance-amount"><?php echo formatCurrency($loja['saldo_disponivel']); ?></span>
-                                        </div>
-                                        <button class="btn-use-balance" onclick="usarSaldo(<?php echo $loja['id']; ?>, '<?php echo htmlspecialchars($loja['nome_fantasia']); ?>', <?php echo $loja['saldo_disponivel']; ?>)">
-                                            <i class="fas fa-shopping-cart"></i>
-                                            Usar Agora
-                                        </button>
-                                    </div>
-                                <?php elseif ($loja['cashback_pendente'] > 0): ?>
-                                    <div class="balance-status pending">
-                                        <div class="balance-icon">
-                                            <i class="fas fa-clock"></i>
-                                        </div>
-                                        <div class="balance-info">
-                                            <span class="balance-label">Cashback Pendente</span>
-                                            <span class="balance-amount"><?php echo formatCurrency($loja['cashback_pendente']); ?></span>
-                                        </div>
-                                        <span class="status-badge pending">Aguardando</span>
-                                    </div>
-                                <?php elseif ($loja['total_usado'] > 0): ?>
-                                    <div class="balance-status used">
-                                        <div class="balance-icon">
-                                            <i class="fas fa-check-circle"></i>
-                                        </div>
-                                        <div class="balance-info">
-                                            <span class="balance-label">Já Utilizado</span>
-                                            <span class="balance-amount"><?php echo formatCurrency($loja['total_usado']); ?></span>
-                                        </div>
-                                        <span class="usage-detail"><?php echo $loja['total_usos']; ?> vezes</span>
-                                    </div>
-                                <?php else: ?>
-                                    <div class="balance-status none">
-                                        <div class="balance-icon">
-                                            <i class="fas fa-shopping-bag"></i>
-                                        </div>
-                                        <div class="balance-info">
-                                            <span class="balance-label">Comece a Comprar</span>
-                                            <span class="balance-description">Ganhe cashback nesta loja</span>
-                                        </div>
-                                    </div>
-                                <?php endif; ?>
-
-                                <div class="card-actions">
-                                    <button class="btn-secondary" onclick="verDetalhes(<?php echo $loja['id']; ?>)">
-                                        <i class="fas fa-info-circle"></i>
-                                        Ver Detalhes
-                                    </button>
-
-                                    <?php if ($loja['ultimo_uso']): ?>
-                                        <div class="last-use">
-                                            <i class="fas fa-calendar-alt"></i>
-                                            Último uso: <?php echo formatDate($loja['ultimo_uso']); ?>
-                                        </div>
+                    <?php foreach ($lojas as $loja): ?>
+                        <div class="store-card" data-store-id="<?php echo $loja['id']; ?>">
+                            <div class="store-card-header">
+                                <div class="store-logo">
+                                    <?php if (!empty($loja['logo']) && file_exists('../../uploads/store_logos/' . $loja['logo'])): ?>
+                                        <img src="../../uploads/store_logos/<?php echo htmlspecialchars($loja['logo']); ?>" 
+                                             alt="<?php echo htmlspecialchars($loja['nome_fantasia']); ?>"
+                                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
                                     <?php endif; ?>
+                                    <div class="store-initial" <?php echo !empty($loja['logo']) ? 'style="display: none;"' : ''; ?>>
+                                        <?php echo strtoupper(substr($loja['nome_fantasia'], 0, 1)); ?>
+                                    </div>
+                                </div>
+                                
+                                <button class="favorite-btn <?php echo $loja['eh_favorita'] ? 'active' : ''; ?>" 
+                                        onclick="toggleFavorite(<?php echo $loja['id']; ?>)">
+                                    <i class="material-icons"><?php echo $loja['eh_favorita'] ? 'favorite' : 'favorite_border'; ?></i>
+                                </button>
+                            </div>
+                            
+                            <div class="store-info">
+                                <h3 class="store-name"><?php echo htmlspecialchars($loja['nome_fantasia']); ?></h3>
+                                
+                                <div class="store-category">
+                                    <i class="material-icons">category</i>
+                                    <?php echo ucfirst(htmlspecialchars($loja['categoria'])); ?>
+                                </div>
+                                
+                                <div class="cashback-info">
+                                    <span class="cashback-percentage">
+                                        <?php echo number_format($loja['porcentagem_cashback'], 1); ?>%
+                                    </span>
+                                    <span class="cashback-label">de cashback</span>
+                                </div>
+                                
+                                <?php if (!empty($loja['descricao'])): ?>
+                                    <p class="store-description">
+                                        <?php echo htmlspecialchars(substr($loja['descricao'], 0, 100)); ?>
+                                        <?php echo strlen($loja['descricao']) > 100 ? '...' : ''; ?>
+                                    </p>
+                                <?php endif; ?>
+                                
+                                <div class="store-stats">
+                                    <span class="stat">
+                                        <i class="material-icons">receipt</i>
+                                        <?php echo $loja['total_transacoes']; ?> transações
+                                    </span>
                                 </div>
                             </div>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
+                            
+                            <div class="store-actions">
+                                <?php if (!empty($loja['site'])): ?>
+                                    <a href="<?php echo htmlspecialchars($loja['site']); ?>" 
+                                       target="_blank" 
+                                       class="btn btn-primary btn-sm">
+                                        <i class="material-icons">launch</i>
+                                        Visitar Loja
+                                    </a>
+                                <?php endif; ?>
+                                
+                                <button class="btn btn-secondary btn-sm" onclick="showStoreDetails(<?php echo $loja['id']; ?>)">
+                                    <i class="material-icons">info</i>
+                                    Detalhes
+                                </button>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
                 </div>
-            </div>
-
-            <?php if (!empty($storesData['paginacao']) && $storesData['paginacao']['total_paginas'] > 1): ?>
-                <div class="pagination-wrapper">
-                    <nav class="pagination">
-                        <?php
-                        $currentPage = $storesData['paginacao']['pagina_atual'];
-                        $totalPages = $storesData['paginacao']['total_paginas'];
-
-                        // Construir parâmetros da URL
-                        $urlParams = [];
-                        foreach ($filters as $key => $value) {
-                            $urlParams[] = "$key=" . urlencode($value);
-                        }
-                        $urlParams[] = "filtrar=1";
-                        $queryString = !empty($urlParams) ? '&' . implode('&', $urlParams) : '';
-
-                        // Anterior
-                        if ($currentPage > 1):
-                        ?>
-                            <a href="?page=<?php echo $currentPage - 1 . $queryString; ?>" class="pagination-btn prev">
-                                <i class="fas fa-chevron-left"></i>
+                
+                <!-- Paginação -->
+                <?php if ($totalPages > 1): ?>
+                    <div class="pagination">
+                        <?php if ($page > 1): ?>
+                            <a href="<?php echo buildFilterUrl(['page' => $page - 1]); ?>" class="pagination-btn">
+                                <i class="material-icons">chevron_left</i>
                                 Anterior
                             </a>
                         <?php endif; ?>
-
-                        <div class="pagination-numbers">
-                            <?php
-                            $start = max(1, $currentPage - 2);
-                            $end = min($totalPages, $start + 4);
-
-                            for ($i = $start; $i <= $end; $i++):
-                            ?>
-                                <a href="?page=<?php echo $i . $queryString; ?>" class="pagination-number <?php echo ($i == $currentPage) ? 'active' : ''; ?>">
-                                    <?php echo $i; ?>
-                                </a>
-                            <?php endfor; ?>
+                        
+                        <div class="pagination-info">
+                            Página <?php echo $page; ?> de <?php echo $totalPages; ?>
                         </div>
-
-                        <?php
-                        // Próximo
-                        if ($currentPage < $totalPages):
-                        ?>
-                            <a href="?page=<?php echo $currentPage + 1 . $queryString; ?>" class="pagination-btn next">
-                                Próximo
-                                <i class="fas fa-chevron-right"></i>
+                        
+                        <?php if ($page < $totalPages): ?>
+                            <a href="<?php echo buildFilterUrl(['page' => $page + 1]); ?>" class="pagination-btn">
+                                Próxima
+                                <i class="material-icons">chevron_right</i>
                             </a>
                         <?php endif; ?>
-                    </nav>
-                </div>
-            <?php endif; ?>
+                    </div>
+                <?php endif; ?>
             <?php endif; ?>
         </div>
     </div>
 
-    <div id="storeModal" class="modal">
-        <div class="modal-overlay" onclick="closeModal()"></div>
+    <!-- Modal de Detalhes da Loja -->
+    <div id="storeDetailsModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
                 <h3>Detalhes da Loja</h3>
-                <button onclick="closeModal()" class="modal-close">
-                    <i class="fas fa-times"></i>
+                <button class="modal-close" onclick="closeStoreDetails()">
+                    <i class="material-icons">close</i>
                 </button>
             </div>
-            <div class="modal-body">
-                <div id="storeDetails">
-                    <div class="loading">
-                        <i class="fas fa-spinner fa-spin"></i>
-                        Carregando informações...
-                    </div>
-                </div>
+            <div class="modal-body" id="storeDetailsContent">
+                <!-- Conteúdo será carregado via JavaScript -->
             </div>
         </div>
     </div>
 
-    <div id="useBalanceModal" class="modal">
-        <div class="modal-overlay" onclick="closeUseBalanceModal()"></div>
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Usar Saldo de Cashback</h3>
-                <button onclick="closeUseBalanceModal()" class="modal-close">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div id="useBalanceContent">
-                    <div class="balance-usage-info">
-                        <div class="store-info-modal">
-                            <div class="store-avatar-modal">
-                                <span id="modalStoreInitials"></span>
-                            </div>
-                            <div>
-                                <h4 id="modalStoreName"></h4>
-                                <p>Saldo disponível: <strong id="modalStoreBalance"></strong></p>
-                            </div>
-                        </div>
-
-                        <div class="usage-instructions">
-                            <div class="instruction-item">
-                                <i class="fas fa-shopping-cart"></i>
-                                <span>Vá até a loja e faça sua compra</span>
-                            </div>
-                            <div class="instruction-item">
-                                <i class="fas fa-mobile-alt"></i>
-                                <span>Informe que quer usar saldo do Klube Cash</span>
-                            </div>
-                            <div class="instruction-item">
-                                <i class="fas fa-check-circle"></i>
-                                <span>O valor será descontado automaticamente</span>
-                            </div>
-                        </div>
-
-                        <div class="contact-store">
-                            <p><strong>Dica:</strong> Entre em contato com a loja antes de ir para confirmar que aceita o uso do saldo Klube Cash.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
+    <script src="../../assets/js/main.js"></script>
     <script>
-        // JavaScript permanece igual
-        // Toggle dos filtros
-        document.getElementById('toggleFilters').addEventListener('click', function() {
-            const content = document.getElementById('filtersContent');
-            const icon = this.querySelector('.fa-chevron-down');
-
-            content.classList.toggle('active');
-            icon.style.transform = content.classList.contains('active') ? 'rotate(180deg)' : 'rotate(0deg)';
-        });
-
-        // Função para exibir detalhes da loja
-        function verDetalhes(storeId) {
-            document.getElementById('storeModal').classList.add('active');
-
-            // Simular carregamento de dados (em produção, faria uma chamada AJAX)
-            setTimeout(() => {
-                document.getElementById('storeDetails').innerHTML = `
-                    <div class="store-details-content">
-                        <div class="detail-section">
-                            <h4><i class="fas fa-chart-line"></i> Histórico de Cashback</h4>
-                            <p>Aqui você verá todo o histórico de cashback ganho nesta loja, incluindo valores pendentes e já utilizados.</p>
-                        </div>
-
-                        <div class="detail-section">
-                            <h4><i class="fas fa-clock"></i> Movimentações Recentes</h4>
-                            <p>Últimas 10 movimentações de cashback desta loja aparecerão aqui.</p>
-                        </div>
-
-                        <div class="detail-section">
-                            <h4><i class="fas fa-info-circle"></i> Informações da Loja</h4>
-                            <p>Dados de contato, endereço e outras informações relevantes.</p>
-                        </div>
-
-                        <div class="coming-soon">
-                            <i class="fas fa-tools"></i>
-                            <p>Esta funcionalidade está sendo desenvolvida e estará disponível em breve!</p>
-                        </div>
-                    </div>
-                `;
-            }, 500);
+        // Função para alternar favoritos
+        async function toggleFavorite(lojaId) {
+            try {
+                const response = await fetch(window.location.href, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `action=toggle_favorite&loja_id=${lojaId}`
+                });
+                
+                const result = await response.json();
+                
+                if (result.status === 'added' || result.status === 'removed') {
+                    const btn = document.querySelector(`[data-store-id="${lojaId}"] .favorite-btn`);
+                    const icon = btn.querySelector('i');
+                    
+                    if (result.status === 'added') {
+                        btn.classList.add('active');
+                        icon.textContent = 'favorite';
+                    } else {
+                        btn.classList.remove('active');
+                        icon.textContent = 'favorite_border';
+                    }
+                    
+                    showToast(result.message, 'success');
+                }
+            } catch (error) {
+                console.error('Erro ao alterar favorito:', error);
+                showToast('Erro ao alterar favorito. Tente novamente.', 'error');
+            }
         }
-
-        // Função para usar saldo
-        function usarSaldo(storeId, storeName, balance) {
-            document.getElementById('useBalanceModal').classList.add('active');
-
-            // Preencher informações do modal
-            document.getElementById('modalStoreInitials').textContent = storeName.substring(0, 2).toUpperCase();
-            document.getElementById('modalStoreName').textContent = storeName;
-            document.getElementById('modalStoreBalance').textContent = 'R$ ' + balance.toFixed(2).replace('.', ',');
+        
+        // Função para mostrar detalhes da loja
+        function showStoreDetails(lojaId) {
+            // Implementar carregamento de detalhes via AJAX
+            const modal = document.getElementById('storeDetailsModal');
+            modal.style.display = 'block';
+            
+            // Aqui você pode fazer uma requisição AJAX para carregar os detalhes completos da loja
+            document.getElementById('storeDetailsContent').innerHTML = '<div class="loading">Carregando...</div>';
         }
-
-        // Função para fechar modal principal
-        function closeModal() {
-            document.getElementById('storeModal').classList.remove('active');
+        
+        // Função para fechar modal
+        function closeStoreDetails() {
+            document.getElementById('storeDetailsModal').style.display = 'none';
         }
-
-        // Função para fechar modal de uso de saldo
-        function closeUseBalanceModal() {
-            document.getElementById('useBalanceModal').classList.remove('active');
+        
+        // Fechar modal clicando fora
+        window.onclick = function(event) {
+            const modal = document.getElementById('storeDetailsModal');
+            if (event.target === modal) {
+                modal.style.display = 'none';
+            }
         }
-
-        // Auto-hide para toasts
-        document.addEventListener('DOMContentLoaded', function() {
-            const toasts = document.querySelectorAll('.toast');
-            toasts.forEach(toast => {
-                setTimeout(() => {
-                    toast.style.opacity = '0';
-                    setTimeout(() => toast.remove(), 300);
-                }, 5000);
-            });
-        });
+        
+        // Função para mostrar toast
+        function showToast(message, type) {
+            // Implementar sistema de toast/notificação
+            console.log(`${type}: ${message}`);
+        }
     </script>
 </body>
 </html>
