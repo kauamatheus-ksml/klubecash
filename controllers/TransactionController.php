@@ -1205,6 +1205,71 @@ class TransactionController {
         }
     }
     
+    public function getClientTransactionsPWA($clientId, $filtros = [], $limit = 20, $offset = 0) {
+        try {
+            $sql = "
+                SELECT 
+                    t.id,
+                    t.valor_total,
+                    t.valor_cashback,
+                    t.saldo_usado,
+                    t.data_transacao,
+                    t.status,
+                    t.tipo,
+                    l.nome_fantasia as nome_loja,
+                    l.id as loja_id
+                FROM transacoes_cashback t
+                INNER JOIN lojas l ON t.loja_id = l.id
+                WHERE t.usuario_id = ?
+            ";
+            
+            $params = [$clientId];
+            
+            // Aplicar filtros
+            if (!empty($filtros['data_inicio'])) {
+                $sql .= " AND DATE(t.data_transacao) >= ?";
+                $params[] = $filtros['data_inicio'];
+            }
+            
+            if (!empty($filtros['data_fim'])) {
+                $sql .= " AND DATE(t.data_transacao) <= ?";
+                $params[] = $filtros['data_fim'];
+            }
+            
+            if (!empty($filtros['status'])) {
+                $sql .= " AND t.status = ?";
+                $params[] = $filtros['status'];
+            }
+            
+            if (!empty($filtros['loja_id'])) {
+                $sql .= " AND t.loja_id = ?";
+                $params[] = $filtros['loja_id'];
+            }
+            
+            if (!empty($filtros['tipo'])) {
+                if ($filtros['tipo'] === 'cashback') {
+                    $sql .= " AND t.tipo = 'cashback'";
+                } elseif ($filtros['tipo'] === 'uso_saldo') {
+                    $sql .= " AND t.saldo_usado > 0";
+                }
+            }
+            
+            $sql .= " ORDER BY t.data_transacao DESC LIMIT ? OFFSET ?";
+            $params[] = $limit;
+            $params[] = $offset;
+            
+            $stmt = $this->conn->prepare($sql);
+            $stmt->execute($params);
+            
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+        } catch (Exception $e) {
+            error_log('Erro ao buscar transações PWA: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+
     /**
      * Processa transações em lote a partir de um arquivo CSV
      * 
