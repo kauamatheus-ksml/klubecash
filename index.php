@@ -1,869 +1,116 @@
 <?php
-/**
- * KLUBE CASH - FRONT CONTROLLER PWA
- * Sistema de roteamento inteligente com detecção mobile
- * Redirecionamentos automáticos e suporte offline
- * 
- * @version 2.0
- * @author Klube Cash Development Team
- */
-
-// === CONFIGURAÇÕES INICIAIS ===
-ini_set('display_errors', 0);
-error_reporting(E_ALL);
-
-// Definir timezone
-date_default_timezone_set('America/Sao_Paulo');
-
-// Headers de segurança básicos
-header('X-Frame-Options: SAMEORIGIN');
-header('X-XSS-Protection: 1; mode=block');
-header('X-Content-Type-Options: nosniff');
-
-// === INCLUDES NECESSÁRIOS ===
-require_once __DIR__ . '/config/constants.php';
-require_once __DIR__ . '/config/database.php';
-require_once __DIR__ . '/utils/Security.php';
-require_once __DIR__ . '/utils/Logger.php';
-require_once __DIR__ . '/controllers/AuthController.php';
+// index.php - Versão Corrigida e Simplificada
+require_once './config/constants.php';
+require_once './config/database.php';
 
 /**
- * Classe para detecção de dispositivos móveis
+ * Função para renderizar logo da loja (mantida igual)
  */
-class MobileDetector {
-    private $userAgent;
-    private $httpHeaders;
+function renderStoreLogo($store) {
+    static $logoCache = [];
     
-    public function __construct() {
-        $this->userAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
-        $this->httpHeaders = $this->getHttpHeaders();
-    }
+    $nomeFantasia = htmlspecialchars($store['nome_fantasia']);
+    $primeiraLetra = strtoupper(substr($nomeFantasia, 0, 1));
     
-    /**
-     * Detecta se o dispositivo é móvel
-     */
-    public function isMobile() {
-        return $this->isTablet() || $this->isPhone();
-    }
-    
-    /**
-     * Detecta se é um tablet
-     */
-    public function isTablet() {
-        $tabletRegex = '/(tablet|ipad|playbook|silk)|(android(?!.*mobi))/i';
-        return preg_match($tabletRegex, $this->userAgent);
-    }
-    
-    /**
-     * Detecta se é um smartphone
-     */
-    public function isPhone() {
-        $phoneRegex = '/(up\.browser|up\.link|mmp|symbian|smartphone|midp|wap|phone|android|iemobile)/i';
-        $mobileRegex = '/mobile/i';
+    if (!empty($store['logo'])) {
+        $logoFilename = $store['logo'];
         
-        return preg_match($phoneRegex, $this->userAgent) || 
-               preg_match($mobileRegex, $this->userAgent);
-    }
-    
-    /**
-     * Detecta se é iOS
-     */
-    public function isiOS() {
-        return preg_match('/(iphone|ipod|ipad)/i', $this->userAgent);
-    }
-    
-    /**
-     * Detecta se é Android
-     */
-    public function isAndroid() {
-        return preg_match('/android/i', $this->userAgent);
-    }
-    
-    /**
-     * Detecta se suporta PWA
-     */
-    public function supportsPWA() {
-        // iOS 11.3+ e Chrome Android suportam PWA
-        if ($this->isiOS()) {
-            preg_match('/OS (\d+)_(\d+)/', $this->userAgent, $matches);
-            if (isset($matches[1]) && $matches[1] >= 11) {
-                return isset($matches[2]) && $matches[2] >= 3;
+        if (!isset($logoCache[$logoFilename])) {
+            if (preg_match('/^[a-zA-Z0-9_.-]+\.(jpg|jpeg|png|gif)$/i', $logoFilename)) {
+                $fullPath = __DIR__ . '/uploads/store_logos/' . $logoFilename;
+                $logoCache[$logoFilename] = file_exists($fullPath);
+            } else {
+                $logoCache[$logoFilename] = false;
+                error_log("Arquivo suspeito detectado: " . $logoFilename);
             }
-            return false;
         }
         
-        if ($this->isAndroid()) {
-            return preg_match('/Chrome\/(\d+)/', $this->userAgent, $matches) && 
-                   isset($matches[1]) && $matches[1] >= 57;
+        if ($logoCache[$logoFilename]) {
+            $logoPath = '/uploads/store_logos/' . htmlspecialchars($logoFilename);
+            return '<img src="' . $logoPath . '" alt="Logo ' . $nomeFantasia . '" class="store-logo-image" loading="lazy">';
         }
-        
-        // Desktop Chrome também suporta
-        return preg_match('/Chrome\/(\d+)/', $this->userAgent, $matches) && 
-               isset($matches[1]) && $matches[1] >= 70;
     }
     
-    /**
-     * Detecta se está rodando como PWA
-     */
-    public function isRunningAsPWA() {
-        return isset($_GET['standalone']) || 
-               isset($_GET['utm_source']) && $_GET['utm_source'] === 'pwa' ||
-               (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && 
-                $_SERVER['HTTP_X_REQUESTED_WITH'] === 'PWA');
-    }
+    $corDeFundo = generateColorFromName($nomeFantasia);
+    return '<div class="store-logo-fallback" style="background: linear-gradient(135deg, ' . $corDeFundo . ', ' . adjustBrightness($corDeFundo, -20) . ')" title="' . $nomeFantasia . '">' . $primeiraLetra . '</div>';
+}
+
+function generateColorFromName($name) {
+    $colors = [
+        '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FECA57',
+        '#FF9FF3', '#54A0FF', '#5F27CD', '#FF3838', '#00D2D3',
+        '#FF6348', '#7bed9f', '#70a1ff', '#dda0dd', '#ffb142',
+        '#ff7675', '#74b9ff', '#0984e3', '#00b894', '#fdcb6e'
+    ];
     
-    /**
-     * Obtém informações do dispositivo
-     */
-    public function getDeviceInfo() {
-        return [
-            'isMobile' => $this->isMobile(),
-            'isTablet' => $this->isTablet(),
-            'isPhone' => $this->isPhone(),
-            'isiOS' => $this->isiOS(),
-            'isAndroid' => $this->isAndroid(),
-            'supportsPWA' => $this->supportsPWA(),
-            'isRunningAsPWA' => $this->isRunningAsPWA(),
-            'userAgent' => $this->userAgent,
-            'viewport' => $this->getViewportSize()
-        ];
-    }
+    $hash = crc32($name);
+    $index = abs($hash) % count($colors);
+    return $colors[$index];
+}
+
+function adjustBrightness($hex, $percent) {
+    $hex = ltrim($hex, '#');
+    $r = hexdec(substr($hex, 0, 2));
+    $g = hexdec(substr($hex, 2, 2));
+    $b = hexdec(substr($hex, 4, 2));
     
-    /**
-     * Obtém tamanho estimado do viewport
-     */
-    private function getViewportSize() {
-        if ($this->isPhone()) {
-            return ['width' => 375, 'height' => 667]; // iPhone-like
-        } elseif ($this->isTablet()) {
-            return ['width' => 768, 'height' => 1024]; // iPad-like
-        }
-        return ['width' => 1920, 'height' => 1080]; // Desktop
-    }
+    $r = max(0, min(255, $r + ($r * $percent / 100)));
+    $g = max(0, min(255, $g + ($g * $percent / 100)));
+    $b = max(0, min(255, $b + ($b * $percent / 100)));
     
-    /**
-     * Obtém headers HTTP
-     */
-    private function getHttpHeaders() {
-        return getallheaders() ?: [];
+    return sprintf("#%02x%02x%02x", $r, $g, $b);
+}
+
+// Inicialização da sessão (mantida igual)
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Verificação do usuário logado (mantida igual)
+$isLoggedIn = isset($_SESSION['user_id']);
+$userType = $isLoggedIn ? ($_SESSION['user_type'] ?? '') : '';
+$userName = $isLoggedIn ? ($_SESSION['user_name'] ?? '') : '';
+
+// Determinação da URL do dashboard (mantida igual)
+$dashboardURL = '';
+if ($isLoggedIn) {
+    switch ($userType) {
+        case 'admin':
+            $dashboardURL = ADMIN_DASHBOARD_URL;
+            break;
+        case 'cliente':
+            $dashboardURL = CLIENT_DASHBOARD_URL;
+            break;
+        case 'loja':
+            $dashboardURL = STORE_DASHBOARD_URL;
+            break;
     }
 }
 
-/**
- * Classe principal de roteamento PWA
- */
-class PWARouter {
-    private $mobileDetector;
-    private $authController;
-    private $currentUser;
-    private $requestUri;
-    private $requestMethod;
-    private $routes;
-    private $pwaPaths;
-    
-    public function __construct() {
-        $this->mobileDetector = new MobileDetector();
-        $this->authController = new AuthController();
-        $this->currentUser = $this->authController->getCurrentUser();
-        $this->requestUri = $this->parseRequestUri();
-        $this->requestMethod = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-        
-        $this->initializeRoutes();
-        $this->initializePWAPaths();
-    }
-    
-    /**
-     * Parseia a URI da requisição
-     */
-    private function parseRequestUri() {
-        $uri = $_SERVER['REQUEST_URI'] ?? '/';
-        $uri = parse_url($uri, PHP_URL_PATH);
-        $uri = rtrim($uri, '/');
-        return $uri === '' ? '/' : $uri;
-    }
-    
-    /**
-     * Inicializa as rotas do sistema
-     */
-    private function initializeRoutes() {
-        $this->routes = [
-            // === ROTAS PÚBLICAS ===
-            '/' => ['file' => 'views/public/index.php', 'auth' => false],
-            '/sobre' => ['file' => 'views/public/about.php', 'auth' => false],
-            '/contato' => ['file' => 'views/public/contact.php', 'auth' => false],
-            '/como-funciona' => ['file' => 'views/public/how-it-works.php', 'auth' => false],
-            '/lojas-parceiras' => ['file' => 'views/public/partner-stores.php', 'auth' => false],
-            '/seja-parceiro' => ['file' => 'views/public/become-partner.php', 'auth' => false],
-            
-            // === ROTAS DE AUTENTICAÇÃO ===
-            '/login' => ['file' => 'views/auth/login.php', 'auth' => false],
-            '/registro' => ['file' => 'views/auth/register.php', 'auth' => false],
-            '/recuperar-senha' => ['file' => 'views/auth/recover-password.php', 'auth' => false],
-            '/logout' => ['action' => 'logout', 'auth' => true],
-            
-            // === ROTAS DO CLIENTE ===
-            '/cliente' => ['file' => 'views/client/dashboard.php', 'auth' => true, 'role' => 'cliente'],
-            '/cliente/dashboard' => ['file' => 'views/client/dashboard.php', 'auth' => true, 'role' => 'cliente'],
-            '/cliente/extrato' => ['file' => 'views/client/statement.php', 'auth' => true, 'role' => 'cliente'],
-            '/cliente/cashback' => ['file' => 'views/client/cashback-history.php', 'auth' => true, 'role' => 'cliente'],
-            '/cliente/lojas' => ['file' => 'views/client/partner-stores.php', 'auth' => true, 'role' => 'cliente'],
-            '/cliente/perfil' => ['file' => 'views/client/profile.php', 'auth' => true, 'role' => 'cliente'],
-            
-            // === ROTAS ADMINISTRATIVAS ===
-            '/admin' => ['file' => 'views/admin/dashboard.php', 'auth' => true, 'role' => 'admin'],
-            '/admin/dashboard' => ['file' => 'views/admin/dashboard.php', 'auth' => true, 'role' => 'admin'],
-            '/admin/usuarios' => ['file' => 'views/admin/users.php', 'auth' => true, 'role' => 'admin'],
-            '/admin/lojas' => ['file' => 'views/admin/stores.php', 'auth' => true, 'role' => 'admin'],
-            '/admin/transacoes' => ['file' => 'views/admin/transactions.php', 'auth' => true, 'role' => 'admin'],
-            '/admin/configuracoes' => ['file' => 'views/admin/settings.php', 'auth' => true, 'role' => 'admin'],
-            
-            // === ROTAS DA LOJA ===
-            '/loja' => ['file' => 'views/store/dashboard.php', 'auth' => true, 'role' => 'loja'],
-            '/loja/dashboard' => ['file' => 'views/store/dashboard.php', 'auth' => true, 'role' => 'loja'],
-            '/loja/registrar-transacao' => ['file' => 'views/store/register-transaction.php', 'auth' => true, 'role' => 'loja'],
-            '/loja/comissoes' => ['file' => 'views/store/pending-commissions.php', 'auth' => true, 'role' => 'loja'],
-            '/loja/perfil' => ['file' => 'views/store/profile.php', 'auth' => true, 'role' => 'loja'],
-            
-            // === ROTAS PWA ESPECÍFICAS ===
-            '/manifest.json' => ['action' => 'manifest'],
-            '/sw.js' => ['file' => 'pwa/sw.js', 'headers' => ['Content-Type: application/javascript']],
-            '/offline' => ['file' => 'pwa/offline.html'],
-            
-            // === ROTAS API ===
-            '/api' => ['action' => 'api_handler']
-        ];
-    }
-    
-    /**
-     * Inicializa caminhos PWA (versões mobile)
-     */
-    private function initializePWAPaths() {
-        $this->pwaPaths = [
-            '/cliente/dashboard' => 'views/client/dashboard-pwa.php',
-            '/cliente/extrato' => 'views/client/statement-pwa.php',
-            '/cliente/cashback' => 'views/client/cashback-history-pwa.php',
-            '/cliente/lojas' => 'views/client/partner-stores-pwa.php',
-            '/cliente/perfil' => 'views/client/profile-pwa.php'
-        ];
-    }
-    
-    /**
-     * Método principal de roteamento
-     */
-    public function route() {
-        try {
-            // Log da requisição
-            $this->logRequest();
-            
-            // Verificar manutenção
-            if ($this->isMaintenanceMode()) {
-                $this->showMaintenancePage();
-                return;
-            }
-            
-            // Aplicar headers PWA se necessário
-            if ($this->shouldUsePWA()) {
-                $this->setPWAHeaders();
-            }
-            
-            // Tratamento especial para manifest e service worker
-            if ($this->handleSpecialRoutes()) {
-                return;
-            }
-            
-            // Verificar se a rota existe
-            $route = $this->matchRoute();
-            
-            if (!$route) {
-                $this->handle404();
-                return;
-            }
-            
-            // Verificar autenticação
-            if (!$this->checkAuthentication($route)) {
-                $this->redirectToLogin();
-                return;
-            }
-            
-            // Verificar permissões
-            if (!$this->checkPermissions($route)) {
-                $this->handle403();
-                return;
-            }
-            
-            // Decidir se usa versão PWA
-            $finalFile = $this->decidePWAVersion($route);
-            
-            // Executar a rota
-            $this->executeRoute($route, $finalFile);
-            
-        } catch (Exception $e) {
-            $this->handleException($e);
-        }
-    }
-    
-    /**
-     * Verifica se deve usar PWA
-     */
-    private function shouldUsePWA() {
-        $deviceInfo = $this->mobileDetector->getDeviceInfo();
-        
-        return ($deviceInfo['isMobile'] && $deviceInfo['supportsPWA']) ||
-               $deviceInfo['isRunningAsPWA'] ||
-               (isset($_GET['pwa']) && $_GET['pwa'] === '1');
-    }
-    
-    /**
-     * Define headers específicos para PWA
-     */
-    private function setPWAHeaders() {
-        header('Cache-Control: no-cache, no-store, must-revalidate');
-        header('Pragma: no-cache');
-        header('Expires: 0');
-        header('X-PWA-Mode: 1');
-        
-        // Headers para instalação PWA
-        if ($this->mobileDetector->isRunningAsPWA()) {
-            header('X-PWA-Running: 1');
-            header('X-Frame-Options: ALLOWALL');
-        }
-        
-        // Headers para Service Worker
-        header('Service-Worker-Allowed: /');
-        
-        // Meta tags dinâmicas para PWA
-        $this->setPWAMetaTags();
-    }
-    
-    /**
-     * Define meta tags dinâmicas para PWA
-     */
-    private function setPWAMetaTags() {
-        $deviceInfo = $this->mobileDetector->getDeviceInfo();
-        
-        // Viewport otimizado por dispositivo
-        if ($deviceInfo['isPhone']) {
-            header('X-Viewport: width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
-        } elseif ($deviceInfo['isTablet']) {
-            header('X-Viewport: width=device-width, initial-scale=1.0, maximum-scale=1.2');
-        }
-        
-        // Theme color baseado no dispositivo
-        if ($deviceInfo['isiOS']) {
-            header('X-Apple-Mobile-Web-App-Capable: yes');
-            header('X-Apple-Mobile-Web-App-Status-Bar-Style: default');
-            header('X-Apple-Mobile-Web-App-Title: Klube Cash');
-        }
-        
-        if ($deviceInfo['isAndroid']) {
-            header('X-Mobile-Web-App-Capable: yes');
-            header('X-Theme-Color: #FF7A00');
-        }
-    }
-    
-    /**
-     * Trata rotas especiais (manifest, service worker)
-     */
-    private function handleSpecialRoutes() {
-        switch ($this->requestUri) {
-            case '/manifest.json':
-                $this->serveManifest();
-                return true;
-                
-            case '/sw.js':
-                $this->serveServiceWorker();
-                return true;
-                
-            case '/offline':
-                $this->serveOfflinePage();
-                return true;
-                
-            default:
-                return false;
-        }
-    }
-    
-    /**
-     * Serve o manifest.json
-     */
-    private function serveManifest() {
-        header('Content-Type: application/manifest+json');
-        header('Cache-Control: public, max-age=86400'); // 24 horas
-        
-        $manifestPath = __DIR__ . '/pwa/manifest.json';
-        
-        if (file_exists($manifestPath)) {
-            readfile($manifestPath);
-        } else {
-            // Gerar manifest dinâmico
-            $manifest = $this->generateDynamicManifest();
-            echo json_encode($manifest, JSON_PRETTY_PRINT);
-        }
-    }
-    
-    /**
-     * Gera manifest dinâmico
-     */
-    private function generateDynamicManifest() {
-        return [
-            "name" => "Klube Cash - Cashback Inteligente",
-            "short_name" => "Klube Cash",
-            "description" => "Transforme suas compras em dinheiro de volta",
-            "start_url" => "/",
-            "display" => "standalone",
-            "orientation" => "portrait",
-            "theme_color" => "#FF7A00",
-            "background_color" => "#FFFFFF",
-            "scope" => "/",
-            "lang" => "pt-BR",
-            "icons" => [
-                [
-                    "src" => "/assets/icons/icon-72x72.png",
-                    "sizes" => "72x72",
-                    "type" => "image/png",
-                    "purpose" => "any maskable"
-                ],
-                [
-                    "src" => "/assets/icons/icon-192x192.png",
-                    "sizes" => "192x192",
-                    "type" => "image/png",
-                    "purpose" => "any maskable"
-                ],
-                [
-                    "src" => "/assets/icons/icon-512x512.png",
-                    "sizes" => "512x512",
-                    "type" => "image/png",
-                    "purpose" => "any maskable"
-                ]
-            ],
-            "categories" => ["finance", "business", "shopping"],
-            "shortcuts" => [
-                [
-                    "name" => "Dashboard",
-                    "short_name" => "Dashboard",
-                    "description" => "Acesso rápido ao painel principal",
-                    "url" => "/cliente/dashboard?utm_source=pwa_shortcut",
-                    "icons" => [
-                        [
-                            "src" => "/assets/icons/dashboard-icon.png",
-                            "sizes" => "96x96"
-                        ]
-                    ]
-                ],
-                [
-                    "name" => "Cashback",
-                    "short_name" => "Cashback",
-                    "description" => "Ver histórico de cashback",
-                    "url" => "/cliente/cashback?utm_source=pwa_shortcut",
-                    "icons" => [
-                        [
-                            "src" => "/assets/icons/cashback-icon.png",
-                            "sizes" => "96x96"
-                        ]
-                    ]
-                ]
-            ]
-        ];
-    }
-    
-    /**
-     * Serve o service worker
-     */
-    private function serveServiceWorker() {
-        header('Content-Type: application/javascript');
-        header('Cache-Control: no-cache, no-store, must-revalidate');
-        header('Service-Worker-Allowed: /');
-        
-        $swPath = __DIR__ . '/pwa/sw.js';
-        
-        if (file_exists($swPath)) {
-            readfile($swPath);
-        } else {
-            // Gerar service worker básico
-            echo $this->generateBasicServiceWorker();
-        }
-    }
-    
-    /**
-     * Gera service worker básico
-     */
-    private function generateBasicServiceWorker() {
-        return "
-const CACHE_NAME = 'klube-cash-v1';
-const urlsToCache = [
-    '/',
-    '/offline',
-    '/assets/css/main.css',
-    '/assets/js/main.js',
-    '/assets/icons/icon-192x192.png'
-];
-
-self.addEventListener('install', (event) => {
-    event.waitUntil(
-        caches.open(CACHE_NAME)
-            .then((cache) => cache.addAll(urlsToCache))
-    );
-});
-
-self.addEventListener('fetch', (event) => {
-    event.respondWith(
-        caches.match(event.request)
-            .then((response) => {
-                return response || fetch(event.request);
-            })
-            .catch(() => {
-                return caches.match('/offline');
-            })
-    );
-});
-        ";
-    }
-    
-    /**
-     * Serve a página offline
-     */
-    private function serveOfflinePage() {
-        header('Content-Type: text/html; charset=UTF-8');
-        header('Cache-Control: public, max-age=3600'); // 1 hora
-        
-        $offlinePath = __DIR__ . '/pwa/offline.html';
-        
-        if (file_exists($offlinePath)) {
-            readfile($offlinePath);
-        } else {
-            echo $this->generateOfflinePage();
-        }
-    }
-    
-    /**
-     * Gera página offline básica
-     */
-    private function generateOfflinePage() {
-        return '<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Klube Cash - Modo Offline</title>
-    <style>
-        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
-        .offline-container { max-width: 400px; margin: 0 auto; }
-        .logo { width: 120px; margin-bottom: 30px; }
-        h1 { color: #FF7A00; margin-bottom: 20px; }
-        p { color: #666; line-height: 1.6; }
-        .retry-btn { background: #FF7A00; color: white; padding: 12px 24px; border: none; border-radius: 6px; cursor: pointer; margin-top: 20px; }
-    </style>
-</head>
-<body>
-    <div class="offline-container">
-        <img src="/assets/images/logo.png" alt="Klube Cash" class="logo">
-        <h1>Você está offline</h1>
-        <p>Parece que você perdeu a conexão com a internet. Algumas funcionalidades podem estar limitadas.</p>
-        <p>Seus dados serão sincronizados automaticamente quando a conexão for restaurada.</p>
-        <button class="retry-btn" onclick="window.location.reload()">Tentar Novamente</button>
-    </div>
-</body>
-</html>';
-    }
-    
-    /**
-     * Busca por uma rota correspondente
-     */
-    private function matchRoute() {
-        // Busca exata
-        if (isset($this->routes[$this->requestUri])) {
-            return $this->routes[$this->requestUri];
-        }
-        
-        // Busca por patterns dinâmicos
-        foreach ($this->routes as $pattern => $route) {
-            if ($this->matchPattern($pattern, $this->requestUri)) {
-                return $route;
-            }
-        }
-        
-        return null;
-    }
-    
-    /**
-     * Verifica se o pattern corresponde à URI
-     */
-    private function matchPattern($pattern, $uri) {
-        // Converter pattern para regex
-        $regex = preg_replace('/\{[^}]+\}/', '([^/]+)', $pattern);
-        $regex = '#^' . $regex . '$#';
-        
-        return preg_match($regex, $uri);
-    }
-    
-    /**
-     * Verifica autenticação
-     */
-    private function checkAuthentication($route) {
-        if (!isset($route['auth']) || !$route['auth']) {
-            return true;
-        }
-        
-        return $this->currentUser !== null;
-    }
-    
-    /**
-     * Verifica permissões de role
-     */
-    private function checkPermissions($route) {
-        if (!isset($route['role'])) {
-            return true;
-        }
-        
-        if (!$this->currentUser) {
-            return false;
-        }
-        
-        return $this->currentUser['tipo'] === $route['role'];
-    }
-    
-    /**
-     * Decide se usa versão PWA
-     */
-    private function decidePWAVersion($route) {
-        if (!$this->shouldUsePWA()) {
-            return $route['file'] ?? null;
-        }
-        
-        // Verificar se existe versão PWA
-        if (isset($this->pwaPaths[$this->requestUri])) {
-            $pwaFile = $this->pwaPaths[$this->requestUri];
-            if (file_exists(__DIR__ . '/' . $pwaFile)) {
-                return $pwaFile;
-            }
-        }
-        
-        return $route['file'] ?? null;
-    }
-    
-    /**
-     * Executa a rota
-     */
-    private function executeRoute($route, $file) {
-        // Executar ação se especificada
-        if (isset($route['action'])) {
-            $this->executeAction($route['action']);
-            return;
-        }
-        
-        // Definir headers customizados
-        if (isset($route['headers'])) {
-            foreach ($route['headers'] as $header) {
-                header($header);
-            }
-        }
-        
-        // Incluir arquivo
-        if ($file && file_exists(__DIR__ . '/' . $file)) {
-            // Disponibilizar variáveis para a view
-            $deviceInfo = $this->mobileDetector->getDeviceInfo();
-            $currentUser = $this->currentUser;
-            $isPWA = $this->shouldUsePWA();
-            
-            include __DIR__ . '/' . $file;
-        } else {
-            $this->handle404();
-        }
-    }
-    
-    /**
-     * Executa ações especiais
-     */
-    private function executeAction($action) {
-        switch ($action) {
-            case 'logout':
-                $this->authController->logout();
-                $this->redirect('/login?logout=1');
-                break;
-                
-            case 'api_handler':
-                $this->handleAPI();
-                break;
-                
-            default:
-                $this->handle404();
-        }
-    }
-    
-    /**
-     * Trata requisições de API
-     */
-    private function handleAPI() {
-        $apiPath = str_replace('/api', '', $this->requestUri);
-        $apiFile = __DIR__ . '/api' . $apiPath . '.php';
-        
-        if (file_exists($apiFile)) {
-            include $apiFile;
-        } else {
-            http_response_code(404);
-            echo json_encode(['error' => 'API endpoint not found']);
-        }
-    }
-    
-    /**
-     * Redireciona para login
-     */
-    private function redirectToLogin() {
-        $redirectUrl = urlencode($this->requestUri);
-        $loginUrl = '/login';
-        
-        if ($this->shouldUsePWA()) {
-            $loginUrl .= '?pwa=1';
-        }
-        
-        if ($redirectUrl !== '/') {
-            $loginUrl .= (strpos($loginUrl, '?') ? '&' : '?') . 'redirect=' . $redirectUrl;
-        }
-        
-        $this->redirect($loginUrl);
-    }
-    
-    /**
-     * Redireciona
-     */
-    private function redirect($url, $code = 302) {
-        header("Location: $url", true, $code);
-        exit;
-    }
-    
-    /**
-     * Verifica modo de manutenção
-     */
-    private function isMaintenanceMode() {
-        return file_exists(__DIR__ . '/maintenance.flag') && 
-               !$this->isAdminUser();
-    }
-    
-    /**
-     * Verifica se é usuário admin
-     */
-    private function isAdminUser() {
-        return $this->currentUser && $this->currentUser['tipo'] === 'admin';
-    }
-    
-    /**
-     * Mostra página de manutenção
-     */
-    private function showMaintenancePage() {
-        http_response_code(503);
-        header('Content-Type: text/html; charset=UTF-8');
-        include __DIR__ . '/views/errors/maintenance.php';
-    }
-    
-    /**
-     * Trata erro 404
-     */
-    private function handle404() {
-        http_response_code(404);
-        
-        if ($this->shouldUsePWA()) {
-            include __DIR__ . '/views/errors/404-pwa.php';
-        } else {
-            include __DIR__ . '/views/errors/404.php';
-        }
-    }
-    
-    /**
-     * Trata erro 403
-     */
-    private function handle403() {
-        http_response_code(403);
-        include __DIR__ . '/views/errors/403.php';
-    }
-    
-    /**
-     * Trata exceções
-     */
-    private function handleException($exception) {
-        http_response_code(500);
-        
-        // Log do erro
-        error_log("PWA Router Exception: " . $exception->getMessage());
-        
-        if (ENVIRONMENT === 'development') {
-            echo '<pre>' . $exception->getTraceAsString() . '</pre>';
-        } else {
-            include __DIR__ . '/views/errors/500.php';
-        }
-    }
-    
-    /**
-     * Log da requisição
-     */
-    private function logRequest() {
-        if (!LOG_REQUESTS) return;
-        
-        $logData = [
-            'timestamp' => date('Y-m-d H:i:s'),
-            'method' => $this->requestMethod,
-            'uri' => $this->requestUri,
-            'ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown',
-            'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'unknown',
-            'referer' => $_SERVER['HTTP_REFERER'] ?? 'direct',
-            'is_mobile' => $this->mobileDetector->isMobile(),
-            'supports_pwa' => $this->mobileDetector->supportsPWA(),
-            'user_id' => $this->currentUser['id'] ?? 'anonymous'
-        ];
-        
-        $logLine = json_encode($logData) . PHP_EOL;
-        file_put_contents(__DIR__ . '/logs/requests.log', $logLine, FILE_APPEND | LOCK_EX);
-    }
-}
-
-// === INICIALIZAÇÃO DO SISTEMA ===
+// Busca das lojas parceiras (mantida igual)
+$partnerStores = [];
 try {
-    // Verificar se o sistema está instalado
-    if (!file_exists(__DIR__ . '/config/installed.flag')) {
-        header('Location: /install.php');
-        exit;
-    }
+    $db = Database::getConnection();
     
-    // Verificar HTTPS em produção
-    if (ENVIRONMENT === 'production' && 
-        (!isset($_SERVER['HTTPS']) || $_SERVER['HTTPS'] !== 'on')) {
-        $redirectURL = 'https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
-        header("Location: $redirectURL", true, 301);
-        exit;
-    }
+    $stmt = $db->query("
+        SELECT 
+            nome_fantasia, 
+            logo, 
+            categoria,
+            descricao,
+            porcentagem_cashback
+        FROM lojas 
+        WHERE status = 'aprovado' 
+        ORDER BY RAND() 
+        LIMIT 8
+    ");
+    $partnerStores = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    // Inicializar e executar roteador
-    $router = new PWARouter();
-    $router->route();
+    error_log("Lojas parceiras carregadas: " . count($partnerStores));
     
-} catch (Exception $e) {
-    // Log crítico do erro
-    error_log("Critical PWA Error: " . $e->getMessage());
-    
-    // Página de erro genérica
-    http_response_code(500);
-    echo '<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Klube Cash - Erro Interno</title>
-    <style>
-        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #f5f5f5; }
-        .error-container { background: white; padding: 40px; border-radius: 8px; max-width: 500px; margin: 0 auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        h1 { color: #e74c3c; margin-bottom: 20px; }
-        p { color: #666; line-height: 1.6; margin-bottom: 20px; }
-        .btn { background: #FF7A00; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; }
-    </style>
-</head>
-<body>
-    <div class="error-container">
-        <h1>Oops! Algo deu errado</h1>
-        <p>Encontramos um problema temporário. Nossa equipe já foi notificada e está trabalhando para resolver.</p>
-        <p>Tente novamente em alguns minutos.</p>
-        <a href="/" class="btn">Voltar ao Início</a>
-    </div>
-</body>
-</html>';
+} catch (PDOException $e) {
+    error_log("Erro ao buscar lojas parceiras: " . $e->getMessage());
+    $partnerStores = [];
 }
 ?>
 

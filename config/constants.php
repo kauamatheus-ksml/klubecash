@@ -284,6 +284,28 @@ if (!defined('ENVIRONMENT')) {
     define('ENVIRONMENT', 'production');
     define('LOG_LEVEL', 'INFO');
 }
+// === SINCRONIZAÇÃO PWA ===
+define('PWA_SYNC_INTERVAL', 300); // 5 minutos
+define('PWA_FULL_SYNC_INTERVAL', 604800); // 7 dias
+define('PWA_MAX_SYNC_RETRIES', 3);
+define('PWA_SYNC_TIMEOUT', 30); // 30 segundos
+
+// === CACHE PWA ===
+define('PWA_CACHE_STATIC_MAX_AGE', 86400); // 1 dia
+define('PWA_CACHE_DYNAMIC_MAX_AGE', 3600); // 1 hora
+define('PWA_CACHE_API_MAX_AGE', 300); // 5 minutos
+
+// === NOTIFICAÇÕES PWA ===
+define('PWA_NOTIFICATIONS_ENABLED', true);
+define('PWA_PUSH_PUBLIC_KEY', 'sua_chave_publica_aqui');
+define('PWA_PUSH_PRIVATE_KEY', 'sua_chave_privada_aqui');
+
+// === LIMITES PWA ===
+define('PWA_MAX_OFFLINE_TRANSACTIONS', 1000);
+define('PWA_MAX_OFFLINE_STORAGE_MB', 50);
+define('PWA_MAX_SYNC_BATCH_SIZE', 100);
+
+
 
 // === EXPORTAÇÕES ===
 define('EXPORTS_DIR', ROOT_DIR . '/exports');
