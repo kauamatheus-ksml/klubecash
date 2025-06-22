@@ -31,12 +31,12 @@ $isFuncionario = $userType === 'funcionario';
 <style>
     /* === VARIÁVEIS CSS PARA CONSISTÊNCIA === */
     :root {
-        --primary-color: #2563eb;
-        --primary-light: #3b82f6;
-        --primary-dark: #1d4ed8;
-        --secondary-color: #FF7A00;
-        --secondary-light: #FFB366;
-        --secondary-dark: #E65C00;
+        --primary-color: #FF7A00;
+        --primary-light: #FFB366;
+        --primary-dark: #E65C00;
+        --secondary-color: #2563eb;
+        --secondary-light: #3b82f6;
+        --secondary-dark: #1d4ed8;
         --white: #FFFFFF;
         --gray-50: #F9FAFB;
         --gray-100: #F3F4F6;
