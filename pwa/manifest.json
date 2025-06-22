@@ -1,0 +1,200 @@
+{
+  "name": "Klube Cash - Sistema de Cashback",
+  "short_name": "Klube Cash",
+  "description": "Plataforma completa de cashback para lojas parceiras e clientes",
+  "version": "2.1.0",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#FF7A00",
+  "background_color": "#FFFFFF",
+  "lang": "pt-BR",
+  "dir": "ltr",
+  
+  "icons": [
+    {
+      "src": "/assets/icons/icon-72x72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/icons/icon-96x96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/icons/icon-128x128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/icons/icon-144x144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/icons/icon-152x152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/assets/icons/icon-384x384.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  
+  "categories": [
+    "finance",
+    "lifestyle",
+    "shopping"
+  ],
+  
+  "prefer_related_applications": false,
+  
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Início",
+      "description": "Acesse seu painel principal",
+      "url": "/cliente/dashboard",
+      "icons": [
+        {
+          "src": "/assets/icons/shortcut-dashboard.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Histórico",
+      "short_name": "Extrato",
+      "description": "Visualize seu histórico de cashback",
+      "url": "/cliente/extrato",
+      "icons": [
+        {
+          "src": "/assets/icons/shortcut-history.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Lojas Parceiras",
+      "short_name": "Lojas",
+      "description": "Encontre lojas parceiras",
+      "url": "/cliente/lojas-parceiras",
+      "icons": [
+        {
+          "src": "/assets/icons/shortcut-stores.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Perfil",
+      "short_name": "Perfil",
+      "description": "Gerencie sua conta",
+      "url": "/cliente/perfil",
+      "icons": [
+        {
+          "src": "/assets/icons/shortcut-profile.png",
+          "sizes": "96x96"
+        }
+      ]
+    }
+  ],
+  
+  "share_target": {
+    "action": "/compartilhar",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  },
+  
+  "protocol_handlers": [
+    {
+      "protocol": "web+klubecash",
+      "url": "/deep-link?action=%s"
+    }
+  ],
+  
+  "edge_side_panel": {
+    "preferred_width": 400
+  },
+  
+  "display_override": [
+    "window-controls-overlay",
+    "standalone",
+    "minimal-ui",
+    "browser"
+  ],
+  
+  "handle_links": "preferred",
+  
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  },
+  
+  "screenshots": [
+    {
+      "src": "/assets/screenshots/mobile-dashboard.png",
+      "sizes": "540x720",
+      "type": "image/png",
+      "platform": "narrow",
+      "label": "Dashboard do cliente no mobile"
+    },
+    {
+      "src": "/assets/screenshots/mobile-stores.png", 
+      "sizes": "540x720",
+      "type": "image/png",
+      "platform": "narrow",
+      "label": "Lista de lojas parceiras"
+    },
+    {
+      "src": "/assets/screenshots/desktop-dashboard.png",
+      "sizes": "1280x800",
+      "type": "image/png", 
+      "platform": "wide",
+      "label": "Dashboard completo no desktop"
+    }
+  ],
+  
+  "file_handlers": [
+    {
+      "action": "/upload-transacoes",
+      "accept": {
+        "text/csv": [".csv"],
+        "application/vnd.ms-excel": [".xls"],
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"]
+      }
+    }
+  ],
+  
+  "related_applications": [],
+  
+  "iarc_rating_id": "",
+  
+  "id": "klubecash-pwa"
+}
