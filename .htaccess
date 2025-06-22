@@ -312,6 +312,92 @@ RewriteRule ^auth/google/auth/?$ auth/google/auth.php [L]
 RewriteRule ^auth/google/register/?$ auth/google/register.php [L]
 RewriteRule ^auth/google/callback/?$ auth/google/callback.php [L]
 # === KLUBE CASH PWA - HEADERS E CACHE ===
+# === PWA OFFLINE STORAGE HEADERS ===
+<IfModule mod_headers.c>
+    # Headers para IndexedDB e Storage API
+    Header always set Cross-Origin-Opener-Policy "same-origin"
+    Header always set Cross-Origin-Embedder-Policy "require-corp"
+    
+    # Permitir storage API
+    Header always set Permissions-Policy "storage-access=(), unpartitioned-cookies=()"
+    
+    # Service Worker headers
+    <FilesMatch "\.(js)$">
+        Header set Cache-Control "public, max-age=86400"
+        Header set Service-Worker-Allowed "/"
+    </FilesMatch>
+    
+    # Offline page cache
+    <FilesMatch "offline\.html$">
+        Header set Cache-Control "public, max-age=3600"
+    </FilesMatch>
+</IfModule>
+
+# === API ENDPOINTS PARA SINCRONIZAÇÃO ===
+RewriteRule ^api/sync/profile/?$ api/pwa/sync.php?table=profile [L,QSA]
+RewriteRule ^api/sync/transactions/?$ api/pwa/sync.php?table=transactions [L,QSA]
+RewriteRule ^api/sync/stores/?$ api/pwa/sync.php?table=stores [L,QSA]
+RewriteRule ^api/sync/cashback/?$ api/pwa/sync.php?table=cashback [L,QSA]
+RewriteRule ^api/sync/notifications/?$ api/pwa/sync.php?table=notifications [L,QSA]
+RewriteRule ^api/sync/generic/?$ api/pwa/sync.php?table=generic [L,QSA]
+
+# === OFFLINE FALLBACK ===
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_URI} !\.(css|js|png|jpg|gif|ico|svg)$ [NC]
+RewriteRule ^(client|admin|store)/ pwa/offline.html [L]
+
+
+
+# Adicionar estas linhas ao arquivo .htaccess existente
+
+# === PUSH NOTIFICATIONS HEADERS ===
+<IfModule mod_headers.c>
+    # Headers para Push API
+    Header always set Push-Policy "push-messaging"
+    Header always set Notification-Policy "notifications"
+    
+    # VAPID headers para service worker
+    <FilesMatch "sw\.js$">
+        Header set Service-Worker-Allowed "/"
+        Header set X-Robots-Tag "noindex"
+        Header set Cache-Control "no-cache, no-store, must-revalidate"
+    </FilesMatch>
+    
+    # Headers para manifest push
+    <FilesMatch "manifest\.json$">
+        Header set Content-Type "application/manifest+json"
+        Header set Cache-Control "public, max-age=86400"
+    </FilesMatch>
+    
+    # Headers para notification icons
+    <FilesMatch "\.(png|jpg|jpeg)$">
+        Header set Cross-Origin-Resource-Policy "cross-origin"
+        Header set Access-Control-Allow-Origin "*"
+    </FilesMatch>
+</IfModule>
+
+# === NOTIFICATION API ENDPOINTS ===
+RewriteRule ^api/pwa/config/?$ api/pwa/notifications.php?action=config [L,QSA]
+RewriteRule ^api/pwa/register-subscription/?$ api/pwa/notifications.php?action=register [L,QSA]
+RewriteRule ^api/pwa/unregister-subscription/?$ api/pwa/notifications.php?action=unregister [L,QSA]
+RewriteRule ^api/pwa/validate-subscription/?$ api/pwa/notifications.php?action=validate [L,QSA]
+RewriteRule ^api/pwa/update-preferences/?$ api/pwa/notifications.php?action=preferences [L,QSA]
+RewriteRule ^api/pwa/sync-notifications/?$ api/pwa/notifications.php?action=sync [L,QSA]
+
+# === NOTIFICATION TESTING ===
+RewriteRule ^api/pwa/test-notification/?$ api/pwa/notifications.php?action=test [L,QSA]
+
+# === PUSH NOTIFICATION SECURITY ===
+<IfModule mod_rewrite.c>
+    # Bloquear acesso direto a chaves VAPID
+    RewriteRule ^config/vapid\.(public|private)\.key$ - [F,L]
+    
+    # Proteger endpoints de notificação
+    RewriteCond %{HTTP_REFERER} !^https?://(.*\.)?klubecash\.com [NC]
+    RewriteRule ^api/pwa/(register|unregister)-subscription/?$ - [F,L]
+</IfModule>
+
 
 # Headers de segurança para PWA
 <IfModule mod_headers.c>
