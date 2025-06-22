@@ -573,7 +573,7 @@ $isFuncionario = $userType === 'funcionario';
                      alt="Logo Klube Cash" 
                      class="navbar-logo"
                      onerror="this.src='<?php echo SITE_URL; ?>/assets/images/icons/KlubeCashLOGO.ico'">
-                <span class="navbar-title">Klube Cash</span>
+                
             </a>
         </div>
 
