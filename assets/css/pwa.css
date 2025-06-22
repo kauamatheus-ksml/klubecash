@@ -820,3 +820,411 @@ body {
     border: 1px solid #ccc;
   }
 }
+
+
+/* === INSTALL BANNER === */
+.install-banner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(135deg, #FF7A00, #FF6B00);
+    color: white;
+    z-index: 1000;
+    transform: translateY(-100%);
+    transition: transform 0.3s ease;
+}
+
+.install-banner.show {
+    transform: translateY(0);
+}
+
+.install-banner-content {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.install-banner-icon {
+    margin-right: 12px;
+    opacity: 0.9;
+}
+
+.install-banner-text {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.install-banner-text strong {
+    font-size: 14px;
+    margin-bottom: 2px;
+}
+
+.install-banner-text span {
+    font-size: 12px;
+    opacity: 0.8;
+}
+
+.install-banner-btn {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    margin-right: 12px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.install-banner-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.install-banner-close {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    padding: 4px;
+    opacity: 0.7;
+    transition: opacity 0.2s ease;
+}
+
+.install-banner-close:hover {
+    opacity: 1;
+}
+
+/* === FLOATING INSTALL BUTTON === */
+.floating-install-btn {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: linear-gradient(135deg, #FF7A00, #FF6B00);
+    color: white;
+    border: none;
+    border-radius: 50px;
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    font-size: 14px;
+    box-shadow: 0 4px 20px rgba(255, 122, 0, 0.3);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    z-index: 999;
+    transform: translateY(100px);
+}
+
+.floating-install-btn.show {
+    transform: translateY(0);
+}
+
+.floating-install-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 25px rgba(255, 122, 0, 0.4);
+}
+
+/* === INSTALL MODAL === */
+.install-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+}
+
+.install-modal.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+.install-modal-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+}
+
+.install-modal-content {
+    background: white;
+    border-radius: 16px;
+    max-width: 400px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    position: relative;
+    animation: modalSlideUp 0.3s ease;
+}
+
+@keyframes modalSlideUp {
+    from {
+        transform: translateY(50px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.install-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 20px 0;
+}
+
+.install-modal-header h3 {
+    margin: 0;
+    font-size: 20px;
+    color: #1A1A1A;
+}
+
+.install-modal-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    color: #666;
+    transition: color 0.2s ease;
+}
+
+.install-modal-close:hover {
+    color: #333;
+}
+
+.install-modal-body {
+    padding: 20px;
+    text-align: center;
+}
+
+.install-modal-icon {
+    margin-bottom: 20px;
+}
+
+.install-modal-icon img {
+    border-radius: 20px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.install-modal-benefits h4 {
+    margin: 0 0 16px;
+    color: #1A1A1A;
+    text-align: left;
+}
+
+.install-modal-benefits ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    text-align: left;
+}
+
+.install-modal-benefits li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0;
+    color: #333;
+}
+
+.install-modal-footer {
+    padding: 0 20px 20px;
+    display: flex;
+    gap: 12px;
+}
+
+.install-modal-footer button {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-primary {
+    background: #FF7A00;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #FF6B00;
+}
+
+.btn-secondary {
+    background: #f5f5f5;
+    color: #666;
+}
+
+.btn-secondary:hover {
+    background: #e5e5e5;
+}
+
+/* === CUSTOM MODAL === */
+.custom-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+}
+
+.custom-modal.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+.custom-modal-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(6px);
+}
+
+.custom-modal-content {
+    background: white;
+    border-radius: 16px;
+    max-width: 500px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    position: relative;
+    animation: modalSlideUp 0.3s ease;
+}
+
+/* === ONBOARDING ESPECÍFICO === */
+.onboarding-success {
+    text-align: center;
+}
+
+.onboarding-icon {
+    margin-bottom: 20px;
+}
+
+.onboarding-success h3 {
+    color: #10B981;
+    margin-bottom: 12px;
+}
+
+.onboarding-tips {
+    text-align: left;
+    margin-top: 20px;
+    padding: 16px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.onboarding-tips h4 {
+    margin: 0 0 12px;
+    color: #1A1A1A;
+}
+
+.onboarding-tips ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.onboarding-tips li {
+    padding: 6px 0;
+    color: #333;
+}
+
+/* === TOAST === */
+.toast {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: #333;
+    color: white;
+    padding: 12px 20px;
+    border-radius: 8px;
+    z-index: 1300;
+    transition: transform 0.3s ease;
+}
+
+.toast.show {
+    transform: translateX(-50%) translateY(0);
+}
+
+.toast.toast-success {
+    background: #10B981;
+}
+
+.toast.toast-error {
+    background: #EF4444;
+}
+
+.toast.toast-warning {
+    background: #F59E0B;
+}
+
+/* === RESPONSIVO === */
+@media (max-width: 768px) {
+    .install-banner-text span {
+        display: none;
+    }
+    
+    .floating-install-btn span {
+        display: none;
+    }
+    
+    .floating-install-btn {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        padding: 0;
+        justify-content: center;
+    }
+    
+    .install-modal-content {
+        margin: 20px;
+    }
+}
+
+/* === MODO ESCURO === */
+@media (prefers-color-scheme: dark) {
+    .install-modal-content,
+    .custom-modal-content {
+        background: #1A1A1A;
+        color: white;
+    }
+    
+    .install-modal-header h3,
+    .onboarding-tips h4 {
+        color: white;
+    }
+    
+    .onboarding-tips {
+        background: #2A2A2A;
+    }
+}
