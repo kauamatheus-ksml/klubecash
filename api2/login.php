@@ -1,16 +1,8 @@
 <?php
-// public_html/api2/login.php
+// public_html/api2/login.php - CORRIGIDO
 
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
-ob_start();
+// ... (seus ini_set e ob_start já existentes, e a função api_log)
 
-function api_log($message) {
-    $log_file = __DIR__ . '/api_debug.log';
-    $timestamp = date('Y-m-d H:i:s');
-    file_put_contents($log_file, "[$timestamp] $message\n", FILE_APPEND);
-}
 api_log("PONTO 1: Script login.php iniciado.");
 
 header('Content-Type: application/json');
@@ -29,14 +21,14 @@ api_log("PONTO 2: Headers CORS definidos. Iniciando bloco try-catch principal.")
 try {
     api_log("PONTO 3: Tentando incluir dependências...");
 
-    // CORREÇÃO: Usando ROOT_PATH para caminhos absolutos
-    require_once ROOT_PATH . 'controllers/AuthController.php';
-    require_once ROOT_PATH . 'config/constants.php';
-    require_once ROOT_PATH . 'config/database.php';
-    require_once ROOT_PATH . 'utils/Email.php'; 
-    // Se Validator.php for usado em AuthController.php ou em algum outro lugar que não foi incluído por ele
-    require_once ROOT_PATH . 'utils/Validator.php'; // Adicionado, caso seja uma dependência
-
+    // CORREÇÃO: Removendo require_once redundantes para constants.php e Email.php
+    // AuthController.php já inclui constants.php e Email.php.
+    require_once ROOT_PATH . 'controllers/AuthController.php'; // Inclui AuthController.php
+    require_once ROOT_PATH . 'config/database.php';            // database.php ainda precisa ser incluído diretamente
+    // require_once ROOT_PATH . 'utils/Email.php'; // REMOVIDO, pois AuthController.php já inclui
+    // require_once ROOT_PATH . 'config/constants.php'; // REMOVIDO, pois AuthController.php já inclui
+    // require_once ROOT_PATH . 'utils/Validator.php'; // Se AuthController não inclui, mantenha
+    
     api_log("PONTO 4: Dependências incluídas com sucesso.");
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
