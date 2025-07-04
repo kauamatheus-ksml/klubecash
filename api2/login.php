@@ -1,5 +1,5 @@
 <?php
-// public_html/api2/login.php - CORREÇÃO FINAL
+// public_html/api2/login.php - REMOVIDO INCLUSÃO DE constants.php AQUI
 
 // Ativar exibição de erros PHP e relatório completo para depuração (REMOVA EM PRODUÇÃO!)
 ini_set('display_errors', 1);
@@ -15,32 +15,44 @@ function api_log($message) {
     $timestamp = date('Y-m-d H:i:s');
     file_put_contents($log_file, "[$timestamp] $message\n", FILE_APPEND);
 }
-api_log("PONTO 1: Script login.php iniciado.");
+// Remover a chamada api_log("PONTO 1: Script login.php iniciado."); por enquanto para não dar erro
+// antes de qualquer include se ele for a raiz do problema de ROOT_PATH.
+// api_log("PONTO 1: Script login.php iniciado."); 
 
 // Headers CORS para permitir requisições do seu app Flutter
 header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *'); // Mude '*' para o domínio do seu app Flutter em produção (ex: https://seuapp.com)
+header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
 // Lida com requisições OPTIONS (preflight CORS)
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
-    ob_end_flush(); // Envia o buffer e finaliza
+    ob_end_flush();
     exit();
 }
 
-api_log("PONTO 2: Headers CORS definidos. Iniciando bloco try-catch principal.");
+// Removida a chamada api_log aqui para garantir que o script não pare antes de incluir dependências
+// api_log("PONTO 2: Headers CORS definidos. Iniciando bloco try-catch principal."); 
 
 try {
-    api_log("PONTO 3: Tentando incluir dependências...");
+    // Removida a chamada api_log aqui
+    // api_log("PONTO 3: Tentando incluir dependências...");
 
-    // CORREÇÃO CRÍTICA:
-    // Incluir AuthController.php. Ele já inclui constants.php, database.php, Email.php e Validator.php.
+    // ======================================================================================
+    // REMOVIDA A INCLUSÃO DIRETA DE constants.php AQUI!
+    // A constante ROOT_PATH AGORA DEVE ESTAR DEFINIDA VIA AUTOLOAD OU UM ARQUIVO DE BOOT PHP.
+    // ======================================================================================
+
+    // As inclusões agora USARÃO ROOT_PATH, que deve vir de outro lugar
+    // Se o erro Undefined Constant persistir, significa que AuthController.php NÃO está carregando constants.php
+    // ou que constants.php NÃO ESTÁ AUTO-CARREGANDO ROOT_PATH como esperado.
     require_once ROOT_PATH . 'controllers/AuthController.php'; 
-    // Não inclua constants.php, database.php, Email.php, Validator.php diretamente aqui novamente.
+    require_once ROOT_PATH . 'config/database.php';            
+    require_once ROOT_PATH . 'utils/Email.php'; 
+    require_once ROOT_PATH . 'utils/Validator.php'; 
 
-    api_log("PONTO 4: Dependências incluídas com sucesso.");
+    api_log("PONTO 4: Dependências incluídas com sucesso."); // Este log será o teste.
 
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $input_data = file_get_contents('php://input');
@@ -65,8 +77,6 @@ try {
         api_log("PONTO 7: Resultado de AuthController::login: " . json_encode($result));
 
         if ($result['status']) {
-            // session_start() é chamado dentro de AuthController::login se a sessão não estiver ativa
-            // Garantir que a sessão esteja iniciada para acessar $_SESSION
             if (session_status() === PHP_SESSION_NONE) {
                 session_start();
             }
@@ -93,7 +103,7 @@ try {
         http_response_code(405);
         echo json_encode(['message' => 'Método não permitido ou dados ausentes.']);
     }
-
+aa
 } catch (Throwable $e) { // Captura qualquer erro ou exceção (incluindo erros fatais)
     $error_message = "PONTO 9: ERRO CATASTRÓFICO: " . $e->getMessage() . " em " . $e->getFile() . " na linha " . $e->getLine() . "\nStack trace:\n" . $e->getTraceAsString();
     api_log($error_message);
