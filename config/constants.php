@@ -3,7 +3,7 @@
  * Constantes do sistema - Klube Cash v2.1
  * Configurações otimizadas para Mercado Pago com qualidade máxima
  */
-define('ROOT_PATH', '/home/u383946504/domains/klubecash.com/public_html/');
+define('ROOT_PATH', '/home/u383946504/domains/klubecash.com/public_html/'); // <--- SEU CAMINHO ABSOLUTO AQUI
 // === INFORMAÇÕES DO SISTEMA ===
 define('SYSTEM_NAME', 'Klube Cash');
 define('SYSTEM_VERSION', '2.1.0');
