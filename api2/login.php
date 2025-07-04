@@ -88,5 +88,6 @@ try {
     echo json_encode(['message' => 'Erro interno do servidor. Detalhes em api_debug.log']);
 }
 
+
 ob_end_flush();
 ?>
