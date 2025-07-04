@@ -11,10 +11,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit();
 }
 
-// Exemplo para public_html/api2/login.php
-require_once __DIR__ . '/../controllers/AuthController.php'; // Vai de api2/ para public_html/controllers/
-require_once __DIR__ . '/../config/constants.php'; // Vai de api2/ para public_html/config/
-// E assim por diante para todos os require_once em TODOS os seus arquivos dentro de public_html/api2/
+require_once __DIR__ . '/../../controllers/AuthController.php';
+require_once __DIR__ . '/../../config/constants.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && file_get_contents('php://input')) {
     $data = json_decode(file_get_contents('php://input'), true);
