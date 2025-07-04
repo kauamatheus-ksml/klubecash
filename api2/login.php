@@ -103,7 +103,7 @@ try {
         http_response_code(405);
         echo json_encode(['message' => 'Método não permitido ou dados ausentes.']);
     }
-aa
+aa12
 } catch (Throwable $e) { // Captura qualquer erro ou exceção (incluindo erros fatais)
     $error_message = "PONTO 9: ERRO CATASTRÓFICO: " . $e->getMessage() . " em " . $e->getFile() . " na linha " . $e->getLine() . "\nStack trace:\n" . $e->getTraceAsString();
     api_log($error_message);
