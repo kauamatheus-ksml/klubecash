@@ -191,6 +191,9 @@ define('MIN_WITHDRAWAL_VALUE', 20.00);
 define('LOGIN_URL', SITE_URL . '/login');
 define('REGISTER_URL', SITE_URL . '/registro');
 define('RECOVER_PASSWORD_URL', SITE_URL . '/recuperar-senha');
+// === URLs DE AUTENTICAÇÃO ===
+
+define('LOGOUT_URL', SITE_URL . '/logout'); // ADICIONAR ESTA LINHA
 
 // === URLs DO CLIENTE ===
 define('CLIENT_DASHBOARD_URL', SITE_URL . '/cliente/dashboard');

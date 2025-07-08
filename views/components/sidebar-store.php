@@ -202,8 +202,8 @@ foreach ($menuItems as $item) {
 
     <!-- Footer com Logout -->
     <footer class="sidebar-footer">
-        <a href="../../auth/logout.php" class="logout-btn" onclick="return confirm('Tem certeza que deseja sair?')" title="Sair do sistema">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <a href="/controllers/AuthController.php?action=logout" class="logout-btn" onclick="return confirmarLogout()" title="Sair do sistema">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
             </svg>
             <span>Sair</span>
@@ -545,4 +545,37 @@ window.sidebarControls = {
 // updateNavBadge('payment-history', 5); // 5 pagamentos pendentes
 // window.sidebarControls.toggle(); // Toggle sidebar
 // window.sidebarControls.expand(); // Forçar expansão
+</script>
+
+<style>
+.sidebar-footer {
+    margin-top: auto;
+    padding: 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.logout-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    color: #dc3545;
+    text-decoration: none;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    width: 100%;
+    font-weight: 500;
+}
+
+.logout-btn:hover {
+    background-color: rgba(220, 53, 69, 0.1);
+    color: #b02a37;
+    transform: translateX(3px);
+}
+</style>
+
+<script>
+function confirmarLogout() {
+    return confirm('Tem certeza que deseja sair?');
+}
 </script>

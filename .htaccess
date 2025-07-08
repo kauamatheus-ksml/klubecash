@@ -185,10 +185,10 @@ RewriteRule ^email/?$ enviar-email.php [L]
 RewriteRule ^send-email/?$ enviar-email.php [L]
 
 # === ROTAS EXISTENTES (MANTIDAS) ===
-# Autenticação
 RewriteRule ^login/?$ views/auth/login.php [L,NC]
 RewriteRule ^registro/?$ views/auth/register.php [L]
 RewriteRule ^recuperar-senha/?$ views/auth/recover-password.php [L]
+RewriteRule ^logout/?$ views/auth/logout.php [L,NC]
 # === URLS AMIGÁVEIS PARA SEO ===
 # Homepage otimizada para palavras-chave (ADICIONAR)
 RewriteRule ^sistema-cashback/?$ index.php [L]
