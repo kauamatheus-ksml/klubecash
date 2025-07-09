@@ -475,7 +475,7 @@ main {
     /* Para sidebar colapsada */
     .klube-sidebar.collapsed ~ .klube-main-adjusted,
     body:has(.klube-sidebar.collapsed) .klube-main-adjusted {
-        margin-left: 80px !important;
+        margin-left: 95px !important;
     }
 }
 
