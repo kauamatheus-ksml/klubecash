@@ -868,33 +868,7 @@ function testSession() {
 }
 
 // Criar botão após DOM carregado
-document.addEventListener('DOMContentLoaded', function() {
-    const testBtn = document.createElement('button');
-    testBtn.innerHTML = '🔍 Testar';
-    testBtn.type = 'button';
-    testBtn.style.cssText = `
-        position: fixed;
-        top: 10px;
-        right: 10px;
-        z-index: 9999;
-        padding: 10px 15px;
-        background: #007bff;
-        color: white;
-        border: none;
-        border-radius: 5px;
-        cursor: pointer;
-        font-size: 14px;
-    `;
-    
-    testBtn.addEventListener('click', function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        console.log('Botão clicado!');
-        testSession();
-    });
-    
-    document.body.appendChild(testBtn);
-});
+
 </script>
 </body>
 </html>
