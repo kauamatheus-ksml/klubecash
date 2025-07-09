@@ -875,7 +875,7 @@ $activeMenu = 'dashboard';
                         <h3>Nova Transação</h3>
                         <p>Registrar uma nova venda</p>
                     </a>
-                    
+                    <!--
                     <a href="<?php echo STORE_BATCH_UPLOAD_URL; ?>" class="action-card">
                         <div class="action-icon">
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -886,7 +886,7 @@ $activeMenu = 'dashboard';
                         </div>
                         <h3>Upload em Lote</h3>
                         <p>Importar múltiplas transações</p>
-                    </a>
+                    </a>-->
                     
                     <a href="<?php echo STORE_PENDING_TRANSACTIONS_URL; ?>" class="action-card">
                         <div class="action-icon">
