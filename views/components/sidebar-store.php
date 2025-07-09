@@ -27,7 +27,7 @@ if (count($nameParts) >= 2) {
 }
 $initials = strtoupper($initials);
 
-// Menu items
+// Menu items - VENDAS E UPLOAD EM LOTE OCULTADOS
 $menuItems = [
     [
         'id' => 'dashboard', 
@@ -41,18 +41,24 @@ $menuItems = [
         'url' => STORE_REGISTER_TRANSACTION_URL,
         'icon' => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>'
     ],
+    /*
+    // VENDAS - OCULTADO CONFORME SOLICITADO
     [
         'id' => 'transactions', 
         'title' => 'Vendas', 
         'url' => STORE_TRANSACTIONS_URL,
         'icon' => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>'
     ],
+    */
+    /*
+    // UPLOAD EM LOTE - OCULTADO CONFORME SOLICITADO
     [
         'id' => 'batch-upload', 
         'title' => 'Upload em Lote', 
         'url' => STORE_BATCH_UPLOAD_URL,
         'icon' => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>'
     ],
+    */
     [
         'id' => 'payment-history', 
         'title' => 'Pagamentos', 
@@ -62,8 +68,8 @@ $menuItems = [
     ],
     [
         'id' => 'saldos', 
-        'title' => 'Pendentes de Pagamento', 
-        'url' => STORE_PENDING_TRANSACTIONS_URL,
+        'title' => 'Saldos', 
+        'url' => STORE_SALDOS_URL,
         'icon' => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"/>'
     ],
     [
@@ -96,220 +102,105 @@ $menuItems = [
     <!-- Header -->
     <header class="klube-sidebar-header">
         <div class="klube-logo-container">
-            <img src="../../assets/images/logo.png" alt="Klube Cash" class="klube-logo">
-            <span class="klube-logo-text">Klube Cash</span>
+            <img src="../../assets/images/icons/KlubeCashLOGO.png" alt="Klube Cash" class="klube-logo">
+            <span class="klube-brand-text">Klube Cash</span>
         </div>
-        <button class="klube-collapse-btn" id="klubeCollapseBtn" aria-label="Recolher menu">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="15,18 9,12 15,6"></polyline>
+        
+        <button class="klube-close-btn" id="klubeCloseBtn" aria-label="Fechar menu">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
             </svg>
         </button>
     </header>
 
-    <!-- Perfil do usuário -->
+    <!-- Perfil do Usuário -->
     <div class="klube-user-profile">
-        <div class="klube-avatar"><?= $initials ?></div>
+        <div class="klube-user-avatar">
+            <?php echo $initials; ?>
+        </div>
         <div class="klube-user-info">
-            <div class="klube-user-name"><?= htmlspecialchars($userName) ?></div>
-            <div class="klube-user-role">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
-                </svg>
-                Lojista
-            </div>
+            <span class="klube-user-name"><?php echo htmlspecialchars($userName); ?></span>
+            <span class="klube-user-type">Loja Parceira</span>
         </div>
     </div>
 
     <!-- Navegação -->
-    <nav class="klube-nav" role="navigation">
-        <div class="klube-nav-section">
-            <h3 class="klube-section-title">Menu Principal</h3>
-            <ul class="klube-menu">
-                <?php foreach ($menuItems as $item): ?>
-                    <li class="klube-menu-item">
-                        <a href="<?= $item['url'] ?>" 
-                           class="klube-menu-link <?= ($activeMenu === $item['id']) ? 'active' : '' ?>"
-                           data-page="<?= $item['id'] ?>"
-                           aria-current="<?= ($activeMenu === $item['id']) ? 'page' : 'false' ?>">
-                            <span class="klube-menu-icon">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <?= $item['icon'] ?>
-                                </svg>
-                            </span>
-                            <span class="klube-menu-text"><?= $item['title'] ?></span>
-                            <?php if (isset($item['badge']) && $item['badge'] > 0): ?>
-                                <span class="klube-badge"><?= $item['badge'] ?></span>
-                            <?php endif; ?>
-                            <span class="klube-tooltip"><?= $item['title'] ?></span>
-                        </a>
-                    </li>
-                <?php endforeach; ?>
-            </ul>
-        </div>
+    <nav class="klube-nav">
+        <ul class="klube-nav-list">
+            <?php foreach ($menuItems as $item): ?>
+            <li class="klube-nav-item">
+                <a href="<?php echo $item['url']; ?>" 
+                   class="klube-nav-link <?php echo ($activeMenu === $item['id']) ? 'active' : ''; ?>">
+                    <span class="klube-nav-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <?php echo $item['icon']; ?>
+                        </svg>
+                    </span>
+                    <span class="klube-nav-text"><?php echo $item['title']; ?></span>
+                    
+                    <?php if (isset($item['badge']) && $item['badge'] > 0): ?>
+                    <span class="klube-nav-badge"><?php echo $item['badge']; ?></span>
+                    <?php endif; ?>
+                </a>
+            </li>
+            <?php endforeach; ?>
+        </ul>
     </nav>
 
-    <!-- Footer -->
-    <footer class="klube-sidebar-footer">
-        <a href="../../auth/logout.php" class="klube-logout-btn" onclick="return confirm('Sair do sistema?')">
-            <svg class="klube-logout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4m7 14l5-5-5-5m5 5H9"/>
-            </svg>
-            <span class="klube-logout-text">Sair</span>
-        </a>
-    </footer>
-
+    <!-- Versão -->
+    <div class="klube-sidebar-footer">
+        <span class="klube-version">Klube Cash v<?php echo SYSTEM_VERSION; ?></span>
+    </div>
 </aside>
 
-<!-- Script da Sidebar -->
+<!-- Script JavaScript -->
 <script>
-(function() {
-    'use strict';
-    
-    // Elementos
-    const sidebar = document.getElementById('klubeSidebar');
-    const collapseBtn = document.getElementById('klubeCollapseBtn');
+document.addEventListener('DOMContentLoaded', function() {
     const mobileToggle = document.getElementById('klubeMobileToggle');
+    const sidebar = document.getElementById('klubeSidebar');
     const overlay = document.getElementById('klubeOverlay');
-    
-    if (!sidebar) return;
-    
-    // Estado
-    let isCollapsed = localStorage.getItem('klubeSidebarCollapsed') === 'true';
-    let isMobileOpen = false;
-    
-    // Funções utilitárias
-    function isMobile() { 
-        return window.innerWidth <= 768; 
+    const closeBtn = document.getElementById('klubeCloseBtn');
+
+    // Função para abrir a sidebar
+    function openSidebar() {
+        sidebar.classList.add('klube-sidebar-open');
+        overlay.classList.add('klube-overlay-active');
+        document.body.style.overflow = 'hidden';
     }
-    
-    function adjustMainContent() {
-        // Aguarda um pouco para garantir que a sidebar foi renderizada
-        setTimeout(() => {
-            const mainContent = document.querySelector('.main-content, .content, .page-content, main');
-            if (mainContent) {
-                if (isMobile()) {
-                    mainContent.style.marginLeft = '0';
-                    mainContent.style.paddingLeft = '0';
-                } else {
-                    const sidebarWidth = isCollapsed ? '80px' : '280px';
-                    mainContent.style.marginLeft = sidebarWidth;
-                    mainContent.style.paddingLeft = '0';
-                    mainContent.style.transition = 'margin-left 0.3s ease';
-                }
-                
-                // Adiciona classe especial para identificação
-                mainContent.classList.add('klube-main-adjusted');
-            }
-        }, 50);
+
+    // Função para fechar a sidebar
+    function closeSidebar() {
+        sidebar.classList.remove('klube-sidebar-open');
+        overlay.classList.remove('klube-overlay-active');
+        document.body.style.overflow = '';
     }
-    
-    // Toggle desktop
-    function toggleDesktop() {
-        if (isMobile()) return;
-        
-        isCollapsed = !isCollapsed;
-        sidebar.classList.toggle('collapsed', isCollapsed);
-        localStorage.setItem('klubeSidebarCollapsed', isCollapsed);
-        adjustMainContent();
-    }
-    
-    // Toggle mobile
-    function toggleMobile() {
-        if (!isMobile()) return;
-        
-        isMobileOpen = !isMobileOpen;
-        sidebar.classList.toggle('mobile-open', isMobileOpen);
-        overlay.classList.toggle('active', isMobileOpen);
-        document.body.classList.toggle('klube-mobile-menu-open', isMobileOpen);
-    }
-    
-    function closeMobile() {
-        if (!isMobile()) return;
-        
-        isMobileOpen = false;
-        sidebar.classList.remove('mobile-open');
-        overlay.classList.remove('active');
-        document.body.classList.remove('klube-mobile-menu-open');
-    }
-    
+
     // Event listeners
-    if (collapseBtn) {
-        collapseBtn.addEventListener('click', toggleDesktop);
-    }
-    
     if (mobileToggle) {
-        mobileToggle.addEventListener('click', toggleMobile);
+        mobileToggle.addEventListener('click', openSidebar);
     }
-    
+
+    if (closeBtn) {
+        closeBtn.addEventListener('click', closeSidebar);
+    }
+
     if (overlay) {
-        overlay.addEventListener('click', closeMobile);
+        overlay.addEventListener('click', closeSidebar);
     }
-    
-    // Clicks fora da sidebar em mobile
-    document.addEventListener('click', function(e) {
-        if (isMobile() && isMobileOpen && 
-            !sidebar.contains(e.target) && 
-            !mobileToggle.contains(e.target)) {
-            closeMobile();
-        }
-    });
-    
-    // Resize handler
-    let resizeTimeout;
-    window.addEventListener('resize', function() {
-        clearTimeout(resizeTimeout);
-        resizeTimeout = setTimeout(function() {
-            if (isMobile()) {
-                sidebar.classList.remove('collapsed');
-                closeMobile();
-            } else {
-                sidebar.classList.toggle('collapsed', isCollapsed);
-            }
-            adjustMainContent();
-        }, 100);
-    });
-    
-    // Teclas de atalho
+
+    // Fechar sidebar com ESC
     document.addEventListener('keydown', function(e) {
-        if (e.ctrlKey && e.key === 'b' && !isMobile()) {
-            e.preventDefault();
-            toggleDesktop();
-        }
-        if (e.key === 'Escape' && isMobile() && isMobileOpen) {
-            closeMobile();
+        if (e.key === 'Escape' && sidebar.classList.contains('klube-sidebar-open')) {
+            closeSidebar();
         }
     });
-    
-    // Inicialização
-    function initialize() {
-        if (!isMobile() && isCollapsed) {
-            sidebar.classList.add('collapsed');
+
+    // Fechar sidebar automaticamente em desktop quando a tela for redimensionada
+    window.addEventListener('resize', function() {
+        if (window.innerWidth > 992) {
+            closeSidebar();
         }
-        adjustMainContent();
-        
-        // Observer para mudanças no DOM
-        const observer = new MutationObserver(function(mutations) {
-            mutations.forEach(function(mutation) {
-                if (mutation.type === 'childList') {
-                    adjustMainContent();
-                }
-            });
-        });
-        
-        observer.observe(document.body, {
-            childList: true,
-            subtree: true
-        });
-    }
-    
-    // Garantir inicialização após DOM ready
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initialize);
-    } else {
-        initialize();
-    }
-    
-    console.log('✅ Sidebar carregada com posicionamento perfeito');
-    
-})();
+    });
+});
 </script>
