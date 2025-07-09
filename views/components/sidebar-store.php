@@ -29,13 +29,49 @@ $initials = strtoupper($initials);
 
 // Menu items simples
 $menuItems = [
-    ['id' => 'dashboard', 'title' => 'Dashboard', 'url' => STORE_DASHBOARD_URL],
-    ['id' => 'register-transaction', 'title' => 'Nova Venda', 'url' => STORE_REGISTER_TRANSACTION_URL],
-    ['id' => 'transactions', 'title' => 'Vendas', 'url' => STORE_TRANSACTIONS_URL],
-    ['id' => 'batch-upload', 'title' => 'Upload em Lote', 'url' => STORE_BATCH_UPLOAD_URL],
-    ['id' => 'payment-history', 'title' => 'Pagamentos', 'url' => STORE_PAYMENT_HISTORY_URL, 'badge' => 3],
-    ['id' => 'saldos', 'title' => 'Saldos', 'url' => STORE_SALDOS_URL],
-    ['id' => 'profile', 'title' => 'Perfil', 'url' => STORE_PROFILE_URL]
+    [
+        'id' => 'dashboard', 
+        'title' => 'Dashboard', 
+        'url' => STORE_DASHBOARD_URL,
+        'icon' => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5a2 2 0 012-2h4a2 2 0 012 2v6H8V5z"/>'
+    ],
+    [
+        'id' => 'register-transaction', 
+        'title' => 'Nova Venda', 
+        'url' => STORE_REGISTER_TRANSACTION_URL,
+        'icon' => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>'
+    ],
+    [
+        'id' => 'transactions', 
+        'title' => 'Vendas', 
+        'url' => STORE_TRANSACTIONS_URL,
+        'icon' => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>'
+    ],
+    [
+        'id' => 'batch-upload', 
+        'title' => 'Upload em Lote', 
+        'url' => STORE_BATCH_UPLOAD_URL,
+        'icon' => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>'
+    ],
+    [
+        'id' => 'payment-history', 
+        'title' => 'Pagamentos', 
+        'url' => STORE_PAYMENT_HISTORY_URL, 
+        'badge' => 3,
+        'icon' => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>'
+    ],
+    [
+        'id' => 'saldos', 
+        'title' => 'Saldos', 
+        'url' => STORE_SALDOS_URL,
+        'icon' => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"/>'
+    ],
+    [
+        'id' => 'profile', 
+        'title' => 'Perfil', 
+        'url' => STORE_PROFILE_URL,
+        'icon' => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>'
+    ]
 ];
 ?>
 
