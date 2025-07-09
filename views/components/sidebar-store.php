@@ -134,7 +134,7 @@ unset($item); // Limpar referência
 ?>
 
 <!-- CARREGAMENTO DO CSS ISOLADO -->
-<link rel="stylesheet" href="../../assets/css/sidebar-isolated.css">
+<link rel="stylesheet" href="../../assets/css/sidebar-store-modern.css">
 
 <!-- ====================================
      CONTROLES MOBILE E DESKTOP
