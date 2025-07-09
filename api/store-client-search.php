@@ -32,28 +32,30 @@ if ($action !== 'search_client') {
     exit;
 }
 
-$searchTerm = trim($input['search_term'] ?? ''); // Modificado de 'email' para 'search_term'
+$searchTerm = trim($input['search_term'] ?? '');
 $storeId = intval($input['store_id'] ?? 0);
 
-if (empty($searchTerm) || $storeId <= 0) { // Modificado de empty($email)
-    echo json_encode(['status' => false, 'message' => 'Termo de busca (Email ou CPF) e ID da loja são obrigatórios']);
+if (empty($searchTerm) || $storeId <= 0) {
+    echo json_encode(['status' => false, 'message' => 'Termo de busca (Email, CPF ou Telefone) e ID da loja são obrigatórios']);
     exit;
 }
 
-// Limpar CPF de possíveis formatações (pontos, traços)
+// Limpar CPF e telefone de possíveis formatações (pontos, traços, parênteses, espaços)
 $cpfSearch = preg_replace('/[^0-9]/', '', $searchTerm);
+$phoneSearch = preg_replace('/[^0-9]/', '', $searchTerm);
 
 try {
     $db = Database::getConnection();
     
-    // Buscar cliente por email
+    // Buscar cliente por email, CPF ou telefone
     $stmt = $db->prepare("
-        SELECT id, nome, email, status, data_criacao, cpf -- Adicionado cpf ao SELECT
+        SELECT id, nome, email, telefone, cpf, status, data_criacao
         FROM usuarios
-        WHERE (email = :searchTerm OR cpf = :cpfSearch) AND tipo = :tipo
+        WHERE (email = :searchTerm OR cpf = :cpfSearch OR telefone = :phoneSearch) AND tipo = :tipo
     ");
     $stmt->bindParam(':searchTerm', $searchTerm); // Para busca de email
-    $stmt->bindParam(':cpfSearch', $cpfSearch);     // Para busca de CPF (já limpo)
+    $stmt->bindParam(':cpfSearch', $cpfSearch);   // Para busca de CPF (já limpo)
+    $stmt->bindParam(':phoneSearch', $phoneSearch); // Para busca de telefone (já limpo)
     $tipo = USER_TYPE_CLIENT;
     $stmt->bindParam(':tipo', $tipo);
     $stmt->execute();
@@ -63,7 +65,7 @@ try {
     if (!$client) {
         echo json_encode([
             'status' => false, 
-            'message' => 'Cliente não encontrado. Verifique se o email está correto e se o cliente está cadastrado no Klube Cash.'
+            'message' => 'Cliente não encontrado. Verifique se o email, CPF ou telefone está correto e se o cliente está cadastrado no Klube Cash.'
         ]);
         exit;
     }
@@ -105,7 +107,8 @@ try {
             'id' => $client['id'],
             'nome' => $client['nome'],
             'email' => $client['email'],
-            'cpf' => $client['cpf'] ?? null, // Adicionar esta linha (se 'cpf' foi selecionado na query)
+            'telefone' => $client['telefone'] ?? null,
+            'cpf' => $client['cpf'] ?? null,
             'status' => $client['status'],
             'data_cadastro' => date('d/m/Y', strtotime($client['data_criacao'])),
             'saldo' => $saldo,

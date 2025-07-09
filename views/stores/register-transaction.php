@@ -1144,18 +1144,19 @@ $activeMenu = 'register-transaction';
                                 </svg>
                             </div>
                             <h2 class="step-title">Identificar Cliente</h2>
-                            <p class="step-description">Digite o email ou CPF do cliente cadastrado no Klube Cash para continuar</p>
+                            <p class="step-description">Digite o email, CPF ou telefone do cliente cadastrado no Klube Cash para continuar</p>
                         </div>
+
                         
                         <div class="client-search-container">
                             <div class="form-group">
-                                <label for="search_term" class="form-label required">Email ou CPF do Cliente</label>
+                                <label for="search_term" class="form-label required">Email, CPF ou Telefone do Cliente</label>
                                 <div class="search-input-group">
                                     <div class="search-input-wrapper">
                                         <input type="text" id="search_term" name="search_term" class="form-input"
-                                               placeholder="exemplo@email.com ou 123.456.789-00" required
-                                               value="<?php echo isset($_POST['search_term']) ? htmlspecialchars($_POST['search_term']) : ''; ?>">
-                                        <small class="form-help">🔍 Digite o email ou CPF completo do cliente cadastrado no Klube Cash</small>
+                                            placeholder="exemplo@email.com, 123.456.789-00 ou (38) 99999-9999" required
+                                            value="<?php echo isset($_POST['search_term']) ? htmlspecialchars($_POST['search_term']) : ''; ?>">
+                                        <small class="form-help">🔍 Digite o email, CPF ou telefone completo do cliente cadastrado no Klube Cash</small>
                                     </div>
                                     <button type="button" id="searchClientBtn" class="search-btn">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1167,7 +1168,7 @@ $activeMenu = 'register-transaction';
                                     </button>
                                 </div>
                             </div>
-                            
+                                                            
                             <div id="clientInfoCard" class="client-info-card">
                                 <div class="client-info-header">
                                     <svg class="client-info-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
