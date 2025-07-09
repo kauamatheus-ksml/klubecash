@@ -102,7 +102,7 @@ $menuItems = [
     <!-- Header -->
     <header class="klube-sidebar-header">
         <div class="klube-logo-container">
-            <img src="../../assets/images/logo.png" alt="Klube Cash" class="klube-logo">
+            <img src="../../assets/images/logo-icon .png" alt="Klube Cash" class="klube-logo">
             <span class="klube-logo-text">Klube Cash</span>
         </div>
         <button class="klube-collapse-btn" id="klubeCollapseBtn" aria-label="Recolher menu">
