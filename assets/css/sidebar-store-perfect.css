@@ -321,7 +321,7 @@
     display: none;
 }
 
-/* Toggle mobile */
+/* Toggle mobile - CORRIGIDO PARA SER CLICÁVEL */
 .klube-mobile-toggle {
     display: none;
     position: fixed;
@@ -333,19 +333,38 @@
     border: 1px solid #e5e7eb;
     border-radius: 12px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    z-index: 1001;
+    z-index: 9999; /* Z-index muito alto para garantir que fique por cima */
     align-items: center;
     justify-content: center;
     cursor: pointer;
     color: #6b7280;
     transition: all 0.3s ease;
+    user-select: none; /* Previne seleção de texto */
+    pointer-events: auto; /* Garante que seja clicável */
+    outline: none; /* Remove outline padrão */
+    -webkit-tap-highlight-color: transparent; /* Remove highlight no mobile */
 }
 
-.klube-mobile-toggle:hover {
+.klube-mobile-toggle:hover,
+.klube-mobile-toggle:focus,
+.klube-mobile-toggle:active {
     background: #f9fafb;
     color: #F1780C;
     transform: scale(1.05);
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+    border-color: #F1780C;
+}
+
+/* Garantir que o botão seja visível em todos os estados */
+.klube-mobile-toggle:before {
+    content: '';
+    position: absolute;
+    top: -10px;
+    left: -10px;
+    right: -10px;
+    bottom: -10px;
+    background: transparent;
+    z-index: -1;
 }
 
 /* Overlay */
@@ -395,6 +414,7 @@
     .klube-sidebar {
         transform: translateX(-100%);
         width: 320px;
+        z-index: 1001; /* Menor que o botão móvel */
     }
     
     .klube-sidebar.mobile-open {
@@ -403,6 +423,7 @@
     
     .klube-mobile-toggle {
         display: flex !important;
+        z-index: 9999 !important; /* Força z-index alto no mobile */
     }
     
     .klube-collapse-btn {
@@ -447,10 +468,15 @@
         position: fixed;
         width: 100%;
     }
+    
+    /* Garantir que nada sobreponha o botão móvel */
+    .klube-mobile-toggle {
+        isolation: isolate;
+    }
 }
 
 /* AJUSTE AUTOMÁTICO DO CONTEÚDO PRINCIPAL */
-/* Estas regras ajustam automaticamente qualquer conteúdo principal */
+/* Mantendo suas alterações nas margens */
 
 .klube-main-adjusted {
     transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
@@ -466,13 +492,13 @@ main {
 }
 
 @media (min-width: 769px) {
-    /* Desktop: sempre aplicar margem */
+    /* Desktop: sempre aplicar margem - SUAS ALTERAÇÕES MANTIDAS */
     .klube-main-adjusted {
         margin-left: 295px !important;
         padding-left: 0 !important;
     }
     
-    /* Para sidebar colapsada */
+    /* Para sidebar colapsada - SUAS ALTERAÇÕES MANTIDAS */
     .klube-sidebar.collapsed ~ .klube-main-adjusted,
     body:has(.klube-sidebar.collapsed) .klube-main-adjusted {
         margin-left: 95px !important;
@@ -480,7 +506,7 @@ main {
 }
 
 @media (max-width: 768px) {
-    /* Mobile: sempre sem margem */
+    /* Mobile: sempre sem margem - SUAS ALTERAÇÕES MANTIDAS */
     .klube-main-adjusted {
         margin-left: 10px !important;
         padding-left: 10px !important;
@@ -543,5 +569,36 @@ main {
     
     .klube-main-adjusted {
         margin-left: 0 !important;
+    }
+}
+
+/* Correções adicionais para garantir que o botão móvel sempre funcione */
+@media (max-width: 768px) {
+    /* Forçar o botão a ficar sempre visível e clicável */
+    .klube-mobile-toggle {
+        position: fixed !important;
+        display: flex !important;
+        z-index: 99999 !important;
+        pointer-events: auto !important;
+        touch-action: manipulation !important;
+    }
+    
+    /* Prevenir que qualquer elemento sobreponha o botão */
+    .main-content,
+    .content,
+    .page-content,
+    main,
+    .dashboard-container,
+    .admin-container,
+    .store-container {
+        z-index: 1 !important;
+        position: relative !important;
+    }
+    
+    /* Área de toque expandida para melhor usabilidade móvel */
+    .klube-mobile-toggle {
+        min-height: 48px;
+        min-width: 48px;
+        touch-action: manipulation;
     }
 }
