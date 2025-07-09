@@ -818,7 +818,7 @@ try {
                     <div class="card fade-in">
                         <div class="card-icon">2</div>
                         <h3>Compre e Se Identifique</h3>
-                        <p>Faça suas compras normalmente nas lojas parceiras e se identifique como membro Klube Cash no momento da compra.</p>
+                        <p>Faça suas compras normalmente nas lojas parceiras e se identifique como membro Klubes Cash no momento da compra.</p>
                     </div>
                     
                     <div class="card fade-in">
