@@ -332,7 +332,18 @@ RewriteRule ^auth/google/callback/?$ auth/google/callback.php [L]
         Header set Cache-Control "public, max-age=3600"
     </FilesMatch>
 </IfModule>
+# Otimização de cache para CSS da sidebar
+<FilesMatch "\.(css)$">
+    ExpiresActive on
+    ExpiresByType text/css "access plus 7 days"
+    Header set Cache-Control "public, must-revalidate"
+</FilesMatch>
 
+# Compressão para melhor performance
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/css
+    AddOutputFilterByType DEFLATE application/javascript
+</IfModule>
 # === API ENDPOINTS PARA SINCRONIZAÇÃO ===
 RewriteRule ^api/sync/profile/?$ api/pwa/sync.php?table=profile [L,QSA]
 RewriteRule ^api/sync/transactions/?$ api/pwa/sync.php?table=transactions [L,QSA]
