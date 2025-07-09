@@ -1,7 +1,7 @@
 <?php
 /**
- * Sidebar Isolada - Sem Interferências
- * Versão minimalista que não afeta nada na página
+ * Sidebar da Loja - Versão Corrigida
+ * Sistema perfeito de posicionamento sem sobreposições
  */
 
 // Verificações básicas
@@ -27,7 +27,7 @@ if (count($nameParts) >= 2) {
 }
 $initials = strtoupper($initials);
 
-// Menu items simples
+// Menu items
 $menuItems = [
     [
         'id' => 'dashboard', 
@@ -75,10 +75,11 @@ $menuItems = [
 ];
 ?>
 
-<link rel="stylesheet" href="../../assets/css/sidebar-store-modern.css">
+<!-- CSS da Sidebar Incorporado -->
+<link rel="stylesheet" href="../../assets/css/sidebar-store-perfect.css">
 
 <!-- Mobile Toggle -->
-<button class="klube-sidebar-mobile-toggle" id="klubeMobileToggle">
+<button class="klube-mobile-toggle" id="klubeMobileToggle" aria-label="Abrir menu">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <line x1="3" y1="6" x2="21" y2="6"></line>
         <line x1="3" y1="12" x2="21" y2="12"></line>
@@ -86,221 +87,174 @@ $menuItems = [
     </svg>
 </button>
 
-<!-- Expand Button -->
-<button class="klube-sidebar-expand" id="klubeExpandBtn">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polyline points="9,18 15,12 9,6"></polyline>
-    </svg>
-</button>
-
 <!-- Overlay -->
-<div class="klube-sidebar-overlay" id="klubeOverlay"></div>
+<div class="klube-overlay" id="klubeOverlay"></div>
 
 <!-- Sidebar -->
-<div class="klube-sidebar-wrapper">
-    <aside class="klube-sidebar" id="klubeSidebar">
-        
-        <!-- Header -->
-        <header class="klube-sidebar-header">
-            <div style="display: flex; align-items: center;">
-                <img src="../../assets/images/logo.png" alt="Klube Cash" class="klube-sidebar-logo">
-                <span class="klube-sidebar-logo-text">Klube Cash</span>
-            </div>
-            <button class="klube-sidebar-toggle" id="klubeToggle">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="15,18 9,12 15,6"></polyline>
-                </svg>
-            </button>
-        </header>
+<aside class="klube-sidebar" id="klubeSidebar">
+    
+    <!-- Header -->
+    <header class="klube-sidebar-header">
+        <div class="klube-logo-container">
+            <img src="../../assets/images/logo.png" alt="Klube Cash" class="klube-logo">
+            <span class="klube-logo-text">Klube Cash</span>
+        </div>
+        <button class="klube-collapse-btn" id="klubeCollapseBtn" aria-label="Recolher menu">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="15,18 9,12 15,6"></polyline>
+            </svg>
+        </button>
+    </header>
 
-        <!-- Perfil -->
-        <div class="klube-sidebar-profile">
-            <div class="klube-sidebar-avatar"><?= $initials ?></div>
-            <div class="klube-sidebar-user-info">
-                <div class="klube-sidebar-user-name"><?= htmlspecialchars($userName) ?></div>
-                <div class="klube-sidebar-user-role">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
-                    </svg>
-                    Lojista
-                </div>
+    <!-- Perfil do usuário -->
+    <div class="klube-user-profile">
+        <div class="klube-avatar"><?= $initials ?></div>
+        <div class="klube-user-info">
+            <div class="klube-user-name"><?= htmlspecialchars($userName) ?></div>
+            <div class="klube-user-role">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                </svg>
+                Lojista
             </div>
         </div>
+    </div>
 
-        <!-- Navegação -->
-        <nav class="klube-sidebar-nav">
-            <div class="klube-sidebar-section">
-                <h3 class="klube-sidebar-section-title">Menu Principal</h3>
-                <ul class="klube-sidebar-menu">
-                    <?php foreach ($menuItems as $item): ?>
-                        <li class="klube-sidebar-menu-item">
-                            <a href="<?= $item['url'] ?>" 
-                            class="klube-sidebar-menu-link <?= ($activeMenu === $item['id']) ? 'active' : '' ?>"
-                            data-page="<?= $item['id'] ?>">
-                                <span class="klube-sidebar-menu-icon">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <?= $item['icon'] ?>
-                                    </svg>
-                                </span>
-                                <span class="klube-sidebar-menu-text"><?= $item['title'] ?></span>
-                                <?php if (isset($item['badge']) && $item['badge'] > 0): ?>
-                                    <span class="klube-sidebar-badge"><?= $item['badge'] ?></span>
-                                <?php endif; ?>
-                                <span class="klube-sidebar-tooltip"><?= $item['title'] ?></span>
-                            </a>
-                        </li>
-                    <?php endforeach; ?>
-                </ul>
-            </div>
-        </nav>
+    <!-- Navegação -->
+    <nav class="klube-nav" role="navigation">
+        <div class="klube-nav-section">
+            <h3 class="klube-section-title">Menu Principal</h3>
+            <ul class="klube-menu">
+                <?php foreach ($menuItems as $item): ?>
+                    <li class="klube-menu-item">
+                        <a href="<?= $item['url'] ?>" 
+                           class="klube-menu-link <?= ($activeMenu === $item['id']) ? 'active' : '' ?>"
+                           data-page="<?= $item['id'] ?>"
+                           aria-current="<?= ($activeMenu === $item['id']) ? 'page' : 'false' ?>">
+                            <span class="klube-menu-icon">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <?= $item['icon'] ?>
+                                </svg>
+                            </span>
+                            <span class="klube-menu-text"><?= $item['title'] ?></span>
+                            <?php if (isset($item['badge']) && $item['badge'] > 0): ?>
+                                <span class="klube-badge"><?= $item['badge'] ?></span>
+                            <?php endif; ?>
+                            <span class="klube-tooltip"><?= $item['title'] ?></span>
+                        </a>
+                    </li>
+                <?php endforeach; ?>
+            </ul>
+        </div>
+    </nav>
 
-        <!-- Footer -->
-        <footer class="klube-sidebar-footer">
-            <a href="../../auth/logout.php" class="klube-sidebar-logout" onclick="return confirm('Sair do sistema?')">
-                <svg class="klube-sidebar-logout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4m7 14l5-5-5-5m5 5H9"/>
-                </svg>
-                <span class="klube-sidebar-logout-text">Sair</span>
-            </a>
-        </footer>
+    <!-- Footer -->
+    <footer class="klube-sidebar-footer">
+        <a href="../../auth/logout.php" class="klube-logout-btn" onclick="return confirm('Sair do sistema?')">
+            <svg class="klube-logout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4m7 14l5-5-5-5m5 5H9"/>
+            </svg>
+            <span class="klube-logout-text">Sair</span>
+        </a>
+    </footer>
 
-    </aside>
-</div>
+</aside>
 
+<!-- Script da Sidebar -->
 <script>
-/**
- * Sidebar Isolada - JavaScript Minimalista
- * NÃO interfere em nada na página
- */
 (function() {
     'use strict';
     
-    // Elementos específicos da sidebar
+    // Elementos
     const sidebar = document.getElementById('klubeSidebar');
-    const toggle = document.getElementById('klubeToggle');
+    const collapseBtn = document.getElementById('klubeCollapseBtn');
     const mobileToggle = document.getElementById('klubeMobileToggle');
-    const expandBtn = document.getElementById('klubeExpandBtn');
     const overlay = document.getElementById('klubeOverlay');
     
-    if (!sidebar) return; // Se não existe, não faz nada
+    if (!sidebar) return;
     
     // Estado
     let isCollapsed = localStorage.getItem('klubeSidebarCollapsed') === 'true';
     let isMobileOpen = false;
-    let hideTimeout;
     
     // Funções utilitárias
-    function isMobile() { return window.innerWidth <= 768; }
-    
-    function updateMainContent() {
-        const main = document.querySelector('.main-content, .content, .page-content');
-        if (main) {
-            main.classList.add('klube-main-content');
-            if (isMobile()) {
-                main.style.marginLeft = '0';
-            } else {
-                main.style.marginLeft = isCollapsed ? '80px' : '280px';
-            }
-        }
+    function isMobile() { 
+        return window.innerWidth <= 768; 
     }
     
-    function updateExpandButton() {
-        if (expandBtn) {
-            if (!isMobile() && isCollapsed) {
-                expandBtn.classList.add('show');
-            } else {
-                expandBtn.classList.remove('show');
+    function adjustMainContent() {
+        // Aguarda um pouco para garantir que a sidebar foi renderizada
+        setTimeout(() => {
+            const mainContent = document.querySelector('.main-content, .content, .page-content, main');
+            if (mainContent) {
+                if (isMobile()) {
+                    mainContent.style.marginLeft = '0';
+                    mainContent.style.paddingLeft = '0';
+                } else {
+                    const sidebarWidth = isCollapsed ? '80px' : '280px';
+                    mainContent.style.marginLeft = sidebarWidth;
+                    mainContent.style.paddingLeft = '0';
+                    mainContent.style.transition = 'margin-left 0.3s ease';
+                }
+                
+                // Adiciona classe especial para identificação
+                mainContent.classList.add('klube-main-adjusted');
             }
-        }
+        }, 50);
     }
     
     // Toggle desktop
     function toggleDesktop() {
         if (isMobile()) return;
+        
         isCollapsed = !isCollapsed;
         sidebar.classList.toggle('collapsed', isCollapsed);
         localStorage.setItem('klubeSidebarCollapsed', isCollapsed);
-        updateMainContent();
-        updateExpandButton();
+        adjustMainContent();
     }
     
     // Toggle mobile
     function toggleMobile() {
         if (!isMobile()) return;
-        isMobileOpen = !isMobileOpen;
-        sidebar.classList.toggle('open', isMobileOpen);
-        overlay.classList.toggle('active', isMobileOpen);
-        document.body.classList.toggle('klube-sidebar-open', isMobileOpen);
         
-        if (isMobileOpen) {
-            hideMobileToggleDelayed();
-        } else {
-            showMobileToggle();
-        }
+        isMobileOpen = !isMobileOpen;
+        sidebar.classList.toggle('mobile-open', isMobileOpen);
+        overlay.classList.toggle('active', isMobileOpen);
+        document.body.classList.toggle('klube-mobile-menu-open', isMobileOpen);
     }
     
     function closeMobile() {
         if (!isMobile()) return;
+        
         isMobileOpen = false;
-        sidebar.classList.remove('open');
+        sidebar.classList.remove('mobile-open');
         overlay.classList.remove('active');
-        document.body.classList.remove('klube-sidebar-open');
-        showMobileToggle();
+        document.body.classList.remove('klube-mobile-menu-open');
     }
     
-    function hideMobileToggleDelayed() {
-        clearTimeout(hideTimeout);
-        hideTimeout = setTimeout(() => {
-            if (mobileToggle) mobileToggle.classList.add('hidden');
-        }, 2000);
-    }
-    
-    function showMobileToggle() {
-        if (mobileToggle) mobileToggle.classList.remove('hidden');
-    }
-    
-    // Event listeners com proteção
-    if (toggle) {
-        toggle.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            toggleDesktop();
-        });
-    }
-    
-    if (expandBtn) {
-        expandBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            toggleDesktop();
-        });
+    // Event listeners
+    if (collapseBtn) {
+        collapseBtn.addEventListener('click', toggleDesktop);
     }
     
     if (mobileToggle) {
-        mobileToggle.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            toggleMobile();
-        });
+        mobileToggle.addEventListener('click', toggleMobile);
     }
     
     if (overlay) {
-        overlay.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            closeMobile();
-        });
+        overlay.addEventListener('click', closeMobile);
     }
     
-    // Outside clicks (apenas para mobile)
+    // Clicks fora da sidebar em mobile
     document.addEventListener('click', function(e) {
-        if (!isMobile() || !isMobileOpen) return;
-        if (!sidebar.contains(e.target) && !mobileToggle.contains(e.target)) {
+        if (isMobile() && isMobileOpen && 
+            !sidebar.contains(e.target) && 
+            !mobileToggle.contains(e.target)) {
             closeMobile();
         }
     });
     
-    // Resize com throttle
+    // Resize handler
     let resizeTimeout;
     window.addEventListener('resize', function() {
         clearTimeout(resizeTimeout);
@@ -309,14 +263,13 @@ $menuItems = [
                 sidebar.classList.remove('collapsed');
                 closeMobile();
             } else {
-                if (isCollapsed) sidebar.classList.add('collapsed');
+                sidebar.classList.toggle('collapsed', isCollapsed);
             }
-            updateMainContent();
-            updateExpandButton();
+            adjustMainContent();
         }, 100);
     });
     
-    // Keyboard (apenas Ctrl+B)
+    // Teclas de atalho
     document.addEventListener('keydown', function(e) {
         if (e.ctrlKey && e.key === 'b' && !isMobile()) {
             e.preventDefault();
@@ -328,13 +281,35 @@ $menuItems = [
     });
     
     // Inicialização
-    if (!isMobile() && isCollapsed) {
-        sidebar.classList.add('collapsed');
+    function initialize() {
+        if (!isMobile() && isCollapsed) {
+            sidebar.classList.add('collapsed');
+        }
+        adjustMainContent();
+        
+        // Observer para mudanças no DOM
+        const observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(mutation) {
+                if (mutation.type === 'childList') {
+                    adjustMainContent();
+                }
+            });
+        });
+        
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
     }
-    updateMainContent();
-    updateExpandButton();
     
-    console.log('✅ Sidebar isolada carregada sem interferências');
+    // Garantir inicialização após DOM ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initialize);
+    } else {
+        initialize();
+    }
+    
+    console.log('✅ Sidebar carregada com posicionamento perfeito');
     
 })();
 </script>
