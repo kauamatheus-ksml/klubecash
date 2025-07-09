@@ -924,7 +924,7 @@ $activeMenu = 'dashboard';
             <div class="recent-transactions">
                 <div class="section-header">
                     <h2>Últimas Transações</h2>
-                    <a href="<?php echo STORE_PENDING_TRANSACTIONS_URL; ?>" class="link-more">Ver Todas</a>
+                    <a href="<?php echo STORE_PAYMENT_HISTORY_URL; ?>" class="link-more">Ver Todas</a>
                 </div>
                 
                 <div class="table-responsive">
