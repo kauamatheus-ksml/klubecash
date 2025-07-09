@@ -1,88 +1,99 @@
 /* ===================================
-   SIDEBAR MODERNA PARA LOJAS - KLUBE CASH
-   Tema claro, responsiva e elegante - CORRIGIDO
+   SIDEBAR ISOLADA - KLUBE CASH
+   Versão final sem interferências
+   
+   ESTRATÉGIA DE ISOLAMENTO:
+   - Prefixo único 'klube-sidebar-' em todas as classes
+   - Contenção CSS com 'all: initial' no wrapper
+   - Variáveis CSS com namespace específico
+   - Z-index controlado para não sobrepor elementos da página
 =================================== */
 
+/* VARIÁVEIS CSS ISOLADAS */
 :root {
-    /* Cores principais */
-    --primary: #F1780C;
-    --primary-light: #FFF0E6;
-    --primary-dark: #ff7700;
-    --white: #FFFFFF;
-    --gray-50: #F9FAFB;
-    --gray-100: #F3F4F6;
-    --gray-200: #E5E7EB;
-    --gray-300: #D1D5DB;
-    --gray-400: #9CA3AF;
-    --gray-500: #6B7280;
-    --gray-600: #4B5563;
-    --gray-700: #374151;
-    --gray-800: #1F2937;
-    --gray-900: #111827;
-    
-    /* Sombras */
-    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-    
-    /* Layout */
-    --sidebar-width: 280px;
-    --sidebar-width-collapsed: 80px;
-    --header-height: 80px;
-    --border-radius: 12px;
-    --border-radius-sm: 8px;
-    
-    /* Transições */
-    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    --transition-fast: all 0.2s ease;
+    --klube-sidebar-primary: #F1780C;
+    --klube-sidebar-primary-light: #FFF0E6;
+    --klube-sidebar-primary-dark: #ff7700;
+    --klube-sidebar-white: #FFFFFF;
+    --klube-sidebar-gray-50: #F9FAFB;
+    --klube-sidebar-gray-100: #F3F4F6;
+    --klube-sidebar-gray-200: #E5E7EB;
+    --klube-sidebar-gray-300: #D1D5DB;
+    --klube-sidebar-gray-400: #9CA3AF;
+    --klube-sidebar-gray-500: #6B7280;
+    --klube-sidebar-gray-600: #4B5563;
+    --klube-sidebar-gray-700: #374151;
+    --klube-sidebar-gray-800: #1F2937;
+    --klube-sidebar-gray-900: #111827;
+    --klube-sidebar-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --klube-sidebar-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    --klube-sidebar-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    --klube-sidebar-shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    --klube-sidebar-transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Reset base */
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-
-/* ===================================
-   CONTAINER PRINCIPAL
-=================================== */
-.sidebar-container {
+/* WRAPPER PRINCIPAL - ISOLAMENTO ABSOLUTO */
+.klube-sidebar-wrapper {
+    /* 
+    EXPLICAÇÃO: 'all: initial' reseta TODAS as propriedades CSS herdadas,
+    garantindo que nada da página principal afete a sidebar
+    */
+    all: initial;
     position: fixed;
     top: 0;
     left: 0;
-    height: 100vh;
-    width: var(--sidebar-width);
-    background: var(--white);
-    border-right: 1px solid var(--gray-200);
-    box-shadow: var(--shadow-lg);
-    transition: var(--transition);
-    z-index: 1000;
-    display: flex;
-    flex-direction: column;
+    z-index: 999; /* Z-index baixo o suficiente para não interferir em modais */
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    line-height: normal;
 }
 
-.sidebar-container.collapsed {
-    width: var(--sidebar-width-collapsed);
+/* RESET ESPECÍFICO PARA ELEMENTOS DA SIDEBAR */
+.klube-sidebar-wrapper *,
+.klube-sidebar-wrapper *::before,
+.klube-sidebar-wrapper *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+/* CONTAINER PRINCIPAL DA SIDEBAR */
+.klube-sidebar {
+    width: 280px;
+    height: 100vh;
+    background: var(--klube-sidebar-white);
+    border-right: 1px solid var(--klube-sidebar-gray-200);
+    box-shadow: var(--klube-sidebar-shadow-lg);
+    display: flex;
+    flex-direction: column;
+    transition: var(--klube-sidebar-transition);
+    position: relative;
+}
+
+/* ESTADO COLAPSADO DA SIDEBAR */
+.klube-sidebar.collapsed {
+    width: 80px;
 }
 
 /* ===================================
    HEADER DA SIDEBAR
+   
+   FUNCIONALIDADE: Contém logo e botão de toggle
+   COMPORTAMENTO: Logo desaparece quando colapsada
 =================================== */
-.sidebar-header {
-    height: var(--header-height);
+.klube-sidebar-header {
+    height: 80px;
     padding: 20px;
-    border-bottom: 1px solid var(--gray-200);
+    background: linear-gradient(135deg, var(--klube-sidebar-primary) 0%, var(--klube-sidebar-primary-dark) 100%);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+    flex-shrink: 0; /* Impede que o header encolha */
     position: relative;
     overflow: hidden;
 }
 
-.sidebar-header::before {
+/* EFEITO VISUAL NO HEADER */
+.klube-sidebar-header::before {
     content: '';
     position: absolute;
     top: 0;
@@ -91,213 +102,220 @@
     bottom: 0;
     background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="20" cy="20" r="1" fill="rgba(255,255,255,0.1)"/><circle cx="80" cy="40" r="0.5" fill="rgba(255,255,255,0.1)"/><circle cx="40" cy="80" r="1.5" fill="rgba(255,255,255,0.05)"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
     opacity: 0.3;
+    pointer-events: none; /* Impede interferência nos cliques */
 }
 
-.logo-section {
+/* SEÇÃO DO LOGO */
+.klube-sidebar-logo-section {
     display: flex;
     align-items: center;
     gap: 12px;
     position: relative;
     z-index: 1;
-    transition: var(--transition);
+    transition: var(--klube-sidebar-transition);
 }
 
-.logo {
+.klube-sidebar-logo {
     height: 40px;
     width: auto;
-    filter: brightness(0) invert(1);
-    transition: var(--transition);
+    filter: brightness(0) invert(1); /* Torna a logo branca */
+    transition: var(--klube-sidebar-transition);
 }
 
-.logo-text {
+.klube-sidebar-logo-text {
+    color: var(--klube-sidebar-white);
     font-size: 18px;
     font-weight: 700;
-    color: var(--white);
-    transition: var(--transition);
+    transition: var(--klube-sidebar-transition);
+    white-space: nowrap;
 }
 
-.sidebar-container.collapsed .logo-text {
+/* COMPORTAMENTO QUANDO COLAPSADA */
+.klube-sidebar.collapsed .klube-sidebar-logo-text {
     opacity: 0;
     width: 0;
     overflow: hidden;
 }
 
-/* CORRIGIDO: Toggle button sempre visível e clicável */
-.toggle-btn {
+.klube-sidebar.collapsed .klube-sidebar-logo {
+    display: none;
+}
+
+/* BOTÃO DE TOGGLE */
+.klube-sidebar-toggle {
     background: rgba(255, 255, 255, 0.2);
     border: none;
     width: 36px;
     height: 36px;
-    border-radius: var(--border-radius-sm);
+    border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: var(--transition);
+    color: var(--klube-sidebar-white);
+    transition: var(--klube-sidebar-transition);
     position: relative;
     z-index: 1;
-    flex-shrink: 0; /* NOVO: Não permitir encolher */
 }
 
-.toggle-btn:hover {
+.klube-sidebar-toggle:hover {
     background: rgba(255, 255, 255, 0.3);
     transform: scale(1.05);
 }
 
-.toggle-btn svg {
-    width: 18px;
-    height: 18px;
-    color: var(--white);
-    transition: var(--transition);
+.klube-sidebar-toggle svg {
+    transition: var(--klube-sidebar-transition);
 }
 
-.sidebar-container.collapsed .toggle-btn svg {
+.klube-sidebar.collapsed .klube-sidebar-toggle svg {
     transform: rotate(180deg);
-}
-
-/* CORRIGIDO: Logo section quando colapsada */
-.sidebar-container.collapsed .logo-section {
-    width: 36px; /* NOVO: Largura fixa para manter o botão visível */
-    justify-content: center;
-}
-
-.sidebar-container.collapsed .logo {
-    display: none; /* NOVO: Esconder logo quando colapsada */
 }
 
 /* ===================================
    PERFIL DO USUÁRIO
+   
+   FUNCIONALIDADE: Mostra avatar e informações do usuário
+   COMPORTAMENTO: Informações desaparecem quando colapsada
 =================================== */
-.user-profile {
+.klube-sidebar-profile {
     padding: 24px 20px;
-    border-bottom: 1px solid var(--gray-200);
-    background: var(--gray-50);
+    border-bottom: 1px solid var(--klube-sidebar-gray-200);
+    background: var(--klube-sidebar-gray-50);
     display: flex;
     align-items: center;
     gap: 12px;
-    transition: var(--transition);
+    flex-shrink: 0;
+    transition: var(--klube-sidebar-transition);
 }
 
-.user-avatar {
+.klube-sidebar-avatar {
     width: 48px;
     height: 48px;
-    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+    background: linear-gradient(135deg, var(--klube-sidebar-primary) 0%, var(--klube-sidebar-primary-dark) 100%);
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--white);
+    color: var(--klube-sidebar-white);
     font-weight: 600;
     font-size: 18px;
     flex-shrink: 0;
-    box-shadow: var(--shadow-md);
+    box-shadow: var(--klube-sidebar-shadow-md);
+    cursor: pointer;
     position: relative;
 }
 
-.user-avatar::after {
+/* INDICADOR ONLINE */
+.klube-sidebar-avatar::after {
     content: '';
     position: absolute;
     top: -2px;
     right: -2px;
     width: 12px;
     height: 12px;
-    background: var(--primary);
-    border: 2px solid var(--white);
+    background: #10B981; /* Verde para indicar online */
+    border: 2px solid var(--klube-sidebar-white);
     border-radius: 50%;
-    animation: pulse 2s infinite;
+    animation: klube-sidebar-pulse 2s infinite;
 }
 
-@keyframes pulse {
+@keyframes klube-sidebar-pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.5; }
 }
 
-.user-info {
+.klube-sidebar-user-info {
     flex: 1;
     min-width: 0;
-    transition: var(--transition);
+    transition: var(--klube-sidebar-transition);
 }
 
-.user-name {
+.klube-sidebar-user-name {
     font-size: 15px;
     font-weight: 600;
-    color: var(--gray-800);
+    color: var(--klube-sidebar-gray-800);
     margin-bottom: 4px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-.user-role {
+.klube-sidebar-user-role {
     display: inline-flex;
     align-items: center;
     gap: 6px;
     padding: 4px 10px;
-    background: var(--primary);
-    color: var(--white);
+    background: var(--klube-sidebar-primary);
+    color: var(--klube-sidebar-white);
     font-size: 11px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     border-radius: 20px;
-    box-shadow: var(--shadow-sm);
+    box-shadow: var(--klube-sidebar-shadow-sm);
 }
 
-.user-role svg {
-    width: 12px;
-    height: 12px;
-}
-
-.sidebar-container.collapsed .user-info {
+/* COMPORTAMENTO QUANDO COLAPSADA */
+.klube-sidebar.collapsed .klube-sidebar-user-info {
     opacity: 0;
     width: 0;
     overflow: hidden;
 }
 
-/* CORRIGIDO: User profile quando colapsada */
-.sidebar-container.collapsed .user-profile {
-    padding: 16px; /* NOVO: Padding menor quando colapsada */
+.klube-sidebar.collapsed .klube-sidebar-profile {
+    padding: 16px;
     justify-content: center;
 }
 
 /* ===================================
-   NAVEGAÇÃO
+   NAVEGAÇÃO PRINCIPAL
+   
+   FUNCIONALIDADE: Menu de navegação com ícones e tooltips
+   COMPORTAMENTO: Texto desaparece quando colapsada, tooltips aparecem
 =================================== */
-.sidebar-nav {
-    flex: 1;
+.klube-sidebar-nav {
+    flex: 1; /* Ocupa todo o espaço disponível */
     padding: 20px 0;
     overflow-y: auto;
     overflow-x: hidden;
+    min-height: 0; /* Permite que o flex item encolha */
 }
 
-.sidebar-nav::-webkit-scrollbar {
+/* SCROLLBAR CUSTOMIZADA */
+.klube-sidebar-nav::-webkit-scrollbar {
     width: 4px;
 }
 
-.sidebar-nav::-webkit-scrollbar-track {
+.klube-sidebar-nav::-webkit-scrollbar-track {
     background: transparent;
 }
 
-.sidebar-nav::-webkit-scrollbar-thumb {
-    background: var(--gray-300);
+.klube-sidebar-nav::-webkit-scrollbar-thumb {
+    background: var(--klube-sidebar-gray-300);
     border-radius: 2px;
 }
 
-.nav-section {
-    margin-bottom: 32px;
+.klube-sidebar-nav::-webkit-scrollbar-thumb:hover {
+    background: var(--klube-sidebar-gray-400);
 }
 
-.nav-section-title {
+/* SEÇÃO DO MENU */
+.klube-sidebar-section {
+    margin-bottom: 32px;
+    position: relative;
+}
+
+.klube-sidebar-section-title {
     padding: 0 20px 12px;
     font-size: 11px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 1px;
-    color: var(--gray-400);
-    transition: var(--transition);
+    color: var(--klube-sidebar-gray-400);
+    transition: var(--klube-sidebar-transition);
 }
 
-.sidebar-container.collapsed .nav-section-title {
+.klube-sidebar.collapsed .klube-sidebar-section-title {
     opacity: 0;
     height: 0;
     padding: 0;
@@ -305,41 +323,47 @@
     overflow: hidden;
 }
 
-.nav-list {
+/* LISTA DE MENU */
+.klube-sidebar-menu {
     list-style: none;
+    margin: 0;
+    padding: 0;
 }
 
-.nav-item {
+.klube-sidebar-menu-item {
     margin: 2px 12px;
 }
 
-.nav-link {
+/* LINKS DO MENU */
+.klube-sidebar-menu-link {
     display: flex;
     align-items: center;
     padding: 14px 16px;
-    color: var(--gray-600);
+    color: var(--klube-sidebar-gray-600);
     text-decoration: none;
-    border-radius: var(--border-radius);
-    transition: var(--transition);
+    border-radius: 12px;
+    transition: var(--klube-sidebar-transition);
     font-weight: 500;
     font-size: 14px;
     position: relative;
     border: 2px solid transparent;
 }
 
-.nav-link:hover {
-    background: var(--primary-light);
-    color: var(--primary);
-    transform: translateX(4px);
+/* ESTADOS DE HOVER E ATIVO */
+.klube-sidebar-menu-link:hover {
+    background: var(--klube-sidebar-primary-light);
+    color: var(--klube-sidebar-primary);
+    transform: translateX(4px); /* Sutil movimento para feedback visual */
 }
 
-.nav-link.active {
-    background: var(--primary);
-    color: var(--white);
-    box-shadow: var(--shadow-md);
+.klube-sidebar-menu-link.active {
+    background: var(--klube-sidebar-primary);
+    color: var(--klube-sidebar-white);
+    box-shadow: var(--klube-sidebar-shadow-md);
 }
 
-.nav-link.active::before {
+/* INDICADOR VISUAL PARA ITEM ATIVO */
+.klube-sidebar-menu-link.active::before {
     content: '';
     position: absolute;
     left: -12px;
@@ -347,71 +371,100 @@
     transform: translateY(-50%);
     width: 4px;
     height: 24px;
-    background: var(--primary);
+    background: var(--klube-sidebar-primary);
     border-radius: 0 4px 4px 0;
 }
 
-.nav-icon {
+/* ÍCONES DO MENU */
+.klube-sidebar-menu-icon {
     width: 20px;
     height: 20px;
     margin-right: 12px;
     flex-shrink: 0;
-    transition: var(--transition);
+    transition: var(--klube-sidebar-transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-.nav-text {
-    transition: var(--transition);
+.klube-sidebar-menu-text {
+    transition: var(--klube-sidebar-transition);
     white-space: nowrap;
+    flex: 1;
 }
 
-.sidebar-container.collapsed .nav-text {
+/* COMPORTAMENTO QUANDO COLAPSADA */
+.klube-sidebar.collapsed .klube-sidebar-menu-text {
     opacity: 0;
     width: 0;
     overflow: hidden;
 }
 
-.sidebar-container.collapsed .nav-icon {
+.klube-sidebar.collapsed .klube-sidebar-menu-icon {
     margin-right: 0;
 }
 
-.sidebar-container.collapsed .nav-link {
+.klube-sidebar.collapsed .klube-sidebar-menu-link {
     justify-content: center;
     padding: 14px;
 }
 
+/* EFEITOS VISUAIS NOS ÍCONES */
+.klube-sidebar.collapsed .klube-sidebar-menu-link:hover .klube-sidebar-menu-icon {
+    transform: scale(1.1);
+}
+
+.klube-sidebar.collapsed .klube-sidebar-menu-link.active:hover .klube-sidebar-menu-icon {
+    transform: scale(1.1) rotate(5deg);
+}
+
 /* ===================================
-   NOTIFICAÇÃO/BADGE
+   BADGES DE NOTIFICAÇÃO
+   
+   FUNCIONALIDADE: Mostram contadores de itens pendentes
+   COMPORTAMENTO: Mudam de posição quando sidebar colapsada
 =================================== */
-.nav-badge {
+.klube-sidebar-badge {
     margin-left: auto;
     background: #EF4444;
-    color: var(--white);
+    color: var(--klube-sidebar-white);
     font-size: 10px;
     font-weight: 600;
     padding: 2px 6px;
     border-radius: 10px;
     min-width: 18px;
     text-align: center;
-    transition: var(--transition);
+    transition: var(--klube-sidebar-transition);
+    line-height: 1.2;
 }
 
-.sidebar-container.collapsed .nav-badge {
+.klube-sidebar.collapsed .klube-sidebar-badge {
     position: absolute;
     top: 8px;
     right: 8px;
     margin: 0;
+    animation: klube-sidebar-badge-pulse 2s infinite;
+}
+
+@keyframes klube-sidebar-badge-pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
 }
 
 /* ===================================
-   FOOTER/LOGOUT
+   FOOTER E LOGOUT
+   
+   FUNCIONALIDADE: Botão de logout sempre visível
+   COMPORTAMENTO: Texto do botão desaparece quando colapsada
 =================================== */
-.sidebar-footer {
+.klube-sidebar-footer {
     padding: 20px;
-    border-top: 1px solid var(--gray-200);
-    background: var(--gray-50);
+    border-top: 1px solid var(--klube-sidebar-gray-200);
+    background: var(--klube-sidebar-gray-50);
+    flex-shrink: 0;
 }
 
-.logout-btn {
+.klube-sidebar-logout {
     width: 100%;
     display: flex;
     align-items: center;
@@ -419,126 +472,109 @@
     gap: 8px;
     padding: 14px 16px;
     background: #EF4444;
-    color: var(--white);
+    color: var(--klube-sidebar-white);
     border: none;
-    border-radius: var(--border-radius);
+    border-radius: 12px;
     font-weight: 600;
     font-size: 14px;
     cursor: pointer;
-    transition: var(--transition);
     text-decoration: none;
+    transition: var(--klube-sidebar-transition);
+    position: relative;
 }
 
-.logout-btn:hover {
+.klube-sidebar-logout:hover {
     background: #DC2626;
     transform: translateY(-2px);
-    box-shadow: var(--shadow-lg);
+    box-shadow: var(--klube-sidebar-shadow-lg);
 }
 
-.logout-btn svg {
+.klube-sidebar-logout-icon {
     width: 18px;
     height: 18px;
+    flex-shrink: 0;
 }
 
-.sidebar-container.collapsed .logout-btn {
+.klube-sidebar.collapsed .klube-sidebar-logout-text {
+    display: none;
+}
+
+.klube-sidebar.collapsed .klube-sidebar-logout {
     padding: 14px;
 }
 
-.sidebar-container.collapsed .logout-btn span {
-    display: none;
-}
-
 /* ===================================
-   MOBILE TOGGLE
+   CONTROLES MOBILE
+   
+   FUNCIONALIDADE: Botões para controle no mobile e desktop
+   COMPORTAMENTO: Aparecem/desaparecem baseado no tamanho da tela
 =================================== */
-.mobile-toggle {
+
+/* TOGGLE MOBILE */
+.klube-sidebar-mobile-toggle {
     display: none;
     position: fixed;
     top: 20px;
     left: 20px;
     width: 48px;
     height: 48px;
-    background: var(--white);
-    border: 1px solid var(--gray-200);
-    border-radius: var(--border-radius);
-    box-shadow: var(--shadow-lg);
+    background: var(--klube-sidebar-white);
+    border: 1px solid var(--klube-sidebar-gray-200);
+    border-radius: 12px;
+    box-shadow: var(--klube-sidebar-shadow-lg);
     z-index: 1001;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: var(--transition);
-    opacity: 1;
-    visibility: visible;
-    transform: scale(1);
+    transition: var(--klube-sidebar-transition);
+    color: var(--klube-sidebar-gray-600);
 }
 
-.mobile-toggle:hover {
-    background: var(--gray-50);
+.klube-sidebar-mobile-toggle:hover {
+    background: var(--klube-sidebar-gray-50);
     transform: scale(1.05);
 }
 
-.mobile-toggle svg {
-    width: 20px;
-    height: 20px;
-    color: var(--gray-600);
-    transition: var(--transition);
-}
-
-.mobile-toggle.hidden {
+.klube-sidebar-mobile-toggle.hidden {
     opacity: 0;
     visibility: hidden;
-    transform: scale(0.8);
     pointer-events: none;
+    transform: scale(0.8);
 }
 
-/* ===================================
-   BOTÃO EXPANDIR - CORRIGIDO
-=================================== */
-.expand-btn {
+/* BOTÃO DE EXPANSÃO (DESKTOP) */
+.klube-sidebar-expand {
     display: none;
     position: fixed;
     top: 20px;
     left: 20px;
     width: 48px;
     height: 48px;
-    background: var(--primary);
+    background: var(--klube-sidebar-primary);
     border: none;
-    border-radius: var(--border-radius);
-    box-shadow: var(--shadow-lg);
+    border-radius: 12px;
+    box-shadow: var(--klube-sidebar-shadow-lg);
     z-index: 1001;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: var(--transition);
-    color: var(--white);
+    color: var(--klube-sidebar-white);
+    transition: var(--klube-sidebar-transition);
 }
 
-.expand-btn:hover {
-    background: var(--primary-dark);
+.klube-sidebar-expand:hover {
+    background: var(--klube-sidebar-primary-dark);
     transform: scale(1.05);
-    box-shadow: var(--shadow-xl);
+    box-shadow: var(--klube-sidebar-shadow-xl);
 }
 
-.expand-btn svg {
-    width: 20px;
-    height: 20px;
+.klube-sidebar-expand.show {
+    display: flex;
+    animation: klube-sidebar-bounce-in 0.5s ease-out;
 }
 
-/* CORRIGIDO: Mostrar expand-btn quando sidebar colapsada em desktop */
-@media (min-width: 769px) {
-    /* Esconder mobile toggle no desktop */
-    .mobile-toggle {
-        display: none !important;
-    }
-    
-    /* Mostrar expand-btn quando sidebar colapsada */
-    .expand-btn.show {
-        display: flex !important;
-    }
-}
-
-/* Overlay mobile */
-.mobile-overlay {
+/* OVERLAY MOBILE */
+.klube-sidebar-overlay {
     display: none;
     position: fixed;
     top: 0;
@@ -547,103 +583,245 @@
     bottom: 0;
     background: rgba(0, 0, 0, 0.5);
     backdrop-filter: blur(4px);
-    z-index: 999;
-    transition: var(--transition);
+    z-index: 998;
+    transition: var(--klube-sidebar-transition);
 }
 
-.mobile-overlay.active {
+.klube-sidebar-overlay.active {
     display: block;
 }
 
 /* ===================================
+   TOOLTIPS INTELIGENTES
+   
+   FUNCIONALIDADE: Mostram nomes dos itens quando sidebar colapsada
+   COMPORTAMENTO: Aparecem apenas no hover e desktop
+=================================== */
+.klube-sidebar-tooltip {
+    position: absolute;
+    left: calc(100% + 15px);
+    top: 50%;
+    transform: translateY(-50%);
+    background: linear-gradient(135deg, var(--klube-sidebar-gray-800) 0%, var(--klube-sidebar-gray-900) 100%);
+    color: var(--klube-sidebar-white);
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: var(--klube-sidebar-transition);
+    z-index: 1002;
+    pointer-events: none;
+    box-shadow: var(--klube-sidebar-shadow-lg);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* SETA DO TOOLTIP */
+.klube-sidebar-tooltip::before {
+    content: '';
+    position: absolute;
+    right: 100%;
+    top: 50%;
+    transform: translateY(-50%);
+    border: 6px solid transparent;
+    border-right-color: var(--klube-sidebar-gray-800);
+}
+
+/* ATIVAÇÃO DO TOOLTIP */
+.klube-sidebar.collapsed .klube-sidebar-menu-link:hover .klube-sidebar-tooltip {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(-50%) translateX(5px);
+}
+
+/* TOOLTIP PARA ITEM ATIVO */
+.klube-sidebar.collapsed .klube-sidebar-menu-link.active:hover .klube-sidebar-tooltip {
+    background: linear-gradient(135deg, var(--klube-sidebar-primary) 0%, var(--klube-sidebar-primary-dark) 100%);
+}
+
+.klube-sidebar.collapsed .klube-sidebar-menu-link.active:hover .klube-sidebar-tooltip::before {
+    border-right-color: var(--klube-sidebar-primary);
+}
+
+/* TOOLTIP PARA LOGOUT */
+.klube-sidebar.collapsed .klube-sidebar-logout::before {
+    content: 'Sair do Sistema';
+    position: absolute;
+    left: calc(100% + 15px);
+    top: 50%;
+    transform: translateY(-50%);
+    background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
+    color: var(--klube-sidebar-white);
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: var(--klube-sidebar-transition);
+    z-index: 1002;
+    pointer-events: none;
+    box-shadow: var(--klube-sidebar-shadow-lg);
+}
+
+.klube-sidebar.collapsed .klube-sidebar-logout:hover::before {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(-50%) translateX(5px);
+}
+
+/* TOOLTIP PARA AVATAR */
+.klube-sidebar.collapsed .klube-sidebar-avatar::before {
+    content: attr(title);
+    position: absolute;
+    left: calc(100% + 15px);
+    top: 50%;
+    transform: translateY(-50%);
+    background: linear-gradient(135deg, var(--klube-sidebar-primary) 0%, var(--klube-sidebar-primary-dark) 100%);
+    color: var(--klube-sidebar-white);
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: var(--klube-sidebar-transition);
+    z-index: 1002;
+    pointer-events: none;
+    min-width: 120px;
+    text-align: center;
+    box-shadow: var(--klube-sidebar-shadow-lg);
+}
+
+.klube-sidebar.collapsed .klube-sidebar-avatar:hover::before {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(-50%) translateX(5px);
+}
+
+/* ===================================
    RESPONSIVIDADE
+   
+   ESTRATÉGIA: Mobile-first com breakpoints específicos
+   COMPORTAMENTO: Sidebar desliza no mobile, colapsa no desktop
 =================================== */
 
-/* Tablets */
-@media (max-width: 1024px) {
-    :root {
-        --sidebar-width: 260px;
+/* DESKTOP GRANDE */
+@media (min-width: 1200px) {
+    .klube-sidebar {
+        width: 300px; /* Ligeiramente maior em telas grandes */
     }
 }
 
-/* Mobile */
+/* TABLET E DESKTOP MÉDIO */
+@media (min-width: 769px) {
+    .klube-sidebar-mobile-toggle {
+        display: none !important;
+    }
+    
+    .klube-sidebar-expand.show {
+        display: flex !important;
+    }
+}
+
+/* TABLET */
+@media (max-width: 1024px) {
+    .klube-sidebar-tooltip {
+        font-size: 11px;
+        padding: 6px 10px;
+    }
+}
+
+/* MOBILE */
 @media (max-width: 768px) {
-    .sidebar-container {
+    .klube-sidebar {
         transform: translateX(-100%);
         width: 320px;
         z-index: 1000;
     }
     
-    .sidebar-container.open {
+    .klube-sidebar.open {
         transform: translateX(0);
     }
     
-    .sidebar-container.collapsed {
-        width: 320px;
-    }
-    
-    .mobile-toggle {
+    .klube-sidebar-mobile-toggle {
         display: flex !important;
     }
     
-    /* Esconder botão expand no mobile */
-    .expand-btn {
+    .klube-sidebar-expand {
         display: none !important;
     }
     
-    .toggle-btn {
+    .klube-sidebar-toggle {
         display: none;
     }
     
-    /* Restaurar elementos quando no mobile */
-    .sidebar-container.collapsed .user-info,
-    .sidebar-container.collapsed .nav-text,
-    .sidebar-container.collapsed .nav-section-title {
-        opacity: 1;
-        width: auto;
-        overflow: visible;
+    /* DESABILITAR TOOLTIPS NO MOBILE */
+    .klube-sidebar-tooltip,
+    .klube-sidebar.collapsed .klube-sidebar-logout::before,
+    .klube-sidebar.collapsed .klube-sidebar-avatar::before {
+        display: none !important;
     }
     
-    .sidebar-container.collapsed .nav-link {
-        justify-content: flex-start;
-        padding: 14px 16px;
+    /* RESTAURAR ELEMENTOS NO MOBILE */
+    .klube-sidebar.collapsed .klube-sidebar-user-info,
+    .klube-sidebar.collapsed .klube-sidebar-menu-text,
+    .klube-sidebar.collapsed .klube-sidebar-section-title {
+        opacity: 1 !important;
+        width: auto !important;
+        overflow: visible !important;
     }
     
-    .sidebar-container.collapsed .nav-icon {
-        margin-right: 12px;
+    .klube-sidebar.collapsed .klube-sidebar-menu-link {
+        justify-content: flex-start !important;
+        padding: 14px 16px !important;
     }
     
-    .sidebar-container.collapsed .logout-btn {
-        padding: 14px 16px;
+    .klube-sidebar.collapsed .klube-sidebar-menu-icon {
+        margin-right: 12px !important;
     }
     
-    .sidebar-container.collapsed .logout-btn span {
-        display: inline;
+    .klube-sidebar.collapsed .klube-sidebar-logout-text {
+        display: inline !important;
     }
     
-    .sidebar-container.collapsed .logo {
-        display: block;
+    .klube-sidebar.collapsed .klube-sidebar-logout {
+        padding: 14px 16px !important;
     }
     
-    .sidebar-container.collapsed .user-profile {
-        padding: 24px 20px;
-        justify-content: flex-start;
+    .klube-sidebar.collapsed .klube-sidebar-logo {
+        display: block !important;
     }
     
-    /* Bloquear scroll do body quando sidebar aberta */
-    body.sidebar-open {
+    .klube-sidebar.collapsed .klube-sidebar-logo-text {
+        opacity: 1 !important;
+        width: auto !important;
+        overflow: visible !important;
+    }
+    
+    .klube-sidebar.collapsed .klube-sidebar-profile {
+        padding: 24px 20px !important;
+        justify-content: flex-start !important;
+    }
+    
+    /* BLOQUEAR SCROLL DO BODY QUANDO SIDEBAR ABERTA */
+    body.klube-sidebar-open {
         overflow: hidden;
     }
 }
 
-/* Mobile pequeno */
+/* MOBILE PEQUENO */
 @media (max-width: 480px) {
-    .sidebar-container {
+    .klube-sidebar {
         width: 100vw;
         max-width: 350px;
     }
     
-    .mobile-toggle {
+    .klube-sidebar-mobile-toggle {
         top: 15px;
         left: 15px;
         width: 44px;
@@ -652,9 +830,13 @@
 }
 
 /* ===================================
-   ANIMAÇÕES E EFEITOS
+   ANIMAÇÕES
+   
+   FUNCIONALIDADE: Animações suaves para melhor UX
+   PERFORMANCE: Usa transform e opacity para animações otimizadas
 =================================== */
-@keyframes slideIn {
+
+@keyframes klube-sidebar-slide-in {
     from {
         opacity: 0;
         transform: translateX(-20px);
@@ -665,7 +847,7 @@
     }
 }
 
-@keyframes bounceIn {
+@keyframes klube-sidebar-bounce-in {
     0% {
         opacity: 0;
         transform: scale(0.3);
@@ -683,32 +865,36 @@
     }
 }
 
-.nav-item {
-    animation: slideIn 0.3s ease-out;
+@keyframes klube-sidebar-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
 }
 
-.nav-item:nth-child(1) { animation-delay: 0.1s; }
-.nav-item:nth-child(2) { animation-delay: 0.2s; }
-.nav-item:nth-child(3) { animation-delay: 0.3s; }
-.nav-item:nth-child(4) { animation-delay: 0.4s; }
-.nav-item:nth-child(5) { animation-delay: 0.5s; }
-
-.mobile-toggle:not(.hidden) {
-    animation: bounceIn 0.5s ease-out;
+/* APLICAÇÃO DAS ANIMAÇÕES */
+.klube-sidebar-menu-item {
+    animation: klube-sidebar-slide-in 0.3s ease-out;
 }
 
-.expand-btn.show {
-    animation: bounceIn 0.5s ease-out;
+.klube-sidebar-menu-item:nth-child(1) { animation-delay: 0.1s; }
+.klube-sidebar-menu-item:nth-child(2) { animation-delay: 0.2s; }
+.klube-sidebar-menu-item:nth-child(3) { animation-delay: 0.3s; }
+.klube-sidebar-menu-item:nth-child(4) { animation-delay: 0.4s; }
+.klube-sidebar-menu-item:nth-child(5) { animation-delay: 0.5s; }
+.klube-sidebar-menu-item:nth-child(6) { animation-delay: 0.6s; }
+.klube-sidebar-menu-item:nth-child(7) { animation-delay: 0.7s; }
+
+.klube-sidebar-mobile-toggle:not(.hidden) {
+    animation: klube-sidebar-bounce-in 0.5s ease-out;
 }
 
-/* Loading state */
-.nav-link.loading {
+/* ESTADO DE LOADING NOS LINKS */
+.klube-sidebar-menu-link.loading {
     opacity: 0.6;
     pointer-events: none;
     position: relative;
 }
 
-.nav-link.loading::after {
+.klube-sidebar-menu-link.loading::after {
     content: '';
     position: absolute;
     top: 50%;
@@ -718,140 +904,97 @@
     border: 2px solid transparent;
     border-top: 2px solid currentColor;
     border-radius: 50%;
-    animation: spin 1s linear infinite;
+    animation: klube-sidebar-spin 1s linear infinite;
 }
 
-@keyframes spin {
+@keyframes klube-sidebar-spin {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
 }
 
-/* Focus para acessibilidade */
-.nav-link:focus,
-.toggle-btn:focus,
-.logout-btn:focus,
-.mobile-toggle:focus,
-.expand-btn:focus {
-    outline: 2px solid var(--primary);
-    outline-offset: 2px;
-}
-
 /* ===================================
-   ESTADOS ESPECIAIS
+   INTEGRAÇÃO COM CONTEÚDO PRINCIPAL
+   
+   FUNCIONALIDADE: Ajusta margem do conteúdo principal
+   COMPORTAMENTO: Margem muda baseada no estado da sidebar
 =================================== */
-.sidebar-container.loading {
-    opacity: 0.8;
-    pointer-events: none;
-}
-
-.sidebar-container.error {
-    border-left: 4px solid #EF4444;
-}
-
-/* Tooltip para modo colapsado */
-.nav-tooltip {
-    position: absolute;
-    left: calc(100% + 12px);
-    top: 50%;
-    transform: translateY(-50%);
-    background: var(--gray-800);
-    color: var(--white);
-    padding: 8px 12px;
-    border-radius: var(--border-radius-sm);
-    font-size: 12px;
-    white-space: nowrap;
-    opacity: 0;
-    visibility: hidden;
-    transition: var(--transition);
-    z-index: 1001;
-}
-
-.nav-tooltip::before {
-    content: '';
-    position: absolute;
-    right: 100%;
-    top: 50%;
-    transform: translateY(-50%);
-    border: 6px solid transparent;
-    border-right-color: var(--gray-800);
-}
-
-.sidebar-container.collapsed .nav-link:hover .nav-tooltip {
-    opacity: 1;
-    visibility: visible;
-}
-
-/* Utility classes */
-.fade-in {
-    animation: fadeIn 0.3s ease-in;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-.slide-up {
-    animation: slideUp 0.3s ease-out;
-}
-
-@keyframes slideUp {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-/* ===================================
-   MELHORIAS DE INTEGRAÇÃO
-=================================== */
-
-/* Ajustes específicos para integração */
-.main-content {
+.klube-main-content {
     margin-left: 280px;
     transition: margin-left 0.3s ease;
     min-height: 100vh;
-    background: #F9FAFB;
 }
 
-.sidebar-container.collapsed ~ .main-content {
+.klube-sidebar.collapsed ~ .klube-main-content {
     margin-left: 80px;
 }
 
 @media (max-width: 768px) {
-    .main-content {
+    .klube-main-content {
         margin-left: 0 !important;
     }
 }
 
-/* Melhoria na experiência de carregamento */
-.page-loading .sidebar-container {
-    opacity: 0.7;
+/* ===================================
+   ESTADOS DE FOCO PARA ACESSIBILIDADE
+   
+   FUNCIONALIDADE: Indicadores visuais para navegação por teclado
+   COMPORTAMENTO: Outline visível apenas no foco por teclado
+=================================== */
+.klube-sidebar-wrapper .klube-sidebar-menu-link:focus,
+.klube-sidebar-wrapper .klube-sidebar-toggle:focus,
+.klube-sidebar-wrapper .klube-sidebar-logout:focus,
+.klube-sidebar-wrapper .klube-sidebar-mobile-toggle:focus,
+.klube-sidebar-wrapper .klube-sidebar-expand:focus {
+    outline: 2px solid var(--klube-sidebar-primary);
+    outline-offset: 2px;
 }
 
-.page-loading .nav-link {
-    pointer-events: none;
+/* REMOVE OUTLINE NO MOUSE CLICK */
+.klube-sidebar-wrapper .klube-sidebar-menu-link:focus:not(:focus-visible),
+.klube-sidebar-wrapper .klube-sidebar-toggle:focus:not(:focus-visible),
+.klube-sidebar-wrapper .klube-sidebar-logout:focus:not(:focus-visible),
+.klube-sidebar-wrapper .klube-sidebar-mobile-toggle:focus:not(:focus-visible),
+.klube-sidebar-wrapper .klube-sidebar-expand:focus:not(:focus-visible) {
+    outline: none;
 }
 
-/* Animação de entrada suave para a página */
-.page-enter {
-    animation: pageEnter 0.4s ease-out;
+/* ===================================
+   UTILIDADES E AJUSTES FINAIS
+   
+   FUNCIONALIDADE: Classes auxiliares e ajustes de compatibilidade
+=================================== */
+
+/* CLASSE PARA ESCONDER ELEMENTOS */
+.klube-sidebar-hidden {
+    display: none !important;
 }
 
-@keyframes pageEnter {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
+/* CLASSE PARA ELEMENTOS VISÍVEIS */
+.klube-sidebar-visible {
+    display: block !important;
+}
+
+/* AJUSTE PARA COMPATIBILIDADE COM BROWSERS ANTIGOS */
+@supports not (backdrop-filter: blur(4px)) {
+    .klube-sidebar-overlay.active {
+        background: rgba(0, 0, 0, 0.7); /* Fundo mais opaco se não suportar blur */
     }
-    to {
-        opacity: 1;
-        transform: translateY(0);
+}
+
+/* CORREÇÃO PARA SAFARI */
+@media screen and (-webkit-min-device-pixel-ratio: 0) {
+    .klube-sidebar-nav::-webkit-scrollbar {
+        width: 6px;
     }
 }
 
-
-
+/* PRINT STYLES - ESCONDER SIDEBAR NA IMPRESSÃO */
+@media print {
+    .klube-sidebar-wrapper {
+        display: none !important;
+    }
+    
+    .klube-main-content {
+        margin-left: 0 !important;
+    }
+}

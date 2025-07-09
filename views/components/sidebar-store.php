@@ -1,581 +1,942 @@
 <?php
 /**
- * Sidebar Moderna para Lojas - Klube Cash
+ * SIDEBAR ISOLADA - KLUBE CASH
+ * Versão final e completa sem interferências
  * 
- * Sidebar responsiva, elegante e funcional para o painel das lojas
+ * FILOSOFIA DO CÓDIGO:
+ * - Isolamento total de estilos e JavaScript
+ * - Não interferência em formulários ou funcionalidades da página
+ * - Responsividade completa para todos os dispositivos
+ * - Acessibilidade seguindo padrões WCAG
+ * - Performance otimizada com lazy loading e throttling
  * 
- * @param string $activeMenu - Menu ativo atual
+ * @param string $activeMenu - Menu ativo atual para destacar na navegação
  */
 
-// Verificações de segurança
+// ====================================
+// VERIFICAÇÕES DE SEGURANÇA
+// ====================================
+
+// Iniciar sessão apenas se não estiver ativa (evita warnings)
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// Verificar se o usuário está logado e tem permissão
 if (!isset($_SESSION['user_id']) || $_SESSION['user_type'] !== 'loja') {
     header('Location: ' . LOGIN_URL . '?error=acesso_restrito');
     exit;
 }
 
-// Definir menu ativo padrão se não definido
+// ====================================
+// CONFIGURAÇÃO DE DADOS
+// ====================================
+
+// Definir menu ativo com fallback seguro
 $activeMenu = $activeMenu ?? 'dashboard';
 
-// Dados do usuário
+// Dados do usuário com fallbacks
 $userName = $_SESSION['user_name'] ?? 'Lojista';
 $userEmail = $_SESSION['user_email'] ?? '';
 $storeId = $_SESSION['store_id'] ?? null;
 
-// Iniciais do usuário para avatar
+// ====================================
+// GERAÇÃO DE INICIAIS DO USUÁRIO
+// Lógica para criar avatar com iniciais do nome
+// ====================================
 $initials = '';
-$nameParts = explode(' ', $userName);
+$nameParts = explode(' ', trim($userName));
+
 if (count($nameParts) >= 2) {
+    // Se tem nome e sobrenome, pega primeira letra de cada
     $initials = substr($nameParts[0], 0, 1) . substr($nameParts[1], 0, 1);
+} elseif (count($nameParts) === 1 && strlen($nameParts[0]) >= 2) {
+    // Se tem apenas um nome, pega as duas primeiras letras
+    $initials = substr($nameParts[0], 0, 2);
 } else {
-    $initials = substr($userName, 0, 2);
+    // Fallback para casos edge
+    $initials = 'US';
 }
+
 $initials = strtoupper($initials);
 
-// Menu items com ícones SVG
+// ====================================
+// CONFIGURAÇÃO DOS ITENS DO MENU
+// Cada item contém: id, título, URL e ícone SVG específico
+// ====================================
 $menuItems = [
     [
         'id' => 'dashboard',
         'title' => 'Dashboard',
         'url' => STORE_DASHBOARD_URL,
-        'icon' => '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5a2 2 0 012-2h4a2 2 0 012 2v6H8V5z"/></svg>',
-        'section' => 'main'
+        'icon' => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5a2 2 0 012-2h4a2 2 0 012 2v6H8V5z"/>',
+        'description' => 'Visão geral das suas vendas e métricas'
     ],
     [
         'id' => 'register-transaction',
         'title' => 'Nova Venda',
         'url' => STORE_REGISTER_TRANSACTION_URL,
-        'icon' => '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>',
-        'section' => 'transactions'
+        'icon' => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>',
+        'description' => 'Registrar uma nova transação de venda'
     ],
     [
         'id' => 'transactions',
         'title' => 'Vendas',
         'url' => STORE_TRANSACTIONS_URL,
-        'icon' => '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>',
-        'section' => 'transactions'
+        'icon' => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>',
+        'description' => 'Histórico de todas as suas vendas'
     ],
     [
         'id' => 'batch-upload',
         'title' => 'Upload em Lote',
         'url' => STORE_BATCH_UPLOAD_URL,
-        'icon' => '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>',
-        'section' => 'transactions'
+        'icon' => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>',
+        'description' => 'Importar múltiplas transações via arquivo'
     ],
     [
         'id' => 'payment-history',
         'title' => 'Pagamentos',
         'url' => STORE_PAYMENT_HISTORY_URL,
-        'icon' => '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>',
-        'section' => 'financial',
-        'badge' => 3 // Exemplo de badge para pendências
+        'icon' => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/>',
+        'description' => 'Histórico de pagamentos e comissões',
+        'badge' => 3 // Exemplo: 3 pagamentos pendentes
     ],
     [
         'id' => 'saldos',
         'title' => 'Saldos',
         'url' => STORE_SALDOS_URL,
-        'icon' => '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"/></svg>',
-        'section' => 'financial'
+        'icon' => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"/>',
+        'description' => 'Consulte seus saldos e repasses'
     ],
     [
         'id' => 'profile',
-        'title' => 'Meu Perfil',
+        'title' => 'Perfil',
         'url' => STORE_PROFILE_URL,
-        'icon' => '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>',
-        'section' => 'settings'
+        'icon' => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>',
+        'description' => 'Configurações do seu perfil e loja'
     ]
 ];
 
-// Agrupar itens por seção
-$sections = [
-    'main' => [
-        'title' => 'Principal',
-        'items' => []
-    ],
-    'transactions' => [
-        'title' => 'Transações',
-        'items' => []
-    ],
-    'financial' => [
-        'title' => 'Financeiro',
-        'items' => []
-    ],
-    'settings' => [
-        'title' => 'Configurações',
-        'items' => []
-    ]
-];
+// ====================================
+// VERIFICAÇÃO DE BADGE DINÂMICA
+// Em implementação real, essas badges viriam do banco de dados
+// ====================================
+$pendingPayments = 0; // Aqui viria uma consulta ao banco
+$newNotifications = 0; // Aqui viria uma consulta ao banco
 
-foreach ($menuItems as $item) {
-    $sections[$item['section']]['items'][] = $item;
+// Atualizar badges baseado em dados reais
+foreach ($menuItems as &$item) {
+    if ($item['id'] === 'payment-history' && $pendingPayments > 0) {
+        $item['badge'] = $pendingPayments;
+    }
 }
+unset($item); // Limpar referência
 ?>
 
-<link rel="stylesheet" href="../../assets/css/sidebar-store-modern.css">
+<!-- CARREGAMENTO DO CSS ISOLADO -->
+<link rel="stylesheet" href="../../assets/css/sidebar-isolated.css">
 
-<!-- Toggle Mobile -->
-<button class="mobile-toggle" id="mobileToggle" aria-label="Abrir menu">
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+<!-- ====================================
+     CONTROLES MOBILE E DESKTOP
+     Botões que aparecem em diferentes situações
+     ==================================== -->
+
+<!-- Toggle Mobile: Aparece apenas no mobile -->
+<button class="klube-sidebar-mobile-toggle" 
+        id="klubeMobileToggle" 
+        aria-label="Abrir menu de navegação"
+        title="Abrir menu (Pressione Alt+M)">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="3" y1="6" x2="21" y2="6"></line>
+        <line x1="3" y1="12" x2="21" y2="12"></line>
+        <line x1="3" y1="18" x2="21" y2="18"></line>
     </svg>
 </button>
 
-<!-- Botão Expandir (Desktop quando colapsada) -->
-<button class="expand-btn" id="expandBtn" aria-label="Expandir menu" title="Expandir menu (Ctrl+B)">
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+<!-- Expand Button: Aparece quando sidebar está colapsada no desktop -->
+<button class="klube-sidebar-expand" 
+        id="klubeExpandBtn" 
+        aria-label="Expandir menu de navegação"
+        title="Expandir menu (Pressione Ctrl+B)">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="9,18 15,12 9,6"></polyline>
     </svg>
 </button>
 
-<!-- Overlay Mobile -->
-<div class="mobile-overlay" id="mobileOverlay"></div>
+<!-- Overlay: Fundo escuro que aparece no mobile quando sidebar está aberta -->
+<div class="klube-sidebar-overlay" 
+     id="klubeOverlay" 
+     aria-hidden="true"></div>
 
-<!-- Sidebar Container -->
-<aside class="sidebar-container" id="sidebarContainer">
-    
-    <!-- Header -->
-    <header class="sidebar-header">
-        <div class="logo-section">
-            <img src="../../assets/images/logo-icon.png" alt="Klube Cash" class="logo">
-            <span class="logo-text">Klube Cash</span>
-        </div>
-        <button class="toggle-btn" id="toggleBtn" aria-label="Minimizar menu" title="Minimizar/Expandir menu (Ctrl+B)">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-            </svg>
-        </button>
-    </header>
-
-    <!-- Perfil do Usuário -->
-    <div class="user-profile">
-        <div class="user-avatar" title="<?= htmlspecialchars($userName) ?>">
-            <?= $initials ?>
-        </div>
-        <div class="user-info">
-            <div class="user-name" title="<?= htmlspecialchars($userName) ?>">
-                <?= htmlspecialchars($userName) ?>
+<!-- ====================================
+     CONTAINER PRINCIPAL DA SIDEBAR
+     ==================================== -->
+<div class="klube-sidebar-wrapper">
+    <aside class="klube-sidebar" 
+           id="klubeSidebar" 
+           role="navigation" 
+           aria-label="Menu principal de navegação"
+           aria-hidden="false">
+        
+        <!-- ====================================
+             HEADER DA SIDEBAR
+             Contém logo e botão de collapse
+             ==================================== -->
+        <header class="klube-sidebar-header">
+            <div class="klube-sidebar-logo-section">
+                <img src="../../assets/images/logo.png" 
+                     alt="Klube Cash - Sistema de Cashback" 
+                     class="klube-sidebar-logo"
+                     loading="lazy">
+                <span class="klube-sidebar-logo-text">Klube Cash</span>
             </div>
-            <div class="user-role">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+            
+            <button class="klube-sidebar-toggle" 
+                    id="klubeToggle" 
+                    aria-label="Recolher menu de navegação"
+                    title="Recolher/Expandir menu (Ctrl+B)">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="15,18 9,12 15,6"></polyline>
                 </svg>
-                Lojista
+            </button>
+        </header>
+
+        <!-- ====================================
+             PERFIL DO USUÁRIO
+             Exibe avatar, nome e tipo de usuário
+             ==================================== -->
+        <div class="klube-sidebar-profile">
+            <div class="klube-sidebar-avatar" 
+                 title="<?= htmlspecialchars($userName) ?> - Clique para ver perfil"
+                 role="button"
+                 tabindex="0">
+                <?= $initials ?>
+            </div>
+            
+            <div class="klube-sidebar-user-info">
+                <div class="klube-sidebar-user-name" 
+                     title="<?= htmlspecialchars($userName) ?>">
+                    <?= htmlspecialchars($userName) ?>
+                </div>
+                
+                <div class="klube-sidebar-user-role">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                    </svg>
+                    Lojista
+                </div>
             </div>
         </div>
-    </div>
 
-    <!-- Navegação -->
-    <nav class="sidebar-nav" role="navigation">
-        <?php foreach ($sections as $sectionKey => $section): ?>
-            <?php if (!empty($section['items'])): ?>
-                <div class="nav-section">
-                    <h3 class="nav-section-title"><?= $section['title'] ?></h3>
-                    <ul class="nav-list" role="menubar">
-                        <?php foreach ($section['items'] as $item): ?>
-                            <li class="nav-item" role="none">
-                                <a href="<?= $item['url'] ?>" 
-                                   class="nav-link <?= ($activeMenu === $item['id']) ? 'active' : '' ?>"
-                                   role="menuitem"
-                                   aria-current="<?= ($activeMenu === $item['id']) ? 'page' : 'false' ?>"
-                                   data-page="<?= $item['id'] ?>">
-                                    <span class="nav-icon">
+        <!-- ====================================
+             NAVEGAÇÃO PRINCIPAL
+             Menu com todos os itens de navegação
+             ==================================== -->
+        <nav class="klube-sidebar-nav" role="navigation">
+            <div class="klube-sidebar-section">
+                <h3 class="klube-sidebar-section-title">Menu Principal</h3>
+                
+                <ul class="klube-sidebar-menu" role="menubar">
+                    <?php foreach ($menuItems as $index => $item): ?>
+                        <li class="klube-sidebar-menu-item" role="none">
+                            <a href="<?= htmlspecialchars($item['url']) ?>" 
+                               class="klube-sidebar-menu-link <?= ($activeMenu === $item['id']) ? 'active' : '' ?>"
+                               role="menuitem"
+                               aria-current="<?= ($activeMenu === $item['id']) ? 'page' : 'false' ?>"
+                               data-page="<?= htmlspecialchars($item['id']) ?>"
+                               title="<?= htmlspecialchars($item['description'] ?? $item['title']) ?>"
+                               <?php if ($activeMenu === $item['id']): ?>
+                                   aria-describedby="current-page-description"
+                               <?php endif; ?>>
+                                
+                                <!-- Ícone do menu -->
+                                <span class="klube-sidebar-menu-icon" 
+                                      aria-hidden="true">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                         <?= $item['icon'] ?>
+                                    </svg>
+                                </span>
+                                
+                                <!-- Texto do menu -->
+                                <span class="klube-sidebar-menu-text">
+                                    <?= htmlspecialchars($item['title']) ?>
+                                </span>
+                                
+                                <!-- Badge de notificação (se houver) -->
+                                <?php if (isset($item['badge']) && $item['badge'] > 0): ?>
+                                    <span class="klube-sidebar-badge" 
+                                          aria-label="<?= $item['badge'] ?> itens pendentes"
+                                          title="<?= $item['badge'] ?> <?= $item['badge'] === 1 ? 'item pendente' : 'itens pendentes' ?>">
+                                        <?= $item['badge'] ?>
                                     </span>
-                                    <span class="nav-text"><?= $item['title'] ?></span>
-                                    <?php if (isset($item['badge']) && $item['badge'] > 0): ?>
-                                        <span class="nav-badge" aria-label="<?= $item['badge'] ?> pendências"><?= $item['badge'] ?></span>
-                                    <?php endif; ?>
-                                    
-                                    <!-- Tooltip para modo colapsado -->
-                                    <span class="nav-tooltip"><?= $item['title'] ?></span>
-                                </a>
-                            </li>
-                        <?php endforeach; ?>
-                    </ul>
-                </div>
-            <?php endif; ?>
-        <?php endforeach; ?>
-    </nav>
+                                <?php endif; ?>
+                                
+                                <!-- Tooltip para modo colapsado -->
+                                <span class="klube-sidebar-tooltip" 
+                                      role="tooltip" 
+                                      aria-hidden="true">
+                                    <?= htmlspecialchars($item['title']) ?>
+                                </span>
+                            </a>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
+        </nav>
 
-    <!-- Footer com Logout -->
-    <footer class="sidebar-footer">
-        <a href="/controllers/AuthController.php?action=logout" class="logout-btn" onclick="return confirmarLogout()" title="Sair do sistema">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
-            </svg>
-            <span>Sair</span>
-        </a>
-    </footer>
+        <!-- ====================================
+             FOOTER COM LOGOUT
+             Botão de logout sempre acessível
+             ==================================== -->
+        <footer class="klube-sidebar-footer">
+            <a href="../../auth/logout.php" 
+               class="klube-sidebar-logout"
+               onclick="return confirm('Tem certeza que deseja sair do sistema?')"
+               title="Sair do sistema"
+               role="button">
+                <svg class="klube-sidebar-logout-icon" 
+                     viewBox="0 0 24 24" 
+                     fill="none" 
+                     stroke="currentColor" 
+                     stroke-width="2"
+                     aria-hidden="true">
+                    <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4m7 14l5-5-5-5m5 5H9"/>
+                </svg>
+                <span class="klube-sidebar-logout-text">Sair</span>
+            </a>
+        </footer>
 
-</aside>
+    </aside>
+</div>
+
+<!-- Texto oculto para acessibilidade -->
+<span id="current-page-description" class="klube-sidebar-hidden">
+    Página atual: você está navegando nesta seção
+</span>
 
 <script>
 /**
- * Controles da Sidebar Moderna - CORRIGIDO
+ * SIDEBAR ISOLADA - JAVASCRIPT FINAL
+ * 
+ * ARQUITETURA:
+ * - IIFE (Immediately Invoked Function Expression) para isolamento
+ * - Namespace único para evitar conflitos globais
+ * - Event delegation para performance
+ * - Throttling em eventos de resize
+ * - Accessible keyboard navigation
+ * - Mobile-first responsive behavior
  */
-document.addEventListener('DOMContentLoaded', function() {
+(function() {
+    'use strict';
     
-    // Elementos
-    const sidebar = document.getElementById('sidebarContainer');
-    const toggleBtn = document.getElementById('toggleBtn');
-    const mobileToggle = document.getElementById('mobileToggle');
-    const expandBtn = document.getElementById('expandBtn');
-    const mobileOverlay = document.getElementById('mobileOverlay');
-    const body = document.body;
-    const navLinks = document.querySelectorAll('.nav-link');
+    // ====================================
+    // CONSTANTES E CONFIGURAÇÕES
+    // ====================================
     
-    // Estado da sidebar
-    let isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
-    let isMobileOpen = false;
-    let hideTimeout;
+    const CONFIG = {
+        STORAGE_KEY: 'klubeSidebarCollapsed',
+        MOBILE_BREAKPOINT: 768,
+        HIDE_DELAY: 2000,
+        RESIZE_THROTTLE: 100,
+        ANIMATION_DURATION: 300
+    };
     
-    // Verificar tamanho da tela
-    function isMobile() {
-        return window.innerWidth <= 768;
-    }
+    const SELECTORS = {
+        sidebar: '#klubeSidebar',
+        toggle: '#klubeToggle',
+        mobileToggle: '#klubeMobileToggle',
+        expandBtn: '#klubeExpandBtn',
+        overlay: '#klubeOverlay',
+        navLinks: '.klube-sidebar-menu-link',
+        mainContent: '.main-content, .content, .page-content'
+    };
     
-    // CORRIGIDO: Controlar visibilidade do expand button
-    function updateExpandButtonVisibility() {
-        if (!isMobile()) {
-            if (isCollapsed) {
-                expandBtn.classList.add('show');
-            } else {
-                expandBtn.classList.remove('show');
+    const CSS_CLASSES = {
+        collapsed: 'collapsed',
+        open: 'open',
+        active: 'active',
+        hidden: 'hidden',
+        loading: 'loading',
+        show: 'show',
+        sidebarOpen: 'klube-sidebar-open',
+        mainContent: 'klube-main-content'
+    };
+    
+    // ====================================
+    // ESTADO E ELEMENTOS
+    // ====================================
+    
+    const elements = {};
+    const state = {
+        isCollapsed: localStorage.getItem(CONFIG.STORAGE_KEY) === 'true',
+        isMobileOpen: false,
+        hideTimeout: null,
+        resizeTimeout: null
+    };
+    
+    // ====================================
+    // INICIALIZAÇÃO
+    // ====================================
+    
+    function init() {
+        try {
+            findElements();
+            
+            if (!elements.sidebar) {
+                console.warn('Klube Sidebar: Elemento sidebar não encontrado');
+                return;
             }
-        } else {
-            expandBtn.classList.remove('show');
+            
+            bindEvents();
+            initState();
+            initAccessibility();
+            
+            console.log('✅ Klube Sidebar inicializada sem interferências');
+        } catch (error) {
+            console.error('❌ Erro ao inicializar Klube Sidebar:', error);
         }
     }
     
-    // Aplicar estado inicial
-    function initSidebar() {
-        if (!isMobile() && isCollapsed) {
-            sidebar.classList.add('collapsed');
-        }
-        updateMainContent();
-        updateExpandButtonVisibility(); // NOVO
+    // ====================================
+    // BUSCA DE ELEMENTOS
+    // ====================================
+    
+    function findElements() {
+        Object.keys(SELECTORS).forEach(key => {
+            elements[key] = document.querySelector(SELECTORS[key]);
+        });
+        
+        // Buscar múltiplos elementos
+        elements.navLinksAll = document.querySelectorAll(SELECTORS.navLinks);
     }
     
-    // Toggle sidebar desktop
-    function toggleSidebar() {
+    // ====================================
+    // VINCULAÇÃO DE EVENTOS
+    // ====================================
+    
+    function bindEvents() {
+        // Eventos dos botões principais
+        bindButtonEvents();
+        
+        // Eventos de navegação
+        bindNavigationEvents();
+        
+        // Eventos de sistema
+        bindSystemEvents();
+        
+        // Eventos de teclado
+        bindKeyboardEvents();
+        
+        // Eventos de touch (mobile)
+        bindTouchEvents();
+    }
+    
+    function bindButtonEvents() {
+        // Toggle desktop
+        if (elements.toggle) {
+            elements.toggle.addEventListener('click', handleDesktopToggle);
+        }
+        
+        // Expand button
+        if (elements.expandBtn) {
+            elements.expandBtn.addEventListener('click', handleDesktopToggle);
+        }
+        
+        // Mobile toggle
+        if (elements.mobileToggle) {
+            elements.mobileToggle.addEventListener('click', handleMobileToggle);
+        }
+        
+        // Overlay
+        if (elements.overlay) {
+            elements.overlay.addEventListener('click', handleOverlayClick);
+        }
+    }
+    
+    function bindNavigationEvents() {
+        // Links de navegação
+        elements.navLinksAll.forEach(link => {
+            link.addEventListener('click', handleNavClick);
+        });
+        
+        // Cliques fora da sidebar (mobile)
+        document.addEventListener('click', handleOutsideClick);
+    }
+    
+    function bindSystemEvents() {
+        // Resize com throttling
+        window.addEventListener('resize', throttledResize);
+        
+        // Visibility change (para pausar animações quando tab não está ativa)
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+    }
+    
+    function bindKeyboardEvents() {
+        document.addEventListener('keydown', handleKeyboard);
+        
+        // Navegação por teclado dentro da sidebar
+        elements.sidebar.addEventListener('keydown', handleSidebarKeyboard);
+    }
+    
+    function bindTouchEvents() {
+        // Implementar swipe gestures no mobile
+        let touchStartX = 0;
+        let touchCurrentX = 0;
+        let isDragging = false;
+        
+        // Swipe para abrir
+        document.addEventListener('touchstart', function(e) {
+            if (isMobile() && e.touches[0].clientX < 50) {
+                touchStartX = e.touches[0].clientX;
+                isDragging = true;
+            }
+        });
+        
+        document.addEventListener('touchmove', function(e) {
+            if (!isDragging) return;
+            touchCurrentX = e.touches[0].clientX;
+            
+            // Prevenir scroll se movimento horizontal significativo
+            if (Math.abs(touchCurrentX - touchStartX) > 10) {
+                e.preventDefault();
+            }
+        }, { passive: false });
+        
+        document.addEventListener('touchend', function() {
+            if (!isDragging) return;
+            
+            const diff = touchCurrentX - touchStartX;
+            if (diff > 50 && !state.isMobileOpen) {
+                openMobile();
+            }
+            
+            isDragging = false;
+        });
+        
+        // Swipe para fechar dentro da sidebar
+        if (elements.sidebar) {
+            elements.sidebar.addEventListener('touchstart', function(e) {
+                if (isMobile() && state.isMobileOpen) {
+                    touchStartX = e.touches[0].clientX;
+                    isDragging = true;
+                }
+            });
+            
+            elements.sidebar.addEventListener('touchend', function() {
+                if (!isDragging) return;
+                
+                const diff = touchStartX - touchCurrentX;
+                if (diff > 100) {
+                    closeMobile();
+                }
+                
+                isDragging = false;
+            });
+        }
+    }
+    
+    // ====================================
+    // HANDLERS DE EVENTOS
+    // ====================================
+    
+    function handleDesktopToggle(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
         if (isMobile()) return;
         
-        isCollapsed = !isCollapsed;
-        sidebar.classList.toggle('collapsed', isCollapsed);
-        localStorage.setItem('sidebarCollapsed', isCollapsed);
-        
-        updateMainContent();
-        updateExpandButtonVisibility(); // NOVO
-        
-        // Trigger evento para ajustar layout da página
-        window.dispatchEvent(new CustomEvent('sidebarToggle', { 
-            detail: { collapsed: isCollapsed, width: isCollapsed ? 80 : 280 }
-        }));
-        
-        // Feedback visual
-        console.log(isCollapsed ? '📱 Sidebar minimizada' : '📖 Sidebar expandida');
+        toggleDesktop();
     }
     
-    // Toggle sidebar mobile
-    function toggleMobileSidebar() {
+    function handleMobileToggle(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
         if (!isMobile()) return;
         
-        isMobileOpen = !isMobileOpen;
-        sidebar.classList.toggle('open', isMobileOpen);
-        mobileOverlay.classList.toggle('active', isMobileOpen);
-        body.classList.toggle('sidebar-open', isMobileOpen);
+        toggleMobile();
+    }
+    
+    function handleOverlayClick(e) {
+        e.preventDefault();
+        e.stopPropagation();
         
-        // Controlar visibilidade do mobile toggle
-        if (isMobileOpen) {
-            hideMobileToggle();
-        } else {
-            showMobileToggle();
+        closeMobile();
+    }
+    
+    function handleNavClick(e) {
+        const link = e.currentTarget;
+        
+        // Adicionar estado de loading
+        link.classList.add(CSS_CLASSES.loading);
+        
+        // Fechar sidebar mobile se aberta
+        if (isMobile() && state.isMobileOpen) {
+            setTimeout(closeMobile, 100);
         }
         
-        // Acessibilidade
-        sidebar.setAttribute('aria-hidden', !isMobileOpen);
-        mobileToggle.setAttribute('aria-expanded', isMobileOpen);
+        // Remover loading após timeout
+        setTimeout(() => {
+            link.classList.remove(CSS_CLASSES.loading);
+        }, 2000);
+        
+        // Analytics/tracking
+        trackNavigation(link.dataset.page);
     }
     
-    // Fechar sidebar mobile
-    function closeMobileSidebar() {
-        if (!isMobile()) return;
+    function handleOutsideClick(e) {
+        if (!isMobile() || !state.isMobileOpen) return;
         
-        isMobileOpen = false;
-        sidebar.classList.remove('open');
-        mobileOverlay.classList.remove('active');
-        body.classList.remove('sidebar-open');
-        
-        showMobileToggle();
-        
-        sidebar.setAttribute('aria-hidden', 'true');
-        mobileToggle.setAttribute('aria-expanded', 'false');
-    }
-    
-    // Esconder mobile toggle
-    function hideMobileToggle() {
-        mobileToggle.classList.add('hidden');
-    }
-    
-    // Mostrar mobile toggle
-    function showMobileToggle() {
-        mobileToggle.classList.remove('hidden');
-    }
-    
-    // Esconder mobile toggle com delay
-    function hideMobileToggleDelayed() {
-        clearTimeout(hideTimeout);
-        hideTimeout = setTimeout(() => {
-            if (isMobileOpen) {
-                hideMobileToggle();
-            }
-        }, 2000); // 2 segundos de delay
-    }
-    
-    // Atualizar margem do conteúdo principal
-    function updateMainContent() {
-        const mainContent = document.querySelector('.main-content, .content, .page-content');
-        if (!mainContent) return;
-        
-        if (isMobile()) {
-            mainContent.style.marginLeft = '0';
-        } else {
-            const marginLeft = isCollapsed ? '80px' : '280px';
-            mainContent.style.marginLeft = marginLeft;
-        }
-        
-        mainContent.style.transition = 'margin-left 0.3s ease';
-    }
-    
-    // Event listeners principais
-    toggleBtn?.addEventListener('click', toggleSidebar);
-    expandBtn?.addEventListener('click', toggleSidebar); // CORRIGIDO: Mesmo comportamento
-    mobileToggle?.addEventListener('click', toggleMobileSidebar);
-    mobileOverlay?.addEventListener('click', closeMobileSidebar);
-    
-    // Event listener para cliques fora da sidebar no mobile
-    document.addEventListener('click', function(e) {
-        if (!isMobile() || !isMobileOpen) return;
-        
-        // Verificar se o clique foi fora da sidebar e não foi no toggle
-        const clickedInsideSidebar = sidebar.contains(e.target);
-        const clickedOnToggle = mobileToggle.contains(e.target);
+        const clickedInsideSidebar = elements.sidebar.contains(e.target);
+        const clickedOnToggle = elements.mobileToggle.contains(e.target);
         
         if (!clickedInsideSidebar && !clickedOnToggle) {
-            closeMobileSidebar();
+            closeMobile();
         }
-    });
+    }
     
-    // Event listener para mostrar mobile toggle quando sidebar aberta
-    sidebar.addEventListener('mouseenter', function() {
-        if (isMobile() && isMobileOpen) {
-            clearTimeout(hideTimeout);
-            showMobileToggle();
-        }
-    });
-    
-    sidebar.addEventListener('mouseleave', function() {
-        if (isMobile() && isMobileOpen) {
-            hideMobileToggleDelayed();
-        }
-    });
-    
-    // Fechar sidebar mobile ao clicar em link
-    navLinks.forEach(link => {
-        link.addEventListener('click', function(e) {
-            // Adicionar loading state
-            this.classList.add('loading');
-            
-            // Fechar sidebar mobile se aberta
-            if (isMobile() && isMobileOpen) {
-                setTimeout(closeMobileSidebar, 100);
-            }
-            
-            // Remover loading após navegação
-            setTimeout(() => {
-                this.classList.remove('loading');
-            }, 2000);
-        });
-    });
-    
-    // CORRIGIDO: Ajustar na mudança de tela
-    window.addEventListener('resize', function() {
-        if (isMobile()) {
-            // Em mobile, sempre remover classe collapsed
-            sidebar.classList.remove('collapsed');
-            if (isMobileOpen) {
-                body.classList.add('sidebar-open');
-                hideMobileToggleDelayed();
-            } else {
-                showMobileToggle();
-            }
-        } else {
-            // Desktop: restaurar estado collapsed e fechar mobile
-            closeMobileSidebar();
-            showMobileToggle();
-            if (isCollapsed) {
-                sidebar.classList.add('collapsed');
-            }
-        }
-        updateMainContent();
-        updateExpandButtonVisibility(); // NOVO
-    });
-    
-    // Navegação por teclado
-    document.addEventListener('keydown', function(e) {
+    function handleKeyboard(e) {
         // ESC para fechar sidebar mobile
-        if (e.key === 'Escape' && isMobile() && isMobileOpen) {
-            closeMobileSidebar();
+        if (e.key === 'Escape' && isMobile() && state.isMobileOpen) {
+            e.preventDefault();
+            closeMobile();
         }
         
         // Ctrl+B para toggle sidebar desktop
         if (e.ctrlKey && e.key === 'b' && !isMobile()) {
             e.preventDefault();
-            toggleSidebar();
+            toggleDesktop();
         }
         
-        // M para mostrar mobile toggle quando oculto
-        if (e.key === 'm' && isMobile() && isMobileOpen) {
+        // Alt+M para toggle mobile
+        if (e.altKey && e.key === 'm' && isMobile()) {
+            e.preventDefault();
+            toggleMobile();
+        }
+    }
+    
+    function handleSidebarKeyboard(e) {
+        const focusableElements = elements.sidebar.querySelectorAll(
+            'a, button, [tabindex]:not([tabindex="-1"])'
+        );
+        
+        const currentIndex = Array.from(focusableElements).indexOf(document.activeElement);
+        
+        switch (e.key) {
+            case 'ArrowDown':
+                e.preventDefault();
+                const nextIndex = (currentIndex + 1) % focusableElements.length;
+                focusableElements[nextIndex].focus();
+                break;
+                
+            case 'ArrowUp':
+                e.preventDefault();
+                const prevIndex = currentIndex === 0 ? focusableElements.length - 1 : currentIndex - 1;
+                focusableElements[prevIndex].focus();
+                break;
+                
+            case 'Home':
+                e.preventDefault();
+                focusableElements[0].focus();
+                break;
+                
+            case 'End':
+                e.preventDefault();
+                focusableElements[focusableElements.length - 1].focus();
+                break;
+        }
+    }
+    
+    function handleVisibilityChange() {
+        // Pausar animações quando tab não está ativa para economizar recursos
+        if (document.hidden) {
+            elements.sidebar.style.animationPlayState = 'paused';
+        } else {
+            elements.sidebar.style.animationPlayState = 'running';
+        }
+    }
+    
+    // ====================================
+    // FUNÇÕES PRINCIPAIS
+    // ====================================
+    
+    function toggleDesktop() {
+        if (isMobile()) return;
+        
+        state.isCollapsed = !state.isCollapsed;
+        elements.sidebar.classList.toggle(CSS_CLASSES.collapsed, state.isCollapsed);
+        localStorage.setItem(CONFIG.STORAGE_KEY, state.isCollapsed);
+        
+        updateMainContent();
+        updateExpandButton();
+        dispatchToggleEvent();
+        
+        // Feedback sonoro para acessibilidade (se disponível)
+        if ('speechSynthesis' in window && state.isCollapsed) {
+            // Feedback mínimo sem interferir
+        }
+    }
+    
+    function toggleMobile() {
+        if (!isMobile()) return;
+        
+        if (state.isMobileOpen) {
+            closeMobile();
+        } else {
+            openMobile();
+        }
+    }
+    
+    function openMobile() {
+        state.isMobileOpen = true;
+        elements.sidebar.classList.add(CSS_CLASSES.open);
+        elements.overlay.classList.add(CSS_CLASSES.active);
+        document.body.classList.add(CSS_CLASSES.sidebarOpen);
+        
+        hideMobileToggleDelayed();
+        updateAriaStates(false);
+        
+        // Focus management
+        const firstFocusable = elements.sidebar.querySelector('a, button');
+        if (firstFocusable) {
+            setTimeout(() => firstFocusable.focus(), CONFIG.ANIMATION_DURATION);
+        }
+    }
+    
+    function closeMobile() {
+        state.isMobileOpen = false;
+        elements.sidebar.classList.remove(CSS_CLASSES.open);
+        elements.overlay.classList.remove(CSS_CLASSES.active);
+        document.body.classList.remove(CSS_CLASSES.sidebarOpen);
+        
+        clearHideTimeout();
+        showMobileToggle();
+        updateAriaStates(true);
+    }
+    
+    function hideMobileToggleDelayed() {
+        clearHideTimeout();
+        state.hideTimeout = setTimeout(() => {
+            if (state.isMobileOpen && elements.mobileToggle) {
+                elements.mobileToggle.classList.add(CSS_CLASSES.hidden);
+            }
+        }, CONFIG.HIDE_DELAY);
+    }
+    
+    function showMobileToggle() {
+        if (elements.mobileToggle) {
+            elements.mobileToggle.classList.remove(CSS_CLASSES.hidden);
+        }
+    }
+    
+    function clearHideTimeout() {
+        if (state.hideTimeout) {
+            clearTimeout(state.hideTimeout);
+            state.hideTimeout = null;
+        }
+    }
+    
+    // ====================================
+    // FUNÇÕES DE ATUALIZAÇÃO
+    // ====================================
+    
+    function updateMainContent() {
+        const main = document.querySelector(SELECTORS.mainContent);
+        if (main) {
+            main.classList.add(CSS_CLASSES.mainContent);
+            
+            if (isMobile()) {
+                main.style.marginLeft = '0';
+            } else {
+                main.style.marginLeft = state.isCollapsed ? '80px' : '280px';
+            }
+            
+            main.style.transition = 'margin-left 0.3s ease';
+        }
+    }
+    
+    function updateExpandButton() {
+        if (elements.expandBtn) {
+            if (!isMobile() && state.isCollapsed) {
+                elements.expandBtn.classList.add(CSS_CLASSES.show);
+            } else {
+                elements.expandBtn.classList.remove(CSS_CLASSES.show);
+            }
+        }
+    }
+    
+    function updateAriaStates(hidden) {
+        elements.sidebar.setAttribute('aria-hidden', hidden);
+        if (elements.mobileToggle) {
+            elements.mobileToggle.setAttribute('aria-expanded', !hidden);
+        }
+    }
+    
+    function dispatchToggleEvent() {
+        const event = new CustomEvent('klubeSidebarToggle', {
+            detail: {
+                collapsed: state.isCollapsed,
+                width: state.isCollapsed ? 80 : 280,
+                timestamp: Date.now()
+            }
+        });
+        
+        window.dispatchEvent(event);
+    }
+    
+    // ====================================
+    // FUNÇÕES DE INICIALIZAÇÃO
+    // ====================================
+    
+    function initState() {
+        if (!isMobile() && state.isCollapsed) {
+            elements.sidebar.classList.add(CSS_CLASSES.collapsed);
+        }
+        
+        updateMainContent();
+        updateExpandButton();
+    }
+    
+    function initAccessibility() {
+        // ARIA labels
+        elements.sidebar.setAttribute('role', 'navigation');
+        elements.sidebar.setAttribute('aria-label', 'Menu principal');
+        
+        if (isMobile()) {
+            updateAriaStates(true);
+        }
+        
+        // Skip link para navegação por teclado
+        const skipLink = document.createElement('a');
+        skipLink.href = '#main-content';
+        skipLink.textContent = 'Pular para conteúdo principal';
+        skipLink.className = 'klube-sidebar-skip-link';
+        skipLink.style.cssText = `
+            position: absolute;
+            top: -40px;
+            left: 6px;
+            background: #000;
+            color: #fff;
+            padding: 8px;
+            text-decoration: none;
+            z-index: 100000;
+            transition: top 0.3s;
+        `;
+        
+        skipLink.addEventListener('focus', () => {
+            skipLink.style.top = '6px';
+        });
+        
+        skipLink.addEventListener('blur', () => {
+            skipLink.style.top = '-40px';
+        });
+        
+        document.body.insertBefore(skipLink, document.body.firstChild);
+    }
+    
+    // ====================================
+    // FUNÇÕES UTILITÁRIAS
+    // ====================================
+    
+    function isMobile() {
+        return window.innerWidth <= CONFIG.MOBILE_BREAKPOINT;
+    }
+    
+    function throttledResize() {
+        clearTimeout(state.resizeTimeout);
+        state.resizeTimeout = setTimeout(handleResize, CONFIG.RESIZE_THROTTLE);
+    }
+    
+    function handleResize() {
+        const wasMobile = state.isMobileOpen;
+        
+        if (isMobile()) {
+            elements.sidebar.classList.remove(CSS_CLASSES.collapsed);
+            if (wasMobile) {
+                document.body.classList.add(CSS_CLASSES.sidebarOpen);
+                hideMobileToggleDelayed();
+            } else {
+                showMobileToggle();
+            }
+        } else {
+            closeMobile();
             showMobileToggle();
-            clearTimeout(hideTimeout);
+            if (state.isCollapsed) {
+                elements.sidebar.classList.add(CSS_CLASSES.collapsed);
+            }
         }
-    });
-    
-    // Inicializar
-    initSidebar();
-    
-    // Acessibilidade inicial
-    if (isMobile()) {
-        sidebar.setAttribute('aria-hidden', 'true');
-        mobileToggle.setAttribute('aria-expanded', 'false');
-    }
-    
-    // Debug: Logs para acompanhar o estado
-    console.log('🚀 Sidebar moderna inicializada');
-    console.log('📱 Mobile:', isMobile());
-    console.log('📏 Colapsada:', isCollapsed);
-});
-
-/**
- * Ajustar layout da página principal quando sidebar muda
- */
-window.addEventListener('sidebarToggle', function(e) {
-    const mainContent = document.querySelector('.main-content, .content, .page-content');
-    if (mainContent) {
-        const marginLeft = e.detail.collapsed ? '80px' : '280px';
-        mainContent.style.marginLeft = marginLeft;
-        mainContent.style.transition = 'margin-left 0.3s ease';
-    }
-});
-
-/**
- * Notificações/badges dinâmicas (exemplo)
- */
-function updateNavBadge(menuId, count) {
-    const navLink = document.querySelector(`[data-page="${menuId}"]`);
-    if (!navLink) return;
-    
-    let badge = navLink.querySelector('.nav-badge');
-    
-    if (count > 0) {
-        if (!badge) {
-            badge = document.createElement('span');
-            badge.className = 'nav-badge';
-            navLink.appendChild(badge);
-        }
-        badge.textContent = count > 99 ? '99+' : count;
-        badge.setAttribute('aria-label', `${count} pendências`);
-    } else if (badge) {
-        badge.remove();
-    }
-}
-
-/**
- * Controles globais da sidebar
- */
-window.sidebarControls = {
-    toggle: function() {
-        const toggleBtn = document.getElementById('toggleBtn');
-        const expandBtn = document.getElementById('expandBtn');
-        if (toggleBtn) toggleBtn.click();
-        else if (expandBtn) expandBtn.click();
-    },
-    
-    expand: function() {
-        const sidebar = document.getElementById('sidebarContainer');
-        if (sidebar && sidebar.classList.contains('collapsed')) {
-            this.toggle();
-        }
-    },
-    
-    collapse: function() {
-        const sidebar = document.getElementById('sidebarContainer');
-        if (sidebar && !sidebar.classList.contains('collapsed') && window.innerWidth > 768) {
-            this.toggle();
-        }
-    },
-    
-    showMobileToggle: function() {
-        const toggle = document.getElementById('mobileToggle');
-        if (toggle) toggle.classList.remove('hidden');
-    },
-    
-    hideMobileToggle: function() {
-        const toggle = document.getElementById('mobileToggle');
-        if (toggle) toggle.classList.add('hidden');
-    },
-    
-    closeMobile: function() {
-        const sidebar = document.getElementById('sidebarContainer');
-        const overlay = document.getElementById('mobileOverlay');
-        const body = document.body;
         
-        if (sidebar) sidebar.classList.remove('open');
-        if (overlay) overlay.classList.remove('active');
-        body.classList.remove('sidebar-open');
-        
-        this.showMobileToggle();
+        updateMainContent();
+        updateExpandButton();
     }
-};
-
-// Exemplo de uso:
-// updateNavBadge('payment-history', 5); // 5 pagamentos pendentes
-// window.sidebarControls.toggle(); // Toggle sidebar
-// window.sidebarControls.expand(); // Forçar expansão
-</script>
-
-<style>
-.sidebar-footer {
-    margin-top: auto;
-    padding: 1rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.logout-btn {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.75rem 1rem;
-    color: #dc3545;
-    text-decoration: none;
-    border-radius: 8px;
-    transition: all 0.3s ease;
-    width: 100%;
-    font-weight: 500;
-}
-
-.logout-btn:hover {
-    background-color: rgba(220, 53, 69, 0.1);
-    color: #b02a37;
-    transform: translateX(3px);
-}
-</style>
-
-<script>
-function confirmarLogout() {
-    return confirm('Tem certeza que deseja sair?');
-}
+    
+    function trackNavigation(page) {
+        // Tracking/analytics simples
+        console.log('Navegação para:', page);
+        
+        // Integração com Google Analytics (se disponível)
+        if (typeof gtag !== 'undefined') {
+            gtag('event', 'navigation', {
+                'page': page,
+                'source': 'klube-sidebar'
+            });
+        }
+        
+        // Integração com outras ferramentas de analytics
+        if (typeof dataLayer !== 'undefined') {
+            dataLayer.push({
+                'event': 'sidebar_navigation',
+                'page': page
+            });
+        }
+    }
+    
+    // ====================================
+    // API PÚBLICA
+    // ====================================
+    
+    const publicAPI = {
+        toggle: toggleDesktop,
+        expand: () => {
+            if (state.isCollapsed && !isMobile()) {
+                toggleDesktop();
+            }
+        },
+        collapse: () => {
+            if (!state.isCollapsed && !isMobile()) {
+                toggleDesktop();
+            }
+        },
+        openMobile: openMobile,
+        closeMobile: closeMobile,
+        isCollapsed: () => state.isCollapsed,
+        isMobileOpen: () => state.isMobileOpen,
+        isMobile: isMobile
+    };
+    
+    // ====================================
+    // INICIALIZAÇÃO E EXPOSIÇÃO
+    // ====================================
+    
+    // Inicializar quando DOM estiver pronto
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+    
+    // Expor API pública
+    window.klubeSidebar = publicAPI;
+    
+    // Compatibilidade com API anterior
+    window.sidebarControls = {
+        toggle: publicAPI.toggle,
+        expand: publicAPI.expand,
+        collapse: publicAPI.collapse,
+        closeMobile: publicAPI.closeMobile,
+        showToggle: showMobileToggle,
+        hideToggle: () => elements.mobileToggle?.classList.add(CSS_CLASSES.hidden)
+    };
+    
+})();
 </script>
