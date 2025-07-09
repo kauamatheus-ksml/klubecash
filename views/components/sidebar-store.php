@@ -155,12 +155,12 @@ $menuItems = [
     </nav>
 
     <!-- Footer -->
-    <footer class="klube-sidebar-footer">
-        <a href="../../auth/logout.php" class="klube-logout-btn" onclick="return confirm('Sair do sistema?')">
-            <svg class="klube-logout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4m7 14l5-5-5-5m5 5H9"/>
+    <footer class="sidebar-footer">
+        <a href="<?php echo LOGOUT_URL; ?>" class="logout-btn" onclick="return confirmarLogout()" title="Sair do sistema">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
             </svg>
-            <span class="klube-logout-text">Sair</span>
+            <span>Sair</span>
         </a>
     </footer>
 
@@ -318,4 +318,10 @@ $menuItems = [
     console.log('✅ Sidebar carregada com posicionamento perfeito');
     
 })();
+</script>
+
+<script>
+function confirmarLogout() {
+    return confirm('Tem certeza que deseja sair?');
+}
 </script>
