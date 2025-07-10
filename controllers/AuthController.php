@@ -1,5 +1,5 @@
 <?php
-
+date_default_timezone_set('America/Sao_Paulo');
 // controllers/AuthController.php
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../config/constants.php';
@@ -633,7 +633,7 @@ class AuthController {
             
             // Gerar token único
             $token = bin2hex(random_bytes(32));
-            $expiry = date('Y-m-d H:i:s', strtotime('+2 hours'));
+            $expiry = date('Y-m-d H:i:s', strtotime('+24 hours')); // 24 horas ao invés de 2
             
             // Verificar se já existe tabela recuperacao_senha, se não, criar
             self::createRecoveryTableIfNotExists($db);
