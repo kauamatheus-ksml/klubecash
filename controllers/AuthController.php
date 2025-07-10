@@ -3,7 +3,7 @@
 // controllers/AuthController.php
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../config/constants.php';
-require_once __DIR__ . '/../config/email.php';
+require_once __DIR__ . '/../utils/Email.php';
 require_once __DIR__ . '/../utils/Validator.php';
 
 /**
