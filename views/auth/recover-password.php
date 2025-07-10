@@ -2,7 +2,8 @@
 // Incluir arquivos de configuração
 require_once '../../config/constants.php';
 require_once '../../config/database.php';
-require_once '../../config/email.php';
+require_once '../../controllers/AuthController.php';
+require_once '../../utils/Email.php';
 
 // Verificar se já existe uma sessão ativa
 session_start();
@@ -85,60 +86,19 @@ if (isset($_GET['token']) && !empty($_GET['token'])) {
         error_log('Erro na validação do token: ' . $e->getMessage());
     }
 } else if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'request') {
-    // Processar o formulário de solicitação de recuperação
+    // USAR O AUTHCONTROLLER QUE JÁ FUNCIONA
     $email = filter_input(INPUT_POST, 'email', FILTER_SANITIZE_EMAIL);
     
     if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error = 'Por favor, informe um email válido.';
     } else {
-        try {
-            $db = Database::getConnection();
-            
-            // Verificar se o email existe
-            $stmt = $db->prepare("SELECT id, nome, status FROM usuarios WHERE email = :email");
-            $stmt->bindParam(':email', $email);
-            $stmt->execute();
-            $user = $stmt->fetch(PDO::FETCH_ASSOC);
-            
-            if (!$user) {
-                // Não informar ao usuário que o email não existe (segurança)
-                $success = 'Se o email estiver cadastrado, enviaremos instruções para recuperar sua senha.';
-            } else if ($user['status'] !== USER_ACTIVE) {
-                $error = 'Sua conta está ' . $user['status'] . '. Entre em contato com o suporte.';
-            } else {
-                // Gerar token único
-                $token = bin2hex(random_bytes(32));
-                $expiry = date('Y-m-d H:i:s', strtotime('+2 hours'));
-                
-                // Salvar token no banco de dados
-                // Primeiro excluir tokens antigos deste usuário
-                $deleteStmt = $db->prepare("DELETE FROM recuperacao_senha WHERE usuario_id = :user_id");
-                $deleteStmt->bindParam(':user_id', $user['id']);
-                $deleteStmt->execute();
-                
-                // Inserir novo token
-                $insertStmt = $db->prepare("INSERT INTO recuperacao_senha (usuario_id, token, data_expiracao) VALUES (:user_id, :token, :expiry)");
-                $insertStmt->bindParam(':user_id', $user['id']);
-                $insertStmt->bindParam(':token', $token);
-                $insertStmt->bindParam(':expiry', $expiry);
-                
-                if ($insertStmt->execute()) {
-                    // Enviar email de recuperação
-                    if (Email::sendPasswordRecovery($email, $user['nome'], $token)) {
-                        $success = 'Enviamos instruções para recuperar sua senha para o email informado.';
-                    } else {
-                        $error = 'Não foi possível enviar o email. Por favor, tente novamente mais tarde.';
-                    }
-                } else {
-                    $error = 'Erro ao gerar token de recuperação. Por favor, tente novamente.';
-                }
-            }
-        } catch (PDOException $e) {
-            $error = 'Erro ao processar a solicitação. Tente novamente.';
-            error_log('Erro na recuperação de senha: ' . $e->getMessage());
-        } catch (Exception $e) {
-            $error = 'Erro ao processar a solicitação. Tente novamente.';
-            error_log('Erro na recuperação de senha: ' . $e->getMessage());
+        // Usar o AuthController que já está funcionando
+        $result = AuthController::recoverPassword($email);
+        
+        if ($result['status']) {
+            $success = $result['message'];
+        } else {
+            $error = $result['message'];
         }
     }
 }

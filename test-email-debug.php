@@ -1,24 +1,26 @@
 <?php
-// teste-classe-email.php
+// teste-pagina-recuperacao.php
 
-require_once __DIR__ . '/utils/Email.php';
+require_once __DIR__ . '/controllers/AuthController.php';
 
-echo "<h1>🧪 Teste da Classe Email Corrigida</h1>";
+echo "<h1>🧪 Teste AuthController Recuperação</h1>";
+
+$testEmail = 'kauamatheus920@gmail.com';
+
+echo "<p>📧 Testando AuthController::recoverPassword('$testEmail')...</p>";
 
 try {
-    $result = Email::sendPasswordRecovery('kauamatheus920@gmail.com', 'Usuário Teste', 'token_teste_123');
+    $result = AuthController::recoverPassword($testEmail);
     
-    if ($result) {
-        echo "<p>✅ <strong>CLASSE EMAIL FUNCIONANDO!</strong></p>";
-        echo "<p>📬 Verifique sua caixa de entrada</p>";
+    echo "<p><strong>Status:</strong> " . ($result['status'] ? "✅ TRUE" : "❌ FALSE") . "</p>";
+    echo "<p><strong>Mensagem:</strong> " . htmlspecialchars($result['message']) . "</p>";
+    
+    if ($result['status']) {
+        echo "<p>✅ <strong>AUTHCONTROLLER FUNCIONANDO!</strong></p>";
+        echo "<p>📬 Verificar email recebido</p>";
     } else {
-        echo "<p>❌ Classe Email ainda com problema</p>";
+        echo "<p>❌ Problema no AuthController</p>";
     }
-    
-    // Teste direto do método send
-    $result2 = Email::send('kauamatheus920@gmail.com', 'Teste Método Send', '<h2>Teste do método send()</h2><p>Funcionando!</p>', 'Teste');
-    
-    echo "<p>Resultado método send(): " . ($result2 ? "✅ OK" : "❌ FALHA") . "</p>";
     
 } catch (Exception $e) {
     echo "<p>❌ Erro: " . $e->getMessage() . "</p>";
