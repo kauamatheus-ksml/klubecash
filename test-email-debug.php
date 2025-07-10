@@ -88,4 +88,35 @@ if (!$phpmailer_loaded) {
 } else {
     echo "<p>✅ PHPMailer OK - Verificar configurações SMTP</p>";
 }
+
+
+echo "<h2>🧪 5. Teste Específico de Envio de Email:</h2>";
+
+try {
+    // Teste de envio real
+    echo "<p>📧 Testando envio de email de recuperação...</p>";
+    
+    $testEmail = 'seuemail@gmail.com'; // SUBSTITUA pelo seu email real
+    $testToken = 'test_token_' . time();
+    
+    $result = Email::sendPasswordRecovery($testEmail, 'Usuário Teste', $testToken);
+    
+    if ($result) {
+        echo "<p>✅ <strong>EMAIL ENVIADO COM SUCESSO!</strong></p>";
+        echo "<p>📬 Verifique a caixa de entrada (e spam) do email: $testEmail</p>";
+    } else {
+        echo "<p>❌ <strong>FALHA AO ENVIAR EMAIL</strong></p>";
+        echo "<p>🔍 Verifique os logs de erro para mais detalhes</p>";
+    }
+    
+} catch (Exception $e) {
+    echo "<p>❌ <strong>ERRO:</strong> " . $e->getMessage() . "</p>";
+}
+
+echo "<h2>📋 6. Verificar Logs de Erro:</h2>";
+echo "<p>Para ver logs detalhados, verifique:</p>";
+echo "<ul>";
+echo "<li>/home/u383946504/domains/klubecash.com/public_html/error_log</li>";
+echo "<li>Painel de controle da Hostinger > Logs de erro</li>";
+echo "</ul>";
 ?>
