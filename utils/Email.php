@@ -73,9 +73,9 @@ class Email {
             // Timeout
             $mail->Timeout = 30;
             
-            // Remetente
-            $mail->setFrom(self::$fromEmail, self::$fromName);
-            $mail->addReplyTo(self::$fromEmail, self::$fromName);
+            // CORREÇÃO CRÍTICA: Usar sempre klubecash@klubecash.com como remetente
+            $mail->setFrom('klubecash@klubecash.com', self::$fromName);
+            $mail->addReplyTo('klubecash@klubecash.com', self::$fromName);
             
             // Destinatário
             $mail->addAddress($to, $toName);

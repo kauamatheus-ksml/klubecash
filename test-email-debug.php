@@ -1,61 +1,26 @@
 <?php
-// teste-email-final.php - TESTE FINAL
+// teste-classe-email.php
 
-require_once __DIR__ . '/config/constants.php';
-require_once __DIR__ . '/libs/PHPMailer/src/PHPMailer.php';
-require_once __DIR__ . '/libs/PHPMailer/src/SMTP.php';
-require_once __DIR__ . '/libs/PHPMailer/src/Exception.php';
+require_once __DIR__ . '/utils/Email.php';
 
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\SMTP;
-use PHPMailer\PHPMailer\Exception;
+echo "<h1>🧪 Teste da Classe Email Corrigida</h1>";
 
 try {
-    $mail = new PHPMailer(true);
-    
-    // Configurações SMTP
-    $mail->isSMTP();
-    $mail->Host = 'smtp.hostinger.com';
-    $mail->SMTPAuth = true;
-    $mail->Username = 'klubecash@klubecash.com';
-    $mail->Password = 'Aaku_2004@';
-    $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-    $mail->Port = 587;
-    $mail->CharSet = 'UTF-8';
-    
-    $mail->SMTPOptions = [
-        'ssl' => [
-            'verify_peer' => false,
-            'verify_peer_name' => false,
-            'allow_self_signed' => true
-        ]
-    ];
-    
-    // CORREÇÃO: Usar o email autenticado como remetente
-    $mail->setFrom('klubecash@klubecash.com', 'Klube Cash');
-    $mail->addReplyTo('klubecash@klubecash.com', 'Klube Cash');
-    $mail->addAddress('kauamatheus920@gmail.com', 'Teste');
-    
-    // Conteúdo
-    $mail->isHTML(true);
-    $mail->Subject = 'Teste CORRIGIDO - Klube Cash';
-    $mail->Body = '
-    <h2>🎉 Teste Corrigido!</h2>
-    <p>Este email foi enviado com o remetente correto: <strong>klubecash@klubecash.com</strong></p>
-    <p>Se você recebeu este email, o problema está resolvido!</p>
-    <p>Data/Hora: ' . date('d/m/Y H:i:s') . '</p>
-    ';
-    
-    $result = $mail->send();
+    $result = Email::sendPasswordRecovery('kauamatheus920@gmail.com', 'Usuário Teste', 'token_teste_123');
     
     if ($result) {
-        echo "✅ EMAIL ENVIADO COM SUCESSO!<br>";
-        echo "📬 Verifique sua caixa de entrada (e spam)";
+        echo "<p>✅ <strong>CLASSE EMAIL FUNCIONANDO!</strong></p>";
+        echo "<p>📬 Verifique sua caixa de entrada</p>";
     } else {
-        echo "❌ Falha: " . $mail->ErrorInfo;
+        echo "<p>❌ Classe Email ainda com problema</p>";
     }
     
+    // Teste direto do método send
+    $result2 = Email::send('kauamatheus920@gmail.com', 'Teste Método Send', '<h2>Teste do método send()</h2><p>Funcionando!</p>', 'Teste');
+    
+    echo "<p>Resultado método send(): " . ($result2 ? "✅ OK" : "❌ FALHA") . "</p>";
+    
 } catch (Exception $e) {
-    echo "❌ Erro: " . $e->getMessage();
+    echo "<p>❌ Erro: " . $e->getMessage() . "</p>";
 }
 ?>
