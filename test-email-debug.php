@@ -1,28 +1,27 @@
 <?php
-// teste-pagina-recuperacao.php
+// debug-recuperacao.php - DEBUG ESPECÍFICO DA PÁGINA
 
+require_once __DIR__ . '/config/constants.php';
+require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/controllers/AuthController.php';
 
-echo "<h1>🧪 Teste AuthController Recuperação</h1>";
-
-$testEmail = 'kauamatheus920@gmail.com';
-
-echo "<p>📧 Testando AuthController::recoverPassword('$testEmail')...</p>";
-
-try {
-    $result = AuthController::recoverPassword($testEmail);
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $email = $_POST['email'] ?? '';
     
-    echo "<p><strong>Status:</strong> " . ($result['status'] ? "✅ TRUE" : "❌ FALSE") . "</p>";
-    echo "<p><strong>Mensagem:</strong> " . htmlspecialchars($result['message']) . "</p>";
+    echo "<h1>🔍 Debug Recuperação</h1>";
+    echo "<p>Email enviado: " . htmlspecialchars($email) . "</p>";
     
-    if ($result['status']) {
-        echo "<p>✅ <strong>AUTHCONTROLLER FUNCIONANDO!</strong></p>";
-        echo "<p>📬 Verificar email recebido</p>";
-    } else {
-        echo "<p>❌ Problema no AuthController</p>";
-    }
+    $result = AuthController::recoverPassword($email);
     
-} catch (Exception $e) {
-    echo "<p>❌ Erro: " . $e->getMessage() . "</p>";
+    echo "<p>Resultado AuthController:</p>";
+    echo "<pre>" . print_r($result, true) . "</pre>";
+    
+    exit;
 }
 ?>
+
+<form method="post">
+    <h1>🧪 Teste Direto de Recuperação</h1>
+    <p>Email: <input type="email" name="email" value="kauamatheus920@gmail.com" required></p>
+    <button type="submit">Testar Recuperação</button>
+</form>
