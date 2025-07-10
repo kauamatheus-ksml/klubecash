@@ -90,33 +90,86 @@ if (!$phpmailer_loaded) {
 }
 
 
-echo "<h2>🧪 5. Teste Específico de Envio de Email:</h2>";
+echo "<h2>🧪 5. Teste Detalhado de Envio:</h2>";
 
 try {
-    // Teste de envio real
-    echo "<p>📧 Testando envio de email de recuperação...</p>";
+    // Habilitar logs detalhados
+    error_reporting(E_ALL);
+    ini_set('display_errors', 1);
     
-    $testEmail = 'seuemail@gmail.com'; // SUBSTITUA pelo seu email real
+    echo "<p>📧 Iniciando teste detalhado...</p>";
+    
+    $testEmail = 'seuemail@gmail.com'; // SUBSTITUA pelo seu email
     $testToken = 'test_token_' . time();
+    
+    // Teste 1: Chamar método diretamente
+    echo "<p>🔧 Teste 1: Chamando sendPasswordRecovery diretamente...</p>";
     
     $result = Email::sendPasswordRecovery($testEmail, 'Usuário Teste', $testToken);
     
-    if ($result) {
-        echo "<p>✅ <strong>EMAIL ENVIADO COM SUCESSO!</strong></p>";
-        echo "<p>📬 Verifique a caixa de entrada (e spam) do email: $testEmail</p>";
-    } else {
-        echo "<p>❌ <strong>FALHA AO ENVIAR EMAIL</strong></p>";
-        echo "<p>🔍 Verifique os logs de erro para mais detalhes</p>";
+    echo "<p>Resultado sendPasswordRecovery: " . ($result ? "✅ TRUE" : "❌ FALSE") . "</p>";
+    
+    // Teste 2: Chamar método send() diretamente
+    echo "<p>🔧 Teste 2: Chamando método send() diretamente...</p>";
+    
+    $simpleMessage = "<h2>Teste direto</h2><p>Este é um teste do método send().</p>";
+    $directResult = Email::send($testEmail, 'Teste Direto - Klube Cash', $simpleMessage, 'Teste');
+    
+    echo "<p>Resultado send direto: " . ($directResult ? "✅ TRUE" : "❌ FALSE") . "</p>";
+    
+    // Teste 3: Capturar logs em tempo real
+    echo "<p>🔧 Teste 3: Capturando erros em tempo real...</p>";
+    
+    // Criar handler de erro personalizado
+    set_error_handler(function($errno, $errstr, $errfile, $errline) {
+        echo "<p>⚠️ <strong>ERRO PHP:</strong> $errstr em $errfile linha $errline</p>";
+    });
+    
+    // Tentar novamente com captura de erros
+    ob_start();
+    $finalResult = Email::send($testEmail, 'Teste Final - Klube Cash', $simpleMessage, 'Teste Final');
+    $output = ob_get_clean();
+    
+    echo "<p>Resultado final: " . ($finalResult ? "✅ TRUE" : "❌ FALSE") . "</p>";
+    
+    if (!empty($output)) {
+        echo "<p>📋 <strong>Output capturado:</strong></p>";
+        echo "<pre>" . htmlspecialchars($output) . "</pre>";
     }
     
 } catch (Exception $e) {
-    echo "<p>❌ <strong>ERRO:</strong> " . $e->getMessage() . "</p>";
+    echo "<p>❌ <strong>EXCEÇÃO CAPTURADA:</strong> " . $e->getMessage() . "</p>";
+    echo "<p>📍 <strong>Arquivo:</strong> " . $e->getFile() . "</p>";
+    echo "<p>📍 <strong>Linha:</strong> " . $e->getLine() . "</p>";
+    echo "<p>📋 <strong>Stack Trace:</strong></p>";
+    echo "<pre>" . $e->getTraceAsString() . "</pre>";
 }
 
-echo "<h2>📋 6. Verificar Logs de Erro:</h2>";
-echo "<p>Para ver logs detalhados, verifique:</p>";
-echo "<ul>";
-echo "<li>/home/u383946504/domains/klubecash.com/public_html/error_log</li>";
-echo "<li>Painel de controle da Hostinger > Logs de erro</li>";
-echo "</ul>";
+// Verificar logs de erro
+echo "<h2>📋 7. Últimos Logs de Erro:</h2>";
+$errorLogFile = '/home/u383946504/domains/klubecash.com/public_html/error_log';
+
+if (file_exists($errorLogFile)) {
+    $logContent = file_get_contents($errorLogFile);
+    $logLines = explode("\n", $logContent);
+    $recentLines = array_slice($logLines, -20); // Últimas 20 linhas
+    
+    echo "<p>📄 <strong>Últimas 20 linhas do error_log:</strong></p>";
+    echo "<pre style='background: #f5f5f5; padding: 10px; border: 1px solid #ddd; max-height: 300px; overflow-y: scroll;'>";
+    foreach ($recentLines as $line) {
+        if (!empty(trim($line))) {
+            echo htmlspecialchars($line) . "\n";
+        }
+    }
+    echo "</pre>";
+} else {
+    echo "<p>❌ Arquivo error_log não encontrado</p>";
+}
+
+// Teste adicional: Verificar se as funções mail() funcionam
+echo "<h2>🔧 8. Teste da Função mail() Nativa do PHP:</h2>";
+
+$nativeResult = mail($testEmail, 'Teste Nativo PHP', 'Este é um teste da função mail() nativa do PHP.', 'From: noreply@klubecash.com');
+
+echo "<p>Resultado mail() nativo: " . ($nativeResult ? "✅ TRUE" : "❌ FALSE") . "</p>";
 ?>
