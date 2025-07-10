@@ -3,6 +3,24 @@
 # Habilitar o motor de reescrita
 RewriteEngine On
 RewriteBase /
+
+# === PROTEÇÃO VENDOR COMPOSER (ADIÇÃO) ===
+# Bloquear acesso ao diretório vendor mas permitir includes internos
+<IfModule mod_rewrite.c>
+    RewriteRule ^vendor/.*$ - [F,L]
+</IfModule>
+
+# Proteção de arquivos Composer
+<Files composer.json>
+    Order allow,deny
+    Deny from all
+</Files>
+
+<Files composer.lock>
+    Order allow,deny
+    Deny from all
+</Files>
+
 # Redirecionar funcionários para área da loja após login
 RewriteCond %{QUERY_STRING} user_type=funcionario
 RewriteRule ^login\.php$ /views/store/dashboard.php? [R=302,L]

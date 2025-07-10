@@ -55,7 +55,10 @@ define('USER_TYPE_STORE', 'loja');
 define('USER_TYPE_EMPLOYEE', 'funcionario');
 
 define('PASSWORD_MIN_LENGTH', 8);
-
+// === AUTENTICAÇÃO (ADIÇÃO) ===
+define('JWT_SECRET', 'klube_cash_secret_key_2025_secure');
+define('SESSION_LIFETIME', 3600); // 1 hora
+define('TOKEN_EXPIRATION', 7200); // 2 horas para recuperação de senha
 
 
 // === PERMISSÕES DO SISTEMA ===
@@ -271,12 +274,12 @@ define('EMAIL_MAX_RETRIES', 3);
 // === CONFIGURAÇÕES DE EMAIL ===
 if (!defined('SMTP_HOST')) {
     define('SMTP_HOST', 'smtp.hostinger.com');
-    define('SMTP_PORT', 465);
+    define('SMTP_PORT', 587); // MUDANÇA: 465 → 587
     define('SMTP_USERNAME', 'klubecash@klubecash.com');
     define('SMTP_PASSWORD', 'Aaku_2004@');
     define('SMTP_FROM_EMAIL', 'noreply@klubecash.com');
     define('SMTP_FROM_NAME', 'Klube Cash');
-    define('SMTP_ENCRYPTION', 'ssl');
+    define('SMTP_ENCRYPTION', 'tls'); // MUDANÇA: 'ssl' → 'tls'
 }
 // === OPENPIX CONFIGURAÇÕES (NOVA) ===
 define('OPENPIX_API_URL', 'https://api.openpix.com.br');

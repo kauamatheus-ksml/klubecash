@@ -7,10 +7,15 @@ use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\SMTP;
 use PHPMailer\PHPMailer\Exception;
 
-// Caminho para as classes do PHPMailer
-require_once __DIR__ . '/../libs/PHPMailer/src/PHPMailer.php';
-require_once __DIR__ . '/../libs/PHPMailer/src/SMTP.php';
-require_once __DIR__ . '/../libs/PHPMailer/src/Exception.php';
+// CORREÇÃO: Tentar carregar via Composer primeiro, se falhar usar libs manuais
+if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
+    require_once __DIR__ . '/../vendor/autoload.php';
+} else {
+    // Fallback para carregamento manual (mantendo código original)
+    require_once __DIR__ . '/../libs/PHPMailer/src/PHPMailer.php';
+    require_once __DIR__ . '/../libs/PHPMailer/src/SMTP.php';
+    require_once __DIR__ . '/../libs/PHPMailer/src/Exception.php';
+}
 
 /**
  * Classe Email - Utilitário para envio de emails
@@ -35,25 +40,33 @@ class Email {
         // Verificar se as constantes estão definidas
         if (defined('SMTP_HOST')) {
             self::$host = SMTP_HOST;
-            self::$port = defined('SMTP_PORT') ? SMTP_PORT : 465;
+            self::$port = defined('SMTP_PORT') ? SMTP_PORT : 587; // CORREÇÃO: Mudei para 587 padrão
             self::$username = defined('SMTP_USERNAME') ? SMTP_USERNAME : 'klubecash@klubecash.com';
             self::$password = defined('SMTP_PASSWORD') ? SMTP_PASSWORD : 'Aaku_2004@';
             self::$fromEmail = defined('SMTP_FROM_EMAIL') ? SMTP_FROM_EMAIL : 'noreply@klubecash.com';
             self::$fromName = defined('SMTP_FROM_NAME') ? SMTP_FROM_NAME : 'Klube Cash';
-            self::$encryption = defined('SMTP_ENCRYPTION') ? SMTP_ENCRYPTION : PHPMailer::ENCRYPTION_STARTTLS;
+            // CORREÇÃO: Configuração dinâmica baseada na porta
+            if (defined('SMTP_ENCRYPTION')) {
+                self::$encryption = SMTP_ENCRYPTION;
+            } else {
+                self::$encryption = (self::$port == 465) ? PHPMailer::ENCRYPTION_SMTPS : PHPMailer::ENCRYPTION_STARTTLS;
+            }
         } else {
             // Configurações padrão se as constantes não estiverem definidas
             self::$host = 'smtp.hostinger.com';
-            self::$port = 465;
+            self::$port = 587; // CORREÇÃO: Mudei para 587 padrão
             self::$username = 'klubecash@klubecash.com';
             self::$password = 'Aaku_2004@';
             self::$fromEmail = 'noreply@klubecash.com';
             self::$fromName = 'Klube Cash';
-            self::$encryption = PHPMailer::ENCRYPTION_STARTTLS;
+            self::$encryption = PHPMailer::ENCRYPTION_STARTTLS; // TLS para porta 587
             
             // Registrar aviso
             error_log('Constantes SMTP não encontradas. Utilizando valores padrão.');
         }
+        
+        // ADIÇÃO: Log das configurações para debug
+        error_log("Email Config - Host: " . self::$host . ", Port: " . self::$port . ", Encryption: " . self::$encryption);
     }
     
     /**
@@ -83,16 +96,22 @@ class Email {
             $mail->Port       = self::$port;
             $mail->CharSet    = 'UTF-8';
             
+            // ADIÇÃO: Timeout aumentado para servidores lentos
+            $mail->Timeout = 60;
+            
+            // ADIÇÃO: Configurações SSL mais permissivas para servidores compartilhados
+            $mail->SMTPOptions = [
+                'ssl' => [
+                    'verify_peer' => false,
+                    'verify_peer_name' => false,
+                    'allow_self_signed' => true
+                ]
+            ];
+            
             // Configurações para ambiente de desenvolvimento
             if (defined('ENVIRONMENT') && ENVIRONMENT === 'development') {
                 $mail->SMTPDebug = SMTP::DEBUG_SERVER;
-                $mail->SMTPOptions = [
-                    'ssl' => [
-                        'verify_peer' => false,
-                        'verify_peer_name' => false,
-                        'allow_self_signed' => true
-                    ]
-                ];
+                $mail->Debugoutput = 'error_log'; // ADIÇÃO: Redirecionar debug para log
             }
             
             // Remetente
@@ -118,9 +137,21 @@ class Email {
             $mail->AltBody = self::stripHtml($message);
             
             // Enviar o email
-            return $mail->send();
+            $result = $mail->send();
+            
+            // ADIÇÃO: Log detalhado do resultado
+            if ($result) {
+                error_log("Email enviado com sucesso para: " . $to . " - Assunto: " . $subject);
+            } else {
+                error_log("Falha ao enviar email para: " . $to . " - Erro: " . $mail->ErrorInfo);
+            }
+            
+            return $result;
         } catch (Exception $e) {
-            error_log('Erro ao enviar email: ' . $e->getMessage());
+            // CORREÇÃO: Log mais detalhado do erro
+            error_log('ERRO CRÍTICO ao enviar email: ' . $e->getMessage());
+            error_log('SMTP Debug Info: ' . ($mail->ErrorInfo ?? 'N/A'));
+            error_log('Stack trace: ' . $e->getTraceAsString());
             return false;
         }
     }
@@ -271,15 +302,16 @@ class Email {
     public static function sendPasswordRecovery($to, $name, $token) {
         $subject = 'Recuperação de Senha - Klube Cash';
         
-        $resetLink = SITE_URL . '/views/auth/recover-password.php?token=' . urlencode($token);
+        // CORREÇÃO: URL corrigida para recuperação de senha
+        $resetLink = SITE_URL . '/recuperar-senha?token=' . urlencode($token);
         
         $message = '
         <h2>Olá, ' . htmlspecialchars($name) . '!</h2>
         <p>Recebemos uma solicitação para redefinir sua senha no Klube Cash.</p>
         <p>Para redefinir sua senha, clique no botão abaixo:</p>
         <p><a href="' . $resetLink . '" class="btn">Redefinir Minha Senha</a></p>
+        <p><strong>Este link é válido por 2 horas.</strong></p>
         <p>Se você não solicitou esta alteração, por favor ignore este email.</p>
-        <p>Este link é válido por ' . (TOKEN_EXPIRATION / 3600) . ' horas.</p>
         <p>Atenciosamente,<br>Equipe Klube Cash</p>';
         
         return self::send($to, $subject, $message, $name);
@@ -406,6 +438,18 @@ class Email {
             $mail->SMTPSecure = self::$encryption;
             $mail->Port       = self::$port;
             
+            // ADIÇÃO: Configurações SSL para teste
+            $mail->SMTPOptions = [
+                'ssl' => [
+                    'verify_peer' => false,
+                    'verify_peer_name' => false,
+                    'allow_self_signed' => true
+                ]
+            ];
+            
+            // ADIÇÃO: Timeout para teste
+            $mail->Timeout = 30;
+            
             // Teste de conexão apenas
             $mail->SMTPDebug = SMTP::DEBUG_CONNECTION;
             
@@ -419,22 +463,59 @@ class Email {
                 return [
                     'status' => true,
                     'message' => 'Conexão com servidor SMTP estabelecida com sucesso!',
-                    'debug' => $debugInfo
+                    'debug' => $debugInfo,
+                    // ADIÇÃO: Informações de configuração para debug
+                    'config' => [
+                        'host' => self::$host,
+                        'port' => self::$port,
+                        'encryption' => self::$encryption,
+                        'username' => self::$username
+                    ]
                 ];
             } else {
                 return [
                     'status' => false,
                     'message' => 'Não foi possível conectar ao servidor SMTP.',
-                    'debug' => $debugInfo
+                    'debug' => $debugInfo,
+                    'config' => [
+                        'host' => self::$host,
+                        'port' => self::$port,
+                        'encryption' => self::$encryption,
+                        'username' => self::$username
+                    ]
                 ];
             }
         } catch (Exception $e) {
             return [
                 'status' => false,
                 'message' => 'Erro: ' . $e->getMessage(),
-                'debug' => $mail->ErrorInfo ?? ''
+                'debug' => $mail->ErrorInfo ?? '',
+                'config' => [
+                    'host' => self::$host,
+                    'port' => self::$port,
+                    'encryption' => self::$encryption,
+                    'username' => self::$username
+                ]
             ];
         }
+    }
+    
+    // ADIÇÃO: Método para testar o envio de email de recuperação
+    public static function testPasswordRecoveryEmail($email = null) {
+        $testEmail = $email ?: 'teste@klubecash.com';
+        $testToken = 'test_token_' . time();
+        
+        error_log("Testando envio de email de recuperação para: " . $testEmail);
+        
+        $result = self::sendPasswordRecovery($testEmail, 'Usuário Teste', $testToken);
+        
+        if ($result) {
+            error_log("Teste de email de recuperação: SUCESSO");
+        } else {
+            error_log("Teste de email de recuperação: FALHOU");
+        }
+        
+        return $result;
     }
 }
 ?>
