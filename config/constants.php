@@ -54,7 +54,7 @@ define('USER_TYPE_ADMIN', 'admin');
 define('USER_TYPE_STORE', 'loja');
 define('USER_TYPE_EMPLOYEE', 'funcionario');
 
-define('PASSWORD_MIN_LENGTH', 8);
+
 // === AUTENTICAÇÃO (ADIÇÃO) ===
 define('JWT_SECRET', 'klube_cash_secret_key_2025_secure');
 define('SESSION_LIFETIME', 3600); // 1 hora
@@ -149,7 +149,7 @@ define('STORE_REJECTED', 'rejeitado');
 // === CONFIGURAÇÕES DE SEGURANÇA ===
 define('PASSWORD_MIN_LENGTH', 8);
 define('SESSION_LIFETIME', 86400);
-define('TOKEN_EXPIRATION', 7200);
+
 define('CPF_REQUIRED', true); // Novo: Indica se CPF é obrigatório
 
 // === MENSAGENS DE VALIDAÇÃO ===
