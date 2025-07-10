@@ -20,7 +20,7 @@ use PHPMailer\PHPMailer\Exception;
 echo "<h2>🧪 Teste Direto do PHPMailer (SEM classe Email):</h2>";
 
 try {
-    $testEmail = 'seuemail@gmail.com'; // SUBSTITUA pelo seu email
+    $testEmail = 'kauamatheus920@gmail.com'; // SUBSTITUA pelo seu email
     
     echo "<p>📧 Criando instância do PHPMailer...</p>";
     
