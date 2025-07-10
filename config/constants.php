@@ -277,7 +277,7 @@ if (!defined('SMTP_HOST')) {
     define('SMTP_PORT', 587); // MUDANÇA: 465 → 587
     define('SMTP_USERNAME', 'klubecash@klubecash.com');
     define('SMTP_PASSWORD', 'Aaku_2004@');
-    define('SMTP_FROM_EMAIL', 'noreply@klubecash.com');
+    define('SMTP_FROM_EMAIL', 'klubecash@klubecash.com');
     define('SMTP_FROM_NAME', 'Klube Cash');
     define('SMTP_ENCRYPTION', 'tls'); // MUDANÇA: 'ssl' → 'tls'
 }
