@@ -197,8 +197,34 @@ if (isset($_GET['test_create'])) {
         $exists = $stmt->rowCount() > 0;
         echo "<p><strong>5. Email existe:</strong> " . ($exists ? 'SIM' : 'NÃO') . "</p>";
         
-        // Testar insert diretamente
-        if (!$exists) {
+        // Verificar se existe tabela lojas e o ID
+        $checkLoja = $db->prepare("SELECT id FROM lojas WHERE id = ?");
+        $checkLoja->execute([$storeId]);
+        $lojaExists = $checkLoja->rowCount() > 0;
+        echo "<p><strong>6. Loja ID {$storeId} existe na tabela lojas:</strong> " . ($lojaExists ? 'SIM' : 'NÃO') . "</p>";
+
+        if (!$lojaExists) {
+            // Verificar se é lojista na tabela usuarios
+            $checkUser = $db->prepare("SELECT id FROM usuarios WHERE id = ? AND tipo = 'loja'");
+            $checkUser->execute([$storeId]);
+            $userExists = $checkUser->rowCount() > 0;
+            echo "<p><strong>7. User ID {$storeId} é lojista:</strong> " . ($userExists ? 'SIM' : 'NÃO') . "</p>";
+            
+            // Mostrar estrutura das tabelas
+            $tables = $db->query("SHOW TABLES LIKE '%loja%'")->fetchAll();
+            echo "<p><strong>8. Tabelas com 'loja':</strong> " . json_encode($tables) . "</p>";
+            
+            // Verificar constraint
+            $constraints = $db->query("
+                SELECT TABLE_NAME, COLUMN_NAME, CONSTRAINT_NAME, REFERENCED_TABLE_NAME, REFERENCED_COLUMN_NAME 
+                FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE 
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'usuarios' AND COLUMN_NAME = 'loja_vinculada_id'
+            ")->fetchAll();
+            echo "<p><strong>9. Constraints loja_vinculada_id:</strong> " . json_encode($constraints) . "</p>";
+        }
+        
+        // Testar insert diretamente apenas se loja existe
+        if (!$exists && $lojaExists) {
             $senhaHash = password_hash($testData['senha'], PASSWORD_DEFAULT);
             
             $insertStmt = $db->prepare("
@@ -219,12 +245,14 @@ if (isset($_GET['test_create'])) {
                 'ativo'
             ]);
             
-            echo "<p><strong>6. Insert Result:</strong> " . ($success ? 'SUCESSO' : 'FALHOU') . "</p>";
+            echo "<p><strong>10. Insert Result:</strong> " . ($success ? 'SUCESSO' : 'FALHOU') . "</p>";
             
             if (!$success) {
                 $errorInfo = $insertStmt->errorInfo();
                 echo "<p><strong>SQL Error:</strong> " . json_encode($errorInfo) . "</p>";
             }
+        } elseif (!$lojaExists) {
+            echo "<p><strong>10. Insert:</strong> PULADO - Loja não existe na tabela lojas</p>";
         }
         
     } catch (Exception $e) {
