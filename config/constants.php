@@ -80,53 +80,49 @@ define('ACAO_UPLOAD_LOTE', 'upload_lote');
 
 // Mapa de permissões legíveis
 define('PERMISSOES_MAPA', [
-    MODULO_DASHBOARD => [
+    'dashboard' => [
         'nome' => 'Dashboard',
-        'descricao' => 'Painel principal com resumos e gráficos',
+        'descricao' => 'Visualizar painel principal',
+        'acoes' => ['ver' => 'Visualizar dashboard']
+    ],
+    'transacoes' => [
+        'nome' => 'Transações', 
+        'descricao' => 'Gerenciar vendas e transações',
         'acoes' => [
-            ACAO_VER => 'Visualizar dashboard'
+            'ver' => 'Visualizar transações',
+            'criar' => 'Registrar nova venda',
+            'upload_lote' => 'Upload em lote'
         ]
     ],
-    MODULO_TRANSACOES => [
-        'nome' => 'Transações',
-        'descricao' => 'Gerenciar vendas e transações de cashback',
-        'acoes' => [
-            ACAO_VER => 'Visualizar transações',
-            ACAO_CRIAR => 'Registrar novas vendas',
-            ACAO_UPLOAD_LOTE => 'Upload de vendas em lote'
-        ]
-    ],
-    MODULO_COMISSOES => [
+    'comissoes' => [
         'nome' => 'Comissões',
-        'descricao' => 'Gerenciar pagamentos de comissões',
+        'descricao' => 'Gerenciar pagamentos',
         'acoes' => [
-            ACAO_VER => 'Visualizar comissões',
-            ACAO_PAGAR => 'Realizar pagamentos'
+            'ver' => 'Visualizar comissões',
+            'pagar' => 'Realizar pagamentos'
         ]
     ],
-    MODULO_FUNCIONARIOS => [
+    'funcionarios' => [
         'nome' => 'Funcionários',
-        'descricao' => 'Gerenciar equipe da loja',
+        'descricao' => 'Gerenciar equipe',
         'acoes' => [
-            ACAO_VER => 'Visualizar funcionários',
-            ACAO_CRIAR => 'Cadastrar funcionários',
-            ACAO_EDITAR => 'Editar funcionários',
-            ACAO_DESATIVAR => 'Desativar funcionários'
+            'ver' => 'Visualizar funcionários',
+            'criar' => 'Cadastrar funcionário', 
+            'editar' => 'Editar dados',
+            'desativar' => 'Desativar acesso'
         ]
     ],
-    MODULO_RELATORIOS => [
+    'relatorios' => [
         'nome' => 'Relatórios',
-        'descricao' => 'Visualizar relatórios e estatísticas',
-        'acoes' => [
-            ACAO_VER => 'Visualizar relatórios'
-        ]
+        'descricao' => 'Visualizar relatórios',
+        'acoes' => ['ver' => 'Visualizar relatórios']
     ],
-    MODULO_CONFIGURACOES => [
+    'configuracoes' => [
         'nome' => 'Configurações',
-        'descricao' => 'Configurações da loja',
+        'descricao' => 'Configurar loja',
         'acoes' => [
-            ACAO_VER => 'Visualizar configurações',
-            ACAO_EDITAR => 'Editar configurações'
+            'ver' => 'Visualizar configurações',
+            'editar' => 'Editar configurações'
         ]
     ]
 ]);
