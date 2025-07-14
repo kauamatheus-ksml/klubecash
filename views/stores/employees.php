@@ -224,30 +224,32 @@ if (isset($_GET['test_create'])) {
             
             // Criar registro na tabela lojas se não existir
             if ($userExists) {
-                echo "<p><strong>10. Criando loja na tabela lojas...</strong></p>";
-                
-                // Buscar dados do lojista
-                $lojista = $db->prepare("SELECT * FROM usuarios WHERE id = ? AND tipo = 'loja'");
-                $lojista->execute([$storeId]);
-                $lojistaData = $lojista->fetch();
-                
-                // Inserir na tabela lojas
-                $createLoja = $db->prepare("
-                    INSERT INTO lojas (id, nome, email, telefone, status, data_criacao) 
-                    VALUES (?, ?, ?, ?, 'aprovado', NOW())
-                ");
-                
-                $lojaCreated = $createLoja->execute([
-                    $storeId,
-                    $lojistaData['nome'],
-                    $lojistaData['email'],
-                    $lojistaData['telefone'] ?? ''
-                ]);
-                
-                echo "<p><strong>11. Loja criada:</strong> " . ($lojaCreated ? 'SIM' : 'NÃO') . "</p>";
-                
-                if ($lojaCreated) {
-                    $lojaExists = true;
+                echo "<p><strong>10. Verificando estrutura da tabela lojas...</strong></p>";
+
+                // Ver estrutura da tabela lojas
+                $structure = $db->query("DESCRIBE lojas")->fetchAll();
+                echo "<p><strong>Colunas da tabela lojas:</strong> " . json_encode($structure) . "</p>";
+
+                // Criar loja com colunas corretas
+                if ($userExists) {
+                    // Buscar dados do lojista
+                    $lojista = $db->prepare("SELECT * FROM usuarios WHERE id = ? AND tipo = 'loja'");
+                    $lojista->execute([$storeId]);
+                    $lojistaData = $lojista->fetch();
+                    
+                    // INSERT com colunas que existem (ajustar conforme estrutura mostrada)
+                    $createLoja = $db->prepare("
+                        INSERT INTO lojas (id, status, data_criacao) 
+                        VALUES (?, 'aprovado', NOW())
+                    ");
+                    
+                    $lojaCreated = $createLoja->execute([$storeId]);
+                    
+                    echo "<p><strong>11. Loja criada:</strong> " . ($lojaCreated ? 'SIM' : 'NÃO') . "</p>";
+                    
+                    if ($lojaCreated) {
+                        $lojaExists = true;
+                    }
                 }
             }
         }
