@@ -804,7 +804,7 @@ try {
                     <span class="section-badge">Processo Simples</span>
                     <h2 class="section-title">Como a Klube Cash Funciona?</h2>
                     <p class="section-description">
-                        Três passos simples para começar a receber dinheiro de volta em todas as suas compras.
+                        3 passos simples para começar a receber dinheiro de volta em todas as suas compras.
                     </p>
                 </div>
                 
