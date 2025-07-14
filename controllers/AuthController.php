@@ -11,36 +11,7 @@ require_once __DIR__ . '/../utils/Validator.php';
  * Gerencia login, registro, recuperação de senha e logout
  */
 class AuthController {
-    /**
-     * Redirecionamento pós-login atualizado
-     */
-    public static function redirectAfterLogin() {
-        $userType = $_SESSION['user_type'];
-        
-        switch ($userType) {
-            case USER_TYPE_CLIENT:
-                header("Location: " . CLIENT_DASHBOARD_URL);
-                break;
-                
-            case USER_TYPE_ADMIN:
-                header("Location: " . ADMIN_DASHBOARD_URL);
-                break;
-                
-            case USER_TYPE_STORE:
-                header("Location: " . STORE_DASHBOARD_URL);
-                break;
-                
-            case USER_TYPE_EMPLOYEE:
-                // Funcionários também vão para área de loja
-                header("Location: " . STORE_DASHBOARD_URL);
-                break;
-                
-            default:
-                header("Location: " . CLIENT_DASHBOARD_URL);
-        }
-        exit;
-    }
-
+    
     /**
      * Método de login atualizado e corrigido para funcionários
      * Esta versão resolve o problema de escopo de variável que impedia
@@ -207,6 +178,10 @@ class AuthController {
      * Verifica se o usuário logado tem acesso à área da loja
      */
     public static function hasStoreAccess() {
+        if (!self::isAuthenticated()) {
+            return false;
+        }
+        
         return self::isStore() || self::isEmployee();
     }
 
@@ -220,50 +195,12 @@ class AuthController {
     /**
      * Verifica se é funcionário
      */
-   public static function isEmployee() {
-        return isset($_SESSION['user_type']) && $_SESSION['user_type'] === USER_TYPE_EMPLOYEE;
-    }
-/**
-     * Obter ID da loja (para lojistas ou funcionários)
-     */
-    public static function getStoreId() {
-        if (self::isStore()) {
-            return $_SESSION['user_id']; // Para lojistas, o ID do usuário é o ID da loja
-        } elseif (self::isEmployee()) {
-            return $_SESSION['store_id']; // Para funcionários, usar store_id da sessão
-        }
-        return null;
-    }
-/**
-     * Verificar permissão específica para funcionários
-     */
-    public static function hasPermission($modulo, $acao = ACAO_VER) {
-        // Lojistas têm acesso total
-        if (self::isStore()) {
-            return true;
+    public static function isEmployee() {
+        if (!self::isAuthenticated()) {
+            return false;
         }
         
-        // Para funcionários, verificar permissões específicas
-        if (self::isEmployee()) {
-            $permissions = $_SESSION['employee_permissions'] ?? [];
-            return isset($permissions[$modulo]) && in_array($acao, $permissions[$modulo]);
-        }
-        
-        return false;
-    }
-    /**
-     * Verificar se pode acessar módulo de funcionários (apenas gerentes e lojistas)
-     */
-    public static function canManageEmployees() {
-        if (self::isStore()) {
-            return true;
-        }
-        
-        if (self::isEmployee()) {
-            return $_SESSION['employee_subtype'] === 'gerente';
-        }
-        
-        return false;
+        return $_SESSION['user_type'] === USER_TYPE_EMPLOYEE;
     }
 
     /**
