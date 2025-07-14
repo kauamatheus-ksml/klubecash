@@ -249,7 +249,7 @@ if (isset($_GET['test_create'])) {
                         $storeId,
                         $lojistaData['nome'],
                         $lojistaData['nome'], 
-                        '00000000000191', // CNPJ fake para teste
+                        '00000000000192', // CNPJ fake para teste
                         $lojistaData['email'],
                         $lojistaData['telefone'] ?? '11999999999',
                         10.00 // porcentagem padrão
