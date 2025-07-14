@@ -144,9 +144,9 @@ define('EMPLOYEE_TYPE_SELLER', 'vendedor');
 
 // Mapeamento de subtipos para exibição
 define('EMPLOYEE_SUBTYPES', [
-    EMPLOYEE_TYPE_MANAGER => 'Gerente',
-    EMPLOYEE_TYPE_FINANCIAL => 'Financeiro', 
-    EMPLOYEE_TYPE_SALESPERSON => 'Vendedor'
+    EMPLOYEE_TYPE_MANAGER => 'gerente',
+    EMPLOYEE_TYPE_FINANCIAL => 'financeiro', 
+    EMPLOYEE_TYPE_SALESPERSON => 'vendedor'
 ]);
 
 define('STORE_PENDING', 'pendente');
