@@ -4,6 +4,21 @@
 
 session_start();
 
+// ADICIONAR ESTA SEÇÃO:
+if (isset($_SESSION['user_type']) && $_SESSION['user_type'] === 'funcionario' && !isset($_SESSION['employee_subtype'])) {
+    require_once './config/database.php';
+    $db = Database::getConnection();
+    $stmt = $db->prepare("SELECT u.subtipo_funcionario, u.loja_vinculada_id, l.nome_fantasia as loja_nome FROM usuarios u INNER JOIN lojas l ON u.loja_vinculada_id = l.id WHERE u.id = ? AND u.tipo = 'funcionario'");
+    $stmt->execute([$_SESSION['user_id']]);
+    $data = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($data) {
+        $_SESSION['employee_subtype'] = $data['subtipo_funcionario'];
+        $_SESSION['store_id'] = $data['loja_vinculada_id'];
+        $_SESSION['store_name'] = $data['loja_nome'];
+        $_SESSION['employee_permissions'] = ($data['subtipo_funcionario'] === 'financeiro') ? ['dashboard', 'comissoes', 'pagamentos', 'relatorios'] : ['dashboard'];
+    }
+}
+
 echo "<h1>Análise da Sessão de Funcionário</h1>";
 echo "<h2>Dados Básicos da Sessão:</h2>";
 
