@@ -1,4 +1,9 @@
 <?php
+if (isset($_GET['debug'])) {
+    error_reporting(E_ALL);
+    ini_set('display_errors', 1);
+    echo "DEBUG MODE<br>";
+}
 /**
  * Página de Gestão de Funcionários - Sistema Klube Cash
  * 
