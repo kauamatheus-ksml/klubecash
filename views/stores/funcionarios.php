@@ -71,11 +71,11 @@ include_once '../components/header.php';
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     
     <!-- CSS Customizado -->
-    <link rel="stylesheet" href="../../assets/css/sidebar-unified.css">
+    
     <link rel="stylesheet" href="../../assets/css/employees-layout-fix.css">
 </head>
 <body class="employees-page">
-    
+
 <div class="container-fluid">
     <div class="row">
         <?php include_once '../components/sidebar.php'; ?>
