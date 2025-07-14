@@ -13,13 +13,16 @@ require_once __DIR__ . '/../utils/Validator.php';
 class AuthController {
     
     /**
-    * Atualização do método de login para incluir funcionários
-    */
+     * Método de login atualizado e corrigido para funcionários
+     * Esta versão resolve o problema de escopo de variável que impedia
+     * as variáveis de sessão específicas de funcionários de serem definidas
+     */
     public static function login($email, $senha, $remember = false) {
         try {
             $db = Database::getConnection();
             
-            // Buscar usuário (incluindo funcionários)
+            // Primeira etapa: Buscar o usuário no banco de dados
+            // Esta consulta inclui todos os campos necessários para funcionários
             $stmt = $db->prepare("
                 SELECT id, nome, email, senha_hash, tipo, status, loja_vinculada_id, subtipo_funcionario
                 FROM usuarios 
@@ -27,25 +30,32 @@ class AuthController {
             ");
             $stmt->execute([$email]);
             
+            // Verificar se o usuário existe
             if ($stmt->rowCount() === 0) {
                 return ['status' => false, 'message' => 'E-mail ou senha incorretos.'];
             }
             
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
             
-            // Verificar senha
+            // Segunda etapa: Validar a senha fornecida
+            // O password_verify compara a senha em texto plano com o hash armazenado
             if (!password_verify($senha, $user['senha_hash'])) {
                 return ['status' => false, 'message' => 'E-mail ou senha incorretos.'];
             }
             
-            // Verificar status
+            // Terceira etapa: Verificar se a conta está ativa
             if ($user['status'] !== 'ativo') {
                 return ['status' => false, 'message' => 'Sua conta está inativa. Entre em contato com o suporte.'];
             }
             
-            // Para funcionários, verificar se a loja está ativa
-            // Para funcionários, verificar se a loja está ativa
+            // CORREÇÃO PRINCIPAL: Inicializar a variável $storeData
+            // Isso garante que a variável sempre exista, evitando erros de "variável não definida"
+            $storeData = null;
+            
+            // Quarta etapa: Validações específicas para funcionários
+            // Para funcionários, precisamos verificar se a loja vinculada está ativa
             if ($user['tipo'] === 'funcionario') {
+                // Buscar dados da loja vinculada
                 $storeStmt = $db->prepare("
                     SELECT status, nome_fantasia 
                     FROM lojas 
@@ -53,50 +63,81 @@ class AuthController {
                 ");
                 $storeStmt->execute([$user['loja_vinculada_id']]);
                 
+                // Se a loja não estiver aprovada, impedir o login
                 if ($storeStmt->rowCount() === 0) {
                     return ['status' => false, 'message' => 'A loja vinculada não está ativa.'];
                 }
                 
+                // IMPORTANTE: Definir $storeData aqui garante que ela esteja disponível depois
                 $storeData = $storeStmt->fetch(PDO::FETCH_ASSOC);
             }
 
-            // Configurar sessão
+            // Quinta etapa: Configurar a sessão PHP
+            // Garantir que a sessão esteja iniciada antes de definir variáveis
             if (session_status() === PHP_SESSION_NONE) {
                 session_start();
             }
 
+            // Definir variáveis básicas de sessão (para todos os tipos de usuário)
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['user_name'] = $user['nome'];
             $_SESSION['user_email'] = $user['email'];
             $_SESSION['user_type'] = $user['tipo'];
             $_SESSION['last_activity'] = time();
 
-            // Dados específicos para funcionários
-            if ($user['tipo'] === 'funcionario') {
+            // Sexta etapa: Configurar dados específicos para funcionários
+            // CORREÇÃO: Agora verificamos se $storeData não é null para evitar erros
+            if ($user['tipo'] === 'funcionario' && $storeData !== null) {
+                
+                // Definir informações básicas do funcionário
                 $_SESSION['employee_subtype'] = $user['subtipo_funcionario'];
                 $_SESSION['store_id'] = $user['loja_vinculada_id'];
                 $_SESSION['store_name'] = $storeData['nome_fantasia'];
                 
+                // Definir permissões baseadas no subtipo do funcionário
+                // Este sistema de permissões permite controle granular de acesso futuro
                 switch($user['subtipo_funcionario']) {
                     case 'gerente':
-                        $_SESSION['employee_permissions'] = ['dashboard', 'transacoes', 'funcionarios', 'relatorios'];
+                        // Gerentes têm acesso completo às operações da loja
+                        $_SESSION['employee_permissions'] = [
+                            'dashboard', 
+                            'transacoes', 
+                            'funcionarios', 
+                            'relatorios'
+                        ];
                         break;
+                        
                     case 'financeiro':
-                        $_SESSION['employee_permissions'] = ['dashboard', 'comissoes', 'pagamentos', 'relatorios'];
+                        // Funcionários financeiros focam em aspectos monetários
+                        $_SESSION['employee_permissions'] = [
+                            'dashboard', 
+                            'comissoes', 
+                            'pagamentos', 
+                            'relatorios'
+                        ];
                         break;
+                        
                     case 'vendedor':
-                        $_SESSION['employee_permissions'] = ['dashboard', 'transacoes'];
+                        // Vendedores têm acesso básico para registrar vendas
+                        $_SESSION['employee_permissions'] = [
+                            'dashboard', 
+                            'transacoes'
+                        ];
                         break;
+                        
                     default:
+                        // Fallback para subtipos não reconhecidos
                         $_SESSION['employee_permissions'] = ['dashboard'];
                 }
             }
             
-            // Atualizar último login
+            // Sétima etapa: Registrar o login no banco de dados
+            // Atualizar o timestamp do último login para fins de auditoria
             $updateStmt = $db->prepare("UPDATE usuarios SET ultimo_login = NOW() WHERE id = ?");
             $updateStmt->execute([$user['id']]);
             
-            // Preparar dados de retorno
+            // Oitava etapa: Preparar dados de retorno
+            // Estas informações podem ser usadas pela aplicação após o login
             $result = [
                 'status' => true,
                 'message' => 'Login realizado com sucesso!',
@@ -108,9 +149,12 @@ class AuthController {
                 ]
             ];
             
-            // Adicionar dados específicos de funcionário
-            if ($user['tipo'] === 'funcionario') {
+            // Adicionar informações específicas de funcionário ao resultado
+            // Isso permite que a aplicação saiba detalhes sobre o funcionário logado
+            if ($user['tipo'] === 'funcionario' && $storeData !== null) {
+                // Buscar o nome de exibição do subtipo usando as constantes definidas
                 $subtypeDisplay = EMPLOYEE_SUBTYPES[$user['subtipo_funcionario']] ?? 'Não definido';
+                
                 $result['employee_info'] = [
                     'subtipo' => $user['subtipo_funcionario'],
                     'subtipo_display' => $subtypeDisplay,
@@ -119,9 +163,12 @@ class AuthController {
                 ];
             }
             
+            // Retornar resultado de sucesso com todas as informações
             return $result;
             
         } catch (PDOException $e) {
+            // Tratamento de erro: registrar o erro e retornar mensagem genérica
+            // Isso evita exposição de detalhes técnicos sensíveis ao usuário final
             error_log('Erro no login: ' . $e->getMessage());
             return ['status' => false, 'message' => 'Erro interno do sistema. Tente novamente.'];
         }
