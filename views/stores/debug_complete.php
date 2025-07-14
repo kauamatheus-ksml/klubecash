@@ -194,6 +194,32 @@ try {
     }
     
     echo "</div>";
+
+    // 11. TESTE DE EDIÇÃO
+    echo "</div><div class='section'><h2>11. Teste de Edição</h2>";
+
+    try {
+        // Pegar primeiro funcionário para testar edição
+        $funcionarios = $result['data']['funcionarios'] ?? [];
+        if (!empty($funcionarios)) {
+            $funcionarioId = $funcionarios[0]['id'];
+            
+            $editData = [
+                'nome' => 'Nome Editado Teste',
+                'telefone' => '11888888888'
+            ];
+            
+            $editResult = StoreController::updateEmployee($funcionarioId, $editData);
+            echo "<p>ID testado: {$funcionarioId}</p>";
+            echo "<div class='code'>" . json_encode($editResult, JSON_PRETTY_PRINT) . "</div>";
+        } else {
+            echo "<p class='error'>Nenhum funcionário para testar edição</p>";
+        }
+        
+    } catch (Exception $e) {
+        echo "<p class='error'>❌ Edição: " . $e->getMessage() . "</p>";
+        echo "<p>Arquivo: " . $e->getFile() . " - Linha: " . $e->getLine() . "</p>";
+    }
     
 } catch (Exception $e) {
     echo "<div class='error'><h2>ERRO GERAL</h2>";
