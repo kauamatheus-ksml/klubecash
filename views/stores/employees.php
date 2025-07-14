@@ -221,9 +221,38 @@ if (isset($_GET['test_create'])) {
                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'usuarios' AND COLUMN_NAME = 'loja_vinculada_id'
             ")->fetchAll();
             echo "<p><strong>9. Constraints loja_vinculada_id:</strong> " . json_encode($constraints) . "</p>";
+            
+            // Criar registro na tabela lojas se não existir
+            if ($userExists) {
+                echo "<p><strong>10. Criando loja na tabela lojas...</strong></p>";
+                
+                // Buscar dados do lojista
+                $lojista = $db->prepare("SELECT * FROM usuarios WHERE id = ? AND tipo = 'loja'");
+                $lojista->execute([$storeId]);
+                $lojistaData = $lojista->fetch();
+                
+                // Inserir na tabela lojas
+                $createLoja = $db->prepare("
+                    INSERT INTO lojas (id, nome, email, telefone, status, data_criacao) 
+                    VALUES (?, ?, ?, ?, 'aprovado', NOW())
+                ");
+                
+                $lojaCreated = $createLoja->execute([
+                    $storeId,
+                    $lojistaData['nome'],
+                    $lojistaData['email'],
+                    $lojistaData['telefone'] ?? ''
+                ]);
+                
+                echo "<p><strong>11. Loja criada:</strong> " . ($lojaCreated ? 'SIM' : 'NÃO') . "</p>";
+                
+                if ($lojaCreated) {
+                    $lojaExists = true;
+                }
+            }
         }
         
-        // Testar insert diretamente apenas se loja existe
+        // Testar insert de funcionário
         if (!$exists && $lojaExists) {
             $senhaHash = password_hash($testData['senha'], PASSWORD_DEFAULT);
             
@@ -245,14 +274,14 @@ if (isset($_GET['test_create'])) {
                 'ativo'
             ]);
             
-            echo "<p><strong>10. Insert Result:</strong> " . ($success ? 'SUCESSO' : 'FALHOU') . "</p>";
+            echo "<p><strong>12. Funcionário inserido:</strong> " . ($success ? 'SUCESSO' : 'FALHOU') . "</p>";
             
             if (!$success) {
                 $errorInfo = $insertStmt->errorInfo();
                 echo "<p><strong>SQL Error:</strong> " . json_encode($errorInfo) . "</p>";
             }
         } elseif (!$lojaExists) {
-            echo "<p><strong>10. Insert:</strong> PULADO - Loja não existe na tabela lojas</p>";
+            echo "<p><strong>12. Insert:</strong> PULADO - Loja não existe</p>";
         }
         
     } catch (Exception $e) {
