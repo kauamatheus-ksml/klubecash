@@ -789,39 +789,26 @@ try {
                 <!-- Ações do Header -->
                 <div class="header-actions">
                     <?php if ($isLoggedIn): ?>
-                            <h1>Olá, <?php echo htmlspecialchars($userName); ?>! 👋</h1>
-                            
+                        <h1>Olá, <?php echo htmlspecialchars($userName); ?>! 👋</h1>
+                        
+                        <?php if ($userType === 'funcionario' && isset($_SESSION['employee_subtype'])): ?>
                             <?php 
-                            // Mostrar mensagem específica para funcionários
-                            if ($userType === 'funcionario' && isset($_SESSION['employee_subtype'])): 
-                                $subtypeDisplay = '';
-                                switch($_SESSION['employee_subtype']) {
-                                    case 'gerente':
-                                        $subtypeDisplay = 'Gerente';
-                                        break;
-                                    case 'financeiro':
-                                        $subtypeDisplay = 'Financeiro';
-                                        break;
-                                    case 'vendedor':
-                                        $subtypeDisplay = 'Vendedor';
-                                        break;
-                                    default:
-                                        $subtypeDisplay = 'Funcionário';
-                                }
+                            $subtypeMap = ['gerente' => 'Gerente', 'financeiro' => 'Financeiro', 'vendedor' => 'Vendedor'];
+                            $subtypeDisplay = $subtypeMap[$_SESSION['employee_subtype']] ?? 'Funcionário';
                             ?>
-                                <p>🎯 <strong>Acesso como: <?php echo $subtypeDisplay; ?></strong></p>
-                                <p>Gerencie as operações da sua loja com eficiência.</p>
-                            <?php else: ?>
-                                <p>Continue economizando com inteligência. Explore suas oportunidades de cashback.</p>
-                            <?php endif; ?>
-                            
-                            <div class="hero-actions">
-                                <a href="<?php echo htmlspecialchars($dashboardURL); ?>" class="btn btn-primary">
-                                    <?php echo ($userType === 'funcionario') ? 'Acessar Painel da Loja' : 'Acessar Minha Conta'; ?>
-                                </a>
-                                <a href="#parceiros" class="btn btn-ghost">Ver Lojas Parceiras</a>
-                            </div>
+                            <p><span style="display: inline-flex; align-items: center; gap: 8px; background: rgba(255, 215, 0, 0.15); color: #FF8C00; padding: 8px 16px; border-radius: 20px; font-weight: 600;">🎯 Acesso como: <?php echo $subtypeDisplay; ?></span></p>
+                            <p>Gerencie as operações da sua loja com eficiência.</p>
                         <?php else: ?>
+                            <p>Continue economizando com inteligência. Explore suas oportunidades de cashback.</p>
+                        <?php endif; ?>
+                        
+                        <div class="hero-actions">
+                            <a href="<?php echo htmlspecialchars($dashboardURL); ?>" class="btn btn-primary">
+                                <?php echo ($userType === 'funcionario') ? 'Acessar Painel da Loja' : 'Acessar Minha Conta'; ?>
+                            </a>
+                            <a href="#parceiros" class="btn btn-ghost">Ver Lojas Parceiras</a>
+                        </div>
+                    <?php else: ?>
                         <a href="<?php echo LOGIN_URL; ?>" class="btn btn-ghost">Entrar</a>
                         
                     <?php endif; ?>
