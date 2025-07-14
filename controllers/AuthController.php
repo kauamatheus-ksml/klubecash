@@ -44,6 +44,7 @@ class AuthController {
             }
             
             // Para funcionários, verificar se a loja está ativa
+            // Para funcionários, verificar se a loja está ativa
             if ($user['tipo'] === 'funcionario') {
                 $storeStmt = $db->prepare("
                     SELECT status, nome_fantasia 
@@ -58,7 +59,7 @@ class AuthController {
                 
                 $storeData = $storeStmt->fetch(PDO::FETCH_ASSOC);
             }
-            
+
             // Configurar sessão
             if (session_status() === PHP_SESSION_NONE) {
                 session_start();
@@ -74,17 +75,8 @@ class AuthController {
             if ($user['tipo'] === 'funcionario') {
                 $_SESSION['employee_subtype'] = $user['subtipo_funcionario'];
                 $_SESSION['store_id'] = $user['loja_vinculada_id'];
-                
-                // Buscar nome da loja se não foi buscado antes
-                if (!isset($storeData)) {
-                    $storeStmt = $db->prepare("SELECT nome_fantasia FROM lojas WHERE id = ?");
-                    $storeStmt->execute([$user['loja_vinculada_id']]);
-                    $storeData = $storeStmt->fetch(PDO::FETCH_ASSOC);
-                }
-                
                 $_SESSION['store_name'] = $storeData['nome_fantasia'];
                 
-                // Definir permissões
                 switch($user['subtipo_funcionario']) {
                     case 'gerente':
                         $_SESSION['employee_permissions'] = ['dashboard', 'transacoes', 'funcionarios', 'relatorios'];
