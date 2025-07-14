@@ -11,6 +11,13 @@ require_once __DIR__ . '/../utils/Validator.php';
  * Gerencia login, registro, recuperação de senha e logout
  */
 class AuthController {
+
+    public static function requireStoreAccess() {
+        if (!self::hasStoreAccess()) {
+            header("Location: " . LOGIN_URL . "?error=access_denied");
+            exit;
+        }
+    }
     // Adicionar no AuthController.php
     public static function setupEmployeeSession($employeeData) {
         $_SESSION['user_id'] = $employeeData['id'];
@@ -190,10 +197,6 @@ class AuthController {
      * Verifica se o usuário logado tem acesso à área da loja
      */
     public static function hasStoreAccess() {
-        if (!self::isAuthenticated()) {
-            return false;
-        }
-        
         return self::isStore() || self::isEmployee();
     }
 
@@ -208,13 +211,45 @@ class AuthController {
      * Verifica se é funcionário
      */
     public static function isEmployee() {
-        if (!self::isAuthenticated()) {
-            return false;
+        return isset($_SESSION['user_type']) && $_SESSION['user_type'] === USER_TYPE_EMPLOYEE;
+    }
+    public static function canManageEmployees() {
+        if (self::isStore()) {
+            return true;
         }
         
-        return $_SESSION['user_type'] === USER_TYPE_EMPLOYEE;
+        if (self::isEmployee()) {
+            return isset($_SESSION['employee_subtype']) && $_SESSION['employee_subtype'] === EMPLOYEE_TYPE_MANAGER;
+        }
+        
+        return false;
     }
 
+    public static function getStoreId() {
+        if (self::isStore()) {
+            return $_SESSION['user_id'];
+        } elseif (self::isEmployee()) {
+            return $_SESSION['store_id'] ?? null;
+        }
+        return null;
+    }
+
+    public static function getStoreData() {
+        $storeId = self::getStoreId();
+        if (!$storeId) return null;
+
+        try {
+            $db = Database::getConnection();
+            $stmt = $db->prepare("SELECT * FROM usuarios WHERE id = :id AND tipo = :tipo");
+            $stmt->bindParam(':id', $storeId);
+            $tipo = USER_TYPE_STORE;
+            $stmt->bindParam(':tipo', $tipo);
+            $stmt->execute();
+            return $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            return null;
+        }
+    }
     /**
      * Obtém o subtipo do funcionário atual
      * 
