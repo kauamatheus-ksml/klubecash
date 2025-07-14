@@ -11,7 +11,19 @@ require_once __DIR__ . '/../utils/Validator.php';
  * Gerencia login, registro, recuperação de senha e logout
  */
 class AuthController {
-    
+    // Adicionar no AuthController.php
+    public static function setupEmployeeSession($employeeData) {
+        $_SESSION['user_id'] = $employeeData['id'];
+        $_SESSION['user_type'] = USER_TYPE_EMPLOYEE;
+        $_SESSION['user_name'] = $employeeData['nome'];
+        $_SESSION['user_email'] = $employeeData['email'];
+        $_SESSION['employee_subtype'] = $employeeData['subtipo_funcionario'];
+        $_SESSION['store_id'] = $employeeData['loja_vinculada_id'];
+        
+        // Definir permissões baseadas no subtipo
+        $permissions = EMPLOYEE_PERMISSIONS[$employeeData['subtipo_funcionario']] ?? [];
+        $_SESSION['employee_permissions'] = $permissions;
+    }
     /**
      * Método de login atualizado e corrigido para funcionários
      * Esta versão resolve o problema de escopo de variável que impedia

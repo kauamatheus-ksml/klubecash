@@ -1,160 +1,130 @@
 <?php
-// api/employees.php - VERSÃO CORRIGIDA
-header('Content-Type: application/json; charset=UTF-8');
+// api/employees.php
+header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
+header('Access-Control-Allow-Headers: Content-Type');
 
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    exit(0);
-}
-
-require_once __DIR__ . '/../config/database.php';
-require_once __DIR__ . '/../config/constants.php';
-require_once __DIR__ . '/../controllers/AuthController.php';
-require_once __DIR__ . '/../controllers/StoreController.php';
+require_once '../config/database.php';
+require_once '../config/constants.php';
+require_once '../controllers/AuthController.php';
+require_once '../controllers/StoreController.php';
 
 session_start();
 
-// CORREÇÃO PRINCIPAL: Trocar isLoggedIn() por isAuthenticated()
-if (!AuthController::isAuthenticated() || !isset($_SESSION['user_type']) || $_SESSION['user_type'] !== USER_TYPE_STORE) {
+// Verificar autenticação
+if (!AuthController::hasStoreAccess()) {
     http_response_code(401);
-    echo json_encode(['status' => false, 'message' => 'Acesso não autorizado']);
+    echo json_encode(['status' => false, 'message' => 'Acesso negado']);
     exit;
 }
 
 $method = $_SERVER['REQUEST_METHOD'];
+$action = $_GET['action'] ?? '';
 
 switch ($method) {
     case 'GET':
-        handleGetRequest();
+        if ($action === 'list') {
+            handleListEmployees();
+        } else {
+            handleGetEmployee();
+        }
         break;
+        
     case 'POST':
-        handlePostRequest();
+        handleCreateEmployee();
         break;
+        
     case 'PUT':
-        handlePutRequest();
+        handleUpdateEmployee();
         break;
+        
     case 'DELETE':
-        handleDeleteRequest();
+        handleDeleteEmployee();
         break;
+        
     default:
         http_response_code(405);
         echo json_encode(['status' => false, 'message' => 'Método não permitido']);
-        break;
 }
 
-function handleGetRequest() {
-    $employeeId = isset($_GET['id']) ? intval($_GET['id']) : null;
-    
-    if ($employeeId) {
-        // Buscar funcionário específico
-        try {
-            $db = Database::getConnection();
-            $storeId = getStoreId();
-            
-            if (!$storeId) {
-                echo json_encode(['status' => false, 'message' => 'Loja não encontrada']);
-                return;
-            }
-            
-            $stmt = $db->prepare("
-                SELECT id, nome, email, telefone, subtipo_funcionario, status, data_criacao
-                FROM usuarios 
-                WHERE id = ? AND loja_vinculada_id = ? AND tipo = 'funcionario'
-            ");
-            $stmt->execute([$employeeId, $storeId]);
-            
-            $employee = $stmt->fetch(PDO::FETCH_ASSOC);
-            
-            if ($employee) {
-                echo json_encode(['status' => true, 'data' => ['funcionario' => $employee]]);
-            } else {
-                echo json_encode(['status' => false, 'message' => 'Funcionário não encontrado']);
-            }
-            
-        } catch (PDOException $e) {
-            error_log('Erro ao buscar funcionário: ' . $e->getMessage());
-            echo json_encode(['status' => false, 'message' => 'Erro interno do servidor']);
-        }
-    } else {
-        // Listar funcionários
-        $page = isset($_GET['page']) ? intval($_GET['page']) : 1;
-        $filters = [];
-        
-        if (!empty($_GET['subtipo']) && $_GET['subtipo'] !== 'todos') {
-            $filters['subtipo'] = $_GET['subtipo'];
-        }
-        if (!empty($_GET['status']) && $_GET['status'] !== 'todos') {
-            $filters['status'] = $_GET['status'];
-        }
-        if (!empty($_GET['busca'])) {
-            $filters['busca'] = trim($_GET['busca']);
-        }
-        
-        $result = StoreController::getEmployees($filters, $page);
-        echo json_encode($result);
+function handleCreateEmployee() {
+    if (!AuthController::canManageEmployees()) {
+        http_response_code(403);
+        echo json_encode(['status' => false, 'message' => 'Permissão negada']);
+        return;
     }
-}
-
-function handlePostRequest() {
+    
     $data = json_decode(file_get_contents('php://input'), true);
     
     if (!$data) {
-        echo json_encode(['status' => false, 'message' => 'Dados não fornecidos']);
-        return;
+        $data = $_POST; // Fallback para form-data
     }
     
     $result = StoreController::createEmployee($data);
+    
+    http_response_code($result['status'] ? 200 : 400);
     echo json_encode($result);
 }
 
-function handlePutRequest() {
-    $employeeId = isset($_GET['id']) ? intval($_GET['id']) : null;
+function handleListEmployees() {
+    $page = (int)($_GET['page'] ?? 1);
+    $limit = (int)($_GET['limit'] ?? 10);
+    $search = $_GET['search'] ?? '';
+    $status = $_GET['status'] ?? '';
+    $subtipo = $_GET['subtipo'] ?? '';
     
-    if (!$employeeId) {
-        echo json_encode(['status' => false, 'message' => 'ID do funcionário não fornecido']);
+    $result = StoreController::listEmployees([
+        'page' => $page,
+        'limit' => $limit,
+        'search' => $search,
+        'status' => $status,
+        'subtipo' => $subtipo
+    ]);
+    
+    echo json_encode($result);
+}
+
+function handleUpdateEmployee() {
+    if (!AuthController::canManageEmployees()) {
+        http_response_code(403);
+        echo json_encode(['status' => false, 'message' => 'Permissão negada']);
         return;
     }
     
+    $employeeId = (int)($_GET['id'] ?? 0);
     $data = json_decode(file_get_contents('php://input'), true);
     
-    if (!$data) {
-        echo json_encode(['status' => false, 'message' => 'Dados não fornecidos']);
+    if (!$employeeId) {
+        http_response_code(400);
+        echo json_encode(['status' => false, 'message' => 'ID do funcionário obrigatório']);
         return;
     }
     
-    // Corrigir a chamada do método (passando dois parâmetros)
     $result = StoreController::updateEmployee($employeeId, $data);
+    
+    http_response_code($result['status'] ? 200 : 400);
     echo json_encode($result);
 }
 
-function handleDeleteRequest() {
-    $employeeId = isset($_GET['id']) ? intval($_GET['id']) : null;
+function handleDeleteEmployee() {
+    if (!AuthController::canManageEmployees()) {
+        http_response_code(403);
+        echo json_encode(['status' => false, 'message' => 'Permissão negada']);
+        return;
+    }
+    
+    $employeeId = (int)($_GET['id'] ?? 0);
     
     if (!$employeeId) {
-        echo json_encode(['status' => false, 'message' => 'ID do funcionário não fornecido']);
+        http_response_code(400);
+        echo json_encode(['status' => false, 'message' => 'ID do funcionário obrigatório']);
         return;
     }
     
     $result = StoreController::deleteEmployee($employeeId);
+    
+    http_response_code($result['status'] ? 200 : 400);
     echo json_encode($result);
-}
-
-function getStoreId() {
-    try {
-        $db = Database::getConnection();
-        $userId = $_SESSION['user_id'];
-        
-        $stmt = $db->prepare("SELECT id FROM lojas WHERE usuario_id = ?");
-        $stmt->execute([$userId]);
-        
-        $store = $stmt->fetch(PDO::FETCH_ASSOC);
-        return $store ? $store['id'] : null;
-        
-    } catch (PDOException $e) {
-        error_log('Erro ao obter ID da loja: ' . $e->getMessage());
-        return null;
-    }
 }
 ?>

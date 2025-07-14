@@ -751,31 +751,41 @@ class StoreController {
      */
     public static function createEmployee($data) {
         try {
-            if (!self::validateStore()) {
-                return ['status' => false, 'message' => 'Acesso restrito a lojistas.'];
+            // NOVA VERIFICAÇÃO
+            if (!AuthController::hasStoreAccess()) {
+                return ['status' => false, 'message' => 'Acesso negado.'];
             }
             
-            $storeId = self::getStoreId();
+            if (!AuthController::canManageEmployees()) {
+                return ['status' => false, 'message' => 'Apenas lojistas e gerentes podem criar funcionários.'];
+            }
+            
+            // USAR NOVO MÉTODO
+            $storeId = AuthController::getStoreId();
             if (!$storeId) {
                 return ['status' => false, 'message' => 'Loja não encontrada.'];
             }
             
-            // Validações
+            // Validações existentes continuam...
             $errors = [];
             
-            if (empty($data['nome']) || !Validator::validaNome($data['nome'])) {
+            if (empty($data['nome']) || strlen(trim($data['nome'])) < 3) {
                 $errors[] = 'Nome deve ter pelo menos 3 caracteres.';
             }
             
-            if (empty($data['email']) || !Validator::validaEmail($data['email'])) {
+            if (empty($data['email']) || !filter_var($data['email'], FILTER_VALIDATE_EMAIL)) {
                 $errors[] = 'E-mail inválido.';
             }
             
-            if (empty($data['subtipo_funcionario']) || !in_array($data['subtipo_funcionario'], [EMPLOYEE_TYPE_FINANCIAL, EMPLOYEE_TYPE_MANAGER, EMPLOYEE_TYPE_SELLER])) {
+            if (empty($data['subtipo_funcionario']) || !in_array($data['subtipo_funcionario'], [
+                EMPLOYEE_TYPE_MANAGER, 
+                EMPLOYEE_TYPE_FINANCIAL, 
+                EMPLOYEE_TYPE_SALESPERSON
+            ])) {
                 $errors[] = 'Tipo de funcionário inválido.';
             }
             
-            if (empty($data['senha']) || !Validator::validaSenha($data['senha'], PASSWORD_MIN_LENGTH)) {
+            if (empty($data['senha']) || strlen($data['senha']) < PASSWORD_MIN_LENGTH) {
                 $errors[] = 'Senha deve ter pelo menos ' . PASSWORD_MIN_LENGTH . ' caracteres.';
             }
             
@@ -793,30 +803,39 @@ class StoreController {
                 return ['status' => false, 'message' => 'Este e-mail já está cadastrado.'];
             }
             
-            // Criar novo funcionário
+            // Criar funcionário
             $senhaHash = password_hash($data['senha'], PASSWORD_DEFAULT);
             
             $insertStmt = $db->prepare("
-                INSERT INTO usuarios (nome, email, telefone, senha_hash, tipo, subtipo_funcionario, loja_vinculada_id, status, data_criacao) 
-                VALUES (?, ?, ?, ?, 'funcionario', ?, ?, 'ativo', NOW())
+                INSERT INTO usuarios (
+                    nome, email, telefone, senha_hash, tipo, 
+                    subtipo_funcionario, loja_vinculada_id, status, data_criacao
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
             ");
             
             $success = $insertStmt->execute([
-                $data['nome'],
-                $data['email'],
-                $data['telefone'] ?? '',
+                trim($data['nome']),
+                trim($data['email']),
+                trim($data['telefone'] ?? ''),
                 $senhaHash,
+                USER_TYPE_EMPLOYEE,
                 $data['subtipo_funcionario'],
-                $storeId
+                $storeId,
+                USER_ACTIVE
             ]);
             
             if ($success) {
-                return ['status' => true, 'message' => 'Funcionário criado com sucesso!'];
+                $funcionarioId = $db->lastInsertId();
+                
+                // Log da criação
+                error_log("Funcionário criado - ID: {$funcionarioId}, Loja: {$storeId}, Criado por: {$_SESSION['user_id']}");
+                
+                return ['status' => true, 'message' => 'Funcionário criado com sucesso!', 'id' => $funcionarioId];
             } else {
                 return ['status' => false, 'message' => 'Erro ao criar funcionário.'];
             }
             
-        } catch (PDOException $e) {
+        } catch (Exception $e) {
             error_log('Erro ao criar funcionário: ' . $e->getMessage());
             return ['status' => false, 'message' => 'Erro interno do servidor.'];
         }
