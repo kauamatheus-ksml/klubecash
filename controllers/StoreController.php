@@ -803,6 +803,41 @@ class StoreController {
                 return ['status' => false, 'message' => 'Este e-mail já está cadastrado.'];
             }
             
+            // CORREÇÃO: Verificar se loja existe na tabela lojas
+            $checkLoja = $db->prepare("SELECT id FROM lojas WHERE id = ?");
+            $checkLoja->execute([$storeId]);
+            $lojaExists = $checkLoja->rowCount() > 0;
+            
+            $finalStoreId = $storeId;
+            
+            // Se loja não existe, criar na tabela lojas
+            if (!$lojaExists) {
+                $lojista = $db->prepare("SELECT * FROM usuarios WHERE id = ? AND tipo = 'loja'");
+                $lojista->execute([$storeId]);
+                $lojistaData = $lojista->fetch();
+                
+                if ($lojistaData) {
+                    $createLoja = $db->prepare("
+                        INSERT INTO lojas (
+                            usuario_id, nome_fantasia, razao_social, cnpj, 
+                            email, telefone, porcentagem_cashback, status
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'aprovado')
+                    ");
+                    
+                    $createLoja->execute([
+                        $storeId,
+                        $lojistaData['nome'],
+                        $lojistaData['nome'],
+                        '00000000000191', // CNPJ temporário
+                        $lojistaData['email'],
+                        $lojistaData['telefone'] ?? '11999999999',
+                        10.00
+                    ]);
+                    
+                    $finalStoreId = $db->lastInsertId();
+                }
+            }
+            
             // Criar funcionário
             $senhaHash = password_hash($data['senha'], PASSWORD_DEFAULT);
             
@@ -820,7 +855,7 @@ class StoreController {
                 $senhaHash,
                 USER_TYPE_EMPLOYEE,
                 $data['subtipo_funcionario'],
-                $storeId,
+                $finalStoreId,
                 USER_ACTIVE
             ]);
             
@@ -828,7 +863,7 @@ class StoreController {
                 $funcionarioId = $db->lastInsertId();
                 
                 // Log da criação
-                error_log("Funcionário criado - ID: {$funcionarioId}, Loja: {$storeId}, Criado por: {$_SESSION['user_id']}");
+                error_log("Funcionário criado - ID: {$funcionarioId}, Loja: {$finalStoreId}, Criado por: {$_SESSION['user_id']}");
                 
                 return ['status' => true, 'message' => 'Funcionário criado com sucesso!', 'id' => $funcionarioId];
             } else {
