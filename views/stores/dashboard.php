@@ -10,17 +10,6 @@ require_once '../../controllers/TransactionController.php';
 // Iniciar sessão e verificar autenticação
 session_start();
 
-// NOVA VERIFICAÇÃO: Acesso à área de loja (lojistas + funcionários)
-AuthController::requireStoreAccess();
-
-// NOVA VERIFICAÇÃO: Permissão específica para dashboard
-AuthController::requirePermission(MODULO_DASHBOARD, ACAO_VER);
-
-// NOVA BUSCA: Obter dados da loja (funciona para lojistas e funcionários)
-$storeId = AuthController::getStoreId();
-$storeData = AuthController::getStoreData();
-
-
 if (!AuthController::hasStoreAccess()) {
     header("Location: " . LOGIN_URL . "?error=acesso_restrito");
     exit;
@@ -58,14 +47,7 @@ if ($storeQuery->rowCount() == 0) {
     header('Location: ' . LOGIN_URL . '?error=' . urlencode('Sua conta não está associada a nenhuma loja. Entre em contato com o suporte.'));
     exit;
 }
-// Informações do usuário atual (pode ser lojista ou funcionário)
-$currentUser = [
-    'id' => $_SESSION['user_id'],
-    'name' => $_SESSION['user_name'],
-    'type' => $_SESSION['user_type'],
-    'is_employee' => AuthController::isEmployee(),
-    'employee_subtype' => $_SESSION['employee_subtype'] ?? null
-];
+
 // Obter os dados da loja
 $store = $storeQuery->fetch(PDO::FETCH_ASSOC);
 $storeId = $store['id'];

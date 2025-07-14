@@ -10,8 +10,6 @@ require_once '../../controllers/CommissionController.php';
 
 // Iniciar sessão e verificar autenticação
 session_start();
-AuthController::requireStoreAccess();
-AuthController::requirePermission(MODULO_TRANSACOES, ACAO_CRIAR);
 
 
 // Verificar acesso e permissão para criar transações
