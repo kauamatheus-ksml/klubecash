@@ -227,7 +227,43 @@ class AuthController {
 
     public static function getStoreId() {
         if (self::isStore()) {
-            return $_SESSION['user_id'];
+            // Para lojistas, buscar ID na tabela lojas baseado no usuario_id
+            try {
+                $db = Database::getConnection();
+                $stmt = $db->prepare("SELECT id FROM lojas WHERE usuario_id = ?");
+                $stmt->execute([$_SESSION['user_id']]);
+                $loja = $stmt->fetch();
+                
+                if ($loja) {
+                    return $loja['id'];
+                } else {
+                    // Se não existe, criar registro na tabela lojas
+                    $userStmt = $db->prepare("SELECT * FROM usuarios WHERE id = ? AND tipo = 'loja'");
+                    $userStmt->execute([$_SESSION['user_id']]);
+                    $userData = $userStmt->fetch();
+                    
+                    if ($userData) {
+                        $createStmt = $db->prepare("
+                            INSERT INTO lojas (usuario_id, nome_fantasia, razao_social, cnpj, email, telefone, porcentagem_cashback, status) 
+                            VALUES (?, ?, ?, ?, ?, ?, ?, 'aprovado')
+                        ");
+                        $createStmt->execute([
+                            $_SESSION['user_id'],
+                            $userData['nome'],
+                            $userData['nome'],
+                            '00000000000191',
+                            $userData['email'],
+                            $userData['telefone'] ?? '11999999999',
+                            10.00
+                        ]);
+                        return $db->lastInsertId();
+                    }
+                }
+            } catch (Exception $e) {
+                error_log('Erro getStoreId: ' . $e->getMessage());
+            }
+            
+            return $_SESSION['user_id']; // Fallback
         } elseif (self::isEmployee()) {
             return $_SESSION['store_id'] ?? null;
         }
