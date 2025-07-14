@@ -236,8 +236,7 @@ $permissions = [
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    <link rel="stylesheet" href="../../assets/css/views/admin/users.css">
-    <link rel="stylesheet" href="../../assets/css/layout-fix.css">
+    <link rel="stylesheet" href="../../assets/css/stores/employees.css">
 </head>
 <body>
     <?php include_once '../components/sidebar-store.php'; ?>
