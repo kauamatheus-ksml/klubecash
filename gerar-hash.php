@@ -1,11 +1,18 @@
 <?php
-// gerar-hash.php - Arquivo temporário para gerar hash de senha
-// DELETAR APÓS O USO por segurança
-
+// gerar-hash-novo.php - Gerando hash com verificação de integridade
 $senha = '123456';
 $hash = password_hash($senha, PASSWORD_DEFAULT);
 
+echo "Nova tentativa de hash:\n";
 echo "Senha: {$senha}\n";
-echo "Hash gerado: {$hash}\n";
-echo "\nCopie o hash acima para usar nos comandos SQL.\n";
+echo "Hash: {$hash}\n";
+echo "Comprimento: " . strlen($hash) . " caracteres\n";
+echo "Deve ser exatamente 60 caracteres\n";
+
+// Vamos verificar se este hash funciona corretamente
+if (password_verify($senha, $hash)) {
+    echo "✅ Verificação passou - Este hash está correto\n";
+} else {
+    echo "❌ Verificação falhou - Problema no hash\n";
+}
 ?>
