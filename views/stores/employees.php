@@ -237,18 +237,32 @@ if (isset($_GET['test_create'])) {
                     $lojista->execute([$storeId]);
                     $lojistaData = $lojista->fetch();
                     
-                    // INSERT com colunas que existem (ajustar conforme estrutura mostrada)
+                    // INSERT com colunas corretas da tabela lojas
                     $createLoja = $db->prepare("
-                        INSERT INTO lojas (id, status, data_criacao) 
-                        VALUES (?, 'aprovado', NOW())
+                        INSERT INTO lojas (
+                            usuario_id, nome_fantasia, razao_social, cnpj, 
+                            email, telefone, porcentagem_cashback, status, data_cadastro
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'aprovado', NOW())
                     ");
                     
-                    $lojaCreated = $createLoja->execute([$storeId]);
+                    $lojaCreated = $createLoja->execute([
+                        $storeId,
+                        $lojistaData['nome'],
+                        $lojistaData['nome'], 
+                        '00000000000191', // CNPJ fake para teste
+                        $lojistaData['email'],
+                        $lojistaData['telefone'] ?? '11999999999',
+                        10.00 // porcentagem padrão
+                    ]);
                     
                     echo "<p><strong>11. Loja criada:</strong> " . ($lojaCreated ? 'SIM' : 'NÃO') . "</p>";
                     
                     if ($lojaCreated) {
+                        // Buscar o ID gerado
+                        $newLojaId = $db->lastInsertId();
+                        echo "<p><strong>12. Nova loja ID:</strong> " . $newLojaId . "</p>";
                         $lojaExists = true;
+                        $storeId = $newLojaId; // Usar o novo ID para o funcionário
                     }
                 }
             }
