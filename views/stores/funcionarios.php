@@ -6,10 +6,11 @@ require_once '../../controllers/AuthController.php';
 require_once '../../utils/PermissionManager.php';
 
 session_start();
+AuthController::requireStoreAccess();
 
-// Verificar se está logado e tem acesso (lojista apenas)
-if (!AuthController::isStoreOwner()) {
-    header("Location: " . LOGIN_URL . "?error=acesso_restrito");
+// Esta página só pode ser acessada por lojistas e gerentes
+if (!AuthController::canManageEmployees()) {
+    header("Location: " . STORE_DASHBOARD_URL . "?error=permission_denied");
     exit;
 }
 

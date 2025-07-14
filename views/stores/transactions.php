@@ -8,12 +8,10 @@ require_once '../../controllers/TransactionController.php';
 
 // Iniciar sessão e verificar autenticação
 session_start();
+AuthController::requireStoreAccess();
+AuthController::requirePermission(MODULO_TRANSACOES, ACAO_VER);
 
-// Verificar se o usuário está logado
-if (!AuthController::isAuthenticated()) {
-    header('Location: ' . LOGIN_URL . '?error=' . urlencode('Você precisa fazer login para acessar esta página.'));
-    exit;
-}
+
 
 // Verificar se o usuário é do tipo loja
 if (!AuthController::isStore()) {
