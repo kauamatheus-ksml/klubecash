@@ -1,232 +1,63 @@
 <?php
-/**
- * Página de Gestão de Funcionários - Sistema Klube Cash
- * 
- * Esta página foi expandida para trabalhar com um sistema de controle de acesso
- * granular, permitindo que tanto lojistas quanto funcionários específicos
- * (do tipo gerente) possam gerenciar a equipe.
- * 
- * Localização: views/stores/employees.php
- * Estrutura: Mantém compatibilidade total com o sistema existente
- */
-
-// Definir o menu ativo para a sidebar
-$activeMenu = 'funcionarios';
-
-// Incluir dependências necessárias para o funcionamento
+// views/store/funcionarios.php
 require_once '../../config/database.php';
 require_once '../../config/constants.php';
-require_once '../../controllers/StoreController.php';
+require_once '../../controllers/AuthController.php';
+require_once '../../utils/PermissionManager.php';
 
-// Iniciar sessão apenas se não estiver ativa
-// Esta verificação previne erros de "headers already sent"
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+session_start();
 
-// === SISTEMA DE CONTROLE DE ACESSO EXPANDIDO ===
-// Esta seção substitui a verificação simples anterior por um sistema mais sofisticado
-// que compreende diferentes tipos de usuário e suas permissões específicas
-
-// Primeiro, verificar se o usuário está logado
-// Esta é nossa primeira linha de defesa contra acessos não autorizados
-if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type'])) {
-    header("Location: /login?error=session_expired");
+// Verificar se está logado e tem acesso (lojista apenas)
+if (!AuthController::isStoreOwner()) {
+    header("Location: " . LOGIN_URL . "?error=acesso_restrito");
     exit;
 }
 
-// Capturar informações do usuário para análise de permissões
-// Estas variáveis nos ajudam a entender quem está acessando o sistema
-$userType = $_SESSION['user_type'];
-$userId = $_SESSION['user_id'];
-$userName = $_SESSION['user_name'] ?? 'Usuário';
+$pageTitle = "Gerenciar Funcionários";
+$errors = [];
+$success = '';
 
-// Definir variáveis de controle que usaremos em toda a página
-// Estas variáveis tornam o código mais legível e fácil de manter
-$isLojista = ($userType === USER_TYPE_STORE);
-$isFuncionario = ($userType === 'funcionario');
-
-// Para funcionários, precisamos verificar o subtipo para determinar permissões
-$subtipoFuncionario = '';
-$isGerente = false;
-
-if ($isFuncionario) {
-    // Capturar o subtipo do funcionário se estiver disponível na sessão
-    $subtipoFuncionario = $_SESSION['subtipo_funcionario'] ?? '';
-    
-    // Determinar se é um gerente (tipo de funcionário com mais permissões)
-    $isGerente = ($subtipoFuncionario === 'gerente');
-}
-
-// Implementar a lógica de controle de acesso
-// Esta é a parte mais importante: determinar quem pode gerenciar funcionários
-$hasAccess = false;
-$accessLevel = '';
-
-if ($isLojista) {
-    // Lojistas sempre têm acesso total a todas as funcionalidades
-    $hasAccess = true;
-    $accessLevel = 'total'; // Acesso total permite criar, editar e desativar funcionários
-    
-} elseif ($isFuncionario && $isGerente) {
-    // Gerentes têm acesso limitado: podem criar e editar, mas não desativar
-    $hasAccess = true;
-    $accessLevel = 'limitado'; // Acesso limitado exclui algumas ações críticas
-    
-} else {
-    // Outros tipos de funcionário (financeiro, vendedor) não têm acesso
-    $hasAccess = false;
-    $accessLevel = 'negado';
-}
-
-// Se não tem acesso, redirecionar com mensagem explicativa
-if (!$hasAccess) {
-    // Redirecionar para o dashboard com uma mensagem clara sobre a restrição
-    header("Location: " . STORE_DASHBOARD_URL . "?error=access_denied&message=" . urlencode("Apenas lojistas e gerentes podem gerenciar funcionários"));
-    exit;
-}
-
-// Registrar o acesso para fins de auditoria (opcional, mas recomendado)
-// Em sistemas empresariais, é importante manter logs de quem acessa funcionalidades sensíveis
-error_log("Acesso à gestão de funcionários - Usuário: {$userName} (ID: {$userId}), Tipo: {$userType}, Nível: {$accessLevel}");
-
-// === FIM DO SISTEMA DE CONTROLE DE ACESSO ===
-
-// === PROCESSAMENTO DE FILTROS E PAGINAÇÃO ===
-// Esta seção mantém toda a funcionalidade original de filtros e paginação
-// mas agora funciona dentro do contexto do novo sistema de permissões
-
-// Inicializar variáveis para paginação
-// A paginação ajuda a melhorar a performance quando há muitos funcionários
-$page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
-$filters = [];
-
-// Processar filtros vindos da URL (GET parameters)
-// Os filtros permitem que os usuários encontrem funcionários específicos rapidamente
-if ($_SERVER['REQUEST_METHOD'] === 'GET' && !empty($_GET)) {
-    
-    // Filtro por subtipo de funcionário (gerente, financeiro, vendedor)
-    if (!empty($_GET['subtipo']) && $_GET['subtipo'] !== 'todos') {
-        $filters['subtipo'] = $_GET['subtipo'];
-    }
-    
-    // Filtro por status (ativo, inativo)
-    if (!empty($_GET['status']) && $_GET['status'] !== 'todos') {
-        $filters['status'] = $_GET['status'];
-    }
-    
-    // Filtro de busca por texto (nome ou email)
-    if (!empty($_GET['busca'])) {
-        // Usar trim() para remover espaços em branco desnecessários
-        $filters['busca'] = trim($_GET['busca']);
+// Processar ações do formulário
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (isset($_POST['action'])) {
+        switch ($_POST['action']) {
+            case 'criar_funcionario':
+                // Código para criar funcionário (já existe no StoreController)
+                break;
+                
+            case 'atualizar_permissoes':
+                $funcionarioId = (int)$_POST['funcionario_id'];
+                $lojaId = $_SESSION['loja_vinculada_id'] ?? 0;
+                
+                // Atualizar todas as permissões
+                foreach (PERMISSOES_MAPA as $modulo => $config) {
+                    foreach ($config['acoes'] as $acao => $descricao) {
+                        $key = "perm_{$modulo}_{$acao}";
+                        $permitido = isset($_POST[$key]) ? true : false;
+                        
+                        PermissionManager::setPermission($funcionarioId, $lojaId, $modulo, $acao, $permitido);
+                    }
+                }
+                
+                $success = "Permissões atualizadas com sucesso!";
+                break;
+        }
     }
 }
 
-// === CARREGAMENTO DE DADOS COM TRATAMENTO DE ERROS ===
-// Esta seção busca os dados dos funcionários e trata possíveis erros
-// O tratamento robusto de erros é essencial para uma boa experiência do usuário
+// Buscar funcionários da loja
+$db = Database::getConnection();
+$stmt = $db->prepare("
+    SELECT id, nome, email, subtipo_funcionario, status, data_criacao
+    FROM usuarios 
+    WHERE loja_vinculada_id = ? AND tipo = 'funcionario'
+    ORDER BY nome
+");
+$stmt->execute([$_SESSION['loja_vinculada_id']]);
+$funcionarios = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-try {
-    // Chamar o controller para obter dados dos funcionários
-    // O StoreController já existe e funciona, apenas estamos expandindo seu uso
-    $result = StoreController::getEmployees($filters, $page);
-    
-    // Verificar se a operação foi bem-sucedida
-    $hasError = !$result['status'];
-    $errorMessage = $hasError ? $result['message'] : '';
-    
-    // Extrair dados do resultado ou definir arrays vazios em caso de erro
-    // Esta abordagem defensiva previne erros de "undefined index"
-    $employees = $hasError ? [] : ($result['data']['funcionarios'] ?? []);
-    $statistics = $hasError ? [] : ($result['data']['estatisticas'] ?? []);
-    $pagination = $hasError ? [] : ($result['data']['paginacao'] ?? []);
-    
-    // Adicionar informações sobre o nível de acesso aos dados
-    // Isso permite que o frontend adapte a interface baseada nas permissões
-    $pageData = [
-        'access_level' => $accessLevel,
-        'is_lojista' => $isLojista,
-        'is_gerente' => $isGerente,
-        'user_name' => $userName,
-        'can_create' => ($accessLevel === 'total' || $accessLevel === 'limitado'),
-        'can_edit' => ($accessLevel === 'total' || $accessLevel === 'limitado'),
-        'can_delete' => ($accessLevel === 'total'), // Apenas lojistas podem desativar
-    ];
-    
-} catch (Exception $e) {
-    // Em caso de exceção, registrar o erro e preparar dados de fallback
-    // O tratamento de exceções é crucial para evitar que a página "quebre"
-    
-    $hasError = true;
-    $errorMessage = "Erro ao processar a requisição: " . $e->getMessage();
-    
-    // Definir arrays vazios para evitar erros no template
-    $employees = [];
-    $statistics = [];
-    $pagination = [];
-    
-    // Registrar o erro para análise posterior
-    error_log("Erro na página de funcionários - Usuário: {$userName}, Erro: " . $e->getMessage());
-    
-    // Definir dados de página mesmo em caso de erro
-    $pageData = [
-        'access_level' => $accessLevel,
-        'is_lojista' => $isLojista,
-        'is_gerente' => $isGerente,
-        'user_name' => $userName,
-        'can_create' => false, // Em caso de erro, desabilitar ações críticas
-        'can_edit' => false,
-        'can_delete' => false,
-    ];
-}
-
-// === PREPARAÇÃO DE DADOS PARA O TEMPLATE ===
-// Organizar todas as informações que serão utilizadas na renderização da página
-
-// Preparar mensagens contextuais baseadas no tipo de usuário
-if ($isLojista) {
-    $pageTitle = "Gerenciar Funcionários";
-    $pageSubtitle = "Gerencie todos os funcionários da sua loja";
-    $welcomeMessage = "Como lojista, você tem controle total sobre sua equipe.";
-} elseif ($isGerente) {
-    $pageTitle = "Gerenciar Equipe";
-    $pageSubtitle = "Gerencie funcionários (acesso de gerente)";
-    $welcomeMessage = "Como gerente, você pode cadastrar e editar funcionários da equipe.";
-}
-
-// Preparar dados de estatísticas com valores padrão
-// Isso previne erros quando as estatísticas não estão disponíveis
-$stats = [
-    'total_funcionarios' => $statistics['total_funcionarios'] ?? 0,
-    'total_financeiro' => $statistics['total_financeiro'] ?? 0,
-    'total_gerente' => $statistics['total_gerente'] ?? 0,
-    'total_vendedor' => $statistics['total_vendedor'] ?? 0,
-    'funcionarios_ativos' => $statistics['funcionarios_ativos'] ?? 0,
-    'funcionarios_inativos' => $statistics['funcionarios_inativos'] ?? 0,
-];
-
-// Preparar informações de paginação com valores padrão
-$paginationInfo = [
-    'current_page' => $page,
-    'total_pages' => $pagination['total_paginas'] ?? 1,
-    'per_page' => $pagination['por_pagina'] ?? 10,
-    'total_records' => $pagination['total'] ?? 0,
-];
-
-// Definir permissões específicas para uso no JavaScript
-// Estas permissões serão convertidas para JSON e usadas no frontend
-$permissions = [
-    'can_create_employee' => $pageData['can_create'],
-    'can_edit_employee' => $pageData['can_edit'],
-    'can_delete_employee' => $pageData['can_delete'],
-    'can_create_manager' => $isLojista, // Apenas lojistas podem criar outros gerentes
-    'access_level' => $accessLevel,
-    'user_type' => $userType,
-    'subtipo_funcionario' => $subtipoFuncionario,
-];
-
+include_once '../components/header.php';
 ?>
-
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -235,657 +66,346 @@ $permissions = [
     <title>Gerenciar Funcionários - Klube Cash</title>
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
     
+    <!-- CSS Framework -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    <link rel="stylesheet" href="../../assets/css/views/admin/users.css">
-    <link rel="stylesheet" href="../../assets/css/layout-fix.css">
-</head>
-<body>
-    <?php include_once '../components/sidebar-store.php'; ?>
     
-    <div class="main-content" id="mainContent">
-        <div class="page-wrapper">
-            <!-- Cabeçalho -->
-            <div class="page-header">
-                <div class="page-title">
-                    <h1><i class="fas fa-user-tie"></i> Gerenciar Funcionários</h1>
-                    <p>Gerencie os funcionários da sua loja</p>
-                </div>
-                <div class="page-actions">
-                    <button class="btn btn-primary" onclick="showEmployeeModal()">
-                        <i class="fas fa-plus"></i> Novo Funcionário
-                    </button>
-                </div>
+    <!-- CSS Customizado -->
+    
+    <link rel="stylesheet" href="../../assets/css/employees-layout-fix.css">
+</head>
+<body class="employees-page">
+
+<div class="container-fluid">
+    <div class="row">
+        <?php include_once '../components/sidebar.php'; ?>
+        
+        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+            <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                <h1 class="h2">
+                    <i class="fas fa-users me-2"></i>
+                    Gerenciar Funcionários
+                </h1>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNovoFuncionario">
+                    <i class="fas fa-plus me-1"></i>
+                    Novo Funcionário
+                </button>
             </div>
 
-            <!-- Estatísticas -->
-            <?php if (!$hasError && !empty($statistics)): ?>
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-icon">
-                        <i class="fas fa-user-tie"></i>
-                    </div>
-                    <div class="stat-content">
-                        <h3><?php echo number_format($statistics['total_funcionarios']); ?></h3>
-                        <p>Total de Funcionários</p>
-                    </div>
+            <?php if ($success): ?>
+                <div class="alert alert-success alert-dismissible fade show">
+                    <i class="fas fa-check-circle me-2"></i>
+                    <?= htmlspecialchars($success) ?>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-icon financial">
-                        <i class="fas fa-calculator"></i>
-                    </div>
-                    <div class="stat-content">
-                        <h3><?php echo number_format($statistics['total_financeiro']); ?></h3>
-                        <p>Financeiro</p>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon manager">
-                        <i class="fas fa-user-shield"></i>
-                    </div>
-                    <div class="stat-content">
-                        <h3><?php echo number_format($statistics['total_gerente']); ?></h3>
-                        <p>Gerentes</p>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon seller">
-                        <i class="fas fa-handshake"></i>
-                    </div>
-                    <div class="stat-content">
-                        <h3><?php echo number_format($statistics['total_vendedor']); ?></h3>
-                        <p>Vendedores</p>
-                    </div>
-                </div>
-            </div>
             <?php endif; ?>
-            
-            <!-- Container de mensagens -->
-            <div id="messageContainer" class="alert-container"></div>
-            
-            <!-- Filtros -->
-            <div class="filters-section">
-                <form method="GET" class="filters-form" id="filtersForm">
-                    <div class="filter-group">
-                        <div class="search-bar">
-                            <input type="text" 
-                                   name="busca" 
-                                   id="searchInput"
-                                   placeholder="Buscar por nome ou email..." 
-                                   value="<?php echo htmlspecialchars($_GET['busca'] ?? ''); ?>">
-                            <button type="submit" class="search-btn">
-                                <i class="fas fa-search"></i>
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <div class="filter-group">
-                        <select name="subtipo" id="subtipoFilter">
-                            <option value="todos">Todos os tipos</option>
-                            <option value="financeiro" <?php echo (($_GET['subtipo'] ?? '') === 'financeiro') ? 'selected' : ''; ?>>Financeiro</option>
-                            <option value="gerente" <?php echo (($_GET['subtipo'] ?? '') === 'gerente') ? 'selected' : ''; ?>>Gerente</option>
-                            <option value="vendedor" <?php echo (($_GET['subtipo'] ?? '') === 'vendedor') ? 'selected' : ''; ?>>Vendedor</option>
-                        </select>
-                    </div>
-                    
-                    <div class="filter-group">
-                        <select name="status" id="statusFilter">
-                            <option value="todos">Todos os status</option>
-                            <option value="ativo" <?php echo (($_GET['status'] ?? '') === 'ativo') ? 'selected' : ''; ?>>Ativo</option>
-                            <option value="inativo" <?php echo (($_GET['status'] ?? '') === 'inativo') ? 'selected' : ''; ?>>Inativo</option>
-                        </select>
-                    </div>
-                    
-                    <div class="filter-group">
-                        <button type="button" class="btn btn-secondary" onclick="clearFilters()">
-                            <i class="fas fa-times"></i> Limpar
-                        </button>
-                    </div>
-                </form>
-            </div>
 
-            <?php if ($hasError): ?>
-                <div class="alert alert-danger">
-                    <i class="fas fa-exclamation-triangle"></i>
-                    <?php echo htmlspecialchars($errorMessage); ?>
-                </div>
-            <?php else: ?>
-            
-            <!-- Tabela de Funcionários -->
+            <!-- Lista de Funcionários -->
             <div class="card">
                 <div class="card-header">
-                    <h3>Lista de Funcionários</h3>
+                    <h5 class="mb-0">
+                        <i class="fas fa-list me-2"></i>
+                        Funcionários Cadastrados
+                    </h5>
                 </div>
-                
-                <div class="table-container">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Funcionário</th>
-                                <th>Tipo</th>
-                                <th>Status</th>
-                                <th>Data de Cadastro</th>
-                                <th>Último Login</th>
-                                <th class="actions-column">Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php if (empty($employees)): ?>
-                                <tr>
-                                    <td colspan="6" class="no-data">
-                                        <div class="no-data-content">
-                                            <i class="fas fa-user-tie"></i>
-                                            <h4>Nenhum funcionário encontrado</h4>
-                                            <p>Você ainda não cadastrou funcionários.</p>
-                                        </div>
-                                    </td>
-                                </tr>
-                            <?php else: ?>
-                                <?php foreach ($employees as $employee): ?>
+                <div class="card-body">
+                    <?php if (empty($funcionarios)): ?>
+                        <div class="text-center py-4">
+                            <i class="fas fa-user-plus fa-3x text-muted mb-3"></i>
+                            <h5 class="text-muted">Nenhum funcionário cadastrado</h5>
+                            <p class="text-muted">Clique em "Novo Funcionário" para adicionar o primeiro membro da sua equipe.</p>
+                        </div>
+                    <?php else: ?>
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
                                     <tr>
-                                        <td>
-                                            <div class="user-info">
-                                                <div class="user-avatar">
-                                                    <i class="fas fa-user-tie"></i>
-                                                </div>
-                                                <div class="user-details">
-                                                    <div class="user-name"><?php echo htmlspecialchars($employee['nome']); ?></div>
-                                                    <div class="user-email"><?php echo htmlspecialchars($employee['email']); ?></div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <span class="type-badge type-<?php echo $employee['subtipo_funcionario']; ?>">
-                                                <?php echo ucfirst($employee['subtipo_funcionario']); ?>
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <?php 
-                                                $statusClass = $employee['status'] === 'ativo' ? 'badge-success' : 'badge-warning';
-                                                $statusIcon = $employee['status'] === 'ativo' ? 'fas fa-check' : 'fas fa-pause';
-                                            ?>
-                                            <span class="badge <?php echo $statusClass; ?>">
-                                                <i class="<?php echo $statusIcon; ?>"></i>
-                                                <?php echo ucfirst($employee['status']); ?>
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <div class="date-info">
-                                                <div class="date-primary">
-                                                    <?php echo date('d/m/Y', strtotime($employee['data_criacao'])); ?>
-                                                </div>
-                                                <div class="date-secondary">
-                                                    <?php echo date('H:i', strtotime($employee['data_criacao'])); ?>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <div class="date-info">
-                                                <?php if ($employee['ultimo_login']): ?>
-                                                    <div class="date-primary">
-                                                        <?php echo date('d/m/Y', strtotime($employee['ultimo_login'])); ?>
-                                                    </div>
-                                                    <div class="date-secondary">
-                                                        <?php echo date('H:i', strtotime($employee['ultimo_login'])); ?>
-                                                    </div>
-                                                <?php else: ?>
-                                                    <span class="text-muted">Nunca</span>
-                                                <?php endif; ?>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <div class="table-actions">
-                                                <button class="action-btn edit" 
-                                                        onclick="editEmployee(<?php echo $employee['id']; ?>)"
-                                                        title="Editar funcionário">
-                                                    <i class="fas fa-edit"></i>
-                                                </button>
-                                                <button class="action-btn delete" 
-                                                        onclick="deleteEmployee(<?php echo $employee['id']; ?>, '<?php echo addslashes($employee['nome']); ?>')"
-                                                        title="Desativar funcionário">
-                                                    <i class="fas fa-trash"></i>
-                                                </button>
-                                            </div>
-                                        </td>
+                                        <th>Nome</th>
+                                        <th>E-mail</th>
+                                        <th>Tipo</th>
+                                        <th>Status</th>
+                                        <th>Data Cadastro</th>
+                                        <th>Ações</th>
                                     </tr>
-                                <?php endforeach; ?>
-                            <?php endif; ?>
-                        </tbody>
-                    </table>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($funcionarios as $funcionario): ?>
+                                        <tr>
+                                            <td>
+                                                <i class="fas fa-user me-2"></i>
+                                                <?= htmlspecialchars($funcionario['nome']) ?>
+                                            </td>
+                                            <td><?= htmlspecialchars($funcionario['email']) ?></td>
+                                            <td>
+                                                <?php
+                                                $badges = [
+                                                    'gerente' => 'bg-primary',
+                                                    'financeiro' => 'bg-success',
+                                                    'vendedor' => 'bg-info'
+                                                ];
+                                                $badgeClass = $badges[$funcionario['subtipo_funcionario']] ?? 'bg-secondary';
+                                                ?>
+                                                <span class="badge <?= $badgeClass ?>">
+                                                    <?= ucfirst($funcionario['subtipo_funcionario']) ?>
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <span class="badge <?= $funcionario['status'] === 'ativo' ? 'bg-success' : 'bg-danger' ?>">
+                                                    <?= ucfirst($funcionario['status']) ?>
+                                                </span>
+                                            </td>
+                                            <td><?= date('d/m/Y', strtotime($funcionario['data_criacao'])) ?></td>
+                                            <td>
+                                                <div class="btn-group" role="group">
+                                                    <button type="button" class="btn btn-sm btn-outline-primary" 
+                                                            onclick="editarPermissoes(<?= $funcionario['id'] ?>)">
+                                                        <i class="fas fa-key"></i>
+                                                        Permissões
+                                                    </button>
+                                                    <button type="button" class="btn btn-sm btn-outline-secondary">
+                                                        <i class="fas fa-edit"></i>
+                                                        Editar
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php endif; ?>
                 </div>
-                
-                <!-- Paginação -->
-                <?php if (!empty($pagination) && $pagination['total_paginas'] > 1): ?>
-                    <div class="pagination-wrapper">
-                        <div class="pagination-info">
-                            Mostrando <?php echo (($page - 1) * $pagination['por_pagina']) + 1; ?>-<?php echo min($page * $pagination['por_pagina'], $pagination['total']); ?> 
-                            de <?php echo $pagination['total']; ?> funcionários
-                        </div>
-                        <div class="pagination">
-                            <?php if ($page > 1): ?>
-                                <a href="?page=1<?php echo isset($_GET) ? '&' . http_build_query($_GET) : ''; ?>" class="pagination-arrow">
-                                    <i class="fas fa-angle-double-left"></i>
-                                </a>
-                                <a href="?page=<?php echo $page - 1; ?><?php echo isset($_GET) ? '&' . http_build_query($_GET) : ''; ?>" class="pagination-arrow">
-                                    <i class="fas fa-angle-left"></i>
-                                </a>
-                            <?php endif; ?>
-                            
-                            <?php 
-                                $startPage = max(1, $page - 2);
-                                $endPage = min($pagination['total_paginas'], $startPage + 4);
-                                
-                                for ($i = $startPage; $i <= $endPage; $i++): 
-                            ?>
-                                <a href="?page=<?php echo $i; ?><?php echo isset($_GET) ? '&' . http_build_query($_GET) : ''; ?>" 
-                                   class="pagination-item <?php echo ($i == $page) ? 'active' : ''; ?>">
-                                    <?php echo $i; ?>
-                                </a>
-                            <?php endfor; ?>
-                            
-                            <?php if ($page < $pagination['total_paginas']): ?>
-                                <a href="?page=<?php echo $page + 1; ?><?php echo isset($_GET) ? '&' . http_build_query($_GET) : ''; ?>" class="pagination-arrow">
-                                    <i class="fas fa-angle-right"></i>
-                                </a>
-                                <a href="?page=<?php echo $pagination['total_paginas']; ?><?php echo isset($_GET) ? '&' . http_build_query($_GET) : ''; ?>" class="pagination-arrow">
-                                    <i class="fas fa-angle-double-right"></i>
-                                </a>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                <?php endif; ?>
             </div>
-            <?php endif; ?>
-        </div>
+        </main>
     </div>
-    
-    <!-- Modal de Funcionário -->
-    <div class="modal" id="employeeModal">
+</div>
+
+<!-- Modal Novo Funcionário -->
+<div class="modal fade" id="modalNovoFuncionario" tabindex="-1">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h3 class="modal-title" id="employeeModalTitle">
-                    <i class="fas fa-user-plus"></i> Adicionar Funcionário
-                </h3>
-                <button class="modal-close" onclick="hideEmployeeModal()" type="button">
-                    <i class="fas fa-times"></i>
-                </button>
+                <h5 class="modal-title">
+                    <i class="fas fa-user-plus me-2"></i>
+                    Cadastrar Novo Funcionário
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            
-            <div class="modal-body">
-                <form id="employeeForm" onsubmit="submitEmployeeForm(event)">
-                    <input type="hidden" id="employeeId" name="id" value="">
+            <form method="POST" action="">
+                <div class="modal-body">
+                    <input type="hidden" name="action" value="criar_funcionario">
                     
-                    <div class="form-group">
-                        <label class="form-label required" for="employeeName">Nome Completo</label>
-                        <input type="text" 
-                               class="form-control" 
-                               id="employeeName" 
-                               name="nome" 
-                               required 
-                               placeholder="Digite o nome completo">
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label required" for="employeeEmail">E-mail</label>
-                        <input type="email" 
-                               class="form-control" 
-                               id="employeeEmail" 
-                               name="email" 
-                               required 
-                               placeholder="Digite o e-mail">
-                    </div>
-
-                    <div class="form-group">
-                        <label class="form-label" for="employeePhone">Telefone</label>
-                        <input type="tel" 
-                               class="form-control" 
-                               id="employeePhone" 
-                               name="telefone" 
-                               placeholder="(00) 00000-0000">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label class="form-label required" for="employeeType">Tipo de Funcionário</label>
-                        <select class="form-select" id="employeeType" name="subtipo_funcionario" required>
-                            <option value="">Selecione o tipo...</option>
-                            <option value="financeiro">Financeiro</option>
-                            <option value="gerente">Gerente</option>
-                            <option value="vendedor">Vendedor</option>
-                        </select>
-                    </div>
-                    
-                    <div class="form-group" id="passwordGroup">
-                        <label class="form-label required" for="employeePassword">Senha</label>
-                        <div class="password-input">
-                            <input type="password" 
-                                   class="form-control" 
-                                   id="employeePassword" 
-                                   name="senha"
-                                   placeholder="Digite a senha">
-                            <button type="button" class="password-toggle" onclick="togglePassword('employeePassword')">
-                                <i class="fas fa-eye"></i>
-                            </button>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label class="form-label">Nome Completo *</label>
+                            <input type="text" class="form-control" name="nome" required>
                         </div>
-                        <small class="form-text">
-                            Mínimo de 8 caracteres (deixe em branco para manter a senha atual ao editar)
-                        </small>
+                        <div class="col-md-6">
+                            <label class="form-label">E-mail *</label>
+                            <input type="email" class="form-control" name="email" required>
+                        </div>
                     </div>
-                </form>
-            </div>
-            
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="hideEmployeeModal()">
-                    <i class="fas fa-times"></i> Cancelar
-                </button>
-                <button type="submit" form="employeeForm" class="btn btn-primary" id="submitBtn">
-                    <i class="fas fa-save"></i> Salvar
-                </button>
-            </div>
+                    
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Telefone</label>
+                            <input type="text" class="form-control" name="telefone">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Tipo de Funcionário *</label>
+                            <select class="form-select" name="subtipo_funcionario" required id="subtipoSelect">
+                                <option value="">Selecione...</option>
+                                <option value="gerente">Gerente (Acesso total)</option>
+                                <option value="financeiro">Financeiro (Foco em pagamentos)</option>
+                                <option value="vendedor">Vendedor (Foco em vendas)</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Senha Temporária *</label>
+                            <input type="password" class="form-control" name="senha" required minlength="6">
+                            <small class="text-muted">Mínimo 6 caracteres</small>
+                        </div>
+                    </div>
+                    
+                    <!-- Preview de Permissões -->
+                    <div class="mt-4">
+                        <h6>
+                            <i class="fas fa-eye me-2"></i>
+                            Prévia de Permissões
+                        </h6>
+                        <div id="permissionsPreview" class="border rounded p-3 bg-light">
+                            <small class="text-muted">Selecione um tipo de funcionário para ver as permissões padrão</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-1"></i>
+                        Cadastrar Funcionário
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
-    <script>
-        let currentPage = 1;
-        let isLoading = false;
+</div>
 
-        function loadEmployees(page = 1, resetTable = true) {
-            if (isLoading) return;
-            isLoading = true;
-            
-            if (resetTable) {
-                currentPage = 1;
-                page = 1;
-            }
-            
-            // Mostrar loading
-            showLoading();
-            
-            // Construir URL com filtros
-            const params = new URLSearchParams({
-                page: page,
-                subtipo: document.getElementById('filterType').value || 'todos',
-                status: document.getElementById('filterStatus').value || 'todos',
-                busca: document.getElementById('searchInput').value || ''
-            });
-            
-            fetch(`/api/employees?${params.toString()}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.status) {
-                        updateEmployeeTable(data.data.funcionarios);
-                        updateStatistics(data.data.estatisticas);
-                        updatePagination(data.data.paginacao);
-                    } else {
-                        showError(data.message);
-                    }
-                })
-                .catch(error => {
-                    console.error('Erro ao carregar funcionários:', error);
-                    showError('Erro ao carregar dados dos funcionários');
-                })
-                .finally(() => {
-                    hideLoading();
-                    isLoading = false;
-                });
-        }
-
-        function showEmployeeModal(employee = null) {
-            const modal = document.getElementById('employeeModal');
-            const form = document.getElementById('employeeForm');
-            const title = document.getElementById('modalTitle');
-            const passwordGroup = document.getElementById('passwordGroup');
-            
-            // Resetar formulário
-            form.reset();
-            
-            if (employee) {
-                // Editando funcionário
-                title.textContent = 'Editar Funcionário';
-                document.getElementById('employeeName').value = employee.nome || '';
-                document.getElementById('employeeEmail').value = employee.email || '';
-                document.getElementById('employeePhone').value = employee.telefone || '';
-                document.getElementById('employeeType').value = employee.subtipo_funcionario || '';
-                form.dataset.employeeId = employee.id;
-                passwordGroup.style.display = 'none'; // Ocultar senha ao editar
-            } else {
-                // Novo funcionário
-                title.textContent = 'Novo Funcionário';
-                delete form.dataset.employeeId;
-                passwordGroup.style.display = 'block'; // Mostrar senha ao criar
-            }
-            
-            modal.style.display = 'block';
-        }
-
-        function closeEmployeeModal() {
-            document.getElementById('employeeModal').style.display = 'none';
-        }
-
-        function submitEmployeeForm() {
-            const form = document.getElementById('employeeForm');
-            const formData = new FormData(form);
-            const isEditing = !!form.dataset.employeeId;
-            
-            // Converter FormData para objeto
-            const data = {};
-            formData.forEach((value, key) => {
-                data[key] = value;
-            });
-            
-            // Validações básicas
-            if (!data.nome || data.nome.trim().length < 3) {
-                showError('Nome deve ter pelo menos 3 caracteres');
-                return;
-            }
-            
-            if (!data.email || !isValidEmail(data.email)) {
-                showError('E-mail inválido');
-                return;
-            }
-            
-            if (!data.subtipo_funcionario) {
-                showError('Selecione o tipo de funcionário');
-                return;
-            }
-            
-            if (!isEditing && (!data.senha || data.senha.length < 8)) {
-                showError('Senha deve ter pelo menos 8 caracteres');
-                return;
-            }
-            
-            // Determinar URL e método
-            let url = '/api/employees';
-            let method = 'POST';
-            
-            if (isEditing) {
-                url += `?id=${form.dataset.employeeId}`;
-                method = 'PUT';
-                delete data.senha; // Não enviar senha ao editar
-            }
-            
-            // Enviar requisição
-            fetch(url, {
-                method: method,
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(data)
-            })
-            .then(response => response.json())
-            .then(result => {
-                if (result.status) {
-                    closeEmployeeModal();
-                    loadEmployees(); // Recarregar lista
-                    showSuccess(result.message);
-                } else {
-                    showError(result.message);
-                }
-            })
-            .catch(error => {
-                console.error('Erro ao salvar funcionário:', error);
-                showError('Erro ao salvar funcionário');
-            });
-        }
-
-        function deleteEmployee(id, name) {
-            if (!confirm(`Tem certeza que deseja desativar o funcionário "${name}"?`)) {
-                return;
-            }
-            
-            fetch(`/api/employees?id=${id}`, {
-                method: 'DELETE'
-            })
-            .then(response => response.json())
-            .then(result => {
-                if (result.status) {
-                    loadEmployees(); // Recarregar lista
-                    showSuccess(result.message);
-                } else {
-                    showError(result.message);
-                }
-            })
-            .catch(error => {
-                console.error('Erro ao desativar funcionário:', error);
-                showError('Erro ao desativar funcionário');
-            });
-        }
-
-        function updateEmployeeTable(employees) {
-            const tbody = document.querySelector('#employeesTable tbody');
-            
-            if (!employees || employees.length === 0) {
-                tbody.innerHTML = `
-                    <tr class="empty-state">
-                        <td colspan="6">
-                            <div class="empty-message">
-                                <i class="fas fa-users"></i>
-                                <p>Nenhum funcionário encontrado</p>
-                            </div>
-                        </td>
-                    </tr>
-                `;
-                return;
-            }
-            
-            tbody.innerHTML = employees.map(employee => `
-                <tr>
-                    <td>
-                        <div class="user-info">
-                            <div class="user-avatar">
-                                <i class="fas fa-user"></i>
-                            </div>
-                            <div class="user-details">
-                                <div class="user-name">${escapeHtml(employee.nome)}</div>
-                                <div class="user-email">${escapeHtml(employee.email)}</div>
-                            </div>
-                        </div>
-                    </td>
-                    <td>
-                        <span class="type-badge type-funcionario">
-                            ${getEmployeeTypeLabel(employee.subtipo_funcionario)}
-                        </span>
-                    </td>
-                    <td>
-                        <span class="status-badge status-${employee.status}">
-                            ${getStatusLabel(employee.status)}
-                        </span>
-                    </td>
-                    <td>${formatDate(employee.data_criacao)}</td>
-                    <td>${employee.ultimo_login ? formatDate(employee.ultimo_login) : 'Nunca'}</td>
-                    <td>
-                        <div class="actions">
-                            <button onclick="showEmployeeModal(${JSON.stringify(employee).replace(/"/g, '&quot;')})" 
-                                    class="btn btn-sm btn-outline-primary" title="Editar">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                            <button onclick="deleteEmployee(${employee.id}, '${escapeHtml(employee.nome)}')" 
-                                    class="btn btn-sm btn-outline-danger" title="Desativar">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </div>
-                    </td>
-                </tr>
-            `).join('');
-        }
-
-        function getEmployeeTypeLabel(type) {
-            const types = {
-                'financeiro': 'Financeiro',
-                'gerente': 'Gerente',
-                'vendedor': 'Vendedor'
-            };
-            return types[type] || type;
-        }
-
-        function getStatusLabel(status) {
-            const statuses = {
-                'ativo': 'Ativo',
-                'inativo': 'Inativo',
-                'bloqueado': 'Bloqueado'
-            };
-            return statuses[status] || status;
-        }
-
-        function updateStatistics(stats) {
-            if (!stats) return;
-            
-            document.querySelector('.stat-total .stat-number').textContent = stats.total || 0;
-            document.querySelector('.stat-financeiro .stat-number').textContent = stats.financeiro || 0;
-            document.querySelector('.stat-gerentes .stat-number').textContent = stats.gerente || 0;
-            document.querySelector('.stat-vendedores .stat-number').textContent = stats.vendedor || 0;
-        }
-
-        // Funções auxiliares
-        function isValidEmail(email) {
-            return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-        }
-
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-
-        function formatDate(dateString) {
-            if (!dateString) return '-';
-            const date = new Date(dateString);
-            return date.toLocaleDateString('pt-BR') + '<br><small>' + 
-                date.toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'}) + '</small>';
-        }
-
-        function showLoading() {
-            // Implementar loading
-        }
-
-        function hideLoading() {
-            // Implementar hide loading
-        }
-
-        function showError(message) {
-            alert('Erro: ' + message);
-        }
-
-        function showSuccess(message) {
-            alert('Sucesso: ' + message);
-        }
-
-        // Event listeners para filtros
-        document.addEventListener('DOMContentLoaded', function() {
-            document.getElementById('searchInput')?.addEventListener('input', () => {
-                clearTimeout(window.searchTimeout);
-                window.searchTimeout = setTimeout(() => loadEmployees(), 500);
-            });
-            
-            document.getElementById('filterType')?.addEventListener('change', () => loadEmployees());
-            document.getElementById('filterStatus')?.addEventListener('change', () => loadEmployees());
-        });
-    </script>                            
-    <!-- Loading Overlay -->
-    <div id="loadingOverlay" class="loading-overlay" style="display: none;">
-        <div class="loading-spinner">
-            <i class="fas fa-spinner fa-spin"></i>
-            <p>Carregando...</p>
+<!-- Modal Editar Permissões -->
+<div class="modal fade" id="modalPermissoes" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-key me-2"></i>
+                    Editar Permissões
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="">
+                <div class="modal-body">
+                    <input type="hidden" name="action" value="atualizar_permissoes">
+                    <input type="hidden" name="funcionario_id" id="editFuncionarioId">
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Como funciona:</strong> Marque as caixas para permitir que o funcionário acesse essas funcionalidades. 
+                        Permissões desmarcadas serão negadas mesmo que o tipo de funcionário tenha acesso por padrão.
+                    </div>
+                    
+                    <div id="permissionsForm">
+                        <!-- Será preenchido via JavaScript -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-1"></i>
+                        Salvar Permissões
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
+</div>
+
+<script>
+// Mapa de permissões para JavaScript
+const permissoesMap = <?= json_encode(PERMISSOES_MAPA) ?>;
+
+// Permissões padrão por subtipo
+const permissoesPadrao = {
+    'gerente': {
+        'dashboard': ['ver'],
+        'transacoes': ['ver', 'criar', 'upload_lote'],
+        'comissoes': ['ver', 'pagar'],
+        'funcionarios': ['ver', 'criar', 'editar', 'desativar'],
+        'relatorios': ['ver'],
+        'configuracoes': ['ver', 'editar']
+    },
+    'financeiro': {
+        'dashboard': ['ver'],
+        'transacoes': ['ver'],
+        'comissoes': ['ver', 'pagar'],
+        'relatorios': ['ver']
+    },
+    'vendedor': {
+        'dashboard': ['ver'],
+        'transacoes': ['ver', 'criar']
+    }
+};
+
+// Preview de permissões no modal de criação
+document.getElementById('subtipoSelect').addEventListener('change', function() {
+    const subtipo = this.value;
+    const preview = document.getElementById('permissionsPreview');
     
-    <script src="../../assets/js/stores/employees.js"></script>
-</body>
-</html>
+    if (!subtipo) {
+        preview.innerHTML = '<small class="text-muted">Selecione um tipo de funcionário para ver as permissões padrão</small>';
+        return;
+    }
+    
+    const permissions = permissoesPadrao[subtipo];
+    let html = '<div class="row">';
+    
+    Object.keys(permissions).forEach(modulo => {
+        const config = permissoesMap[modulo];
+        html += `<div class="col-md-6 mb-3">
+            <h6 class="text-primary">${config.nome}</h6>
+            <small class="text-muted d-block mb-2">${config.descricao}</small>
+            <ul class="list-unstyled ms-3">`;
+        
+        permissions[modulo].forEach(acao => {
+            const descricao = config.acoes[acao];
+            html += `<li><i class="fas fa-check text-success me-2"></i>${descricao}</li>`;
+        });
+        
+        html += '</ul></div>';
+    });
+    
+    html += '</div>';
+    preview.innerHTML = html;
+});
+
+// Função para editar permissões
+function editarPermissoes(funcionarioId) {
+    document.getElementById('editFuncionarioId').value = funcionarioId;
+    
+    // Carregar permissões atuais via AJAX
+    fetch(`../../api/funcionarios.php?action=get_permissions&id=${funcionarioId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.status) {
+                preencherFormularioPermissoes(data.permissions);
+                new bootstrap.Modal(document.getElementById('modalPermissoes')).show();
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao carregar permissões:', error);
+        });
+}
+
+// Função para preencher o formulário de permissões
+function preencherFormularioPermissoes(permissions) {
+    const form = document.getElementById('permissionsForm');
+    let html = '';
+    
+    Object.keys(permissoesMap).forEach(modulo => {
+        const config = permissoesMap[modulo];
+        html += `
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h6 class="mb-0">${config.nome}</h6>
+                    <small class="text-muted">${config.descricao}</small>
+                </div>
+                <div class="card-body">
+                    <div class="row">`;
+        
+        Object.keys(config.acoes).forEach(acao => {
+            const descricao = config.acoes[acao];
+            const checked = permissions[modulo] && permissions[modulo][acao] ? 'checked' : '';
+            
+            html += `
+                <div class="col-md-6 mb-2">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" 
+                               name="perm_${modulo}_${acao}" ${checked}
+                               id="perm_${modulo}_${acao}">
+                        <label class="form-check-label" for="perm_${modulo}_${acao}">
+                            ${descricao}
+                        </label>
+                    </div>
+                </div>`;
+        });
+        
+        html += `
+                    </div>
+                </div>
+            </div>`;
+    });
+    
+    form.innerHTML = html;
+}
+</script>
