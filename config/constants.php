@@ -138,15 +138,15 @@ define('WHATSAPP_TIMEOUT', 30);
 define('WHATSAPP_PRODUCTION_MODE', true); // NOVA: Indicador explícito de modo produção
 
 // === SUBTIPOS DE FUNCIONÁRIO ===  
-define('EMPLOYEE_TYPE_FINANCIAL', 'financeiro');
 define('EMPLOYEE_TYPE_MANAGER', 'gerente');
-define('EMPLOYEE_TYPE_SELLER', 'vendedor');
+define('EMPLOYEE_TYPE_FINANCIAL', 'financeiro');
+define('EMPLOYEE_TYPE_SALESPERSON', 'vendedor');
 
 // Mapeamento de subtipos para exibição
 define('EMPLOYEE_SUBTYPES', [
-    EMPLOYEE_TYPE_MANAGER => 'gerente',
-    EMPLOYEE_TYPE_FINANCIAL => 'financeiro', 
-    EMPLOYEE_TYPE_SALESPERSON => 'vendedor'
+    EMPLOYEE_TYPE_MANAGER => 'Gerente',
+    EMPLOYEE_TYPE_FINANCIAL => 'Financeiro', 
+    EMPLOYEE_TYPE_SALESPERSON => 'Vendedor'
 ]);
 
 define('STORE_PENDING', 'pendente');
