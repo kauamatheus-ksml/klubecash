@@ -158,7 +158,84 @@ $permissions = [
     'user_type' => $userType,
     'subtipo_funcionario' => $subtipoFuncionario,
 ];
-
+if (isset($_GET['test_create'])) {
+    echo "<div style='background: #f0f0f0; padding: 20px; margin: 20px; border: 1px solid #ccc;'>";
+    echo "<h3>DEBUG - Teste de Criação</h3>";
+    
+    $testData = [
+        'nome' => 'Funcionario Teste',
+        'email' => 'func.teste@' . time() . '.com',
+        'telefone' => '11999999999',
+        'senha' => '12345678',
+        'subtipo_funcionario' => 'vendedor'
+    ];
+    
+    echo "<p><strong>1. Dados:</strong> " . json_encode($testData) . "</p>";
+    
+    try {
+        // Testar getStoreId
+        $storeId = AuthController::getStoreId();
+        echo "<p><strong>2. Store ID:</strong> " . $storeId . "</p>";
+        
+        // Testar validações
+        $errors = [];
+        if (empty($testData['nome']) || strlen(trim($testData['nome'])) < 3) {
+            $errors[] = 'Nome inválido';
+        }
+        if (empty($testData['email']) || !filter_var($testData['email'], FILTER_VALIDATE_EMAIL)) {
+            $errors[] = 'Email inválido';
+        }
+        echo "<p><strong>3. Validações:</strong> " . (empty($errors) ? 'OK' : implode(', ', $errors)) . "</p>";
+        
+        // Testar conexão DB
+        $db = Database::getConnection();
+        echo "<p><strong>4. DB Conexão:</strong> OK</p>";
+        
+        // Testar se email existe
+        $stmt = $db->prepare("SELECT id FROM usuarios WHERE email = ?");
+        $stmt->execute([$testData['email']]);
+        $exists = $stmt->rowCount() > 0;
+        echo "<p><strong>5. Email existe:</strong> " . ($exists ? 'SIM' : 'NÃO') . "</p>";
+        
+        // Testar insert diretamente
+        if (!$exists) {
+            $senhaHash = password_hash($testData['senha'], PASSWORD_DEFAULT);
+            
+            $insertStmt = $db->prepare("
+                INSERT INTO usuarios (
+                    nome, email, telefone, senha_hash, tipo, 
+                    subtipo_funcionario, loja_vinculada_id, status, data_criacao
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
+            ");
+            
+            $success = $insertStmt->execute([
+                $testData['nome'],
+                $testData['email'],
+                $testData['telefone'],
+                $senhaHash,
+                'funcionario',
+                $testData['subtipo_funcionario'],
+                $storeId,
+                'ativo'
+            ]);
+            
+            echo "<p><strong>6. Insert Result:</strong> " . ($success ? 'SUCESSO' : 'FALHOU') . "</p>";
+            
+            if (!$success) {
+                $errorInfo = $insertStmt->errorInfo();
+                echo "<p><strong>SQL Error:</strong> " . json_encode($errorInfo) . "</p>";
+            }
+        }
+        
+    } catch (Exception $e) {
+        echo "<p style='color:red'><strong>ERRO:</strong> " . $e->getMessage() . "</p>";
+        echo "<p><strong>Arquivo:</strong> " . $e->getFile() . "</p>";
+        echo "<p><strong>Linha:</strong> " . $e->getLine() . "</p>";
+    }
+    
+    echo "</div>";
+    exit;
+}
 ?>
 
 <!DOCTYPE html>
