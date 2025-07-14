@@ -31,7 +31,7 @@ body {
 }
 
 .page-wrapper {
-    
+    padding: 25px 30px;
     max-width: 1400px;
     margin: 0 auto;
 }
