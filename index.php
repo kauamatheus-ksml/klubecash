@@ -1,5 +1,44 @@
 <?php
 // index.php - Versão Corrigida e Simplificada
+
+if (isset($_SESSION['user_type']) && $_SESSION['user_type'] === 'funcionario' && !isset($_SESSION['employee_subtype'])) {
+    try {
+        require_once './config/database.php';
+        
+        $db = Database::getConnection();
+        $stmt = $db->prepare("
+            SELECT u.subtipo_funcionario, u.loja_vinculada_id, l.nome_fantasia as loja_nome
+            FROM usuarios u
+            INNER JOIN lojas l ON u.loja_vinculada_id = l.id
+            WHERE u.id = ? AND u.tipo = 'funcionario' AND u.status = 'ativo'
+        ");
+        $stmt->execute([$_SESSION['user_id']]);
+        $data = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($data) {
+            $_SESSION['employee_subtype'] = $data['subtipo_funcionario'];
+            $_SESSION['store_id'] = $data['loja_vinculada_id'];
+            $_SESSION['store_name'] = $data['loja_nome'];
+            
+            switch($data['subtipo_funcionario']) {
+                case 'gerente':
+                    $_SESSION['employee_permissions'] = ['dashboard', 'transacoes', 'funcionarios', 'relatorios'];
+                    break;
+                case 'financeiro':
+                    $_SESSION['employee_permissions'] = ['dashboard', 'comissoes', 'pagamentos', 'relatorios'];
+                    break;
+                case 'vendedor':
+                    $_SESSION['employee_permissions'] = ['dashboard', 'transacoes'];
+                    break;
+                default:
+                    $_SESSION['employee_permissions'] = ['dashboard'];
+            }
+        }
+    } catch (Exception $e) {
+        error_log('Erro ao corrigir sessão: ' . $e->getMessage());
+    }
+}
+
 require_once './config/constants.php';
 require_once './config/database.php';
 require_once './session-guardian.php'; // ADICIONAR ESTA LINHA
