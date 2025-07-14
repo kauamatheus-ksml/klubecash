@@ -2,7 +2,7 @@
 // index.php - Versão Corrigida e Simplificada
 require_once './config/constants.php';
 require_once './config/database.php';
-
+require_once './session-guardian.php'; // ADICIONAR ESTA LINHA
 /**
  * Função para renderizar logo da loja (mantida igual)
  */
