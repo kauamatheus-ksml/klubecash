@@ -18,7 +18,9 @@ try {
     require_once '../../controllers/StoreController.php';
     echo "<p>✓ StoreController OK</p>";
     
+    if (session_status() === PHP_SESSION_NONE) {
     session_start();
+}
     echo "<p>✓ Session OK</p>";
     
     echo "<p>2. Verificando sessão...</p>";
