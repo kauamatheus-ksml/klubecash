@@ -70,16 +70,21 @@ class AuthController {
             $_SESSION['user_type'] = $user['tipo'];
             $_SESSION['last_activity'] = time();
 
-            // Dados específicos para funcionários (esta é a parte que precisa ser adicionada)
+            // Dados específicos para funcionários
             if ($user['tipo'] === 'funcionario') {
-                // Definir subtipo do funcionário na sessão
                 $_SESSION['employee_subtype'] = $user['subtipo_funcionario'];
-                
-                // Definir informações da loja vinculada
                 $_SESSION['store_id'] = $user['loja_vinculada_id'];
-                $_SESSION['store_name'] = $storeData['nome_fantasia']; // $storeData já foi obtido anteriormente no código
                 
-                // Opcional: definir permissões baseadas no subtipo
+                // Buscar nome da loja se não foi buscado antes
+                if (!isset($storeData)) {
+                    $storeStmt = $db->prepare("SELECT nome_fantasia FROM lojas WHERE id = ?");
+                    $storeStmt->execute([$user['loja_vinculada_id']]);
+                    $storeData = $storeStmt->fetch(PDO::FETCH_ASSOC);
+                }
+                
+                $_SESSION['store_name'] = $storeData['nome_fantasia'];
+                
+                // Definir permissões
                 switch($user['subtipo_funcionario']) {
                     case 'gerente':
                         $_SESSION['employee_permissions'] = ['dashboard', 'transacoes', 'funcionarios', 'relatorios'];
