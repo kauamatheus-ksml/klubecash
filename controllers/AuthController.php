@@ -63,18 +63,36 @@ class AuthController {
             if (session_status() === PHP_SESSION_NONE) {
                 session_start();
             }
-            
+
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['user_name'] = $user['nome'];
             $_SESSION['user_email'] = $user['email'];
             $_SESSION['user_type'] = $user['tipo'];
             $_SESSION['last_activity'] = time();
-            
-            // Dados específicos para funcionários
+
+            // Dados específicos para funcionários (esta é a parte que precisa ser adicionada)
             if ($user['tipo'] === 'funcionario') {
+                // Definir subtipo do funcionário na sessão
                 $_SESSION['employee_subtype'] = $user['subtipo_funcionario'];
+                
+                // Definir informações da loja vinculada
                 $_SESSION['store_id'] = $user['loja_vinculada_id'];
-                $_SESSION['store_name'] = $storeData['nome_fantasia'];
+                $_SESSION['store_name'] = $storeData['nome_fantasia']; // $storeData já foi obtido anteriormente no código
+                
+                // Opcional: definir permissões baseadas no subtipo
+                switch($user['subtipo_funcionario']) {
+                    case 'gerente':
+                        $_SESSION['employee_permissions'] = ['dashboard', 'transacoes', 'funcionarios', 'relatorios'];
+                        break;
+                    case 'financeiro':
+                        $_SESSION['employee_permissions'] = ['dashboard', 'comissoes', 'pagamentos', 'relatorios'];
+                        break;
+                    case 'vendedor':
+                        $_SESSION['employee_permissions'] = ['dashboard', 'transacoes'];
+                        break;
+                    default:
+                        $_SESSION['employee_permissions'] = ['dashboard'];
+                }
             }
             
             // Atualizar último login
