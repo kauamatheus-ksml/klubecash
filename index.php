@@ -84,6 +84,10 @@ if ($isLoggedIn) {
         case 'loja':
             $dashboardURL = STORE_DASHBOARD_URL;
             break;
+        case 'funcionario':
+            // Por enquanto, funcionários vão para o dashboard da loja
+            $dashboardURL = STORE_DASHBOARD_URL;
+            break;
     }
 }
 
@@ -694,6 +698,34 @@ try {
         .bg-light {
             background: #f8f9fa;
         }
+
+
+        /* === ESTILOS PARA FUNCIONÁRIOS === */
+        .employee-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255, 215, 0, 0.15);
+            color: #FF8C00;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin-bottom: 15px;
+            border: 1px solid rgba(255, 215, 0, 0.3);
+        }
+
+        .employee-badge::before {
+            content: "👔";
+            font-size: 1rem;
+        }
+
+        /* Destaque especial para funcionários no hero */
+        .hero .employee-badge {
+            background: rgba(255, 255, 255, 0.2);
+            color: #FFD700;
+            border-color: rgba(255, 255, 255, 0.3);
+        }
     </style>
 </head>
 
@@ -718,24 +750,39 @@ try {
                 <!-- Ações do Header -->
                 <div class="header-actions">
                     <?php if ($isLoggedIn): ?>
-                        <div class="user-menu">
-                            <button class="user-button" id="userMenuBtn">
-                                <div class="user-avatar">
-                                    <?php echo strtoupper(substr($userName, 0, 1)); ?>
-                                </div>
-                                <span><?php echo htmlspecialchars($userName); ?></span>
-                            </button>
+                            <h1>Olá, <?php echo htmlspecialchars($userName); ?>! 👋</h1>
                             
-                            <div class="user-dropdown" id="userDropdown">
-                                <a href="<?php echo htmlspecialchars($dashboardURL); ?>" class="dropdown-item">
-                                    Meu Painel
+                            <?php 
+                            // Mostrar mensagem específica para funcionários
+                            if ($userType === 'funcionario' && isset($_SESSION['employee_subtype'])): 
+                                $subtypeDisplay = '';
+                                switch($_SESSION['employee_subtype']) {
+                                    case 'gerente':
+                                        $subtypeDisplay = 'Gerente';
+                                        break;
+                                    case 'financeiro':
+                                        $subtypeDisplay = 'Financeiro';
+                                        break;
+                                    case 'vendedor':
+                                        $subtypeDisplay = 'Vendedor';
+                                        break;
+                                    default:
+                                        $subtypeDisplay = 'Funcionário';
+                                }
+                            ?>
+                                <p>🎯 <strong>Acesso como: <?php echo $subtypeDisplay; ?></strong></p>
+                                <p>Gerencie as operações da sua loja com eficiência.</p>
+                            <?php else: ?>
+                                <p>Continue economizando com inteligência. Explore suas oportunidades de cashback.</p>
+                            <?php endif; ?>
+                            
+                            <div class="hero-actions">
+                                <a href="<?php echo htmlspecialchars($dashboardURL); ?>" class="btn btn-primary">
+                                    <?php echo ($userType === 'funcionario') ? 'Acessar Painel da Loja' : 'Acessar Minha Conta'; ?>
                                 </a>
-                                <a href="<?php echo SITE_URL; ?>/controllers/AuthController.php?action=logout" class="dropdown-item">
-                                    Sair
-                                </a>
+                                <a href="#parceiros" class="btn btn-ghost">Ver Lojas Parceiras</a>
                             </div>
-                        </div>
-                    <?php else: ?>
+                        <?php else: ?>
                         <a href="<?php echo LOGIN_URL; ?>" class="btn btn-ghost">Entrar</a>
                         
                     <?php endif; ?>

@@ -46,7 +46,7 @@ class AuthController {
             // Para funcionários, verificar se a loja está ativa
             if ($user['tipo'] === 'funcionario') {
                 $storeStmt = $db->prepare("
-                    SELECT status 
+                    SELECT status, nome_fantasia 
                     FROM lojas 
                     WHERE id = ? AND status = 'aprovado'
                 ");
@@ -55,9 +55,11 @@ class AuthController {
                 if ($storeStmt->rowCount() === 0) {
                     return ['status' => false, 'message' => 'A loja vinculada não está ativa.'];
                 }
+                
+                $storeData = $storeStmt->fetch(PDO::FETCH_ASSOC);
             }
             
-            // Iniciar sessão
+            // Configurar sessão
             if (session_status() === PHP_SESSION_NONE) {
                 session_start();
             }
@@ -66,41 +68,47 @@ class AuthController {
             $_SESSION['user_name'] = $user['nome'];
             $_SESSION['user_email'] = $user['email'];
             $_SESSION['user_type'] = $user['tipo'];
+            $_SESSION['last_activity'] = time();
             
-            // Para funcionários, adicionar dados específicos
+            // Dados específicos para funcionários
             if ($user['tipo'] === 'funcionario') {
-                $_SESSION['subtipo_funcionario'] = $user['subtipo_funcionario'];
-                $_SESSION['loja_vinculada_id'] = $user['loja_vinculada_id'];
-                
-                // Carregar permissões na sessão para otimizar
-                require_once __DIR__ . '/../utils/PermissionManager.php';
-                $permissions = PermissionManager::getUserPermissions($user['id']);
-                $_SESSION['funcionario_permissions'] = $permissions['permissions'];
+                $_SESSION['employee_subtype'] = $user['subtipo_funcionario'];
+                $_SESSION['store_id'] = $user['loja_vinculada_id'];
+                $_SESSION['store_name'] = $storeData['nome_fantasia'];
             }
             
             // Atualizar último login
             $updateStmt = $db->prepare("UPDATE usuarios SET ultimo_login = NOW() WHERE id = ?");
             $updateStmt->execute([$user['id']]);
             
-            // Definir URL de redirecionamento
-            $redirectUrl = '/views/client/dashboard.php'; // Padrão para clientes
-            
-            if ($user['tipo'] === 'admin') {
-                $redirectUrl = '/views/admin/dashboard.php';
-            } elseif ($user['tipo'] === 'loja' || $user['tipo'] === 'funcionario') {
-                $redirectUrl = '/views/store/dashboard.php';
-            }
-            
-            return [
+            // Preparar dados de retorno
+            $result = [
                 'status' => true,
                 'message' => 'Login realizado com sucesso!',
-                'redirect_url' => $redirectUrl,
-                'user_type' => $user['tipo']
+                'user_data' => [
+                    'id' => $user['id'],
+                    'nome' => $user['nome'],
+                    'email' => $user['email'],
+                    'tipo' => $user['tipo']
+                ]
             ];
+            
+            // Adicionar dados específicos de funcionário
+            if ($user['tipo'] === 'funcionario') {
+                $subtypeDisplay = EMPLOYEE_SUBTYPES[$user['subtipo_funcionario']] ?? 'Não definido';
+                $result['employee_info'] = [
+                    'subtipo' => $user['subtipo_funcionario'],
+                    'subtipo_display' => $subtypeDisplay,
+                    'loja_id' => $user['loja_vinculada_id'],
+                    'loja_nome' => $storeData['nome_fantasia']
+                ];
+            }
+            
+            return $result;
             
         } catch (PDOException $e) {
             error_log('Erro no login: ' . $e->getMessage());
-            return ['status' => false, 'message' => 'Erro interno. Tente novamente.'];
+            return ['status' => false, 'message' => 'Erro interno do sistema. Tente novamente.'];
         }
     }
 
@@ -108,11 +116,11 @@ class AuthController {
      * Verifica se o usuário logado tem acesso à área da loja
      */
     public static function hasStoreAccess() {
-        if (!isset($_SESSION['user_type'])) {
+        if (!self::isAuthenticated()) {
             return false;
         }
         
-        return in_array($_SESSION['user_type'], ['loja', 'funcionario']);
+        return self::isStore() || self::isEmployee();
     }
 
     /**
@@ -126,9 +134,40 @@ class AuthController {
      * Verifica se é funcionário
      */
     public static function isEmployee() {
-        return isset($_SESSION['user_type']) && $_SESSION['user_type'] === 'funcionario';
+        if (!self::isAuthenticated()) {
+            return false;
+        }
+        
+        return $_SESSION['user_type'] === USER_TYPE_EMPLOYEE;
     }
 
+    /**
+     * Obtém o subtipo do funcionário atual
+     * 
+     * @return string|null Subtipo do funcionário ou null se não for funcionário
+     */
+    public static function getEmployeeSubtype() {
+        if (!self::isEmployee()) {
+            return null;
+        }
+        
+        return $_SESSION['employee_subtype'] ?? null;
+    }
+
+
+    /**
+     * Obtém o nome de exibição do subtipo do funcionário
+     * 
+     * @return string|null Nome formatado do subtipo
+     */
+    public static function getEmployeeSubtypeDisplay() {
+        $subtype = self::getEmployeeSubtype();
+        if (!$subtype) {
+            return null;
+        }
+        
+        return EMPLOYEE_SUBTYPES[$subtype] ?? 'Não definido';
+    }
     // Adicione este código no AuthController.php após o login bem-sucedido
     /**
     * Processa registro via Google OAuth (similar ao login, mas com validações específicas)
