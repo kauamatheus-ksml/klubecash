@@ -6,16 +6,21 @@ require_once '../../config/database.php';
 // Verificar se já existe uma sessão ativa
 session_start();
 if (isset($_SESSION['user_id']) && !isset($_GET['force_login'])) {
-    // Redirecionar com base no tipo de usuário
-    if ($_SESSION['user_type'] == USER_TYPE_ADMIN) {
-        header('Location: ' . ADMIN_DASHBOARD_URL);
-        exit;
-    } else if ($_SESSION['user_type'] == USER_TYPE_STORE) {
-        header('Location: ' . STORE_DASHBOARD_URL);
-        exit;
-    } else {
-        header('Location: ' . CLIENT_DASHBOARD_URL);
-        exit;
+    // Redirecionar com base no tipo de usuário - VERSÃO CORRIGIDA
+    $userType = $_SESSION['user_type'];
+    
+    switch ($userType) {
+        case USER_TYPE_ADMIN:
+            header('Location: ' . ADMIN_DASHBOARD_URL);
+            exit;
+        case USER_TYPE_STORE:
+        case USER_TYPE_EMPLOYEE: // CRÍTICO: Funcionários também vão para área da loja
+            header('Location: ' . STORE_DASHBOARD_URL);
+            exit;
+        case USER_TYPE_CLIENT:
+        default:
+            header('Location: ' . CLIENT_DASHBOARD_URL);
+            exit;
     }
 }
 
@@ -67,20 +72,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $updateStmt->bindParam(':id', $user['id']);
                     $updateStmt->execute();
                     
+                    // Log para debug
+                    error_log("LOGIN DEBUG - Usuário: {$user['nome']}, ID: {$user['id']}, Tipo: {$user['tipo']}" . 
+                             ($user['tipo'] === USER_TYPE_EMPLOYEE ? ", Subtipo: {$user['subtipo_funcionario']}" : ""));
+                    
                     // CORREÇÃO CRÍTICA: Redirecionamento correto baseado no tipo
                     switch ($user['tipo']) {
                         case USER_TYPE_ADMIN:
-                            header('Location: ' . ADMIN_DASHBOARD_URL);
+                            $redirectUrl = ADMIN_DASHBOARD_URL;
                             break;
                         case USER_TYPE_STORE:
                         case USER_TYPE_EMPLOYEE: // FUNCIONÁRIOS TAMBÉM VÃO PARA ÁREA DA LOJA
-                            header('Location: ' . STORE_DASHBOARD_URL);
+                            $redirectUrl = STORE_DASHBOARD_URL;
                             break;
                         case USER_TYPE_CLIENT:
                         default:
-                            header('Location: ' . CLIENT_DASHBOARD_URL);
+                            $redirectUrl = CLIENT_DASHBOARD_URL;
                             break;
                     }
+                    
+                    error_log("LOGIN REDIRECT - Redirecionando para: {$redirectUrl}");
+                    header("Location: {$redirectUrl}");
                     exit;
                 }
             } else {
@@ -92,6 +104,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 }
+
 // Verificar mensagens de URL
 $urlError = $_GET['error'] ?? '';
 $urlSuccess = $_GET['success'] ?? '';
