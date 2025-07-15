@@ -32,7 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $db = Database::getConnection();
             
             // Buscar usuário pelo email
-            $stmt = $db->prepare("SELECT id, nome, senha_hash, tipo, status FROM usuarios WHERE email = :email");
+            $stmt = $db->prepare("SELECT id, nome, senha_hash, tipo, status, subtipo_funcionario, loja_vinculada_id FROM usuarios WHERE email = :email");
             $stmt->bindParam(':email', $email);
             $stmt->execute();
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -47,18 +47,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $_SESSION['user_name'] = $user['nome'];
                     $_SESSION['user_type'] = $user['tipo'];
                     
+                    // Configurações específicas para funcionários
+                    if ($user['tipo'] === USER_TYPE_EMPLOYEE) {
+                        $_SESSION['employee_subtype'] = $user['subtipo_funcionario'];
+                        $_SESSION['store_id'] = $user['loja_vinculada_id'];
+                        
+                        // Verificar se a loja está ativa
+                        $storeStmt = $db->prepare("SELECT nome_fantasia FROM lojas WHERE id = ? AND status = 'aprovado'");
+                        $storeStmt->execute([$user['loja_vinculada_id']]);
+                        
+                        if ($storeStmt->rowCount() > 0) {
+                            $storeData = $storeStmt->fetch(PDO::FETCH_ASSOC);
+                            $_SESSION['store_name'] = $storeData['nome_fantasia'];
+                        }
+                    }
+                    
                     // Atualizar último login
                     $updateStmt = $db->prepare("UPDATE usuarios SET ultimo_login = NOW() WHERE id = :id");
                     $updateStmt->bindParam(':id', $user['id']);
                     $updateStmt->execute();
                     
-                    // Redirecionar com base no tipo de usuário - CORRIGIDO
-                    if ($user['tipo'] == USER_TYPE_ADMIN) {
-                        header('Location: ' . ADMIN_DASHBOARD_URL);
-                    } else if ($user['tipo'] == USER_TYPE_STORE) {
-                        header('Location: ' . STORE_DASHBOARD_URL);
-                    } else {
-                        header('Location: ' . CLIENT_DASHBOARD_URL);
+                    // CORREÇÃO CRÍTICA: Redirecionamento correto baseado no tipo
+                    switch ($user['tipo']) {
+                        case USER_TYPE_ADMIN:
+                            header('Location: ' . ADMIN_DASHBOARD_URL);
+                            break;
+                        case USER_TYPE_STORE:
+                        case USER_TYPE_EMPLOYEE: // FUNCIONÁRIOS TAMBÉM VÃO PARA ÁREA DA LOJA
+                            header('Location: ' . STORE_DASHBOARD_URL);
+                            break;
+                        case USER_TYPE_CLIENT:
+                        default:
+                            header('Location: ' . CLIENT_DASHBOARD_URL);
+                            break;
                     }
                     exit;
                 }
@@ -66,11 +87,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $error = 'Email ou senha incorretos.';
             }
         } catch (PDOException $e) {
+            error_log('Erro no login: ' . $e->getMessage());
             $error = 'Erro ao processar o login. Tente novamente.';
         }
     }
 }
-
 // Verificar mensagens de URL
 $urlError = $_GET['error'] ?? '';
 $urlSuccess = $_GET['success'] ?? '';
