@@ -6,7 +6,18 @@
  * Localização: views/stores/dashboard.php
  * Última atualização: Sistema de permissões integrado
  */
-
+// Log de acesso para monitoramento
+if (isset($_SESSION['user_type']) && $_SESSION['user_type'] === 'funcionario') {
+    $accessInfo = [
+        'usuario_id' => $_SESSION['user_id'],
+        'nome' => $_SESSION['user_name'],
+        'subtipo' => $_SESSION['employee_subtype'],
+        'url_acessada' => $_SERVER['REQUEST_URI'],
+        'timestamp' => date('Y-m-d H:i:s')
+    ];
+    
+    error_log("ACESSO FUNCIONÁRIO DASHBOARD: " . json_encode($accessInfo));
+}
 // Incluir arquivos de configuração necessários
 require_once '../../config/constants.php';
 require_once '../../config/database.php';

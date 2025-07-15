@@ -292,7 +292,7 @@ RewriteRule ^cliente/ /store/dashboard? [R=302,L]
 
 # Verificar se funcionário está tentando acessar área errada
 RewriteCond %{QUERY_STRING} user_type=funcionario
-RewriteRule ^cliente/ /store/dashboard? [R=302,L]
+
 
 # Redirecionar qualquer funcionário para área da loja
 RewriteCond %{REQUEST_URI} ^/cliente/

@@ -31,6 +31,23 @@ class AuthController {
         $permissions = EMPLOYEE_PERMISSIONS[$employeeData['subtipo_funcionario']] ?? [];
         $_SESSION['employee_permissions'] = $permissions;
     }
+
+    /**
+     * Determina a URL de redirecionamento após login baseada no tipo de usuário
+     * VERSÃO CORRIGIDA - Funcionários sempre vão para área da loja
+     */
+    private static function getRedirectUrlByUserType($userType) {
+        switch ($userType) {
+            case USER_TYPE_ADMIN:
+                return ADMIN_DASHBOARD_URL;
+            case USER_TYPE_STORE:
+            case USER_TYPE_EMPLOYEE: // CRÍTICO: Funcionários usam área da loja
+                return STORE_DASHBOARD_URL;
+            case USER_TYPE_CLIENT:
+            default:
+                return CLIENT_DASHBOARD_URL;
+        }
+    }
     /**
      * Método de login atualizado e corrigido para funcionários
      * Esta versão resolve o problema de escopo de variável que impedia
@@ -118,9 +135,11 @@ class AuthController {
                     'email' => $user['email'],
                     'tipo' => $user['tipo']
                 ],
-                'redirect_url' => self::getRedirectUrl($user['tipo'])
+                'redirect_url' => self::getRedirectUrlByUserType($user['tipo'])
             ];
             
+
+            error_log("LOGIN REDIRECT - Usuário: {$user['nome']}, Tipo: {$user['tipo']}, URL: " . $result['redirect_url']);
             // Adicionar informações específicas de funcionário
             if ($user['tipo'] === 'funcionario' && $storeData !== null) {
                 $result['employee_info'] = [
@@ -131,6 +150,18 @@ class AuthController {
                 ];
             }
             
+            // Se for funcionário, adicionar informações específicas
+            if ($user['tipo'] === USER_TYPE_EMPLOYEE && $storeData !== null) {
+                $result['employee_info'] = [
+                    'subtipo' => $user['subtipo_funcionario'],
+                    'subtipo_display' => EMPLOYEE_SUBTYPES[$user['subtipo_funcionario']] ?? 'Não definido',
+                    'loja_id' => $user['loja_vinculada_id'],
+                    'loja_nome' => $storeData['nome_fantasia']
+                ];
+                
+                error_log("FUNCIONÁRIO LOGIN - Subtipo: {$user['subtipo_funcionario']}, Loja: {$storeData['nome_fantasia']}");
+            }
+
             return $result;
             
         } catch (PDOException $e) {
@@ -1026,31 +1057,20 @@ if (basename($_SERVER['PHP_SELF']) === 'AuthController.php') {
                 $result = AuthController::login($email, $password);
                 
                 if ($result['status']) {
-                    // CORREÇÃO: Redirecionamento baseado no tipo de usuário
-                    $userType = $_SESSION['user_type'];
+                    // CORREÇÃO CRÍTICA: Usar a URL de redirecionamento do resultado
+                    $redirectUrl = $result['redirect_url'] ?? CLIENT_DASHBOARD_URL;
                     
-                    // Log para debug
-                    error_log("Login bem-sucedido - Usuário: {$_SESSION['user_name']}, Tipo: {$userType}");
+                    // Log detalhado para debug
+                    $userType = $_SESSION['user_type'] ?? 'não definido';
+                    $userName = $_SESSION['user_name'] ?? 'não definido';
                     
-                    switch ($userType) {
-                        case USER_TYPE_ADMIN:
-                            $redirectUrl = ADMIN_DASHBOARD_URL;
-                            break;
-                        case USER_TYPE_STORE:
-                        case USER_TYPE_EMPLOYEE: // FUNCIONÁRIOS VÃO PARA ÁREA DA LOJA
-                            $redirectUrl = STORE_DASHBOARD_URL;
-                            break;
-                        case USER_TYPE_CLIENT:
-                        default:
-                            $redirectUrl = CLIENT_DASHBOARD_URL;
-                            break;
-                    }
+                    error_log("REDIRECT FINAL - Usuário: {$userName}, Tipo: {$userType}, URL: {$redirectUrl}");
                     
-                    error_log("Redirecionando para: {$redirectUrl}");
+                    // Redirecionamento definitivo
                     header("Location: {$redirectUrl}");
                     exit;
                 } else {
-                    // Redirecionar de volta com mensagem de erro
+                    // Erro no login
                     header('Location: ' . LOGIN_URL . '?error=' . urlencode($result['message']));
                     exit;
                 }
