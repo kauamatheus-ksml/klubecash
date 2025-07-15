@@ -13,9 +13,11 @@ if (isset($_SESSION['user_id']) && !isset($_GET['force_login'])) {
     } else if ($_SESSION['user_type'] == USER_TYPE_STORE) {
         header('Location: ' . STORE_DASHBOARD_URL);
         exit;
-    } else {
+    } else if ($user['tipo'] == USER_TYPE_CLIENT) {
         header('Location: ' . CLIENT_DASHBOARD_URL);
-        exit;
+    } else {
+        // Fallback para tipo não reconhecido
+        header('Location: ' . LOGIN_URL . '?error=tipo_usuario_invalido');
     }
 }
 

@@ -28,8 +28,9 @@ if (!AuthController::isAuthenticated()) {
 }
 
 // Verificar se o usuário é do tipo loja
-if (!AuthController::isStore()) {
-    header('Location: ' . LOGIN_URL . '?error=' . urlencode('Acesso restrito a lojas parceiras.'));
+// ✅ SUBSTITUIR POR ESTA:
+if (!AuthController::hasStoreAccess()) {
+    header("Location: " . LOGIN_URL . "?error=acesso_restrito");
     exit;
 }
 
