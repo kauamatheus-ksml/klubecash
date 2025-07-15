@@ -1,4 +1,6 @@
 <?php
+echo "Tipo: " . $_SESSION['user_type']; 
+exit; // Remover depois
 // views/stores/dashboard.php
 // Incluir arquivos de configuração
 require_once '../../config/constants.php';
