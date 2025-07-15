@@ -40,8 +40,7 @@ class AuthController {
         try {
             $db = Database::getConnection();
             
-            // Primeira etapa: Buscar o usuário no banco de dados
-            // Esta consulta inclui todos os campos necessários para funcionários
+            // Buscar o usuário no banco de dados
             $stmt = $db->prepare("
                 SELECT id, nome, email, senha_hash, tipo, status, loja_vinculada_id, subtipo_funcionario
                 FROM usuarios 
@@ -49,114 +48,67 @@ class AuthController {
             ");
             $stmt->execute([$email]);
             
-            // Verificar se o usuário existe
             if ($stmt->rowCount() === 0) {
                 return ['status' => false, 'message' => 'E-mail ou senha incorretos.'];
             }
             
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
             
-            // Segunda etapa: Validar a senha fornecida
-            // O password_verify compara a senha em texto plano com o hash armazenado
+            // Validar a senha
             if (!password_verify($senha, $user['senha_hash'])) {
                 return ['status' => false, 'message' => 'E-mail ou senha incorretos.'];
             }
             
-            // Terceira etapa: Verificar se a conta está ativa
+            // Verificar se a conta está ativa
             if ($user['status'] !== 'ativo') {
                 return ['status' => false, 'message' => 'Sua conta está inativa. Entre em contato com o suporte.'];
             }
             
-            // CORREÇÃO PRINCIPAL: Inicializar a variável $storeData
-            // Isso garante que a variável sempre exista, evitando erros de "variável não definida"
+            // Validações específicas para funcionários
             $storeData = null;
-            
-            // Quarta etapa: Validações específicas para funcionários
-            // Para funcionários, precisamos verificar se a loja vinculada está ativa
             if ($user['tipo'] === 'funcionario') {
-                // Buscar dados da loja vinculada
+                // Verificar se a loja vinculada está ativa
                 $storeStmt = $db->prepare("
-                    SELECT status, nome_fantasia 
+                    SELECT status, nome_fantasia, id
                     FROM lojas 
                     WHERE id = ? AND status = 'aprovado'
                 ");
                 $storeStmt->execute([$user['loja_vinculada_id']]);
                 
-                // Se a loja não estiver aprovada, impedir o login
                 if ($storeStmt->rowCount() === 0) {
-                    return ['status' => false, 'message' => 'A loja vinculada não está ativa.'];
+                    return ['status' => false, 'message' => 'A loja vinculada não está ativa ou aprovada.'];
                 }
                 
-                // IMPORTANTE: Definir $storeData aqui garante que ela esteja disponível depois
                 $storeData = $storeStmt->fetch(PDO::FETCH_ASSOC);
             }
-
-            // Quinta etapa: Configurar a sessão PHP
-            // Garantir que a sessão esteja iniciada antes de definir variáveis
+            
+            // Configurar a sessão
             if (session_status() === PHP_SESSION_NONE) {
                 session_start();
             }
-
-            // Definir variáveis básicas de sessão (para todos os tipos de usuário)
+            
+            // Variáveis básicas de sessão
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['user_name'] = $user['nome'];
             $_SESSION['user_email'] = $user['email'];
             $_SESSION['user_type'] = $user['tipo'];
             $_SESSION['last_activity'] = time();
-
-            // Sexta etapa: Configurar dados específicos para funcionários
-            // CORREÇÃO: Agora verificamos se $storeData não é null para evitar erros
+            
+            // Configurações específicas para funcionários
             if ($user['tipo'] === 'funcionario' && $storeData !== null) {
-                
-                // Definir informações básicas do funcionário
                 $_SESSION['employee_subtype'] = $user['subtipo_funcionario'];
                 $_SESSION['store_id'] = $user['loja_vinculada_id'];
                 $_SESSION['store_name'] = $storeData['nome_fantasia'];
                 
-                // Definir permissões baseadas no subtipo do funcionário
-                // Este sistema de permissões permite controle granular de acesso futuro
-                switch($user['subtipo_funcionario']) {
-                    case 'gerente':
-                        // Gerentes têm acesso completo às operações da loja
-                        $_SESSION['employee_permissions'] = [
-                            'dashboard', 
-                            'transacoes', 
-                            'funcionarios', 
-                            'relatorios'
-                        ];
-                        break;
-                        
-                    case 'financeiro':
-                        // Funcionários financeiros focam em aspectos monetários
-                        $_SESSION['employee_permissions'] = [
-                            'dashboard', 
-                            'comissoes', 
-                            'pagamentos', 
-                            'relatorios'
-                        ];
-                        break;
-                        
-                    case 'vendedor':
-                        // Vendedores têm acesso básico para registrar vendas
-                        $_SESSION['employee_permissions'] = [
-                            'dashboard', 
-                            'transacoes'
-                        ];
-                        break;
-                        
-                    default:
-                        // Fallback para subtipos não reconhecidos
-                        $_SESSION['employee_permissions'] = ['dashboard'];
-                }
+                // Log para debug
+                error_log("Login funcionário - ID: {$user['id']}, Subtipo: {$user['subtipo_funcionario']}, Loja: {$user['loja_vinculada_id']}");
             }
             
-            // Sétima etapa: Registrar o login no banco de dados
-            // Atualizar o timestamp do último login para fins de auditoria
+            // Atualizar último login
             $updateStmt = $db->prepare("UPDATE usuarios SET ultimo_login = NOW() WHERE id = ?");
             $updateStmt->execute([$user['id']]);
             
-            // Oitava etapa: Preparar dados de retorno
-            // Estas informações podem ser usadas pela aplicação após o login
+            // Preparar resultado do login
             $result = [
                 'status' => true,
                 'message' => 'Login realizado com sucesso!',
@@ -165,39 +117,58 @@ class AuthController {
                     'nome' => $user['nome'],
                     'email' => $user['email'],
                     'tipo' => $user['tipo']
-                ]
+                ],
+                'redirect_url' => self::getRedirectUrl($user['tipo'])
             ];
             
-            // Adicionar informações específicas de funcionário ao resultado
-            // Isso permite que a aplicação saiba detalhes sobre o funcionário logado
+            // Adicionar informações específicas de funcionário
             if ($user['tipo'] === 'funcionario' && $storeData !== null) {
-                // Buscar o nome de exibição do subtipo usando as constantes definidas
-                $subtypeDisplay = EMPLOYEE_SUBTYPES[$user['subtipo_funcionario']] ?? 'Não definido';
-                
                 $result['employee_info'] = [
                     'subtipo' => $user['subtipo_funcionario'],
-                    'subtipo_display' => $subtypeDisplay,
+                    'subtipo_display' => EMPLOYEE_SUBTYPES[$user['subtipo_funcionario']] ?? 'Não definido',
                     'loja_id' => $user['loja_vinculada_id'],
                     'loja_nome' => $storeData['nome_fantasia']
                 ];
             }
             
-            // Retornar resultado de sucesso com todas as informações
             return $result;
             
         } catch (PDOException $e) {
-            // Tratamento de erro: registrar o erro e retornar mensagem genérica
-            // Isso evita exposição de detalhes técnicos sensíveis ao usuário final
             error_log('Erro no login: ' . $e->getMessage());
             return ['status' => false, 'message' => 'Erro interno do sistema. Tente novamente.'];
         }
     }
-
+    /**
+     * Determina a URL de redirecionamento após login
+     */
+    private static function getRedirectUrl($userType) {
+        switch ($userType) {
+            case USER_TYPE_ADMIN:
+                return ADMIN_DASHBOARD_URL;
+            case USER_TYPE_STORE:
+            case USER_TYPE_EMPLOYEE: // FUNCIONÁRIOS VÃO PARA A MESMA ÁREA DA LOJA
+                return STORE_DASHBOARD_URL;
+            case USER_TYPE_CLIENT:
+            default:
+                return CLIENT_DASHBOARD_URL;
+        }
+    }
     /**
      * Verifica se o usuário logado tem acesso à área da loja
      */
     public static function hasStoreAccess() {
-        return self::isStore() || self::isEmployee();
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        
+        if (!isset($_SESSION['user_type'])) {
+            return false;
+        }
+        
+        $userType = $_SESSION['user_type'];
+        
+        // Lojistas e funcionários têm acesso à área da loja
+        return in_array($userType, [USER_TYPE_STORE, USER_TYPE_EMPLOYEE]);
     }
 
     /**
@@ -214,20 +185,35 @@ class AuthController {
         return isset($_SESSION['user_type']) && $_SESSION['user_type'] === USER_TYPE_EMPLOYEE;
     }
     public static function canManageEmployees() {
-        if (self::isStore()) {
+        if (!self::hasStoreAccess()) {
+            return false;
+        }
+        
+        $userType = $_SESSION['user_type'];
+        
+        // Lojistas sempre podem gerenciar funcionários
+        if ($userType === USER_TYPE_STORE) {
             return true;
         }
         
-        if (self::isEmployee()) {
-            return isset($_SESSION['employee_subtype']) && $_SESSION['employee_subtype'] === EMPLOYEE_TYPE_MANAGER;
+        // Funcionários: apenas gerentes podem gerenciar outros funcionários
+        if ($userType === USER_TYPE_EMPLOYEE) {
+            return isset($_SESSION['employee_subtype']) && 
+                $_SESSION['employee_subtype'] === EMPLOYEE_TYPE_MANAGER;
         }
         
         return false;
     }
 
     public static function getStoreId() {
-        if (self::isStore()) {
-            // Para lojistas, buscar ID na tabela lojas baseado no usuario_id
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        
+        $userType = $_SESSION['user_type'] ?? '';
+        
+        if ($userType === USER_TYPE_STORE) {
+            // Para lojistas, buscar ID na tabela lojas
             try {
                 $db = Database::getConnection();
                 $stmt = $db->prepare("SELECT id FROM lojas WHERE usuario_id = ?");
@@ -236,37 +222,18 @@ class AuthController {
                 
                 if ($loja) {
                     return $loja['id'];
-                } else {
-                    // Se não existe, criar registro na tabela lojas
-                    $userStmt = $db->prepare("SELECT * FROM usuarios WHERE id = ? AND tipo = 'loja'");
-                    $userStmt->execute([$_SESSION['user_id']]);
-                    $userData = $userStmt->fetch();
-                    
-                    if ($userData) {
-                        $createStmt = $db->prepare("
-                            INSERT INTO lojas (usuario_id, nome_fantasia, razao_social, cnpj, email, telefone, porcentagem_cashback, status) 
-                            VALUES (?, ?, ?, ?, ?, ?, ?, 'aprovado')
-                        ");
-                        $createStmt->execute([
-                            $_SESSION['user_id'],
-                            $userData['nome'],
-                            $userData['nome'],
-                            '00000000000191',
-                            $userData['email'],
-                            $userData['telefone'] ?? '11999999999',
-                            10.00
-                        ]);
-                        return $db->lastInsertId();
-                    }
                 }
             } catch (Exception $e) {
                 error_log('Erro getStoreId: ' . $e->getMessage());
             }
             
             return $_SESSION['user_id']; // Fallback
-        } elseif (self::isEmployee()) {
+            
+        } elseif ($userType === USER_TYPE_EMPLOYEE) {
+            // Para funcionários, usar o ID da loja vinculada
             return $_SESSION['store_id'] ?? null;
         }
+        
         return null;
     }
 

@@ -1,134 +1,208 @@
 <?php
-echo "Tipo: " . $_SESSION['user_type']; 
-exit; // Remover depois
-// views/stores/dashboard.php
-// Incluir arquivos de configuração
+/**
+ * Dashboard da Loja - Sistema Klube Cash v2.1
+ * Compatível com lojistas e funcionários (gerente, financeiro, vendedor)
+ * 
+ * Localização: views/stores/dashboard.php
+ * Última atualização: Sistema de permissões integrado
+ */
+
+// Incluir arquivos de configuração necessários
 require_once '../../config/constants.php';
 require_once '../../config/database.php';
 require_once '../../controllers/AuthController.php';
 require_once '../../controllers/StoreController.php';
 require_once '../../controllers/TransactionController.php';
+require_once '../../utils/PermissionManager.php';
 
-// Iniciar sessão e verificar autenticação
-session_start();
+// Iniciar sessão se não estiver ativa
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
+// === SISTEMA DE VERIFICAÇÃO DE ACESSO ATUALIZADO ===
+
+// Verificação primária: usuário deve ter acesso à área da loja
 if (!AuthController::hasStoreAccess()) {
     header("Location: " . LOGIN_URL . "?error=acesso_restrito");
     exit;
 }
 
-// Verificar permissão específica para ver dashboard
-if (AuthController::isEmployee() && !PermissionManager::checkAccess(MODULO_DASHBOARD, ACAO_VER)) {
+// Verificação de permissão específica para dashboard
+if (!PermissionManager::checkAccess('dashboard', 'ver')) {
     header("Location: " . LOGIN_URL . "?error=sem_permissao");
     exit;
 }
 
-// Verificar se o usuário está logado
+// Verificação de autenticação geral
 if (!AuthController::isAuthenticated()) {
     header('Location: ' . LOGIN_URL . '?error=' . urlencode('Você precisa fazer login para acessar esta página.'));
     exit;
 }
 
-// Verificar se o usuário é do tipo loja
-// ✅ SUBSTITUIR POR ESTA:
-if (!AuthController::hasStoreAccess()) {
-    header("Location: " . LOGIN_URL . "?error=acesso_restrito");
-    exit;
-}
+// === OBTER INFORMAÇÕES DO USUÁRIO ATUAL ===
 
-// Obter ID do usuário logado
 $userId = AuthController::getCurrentUserId();
+$userType = $_SESSION['user_type'];
+$userName = $_SESSION['user_name'];
+$isEmployee = ($userType === USER_TYPE_EMPLOYEE);
+$isStoreOwner = ($userType === USER_TYPE_STORE);
 
-// Obter dados da loja associada ao usuário
-$db = Database::getConnection();
-$storeQuery = $db->prepare("SELECT * FROM lojas WHERE usuario_id = :usuario_id");
-$storeQuery->bindParam(':usuario_id', $userId);
-$storeQuery->execute();
+// Informações específicas para funcionários
+$employeeSubtype = null;
+$employeeSubtypeDisplay = '';
+if ($isEmployee) {
+    $employeeSubtype = $_SESSION['employee_subtype'] ?? null;
+    $employeeSubtypeDisplay = PermissionManager::getSubtipoDisplayName($employeeSubtype);
+}
 
-// Verificar se o usuário tem uma loja associada
-if ($storeQuery->rowCount() == 0) {
-    header('Location: ' . LOGIN_URL . '?error=' . urlencode('Sua conta não está associada a nenhuma loja. Entre em contato com o suporte.'));
+// === OBTER DADOS DA LOJA ===
+
+try {
+    $db = Database::getConnection();
+    $storeId = AuthController::getStoreId();
+    
+    if (!$storeId) {
+        throw new Exception('ID da loja não encontrado.');
+    }
+    
+    // Buscar dados completos da loja
+    if ($isStoreOwner) {
+        // Para lojistas, buscar pela associação do usuário
+        $storeQuery = $db->prepare("
+            SELECT l.*, u.nome as proprietario_nome 
+            FROM lojas l 
+            LEFT JOIN usuarios u ON l.usuario_id = u.id 
+            WHERE l.usuario_id = :usuario_id
+        ");
+        $storeQuery->bindParam(':usuario_id', $userId);
+    } else {
+        // Para funcionários, buscar pelo ID da loja vinculada
+        $storeQuery = $db->prepare("
+            SELECT l.*, u.nome as proprietario_nome 
+            FROM lojas l 
+            LEFT JOIN usuarios u ON l.usuario_id = u.id 
+            WHERE l.id = :loja_id
+        ");
+        $storeQuery->bindParam(':loja_id', $storeId);
+    }
+    
+    $storeQuery->execute();
+    
+    if ($storeQuery->rowCount() === 0) {
+        throw new Exception('Loja não encontrada ou não associada ao usuário.');
+    }
+    
+    $store = $storeQuery->fetch(PDO::FETCH_ASSOC);
+    
+    // Log de acesso para auditoria
+    error_log("Dashboard acessado - Usuário: {$userName} (ID: {$userId}), Tipo: {$userType}" . 
+              ($isEmployee ? ", Subtipo: {$employeeSubtype}" : "") . ", Loja: {$store['nome_fantasia']}");
+
+} catch (Exception $e) {
+    error_log('Erro ao obter dados da loja: ' . $e->getMessage());
+    header('Location: ' . LOGIN_URL . '?error=' . urlencode('Erro ao carregar dados da loja. Entre em contato com o suporte.'));
     exit;
 }
 
-// Obter os dados da loja
-$store = $storeQuery->fetch(PDO::FETCH_ASSOC);
-$storeId = $store['id'];
+// === OBTER ESTATÍSTICAS DA LOJA ===
 
-// Obter estatísticas da loja
-// 1. Total de vendas registradas
-$salesQuery = $db->prepare("
-    SELECT COUNT(*) as total_vendas, 
-           SUM(valor_total) as valor_total_vendas,
-           SUM(valor_cashback) as valor_total_cashback,
-           SUM(valor_cliente) as valor_total_cliente,
-           SUM(valor_admin) as valor_total_admin
-    FROM transacoes_cashback 
-    WHERE loja_id = :loja_id
-");
-$salesQuery->bindParam(':loja_id', $storeId);
-$salesQuery->execute();
-$salesStats = $salesQuery->fetch(PDO::FETCH_ASSOC);
+try {
+    // 1. Total de vendas registradas
+    $salesQuery = $db->prepare("
+        SELECT COUNT(*) as total_vendas, 
+               COALESCE(SUM(valor_total), 0) as valor_total_vendas,
+               COALESCE(SUM(valor_cashback), 0) as valor_total_cashback,
+               COALESCE(SUM(valor_cliente), 0) as valor_total_cliente,
+               COALESCE(SUM(valor_admin), 0) as valor_total_admin
+        FROM transacoes_cashback 
+        WHERE loja_id = :loja_id
+    ");
+    $salesQuery->bindParam(':loja_id', $storeId);
+    $salesQuery->execute();
+    $salesStats = $salesQuery->fetch(PDO::FETCH_ASSOC);
 
-// 2. Comissões pendentes
-$pendingQuery = $db->prepare("
-    SELECT COUNT(*) as total_pendentes, 
-           SUM(valor_cashback) as valor_pendente,
-           SUM(valor_cliente) as valor_cliente_pendente,
-           COUNT(DISTINCT usuario_id) as clientes_afetados
-    FROM transacoes_cashback 
-    WHERE loja_id = :loja_id AND status = :status
-");
+    // 2. Comissões pendentes
+    $pendingQuery = $db->prepare("
+        SELECT COUNT(*) as total_pendentes, 
+               COALESCE(SUM(valor_cashback), 0) as valor_pendente,
+               COALESCE(SUM(valor_cliente), 0) as valor_cliente_pendente,
+               COUNT(DISTINCT usuario_id) as clientes_afetados
+        FROM transacoes_cashback 
+        WHERE loja_id = :loja_id AND status = 'pendente'
+    ");
+    $pendingQuery->bindParam(':loja_id', $storeId);
+    $pendingQuery->execute();
+    $pendingStats = $pendingQuery->fetch(PDO::FETCH_ASSOC);
 
-$paidQuery = $db->prepare("
-    SELECT COUNT(*) as total_pagas, 
-           SUM(valor_cashback) as valor_pago
-    FROM transacoes_cashback 
-    WHERE loja_id = :loja_id AND status = :status
-");
-$paidQuery->bindParam(':loja_id', $storeId);
-$status = 'aprovado';
-$paidQuery->bindParam(':status', $status);
-$paidQuery->execute();
-$paidStats = $paidQuery->fetch(PDO::FETCH_ASSOC);
+    // 3. Comissões pagas
+    $paidQuery = $db->prepare("
+        SELECT COUNT(*) as total_pagas, 
+               COALESCE(SUM(valor_cashback), 0) as valor_pago
+        FROM transacoes_cashback 
+        WHERE loja_id = :loja_id AND status = 'aprovado'
+    ");
+    $paidQuery->bindParam(':loja_id', $storeId);
+    $paidQuery->execute();
+    $paidStats = $paidQuery->fetch(PDO::FETCH_ASSOC);
 
-$pendingQuery->bindParam(':loja_id', $storeId);
-$status = 'pendente';
-$pendingQuery->bindParam(':status', $status);
-$pendingQuery->execute();
-$pendingStats = $pendingQuery->fetch(PDO::FETCH_ASSOC);
+    // 4. Últimas transações (com tratamento de erro)
+    $recentQuery = $db->prepare("
+        SELECT t.*, u.nome as cliente_nome
+        FROM transacoes_cashback t
+        LEFT JOIN usuarios u ON t.usuario_id = u.id
+        WHERE t.loja_id = :loja_id
+        ORDER BY t.data_transacao DESC
+        LIMIT 5
+    ");
+    $recentQuery->bindParam(':loja_id', $storeId);
+    $recentQuery->execute();
+    $recentTransactions = $recentQuery->fetchAll(PDO::FETCH_ASSOC);
 
-// 4. Últimas transações
-$recentQuery = $db->prepare("
-    SELECT t.*, u.nome as cliente_nome
-    FROM transacoes_cashback t
-    JOIN usuarios u ON t.usuario_id = u.id
-    WHERE t.loja_id = :loja_id
-    ORDER BY t.data_transacao DESC
-    LIMIT 5
-");
-$recentQuery->bindParam(':loja_id', $storeId);
-$recentQuery->execute();
-$recentTransactions = $recentQuery->fetchAll(PDO::FETCH_ASSOC);
+    // 5. Estatísticas mensais (últimos 6 meses)
+    $monthlyQuery = $db->prepare("
+        SELECT 
+            DATE_FORMAT(data_transacao, '%Y-%m') as mes,
+            COUNT(*) as total_vendas,
+            COALESCE(SUM(valor_total), 0) as valor_total,
+            COALESCE(SUM(valor_cashback), 0) as valor_cashback
+        FROM transacoes_cashback
+        WHERE loja_id = :loja_id
+        AND data_transacao >= DATE_SUB(CURRENT_DATE(), INTERVAL 6 MONTH)
+        GROUP BY DATE_FORMAT(data_transacao, '%Y-%m')
+        ORDER BY mes ASC
+    ");
+    $monthlyQuery->bindParam(':loja_id', $storeId);
+    $monthlyQuery->execute();
+    $monthlyStats = $monthlyQuery->fetchAll(PDO::FETCH_ASSOC);
 
-// 5. Estatísticas de vendas por mês (últimos 6 meses)
-$monthlyQuery = $db->prepare("
-    SELECT 
-        DATE_FORMAT(data_transacao, '%Y-%m') as mes,
-        COUNT(*) as total_vendas,
-        SUM(valor_total) as valor_total,
-        SUM(valor_cashback) as valor_cashback
-    FROM transacoes_cashback
-    WHERE loja_id = :loja_id
-    AND data_transacao >= DATE_SUB(CURRENT_DATE(), INTERVAL 6 MONTH)
-    GROUP BY DATE_FORMAT(data_transacao, '%Y-%m')
-    ORDER BY mes ASC
-");
-$monthlyQuery->bindParam(':loja_id', $storeId);
-$monthlyQuery->execute();
-$monthlyStats = $monthlyQuery->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    error_log('Erro ao obter estatísticas: ' . $e->getMessage());
+    
+    // Definir valores padrão em caso de erro
+    $salesStats = [
+        'total_vendas' => 0,
+        'valor_total_vendas' => 0,
+        'valor_total_cashback' => 0,
+        'valor_total_cliente' => 0,
+        'valor_total_admin' => 0
+    ];
+    $pendingStats = [
+        'total_pendentes' => 0,
+        'valor_pendente' => 0,
+        'valor_cliente_pendente' => 0,
+        'clientes_afetados' => 0
+    ];
+    $paidStats = [
+        'total_pagas' => 0,
+        'valor_pago' => 0
+    ];
+    $recentTransactions = [];
+    $monthlyStats = [];
+}
 
-// Converter estatísticas mensais para formato adequado para gráficos
+// === PROCESSAR DADOS PARA GRÁFICOS ===
+
 $chartLabels = [];
 $chartData = [];
 $monthNames = [
@@ -140,13 +214,37 @@ $monthNames = [
 
 foreach ($monthlyStats as $stat) {
     $yearMonth = explode('-', $stat['mes']);
-    $monthName = $monthNames[$yearMonth[1]] . '/' . substr($yearMonth[0], 2, 2);
-    $chartLabels[] = $monthName;
-    $chartData[] = floatval($stat['valor_total']);
+    if (count($yearMonth) === 2 && isset($monthNames[$yearMonth[1]])) {
+        $monthName = $monthNames[$yearMonth[1]] . '/' . substr($yearMonth[0], 2, 2);
+        $chartLabels[] = $monthName;
+        $chartData[] = floatval($stat['valor_total']);
+    }
 }
 
-// Definir menu ativo
+// === VERIFICAR PERMISSÕES ESPECÍFICAS PARA EXIBIÇÃO ===
+
+$canViewTransactions = PermissionManager::checkAccess('transacoes', 'ver');
+$canCreateTransactions = PermissionManager::checkAccess('transacoes', 'criar');
+$canViewCommissions = PermissionManager::checkAccess('comissoes', 'ver');
+$canPayCommissions = PermissionManager::checkAccess('comissoes', 'pagar');
+$canViewEmployees = PermissionManager::checkAccess('funcionarios', 'ver');
+$canViewReports = PermissionManager::checkAccess('relatorios', 'ver');
+
+// Definir menu ativo para a sidebar
 $activeMenu = 'dashboard';
+
+// === INFORMAÇÕES PARA EXIBIÇÃO ===
+
+// Título personalizado baseado no tipo de usuário
+if ($isEmployee) {
+    $pageTitle = "Dashboard - {$employeeSubtypeDisplay}";
+    $welcomeMessage = "Bem-vindo(a), {$userName}";
+    $roleInfo = "Funcionário {$employeeSubtypeDisplay} - {$store['nome_fantasia']}";
+} else {
+    $pageTitle = "Dashboard da Loja";
+    $welcomeMessage = "Bem-vindo(a), {$store['nome_fantasia']}";
+    $roleInfo = "Proprietário da Loja";
+}
 ?>
 
 <!DOCTYPE html>

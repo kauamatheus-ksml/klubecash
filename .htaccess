@@ -272,7 +272,7 @@ RewriteRule ^admin/comissoes/?$ views/admin/commissions.php [L]
 RewriteRule ^admin/pagamentos/?$ views/admin/payments.php [L]
 RewriteRule ^admin/relatorios/?$ views/admin/reports.php [L]
 
-
+RewriteRule ^debug-funcionarios/?$ debug-funcionarios.php [L]
 
 
 # PIX e Mercado Pago (OTIMIZADO)
