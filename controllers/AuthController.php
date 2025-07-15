@@ -1026,18 +1026,32 @@ if (basename($_SERVER['PHP_SELF']) === 'AuthController.php') {
                 $result = AuthController::login($email, $password);
                 
                 if ($result['status']) {
-                    // Redirecionar com base no tipo de usuário
-                    if ($_SESSION['user_type'] == USER_TYPE_ADMIN) {
-                        header('Location: ' . ADMIN_DASHBOARD_URL);
-                    } else if ($_SESSION['user_type'] == USER_TYPE_STORE) {
-                        header('Location: ' . STORE_DASHBOARD_URL);
-                    } else {
-                        header('Location: ' . CLIENT_DASHBOARD_URL);
+                    // CORREÇÃO: Redirecionamento baseado no tipo de usuário
+                    $userType = $_SESSION['user_type'];
+                    
+                    // Log para debug
+                    error_log("Login bem-sucedido - Usuário: {$_SESSION['user_name']}, Tipo: {$userType}");
+                    
+                    switch ($userType) {
+                        case USER_TYPE_ADMIN:
+                            $redirectUrl = ADMIN_DASHBOARD_URL;
+                            break;
+                        case USER_TYPE_STORE:
+                        case USER_TYPE_EMPLOYEE: // FUNCIONÁRIOS VÃO PARA ÁREA DA LOJA
+                            $redirectUrl = STORE_DASHBOARD_URL;
+                            break;
+                        case USER_TYPE_CLIENT:
+                        default:
+                            $redirectUrl = CLIENT_DASHBOARD_URL;
+                            break;
                     }
+                    
+                    error_log("Redirecionando para: {$redirectUrl}");
+                    header("Location: {$redirectUrl}");
                     exit;
                 } else {
                     // Redirecionar de volta com mensagem de erro
-                    header('Location: ' . SITE_URL . '/login?error=' . urlencode($result['message']));
+                    header('Location: ' . LOGIN_URL . '?error=' . urlencode($result['message']));
                     exit;
                 }
             }
