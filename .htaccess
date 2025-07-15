@@ -281,6 +281,26 @@ RewriteRule ^api/mercadopago/?$ api/mercadopago.php [L,QSA]
 RewriteRule ^api/mercadopago-webhook/?$ api/mercadopago-webhook.php [L,QSA]
 RewriteRule ^api/store-payment/?$ api/store-payment.php [L,QSA]
 
+
+
+
+
+# === REDIRECIONAMENTO ESPECÍFICO PARA FUNCIONÁRIOS ===
+# Redirecionar funcionários que tentam acessar área do cliente
+RewriteCond %{HTTP_COOKIE} user_type=funcionario [NC]
+RewriteRule ^cliente/ /store/dashboard? [R=302,L]
+
+# Verificar se funcionário está tentando acessar área errada
+RewriteCond %{QUERY_STRING} user_type=funcionario
+RewriteRule ^cliente/ /store/dashboard? [R=302,L]
+
+# Redirecionar qualquer funcionário para área da loja
+RewriteCond %{REQUEST_URI} ^/cliente/
+RewriteCond %{HTTP_REFERER} store|funcionario [NC]
+RewriteRule ^(.*)$ /store/dashboard? [R=302,L]
+
+
+
 # Lojas
 RewriteRule ^lojas/cadastro/?$ views/stores/register.php [L]
 RewriteRule ^lojas/detalhes/([0-9]+)/?$ views/stores/details.php?id=$1 [L]
