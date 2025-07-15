@@ -132,37 +132,7 @@ define('WHATSAPP_BOT_SECRET', 'klube-cash-2024');
 define('WHATSAPP_ENABLED', true);
 define('WHATSAPP_TIMEOUT', 30);
 define('WHATSAPP_PRODUCTION_MODE', true); // NOVA: Indicador explícito de modo produção
-// === SISTEMA DE PERMISSÕES PARA FUNCIONÁRIOS ===
-define('EMPLOYEE_PERMISSIONS', [
-    EMPLOYEE_TYPE_MANAGER => [
-        'dashboard' => ['ver'],
-        'transacoes' => ['ver', 'criar', 'upload_lote'],
-        'comissoes' => ['ver', 'pagar'],
-        'funcionarios' => ['ver', 'criar', 'editar', 'desativar'],
-        'relatorios' => ['ver'],
-        'configuracoes' => ['ver', 'editar']
-    ],
-    EMPLOYEE_TYPE_FINANCIAL => [
-        'dashboard' => ['ver'],
-        'transacoes' => ['ver', 'criar'],
-        'comissoes' => ['ver', 'pagar'],
-        'relatorios' => ['ver']
-    ],
-    EMPLOYEE_TYPE_SALESPERSON => [
-        'dashboard' => ['ver'],
-        'transacoes' => ['ver', 'criar']
-    ]
-]);
 
-// === HELPER FUNCTIONS PARA FUNCIONÁRIOS ===
-function getEmployeePermissions($subtipo) {
-    return EMPLOYEE_PERMISSIONS[$subtipo] ?? [];
-}
-
-function hasEmployeePermission($subtipo, $modulo, $acao) {
-    $permissions = getEmployeePermissions($subtipo);
-    return isset($permissions[$modulo]) && in_array($acao, $permissions[$modulo]);
-}
 // === SUBTIPOS DE FUNCIONÁRIO ===  
 define('EMPLOYEE_TYPE_MANAGER', 'gerente');
 define('EMPLOYEE_TYPE_FINANCIAL', 'financeiro');
