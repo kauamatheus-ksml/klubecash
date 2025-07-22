@@ -62,32 +62,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $error = 'Este email já está cadastrado. Por favor, use outro ou faça login.';
             } else {
                 // Hash da senha
-                $senha_hash = password_hash($senha, PASSWORD_DEFAULT);
+                $senha_hash = password_hash($senha, PASSWORD_BCRYPT);
 
                 // Inserir novo usuário
-                $stmt = $db->prepare("INSERT INTO usuarios (nome, email, senha_hash, tipo, telefone) VALUES (:nome, :email, :senha_hash, :tipo, :telefone)");
-                $stmt->bindParam(':nome', $nome);
-                $stmt->bindParam(':email', $email);
-                $stmt->bindParam(':senha_hash', $senha_hash);
-                $tipo = USER_TYPE_CLIENT;
-                $stmt->bindParam(':tipo', $tipo);
-                $stmt->bindParam(':telefone', $telefone);
+                $stmt = $db->prepare("INSERT INTO usuarios (nome, email, senha_hash, tipo, telefone, status, data_criacao) VALUES (?, ?, ?, ?, ?, ?, NOW())");
+                $result = $stmt->execute([$nome, $email, $senha_hash, USER_TYPE_CLIENT, $telefone, USER_ACTIVE]);
 
-                if ($stmt->execute()) {
+                if ($result) {
                     $user_id = $db->lastInsertId();
 
                     // Tentar enviar email (não crítico)
                     try {
-                        Email::sendWelcome($email, $nome);
+                        if (class_exists('Email')) {
+                            Email::sendWelcome($email, $nome);
+                        }
                     } catch (Exception $e) {
                         error_log("Erro email: " . $e->getMessage());
                     }
 
-                    // CORREÇÃO: Redirecionar direto para login
+                    // Redirecionar para login
                     header('Location: /login?success=cadastro_realizado');
                     exit;
-                } else {
-                    $error = 'Erro ao cadastrar. Tente novamente.';
                 }
             }
         } catch (PDOException $e) {
