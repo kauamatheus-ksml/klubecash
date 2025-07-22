@@ -76,20 +76,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($stmt->execute()) {
                     $user_id = $db->lastInsertId();
 
-                    // Enviar email de boas-vindas
-                    Email::sendWelcome($email, $nome);
+                    // Tentar enviar email (não crítico)
+                    try {
+                        Email::sendWelcome($email, $nome);
+                    } catch (Exception $e) {
+                        error_log("Erro email: " . $e->getMessage());
+                    }
 
-                    // Redirecionar para página de sucesso ou login
-                    $success = 'Cadastro realizado com sucesso! Você já pode fazer login.';
-
-                    // Opcionalmente, fazer login automático
-                    // $_SESSION['user_id'] = $user_id;
-                    // $_SESSION['user_name'] = $nome;
-                    // $_SESSION['user_type'] = $tipo;
-                    // header('Location: ' . CLIENT_DASHBOARD_URL);
-                    // exit;
+                    // CORREÇÃO: Redirecionar direto para login
+                    header('Location: /login?success=cadastro_realizado');
+                    exit;
                 } else {
-                    $error = 'Erro ao cadastrar. Por favor, tente novamente.';
+                    $error = 'Erro ao cadastrar. Tente novamente.';
                 }
             }
         } catch (PDOException $e) {
