@@ -605,3 +605,16 @@ RewriteCond %{REQUEST_FILENAME}\.php -f
 RewriteRule ^(.*)$ $1.php [L]
 
 
+# === TRATAMENTO DE ERROS PERSONALIZADOS ===
+ErrorDocument 404 /views/errors/404.php
+ErrorDocument 500 /views/errors/500.php
+
+# === CONFIGURAÇÕES DE SEGURANÇA PARA REGISTRO ===
+<Files "register.php">
+    php_flag display_errors off
+    php_flag log_errors on
+    php_value error_log /home/u383946504/domains/klubecash.com/public_html/logs/register_errors.log
+</Files>
+
+# === CONFIGURAÇÕES ESPECÍFICAS PARA DEBUG ===
+RewriteRule ^debug-register/?$ views/auth/debug-register.php [L]

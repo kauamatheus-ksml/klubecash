@@ -151,7 +151,7 @@ define('STORE_REJECTED', 'rejeitado');
 
 // === CONFIGURAÇÕES DE SEGURANÇA ===
 define('PASSWORD_MIN_LENGTH', 8);
-define('SESSION_LIFETIME', 86400);
+
 
 define('CPF_REQUIRED', true); // Novo: Indica se CPF é obrigatório
 
@@ -731,5 +731,13 @@ function mp_get_device_id() {
     
     return 'device_' . md5($userAgent . $ip . $timestamp);
 }
+// === CORREÇÕES PARA REGISTRO ===
+if (!defined('PASSWORD_DEFAULT')) {
+    define('PASSWORD_DEFAULT', PASSWORD_BCRYPT);
+}
 
+// === VALIDAÇÃO DE ESTRUTURA ===
+if (!defined('PASSWORD_MIN_LENGTH')) {
+    define('PASSWORD_MIN_LENGTH', 8);
+}
 ?>
