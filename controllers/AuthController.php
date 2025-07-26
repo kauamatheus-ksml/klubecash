@@ -177,10 +177,21 @@ class AuthController {
      * Verifica se o usuário logado tem acesso à área da loja
      */
     public static function hasStoreAccess() {
-        if (!self::isAuthenticated()) return false;
+        if (!self::isAuthenticated()) {
+            return false;
+        }
         
         $userType = $_SESSION['user_type'];
-        return in_array($userType, [USER_TYPE_STORE, USER_TYPE_EMPLOYEE]);
+        
+        // Verificar tipo de usuário
+        $allowedTypes = [USER_TYPE_STORE, USER_TYPE_EMPLOYEE, 'loja', 'funcionario'];
+        if (!in_array($userType, $allowedTypes)) {
+            return false;
+        }
+        
+        // Verificar se tem store_id definido
+        $storeId = self::getStoreId();
+        return !empty($storeId);
     }
 
     /**
@@ -199,12 +210,21 @@ class AuthController {
     
 
     public static function getStoreId() {
-        if ($_SESSION['user_type'] === USER_TYPE_STORE) {
+        // Verificar se sessão está ativa
+        if (!isset($_SESSION['user_type'])) {
+            return null;
+        }
+        
+        $userType = $_SESSION['user_type'];
+        
+        // Para lojistas, usar store_id
+        if ($userType === USER_TYPE_STORE || $userType === 'loja') {
             return $_SESSION['store_id'] ?? null;
         }
         
-        if ($_SESSION['user_type'] === USER_TYPE_EMPLOYEE) {
-            return $_SESSION['loja_vinculada_id'] ?? null;
+        // Para funcionários, usar loja_vinculada_id OU store_id (ambos devem ter o mesmo valor)
+        if ($userType === USER_TYPE_EMPLOYEE || $userType === 'funcionario') {
+            return $_SESSION['store_id'] ?? $_SESSION['loja_vinculada_id'] ?? null;
         }
         
         return null;
@@ -212,13 +232,22 @@ class AuthController {
 
     public static function getStoreData() {
         $storeId = self::getStoreId();
-        if (!$storeId) return null;
+        if (!$storeId) {
+            return null;
+        }
 
         try {
             $db = Database::getConnection();
-            $stmt = $db->prepare("SELECT * FROM lojas WHERE id = ?");
+            $stmt = $db->prepare("SELECT * FROM lojas WHERE id = ? LIMIT 1");
             $stmt->execute([$storeId]);
-            return $stmt->fetch(PDO::FETCH_ASSOC);
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$result) {
+                error_log("ERRO: Loja não encontrada - Store ID: {$storeId}");
+                return null;
+            }
+            
+            return $result;
         } catch (Exception $e) {
             error_log("Erro ao buscar dados da loja: " . $e->getMessage());
             return null;
@@ -229,23 +258,20 @@ class AuthController {
      * Verifica se o usuário pode gerenciar funcionários (sistema simplificado)
      */
     public static function canManageEmployees() {
-        if (!self::hasStoreAccess()) return false;
-        
-        // Sistema simplificado: lojistas sempre podem, funcionários também (mesmo acesso)
-        $userType = $_SESSION['user_type'];
-        return in_array($userType, [USER_TYPE_STORE, USER_TYPE_EMPLOYEE]);
-    }
-    /**
-     * Obtém o subtipo do funcionário atual
-     * 
-     * @return string|null Subtipo do funcionário ou null se não for funcionário
-     */
-    public static function getEmployeeSubtype() {
-        if (!self::isEmployee()) {
-            return null;
+        // Verificar se tem acesso à área da loja
+        if (!self::hasStoreAccess()) {
+            return false;
         }
         
-        return $_SESSION['employee_subtype'] ?? null;
+        // Verificar se tem store_id definido (crítico!)
+        $storeId = self::getStoreId();
+        if (!$storeId) {
+            return false;
+        }
+        
+        // Sistema simplificado: lojistas e funcionários têm mesmo acesso
+        $userType = $_SESSION['user_type'];
+        return in_array($userType, [USER_TYPE_STORE, USER_TYPE_EMPLOYEE, 'loja', 'funcionario']);
     }
 
 
