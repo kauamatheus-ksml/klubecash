@@ -1,10 +1,12 @@
 <?php
 // views/stores/dashboard.php
+// Incluir arquivos de configuração
 require_once '../../config/constants.php';
 require_once '../../config/database.php';
 require_once '../../controllers/AuthController.php';
 require_once '../../controllers/StoreController.php';
 require_once '../../controllers/TransactionController.php';
+// ✅ ADICIONAR APENAS ISTO:
 require_once '../../utils/StoreHelper.php';
 
 // Iniciar sessão
@@ -18,6 +20,12 @@ StoreHelper::logUserAction($_SESSION['user_id'], 'acessou_dashboard', [
     'loja_id' => StoreHelper::getCurrentStoreId()
 ]);
 
+
+
+
+
+
+// ✅ SUBSTITUIR POR:
 // Obter dados da loja - funciona para lojista E funcionário
 $storeId = StoreHelper::getCurrentStoreId();
 $store = AuthController::getStoreData();
@@ -26,9 +34,6 @@ if (!$storeId || !$store) {
     header('Location: ' . LOGIN_URL . '?error=' . urlencode('Erro ao acessar dados da loja.'));
     exit;
 }
-
-// Obter conexão com banco para as queries
-$db = Database::getConnection();
 
 // Obter estatísticas da loja
 // 1. Total de vendas registradas
