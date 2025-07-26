@@ -23,7 +23,7 @@ $storeId = StoreHelper::getCurrentStoreId();
 $store = AuthController::getStoreData();
 
 if (!$storeId || !$store) {
-    header('Location: ' . LOGIN_URL . '?error=' . urlencode('Erro ao acessar dados da loja.'));
+    header('Location: ...');  // NÃO DEVE MAIS EXECUTAR
     exit;
 }
 
