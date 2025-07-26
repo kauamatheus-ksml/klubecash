@@ -61,71 +61,11 @@ define('SESSION_LIFETIME', 3600); // 1 hora
 define('TOKEN_EXPIRATION', 7200); // 2 horas para recuperação de senha
 
 
-// === PERMISSÕES DO SISTEMA ===
-// Módulos disponíveis
-define('MODULO_DASHBOARD', 'dashboard');
-define('MODULO_TRANSACOES', 'transacoes');
-define('MODULO_COMISSOES', 'comissoes');
-define('MODULO_FUNCIONARIOS', 'funcionarios');
-define('MODULO_RELATORIOS', 'relatorios');
-define('MODULO_CONFIGURACOES', 'configuracoes');
 
-// Ações disponíveis
-define('ACAO_VER', 'ver');
-define('ACAO_CRIAR', 'criar');
-define('ACAO_EDITAR', 'editar');
-define('ACAO_DESATIVAR', 'desativar');
-define('ACAO_PAGAR', 'pagar');
-define('ACAO_UPLOAD_LOTE', 'upload_lote');
 
-// Mapa de permissões legíveis
-define('PERMISSOES_MAPA', [
-    'dashboard' => [
-        'nome' => 'Dashboard',
-        'descricao' => 'Visualizar painel principal',
-        'acoes' => ['ver' => 'Visualizar dashboard']
-    ],
-    'transacoes' => [
-        'nome' => 'Transações', 
-        'descricao' => 'Gerenciar vendas e transações',
-        'acoes' => [
-            'ver' => 'Visualizar transações',
-            'criar' => 'Registrar nova venda',
-            'upload_lote' => 'Upload em lote'
-        ]
-    ],
-    'comissoes' => [
-        'nome' => 'Comissões',
-        'descricao' => 'Gerenciar pagamentos',
-        'acoes' => [
-            'ver' => 'Visualizar comissões',
-            'pagar' => 'Realizar pagamentos'
-        ]
-    ],
-    'funcionarios' => [
-        'nome' => 'Funcionários',
-        'descricao' => 'Gerenciar equipe',
-        'acoes' => [
-            'ver' => 'Visualizar funcionários',
-            'criar' => 'Cadastrar funcionário', 
-            'editar' => 'Editar dados',
-            'desativar' => 'Desativar acesso'
-        ]
-    ],
-    'relatorios' => [
-        'nome' => 'Relatórios',
-        'descricao' => 'Visualizar relatórios',
-        'acoes' => ['ver' => 'Visualizar relatórios']
-    ],
-    'configuracoes' => [
-        'nome' => 'Configurações',
-        'descricao' => 'Configurar loja',
-        'acoes' => [
-            'ver' => 'Visualizar configurações',
-            'editar' => 'Editar configurações'
-        ]
-    ]
-]);
+
+
+
 // === CONFIGURAÇÕES WHATSAPP BOT ===
 define('WHATSAPP_BOT_URL', 'https://f49c-2804-690-33ce-3000-c32-7891-4174-5fcb.ngrok-free.app');
 define('WHATSAPP_BOT_SECRET', 'klube-cash-2024');
@@ -133,17 +73,40 @@ define('WHATSAPP_ENABLED', true);
 define('WHATSAPP_TIMEOUT', 30);
 define('WHATSAPP_PRODUCTION_MODE', true); // NOVA: Indicador explícito de modo produção
 
-// === SUBTIPOS DE FUNCIONÁRIO ===  
-define('EMPLOYEE_TYPE_MANAGER', 'gerente');
-define('EMPLOYEE_TYPE_FINANCIAL', 'financeiro');
-define('EMPLOYEE_TYPE_SALESPERSON', 'vendedor');
 
-// Mapeamento de subtipos para exibição
-define('EMPLOYEE_SUBTYPES', [
-    EMPLOYEE_TYPE_MANAGER => 'Gerente',
-    EMPLOYEE_TYPE_FINANCIAL => 'Financeiro', 
-    EMPLOYEE_TYPE_SALESPERSON => 'Vendedor'
+
+// === SISTEMA DE USUÁRIOS SIMPLIFICADO ===
+// Todos os funcionários têm acesso igual ao lojista
+define('STORE_ACCESS_TYPES', [
+    USER_TYPE_STORE => 'Lojista',
+    USER_TYPE_EMPLOYEE => 'Funcionário'
 ]);
+
+// === RASTREAMENTO DE AÇÕES ===
+define('TRACK_USER_ACTIONS', true);
+define('LOG_TRANSACTION_CREATOR', true);
+define('LOG_PAYMENT_CREATOR', true);
+define('LOG_EMPLOYEE_CREATOR', true);
+
+// === CAMPOS DE AUDITORIA ===
+define('AUDIT_CREATED_BY', 'criado_por');
+define('AUDIT_UPDATED_BY', 'atualizado_por');
+define('AUDIT_CREATED_AT', 'data_criacao');
+define('AUDIT_UPDATED_AT', 'data_atualizacao');
+
+// === FUNCIONÁRIOS SIMPLIFICADO ===
+// Todos funcionários têm acesso igual, diferenciados apenas para exibição
+define('EMPLOYEE_DISPLAY_TYPES', [
+    'funcionario' => 'Funcionário',
+    'gerente' => 'Gerente', 
+    'coordenador' => 'Coordenador',
+    'assistente' => 'Assistente'
+]);
+
+// Campo opcional para organização interna (não afeta permissões)
+define('EMPLOYEE_POSITION_FIELD', 'cargo_display');
+
+
 
 define('STORE_PENDING', 'pendente');
 define('STORE_APPROVED', 'aprovado');
