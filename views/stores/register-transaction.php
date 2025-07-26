@@ -12,15 +12,18 @@ require_once '../../utils/StoreHelper.php';
 // Iniciar sessão
 session_start();
 
-// Verificação simplificada - substitui TODAS as verificações complexas
+// Verificação simplificada
 StoreHelper::requireStoreAccess();
 
-// Obter dados da loja - funciona para lojista E funcionário
+// Obter dados da loja - SE a verificação passou, os dados existem
 $storeId = StoreHelper::getCurrentStoreId();
 $store = AuthController::getStoreData();
 
+// Esta verificação não deveria ser necessária, mas vamos manter como fallback
 if (!$storeId || !$store) {
-    header('Location: ' . LOGIN_URL . '?error=' . urlencode('Erro ao acessar dados da loja.'));
+    // Se chegou aqui, há problema na sessão - vamos limpar e tentar novamente
+    session_destroy();
+    header('Location: ' . LOGIN_URL . '?error=' . urlencode('Sessão inválida. Faça login novamente.'));
     exit;
 }
 
