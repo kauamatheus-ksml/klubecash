@@ -1,35 +1,46 @@
 <?php
 /**
- * TESTE BÁSICO - StoreHelper
- * Se este arquivo não der erro fatal, está funcionando
+ * Helper para verificações simplificadas - Klube Cash v2.1
+ * Sistema ultrarrápido que substitui toda complexidade de permissões
  */
 
 require_once __DIR__ . '/../config/constants.php';
 
 class StoreHelper {
     
-    public static function test() {
-        return "StoreHelper funcionando!";
-    }
-    
+    /**
+     * Verificação obrigatória para páginas da loja - USA EM TODOS OS ARQUIVOS
+     * Substitui todas as verificações complexas de permissão
+     */
     public static function requireStoreAccess() {
-        // Versão de teste simples
+        // Verificar se está logado
         if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type'])) {
-            echo "❌ ERRO: Usuário não logado<br>";
-            return false;
+            header("Location: " . LOGIN_URL . "?error=session_expired");
+            exit;
         }
         
         $userType = $_SESSION['user_type'];
         
+        // Apenas lojistas e funcionários têm acesso
         if (!in_array($userType, [USER_TYPE_STORE, USER_TYPE_EMPLOYEE])) {
-            echo "❌ ERRO: Tipo de usuário não autorizado: " . $userType . "<br>";
-            return false;
+            header("Location: " . LOGIN_URL . "?error=access_denied");
+            exit;
         }
-        
-        echo "✅ SUCESSO: Acesso autorizado para " . $userType . "<br>";
-        return true;
     }
     
+    /**
+     * Verifica se o usuário tem acesso à loja específica
+     * ÚNICA verificação necessária - substitui todo PermissionManager
+     */
+    public static function hasStoreAccess($userType, $userStoreId, $requiredStoreId) {
+        return ($userType === USER_TYPE_STORE || 
+                ($userType === USER_TYPE_EMPLOYEE && $userStoreId == $requiredStoreId));
+    }
+    
+    /**
+     * Obtém ID da loja do usuário atual
+     * Funciona para lojistas E funcionários
+     */
     public static function getCurrentStoreId() {
         if (!isset($_SESSION['user_type'])) return null;
         
@@ -44,32 +55,54 @@ class StoreHelper {
         return null;
     }
     
+    /**
+     * Verifica se pode gerenciar funcionários
+     * Apenas para a página específica de funcionários
+     */
+    public static function canManageEmployees() {
+        $userType = $_SESSION['user_type'] ?? '';
+        
+        // Lojistas sempre podem
+        if ($userType === USER_TYPE_STORE) {
+            return true;
+        }
+        
+        // Funcionários com subtipo "gerente" também podem
+        if ($userType === USER_TYPE_EMPLOYEE) {
+            $subtipo = $_SESSION['subtipo_funcionario'] ?? '';
+            return in_array($subtipo, ['gerente', 'coordenador']);
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Registra ação do usuário para auditoria
+     * Substitui logs complexos - registra QUEM fez O QUE
+     */
     public static function logUserAction($userId, $action, $details = []) {
+        if (!defined('TRACK_USER_ACTIONS') || !TRACK_USER_ACTIONS) return;
+        
         $logData = [
             'usuario_id' => $userId,
             'acao' => $action,
             'detalhes' => json_encode($details),
+            'ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown',
+            'user_agent' => substr($_SERVER['HTTP_USER_AGENT'] ?? 'unknown', 0, 200),
             'data_hora' => date('Y-m-d H:i:s')
         ];
         
-        error_log("TESTE_AUDIT: " . json_encode($logData));
-        echo "📝 LOG: " . $action . " registrado para usuário " . $userId . "<br>";
+        error_log("KLUBE_AUDIT: " . json_encode($logData));
+    }
+    
+    /**
+     * Adiciona campo criado_por em transações/pagamentos
+     * Para auditoria - saber quem criou cada registro
+     */
+    public static function addCreatedByField($data) {
+        if (LOG_TRANSACTION_CREATOR || LOG_PAYMENT_CREATOR) {
+            $data[AUDIT_CREATED_BY] = $_SESSION['user_id'] ?? null;
+        }
+        return $data;
     }
 }
-
-// TESTE IMEDIATO
-if (basename($_SERVER['PHP_SELF']) === 'StoreHelper.php') {
-    echo "<h3>🧪 TESTE do StoreHelper</h3>";
-    echo StoreHelper::test() . "<br>";
-    
-    // Simular sessão para teste
-    if (!session_id()) session_start();
-    $_SESSION['user_id'] = 1;
-    $_SESSION['user_type'] = 'loja';
-    $_SESSION['store_id'] = 1;
-    
-    StoreHelper::requireStoreAccess();
-    echo "Store ID: " . StoreHelper::getCurrentStoreId() . "<br>";
-    StoreHelper::logUserAction(1, 'teste_sistema', ['teste' => true]);
-}
-?>
