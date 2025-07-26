@@ -105,6 +105,13 @@ class AuthController {
                         $_SESSION['store_id'] = $lojaDados['id'];
                         $_SESSION['store_name'] = $lojaDados['nome_fantasia'];
                         $_SESSION['loja_vinculada_id'] = $lojaDados['id']; // Para compatibilidade
+                        
+                        // Log de auditoria
+                        if (defined('TRACK_USER_ACTIONS') && TRACK_USER_ACTIONS) {
+                            error_log("KLUBE_AUDIT: Loja logada - User ID: {$user['id']}, Store ID: {$lojaDados['id']}, Nome: {$lojaDados['nome_fantasia']}");
+                        }
+                    } else {
+                        error_log("ERRO: Usuário lojista {$user['id']} sem loja associada");
                     }
                 } catch (Exception $e) {
                     error_log("Erro ao buscar dados da loja: " . $e->getMessage());
