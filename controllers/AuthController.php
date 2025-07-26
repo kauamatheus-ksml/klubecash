@@ -92,7 +92,7 @@ class AuthController {
             $_SESSION['user_email'] = $user['email'];
             $_SESSION['user_type'] = $user['tipo'];
             $_SESSION['last_activity'] = time();
-            
+
             // === SISTEMA SIMPLIFICADO: CONFIGURAR DADOS DA LOJA ===
             if ($user['tipo'] === USER_TYPE_STORE) {
                 // Para lojistas, buscar dados da loja associada
@@ -110,6 +110,9 @@ class AuthController {
                     error_log("Erro ao buscar dados da loja: " . $e->getMessage());
                 }
             }
+
+            // Sexta etapa: Configurar dados específicos para funcionários
+            // (resto do código dos funcionários...)
 
 
 
