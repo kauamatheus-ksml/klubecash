@@ -6,51 +6,34 @@ require_once '../../config/database.php';
 require_once '../../controllers/AuthController.php';
 require_once '../../controllers/StoreController.php';
 require_once '../../controllers/TransactionController.php';
+// ✅ ADICIONAR APENAS ISTO:
+require_once '../../utils/StoreHelper.php';
 
-// Iniciar sessão e verificar autenticação
+// Iniciar sessão
 session_start();
 
-if (!AuthController::hasStoreAccess()) {
-    header("Location: " . LOGIN_URL . "?error=acesso_restrito");
+// Verificação ultra-simples - substitui TODAS as verificações anteriores
+StoreHelper::requireStoreAccess();
+
+// Registrar acesso para auditoria
+StoreHelper::logUserAction($_SESSION['user_id'], 'acessou_dashboard', [
+    'loja_id' => StoreHelper::getCurrentStoreId()
+]);
+
+
+
+
+
+
+// ✅ SUBSTITUIR POR:
+// Obter dados da loja - funciona para lojista E funcionário
+$storeId = StoreHelper::getCurrentStoreId();
+$store = AuthController::getStoreData();
+
+if (!$storeId || !$store) {
+    header('Location: ' . LOGIN_URL . '?error=' . urlencode('Erro ao acessar dados da loja.'));
     exit;
 }
-
-// Verificar permissão específica para ver dashboard
-if (AuthController::isEmployee() && !PermissionManager::checkAccess(MODULO_DASHBOARD, ACAO_VER)) {
-    header("Location: " . LOGIN_URL . "?error=sem_permissao");
-    exit;
-}
-
-// Verificar se o usuário está logado
-if (!AuthController::isAuthenticated()) {
-    header('Location: ' . LOGIN_URL . '?error=' . urlencode('Você precisa fazer login para acessar esta página.'));
-    exit;
-}
-
-// Verificar se o usuário é do tipo loja
-if (!AuthController::isStore()) {
-    header('Location: ' . LOGIN_URL . '?error=' . urlencode('Acesso restrito a lojas parceiras.'));
-    exit;
-}
-
-// Obter ID do usuário logado
-$userId = AuthController::getCurrentUserId();
-
-// Obter dados da loja associada ao usuário
-$db = Database::getConnection();
-$storeQuery = $db->prepare("SELECT * FROM lojas WHERE usuario_id = :usuario_id");
-$storeQuery->bindParam(':usuario_id', $userId);
-$storeQuery->execute();
-
-// Verificar se o usuário tem uma loja associada
-if ($storeQuery->rowCount() == 0) {
-    header('Location: ' . LOGIN_URL . '?error=' . urlencode('Sua conta não está associada a nenhuma loja. Entre em contato com o suporte.'));
-    exit;
-}
-
-// Obter os dados da loja
-$store = $storeQuery->fetch(PDO::FETCH_ASSOC);
-$storeId = $store['id'];
 
 // Obter estatísticas da loja
 // 1. Total de vendas registradas

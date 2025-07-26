@@ -7,52 +7,22 @@ require_once '../../controllers/AuthController.php';
 require_once '../../controllers/StoreController.php';
 require_once '../../controllers/TransactionController.php';
 require_once '../../controllers/CommissionController.php';
+require_once '../../utils/StoreHelper.php';
 
-// Iniciar sessão e verificar autenticação
+// Iniciar sessão
 session_start();
 
+// Verificação simplificada - substitui TODAS as verificações complexas
+StoreHelper::requireStoreAccess();
 
-// Verificar acesso e permissão para criar transações
-if (!AuthController::hasStoreAccess()) {
-    header("Location: " . LOGIN_URL . "?error=acesso_restrito");
+// Obter dados da loja - funciona para lojista E funcionário
+$storeId = StoreHelper::getCurrentStoreId();
+$store = AuthController::getStoreData();
+
+if (!$storeId || !$store) {
+    header('Location: ' . LOGIN_URL . '?error=' . urlencode('Erro ao acessar dados da loja.'));
     exit;
 }
-
-if (AuthController::isEmployee() && !PermissionManager::checkAccess(MODULO_TRANSACOES, ACAO_CRIAR)) {
-    header("Location: " . LOGIN_URL . "?error=sem_permissao");
-    exit;
-}
-
-// Verificar se o usuário está logado
-if (!AuthController::isAuthenticated()) {
-    header('Location: ' . LOGIN_URL . '?error=' . urlencode('Você precisa fazer login para acessar esta página.'));
-    exit;
-}
-
-// Verificar se o usuário é do tipo loja
-if (!AuthController::isStore()) {
-    header('Location: ' . CLIENT_DASHBOARD_URL . '?error=' . urlencode('Acesso restrito a lojas parceiras.'));
-    exit;
-}
-
-// Obter ID do usuário logado
-$userId = AuthController::getCurrentUserId();
-
-// Obter dados da loja associada ao usuário
-$db = Database::getConnection();
-$storeQuery = $db->prepare("SELECT * FROM lojas WHERE usuario_id = :usuario_id");
-$storeQuery->bindParam(':usuario_id', $userId);
-$storeQuery->execute();
-
-// Verificar se o usuário tem uma loja associada
-if ($storeQuery->rowCount() == 0) {
-    header('Location: ' . LOGIN_URL . '?error=' . urlencode('Sua conta não está associada a nenhuma loja. Entre em contato com o suporte.'));
-    exit;
-}
-
-// Obter os dados da loja
-$store = $storeQuery->fetch(PDO::FETCH_ASSOC);
-$storeId = $store['id'];
 
 // Verificar se o formulário foi enviado
 $success = false;
@@ -78,6 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Cliente não selecionado. Por favor, busque e selecione um cliente.';
     } else {
         // Buscar usuário pelo ID
+        $db = Database::getConnection();
         $userQuery = $db->prepare("SELECT id, nome, email FROM usuarios WHERE id = :id AND tipo = :tipo AND status = :status");
         $userQuery->bindParam(':id', $clientId, PDO::PARAM_INT);
         $tipoCliente = USER_TYPE_CLIENT;
@@ -125,6 +96,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 if ($result['status']) {
                     $success = true;
+                    
+                    // ✅ AUDITORIA: Registrar quem criou a transação
+                    StoreHelper::logUserAction($_SESSION['user_id'], 'criou_transacao', [
+                        'loja_id' => $storeId,
+                        'transaction_id' => $result['data']['transaction_id'],
+                        'valor_total' => $valorTotal,
+                        'cliente_id' => $clientId,
+                        'codigo_transacao' => $codigoTransacao,
+                        'valor_saldo_usado' => $valorSaldoUsado
+                    ]);
+                    
                     $transactionData = [];
                     error_log("FORM DEBUG: Transação registrada com sucesso - ID: " . $result['data']['transaction_id']);
                 } else {

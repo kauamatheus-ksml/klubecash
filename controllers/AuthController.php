@@ -115,39 +115,8 @@ class AuthController {
                 
                 // Definir permissões baseadas no subtipo do funcionário
                 // Este sistema de permissões permite controle granular de acesso futuro
-                switch($user['subtipo_funcionario']) {
-                    case 'gerente':
-                        // Gerentes têm acesso completo às operações da loja
-                        $_SESSION['employee_permissions'] = [
-                            'dashboard', 
-                            'transacoes', 
-                            'funcionarios', 
-                            'relatorios'
-                        ];
-                        break;
-                        
-                    case 'financeiro':
-                        // Funcionários financeiros focam em aspectos monetários
-                        $_SESSION['employee_permissions'] = [
-                            'dashboard', 
-                            'comissoes', 
-                            'pagamentos', 
-                            'relatorios'
-                        ];
-                        break;
-                        
-                    case 'vendedor':
-                        // Vendedores têm acesso básico para registrar vendas
-                        $_SESSION['employee_permissions'] = [
-                            'dashboard', 
-                            'transacoes'
-                        ];
-                        break;
-                        
-                    default:
-                        // Fallback para subtipos não reconhecidos
-                        $_SESSION['employee_permissions'] = ['dashboard'];
-                }
+                $_SESSION['loja_vinculada_id'] = $user['loja_vinculada_id'];
+                $_SESSION['subtipo_funcionario'] = $user['subtipo_funcionario']; 
             }
             
             // Sétima etapa: Registrar o login no banco de dados
@@ -197,7 +166,10 @@ class AuthController {
      * Verifica se o usuário logado tem acesso à área da loja
      */
     public static function hasStoreAccess() {
-        return self::isStore() || self::isEmployee();
+        if (!self::isAuthenticated()) return false;
+        
+        $userType = $_SESSION['user_type'];
+        return in_array($userType, [USER_TYPE_STORE, USER_TYPE_EMPLOYEE]);
     }
 
     /**
@@ -226,47 +198,14 @@ class AuthController {
     }
 
     public static function getStoreId() {
-        if (self::isStore()) {
-            // Para lojistas, buscar ID na tabela lojas baseado no usuario_id
-            try {
-                $db = Database::getConnection();
-                $stmt = $db->prepare("SELECT id FROM lojas WHERE usuario_id = ?");
-                $stmt->execute([$_SESSION['user_id']]);
-                $loja = $stmt->fetch();
-                
-                if ($loja) {
-                    return $loja['id'];
-                } else {
-                    // Se não existe, criar registro na tabela lojas
-                    $userStmt = $db->prepare("SELECT * FROM usuarios WHERE id = ? AND tipo = 'loja'");
-                    $userStmt->execute([$_SESSION['user_id']]);
-                    $userData = $userStmt->fetch();
-                    
-                    if ($userData) {
-                        $createStmt = $db->prepare("
-                            INSERT INTO lojas (usuario_id, nome_fantasia, razao_social, cnpj, email, telefone, porcentagem_cashback, status) 
-                            VALUES (?, ?, ?, ?, ?, ?, ?, 'aprovado')
-                        ");
-                        $createStmt->execute([
-                            $_SESSION['user_id'],
-                            $userData['nome'],
-                            $userData['nome'],
-                            '00000000000191',
-                            $userData['email'],
-                            $userData['telefone'] ?? '11999999999',
-                            10.00
-                        ]);
-                        return $db->lastInsertId();
-                    }
-                }
-            } catch (Exception $e) {
-                error_log('Erro getStoreId: ' . $e->getMessage());
-            }
-            
-            return $_SESSION['user_id']; // Fallback
-        } elseif (self::isEmployee()) {
+        if ($_SESSION['user_type'] === USER_TYPE_STORE) {
             return $_SESSION['store_id'] ?? null;
         }
+        
+        if ($_SESSION['user_type'] === USER_TYPE_EMPLOYEE) {
+            return $_SESSION['loja_vinculada_id'] ?? null;
+        }
+        
         return null;
     }
 

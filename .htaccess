@@ -21,18 +21,31 @@ RewriteBase /
     Deny from all
 </Files>
 
-# Redirecionar funcionários para área da loja após login
+# Sistema simplificado: funcionários têm acesso igual ao lojista
 RewriteCond %{QUERY_STRING} user_type=funcionario
 RewriteRule ^login\.php$ /views/store/dashboard.php? [R=302,L]
+
+
+# === ROTAS DE AUDITORIA (NOVO SISTEMA) ===
+RewriteRule ^admin/auditoria/?$ views/admin/audit-log.php [L]
+RewriteRule ^admin/logs-usuario/?$ views/admin/user-logs.php [L]
+RewriteRule ^api/audit/?$ api/audit.php [L,QSA]
 
 # Proteger API de funcionários
 RewriteCond %{REQUEST_URI} ^/api/funcionarios\.php
 RewriteCond %{REQUEST_METHOD} !^(GET|POST)$
 RewriteRule .* - [F,L]
 
-# Redirecionar acesso negado para página específica
-RewriteCond %{QUERY_STRING} error=sem_permissao
-RewriteRule ^.*$ /views/errors/permission-denied.php? [R=302,L]
+# === REDIRECIONAMENTOS DE ERRO SIMPLIFICADOS ===
+# Sistema simplificado - apenas access_denied e session_expired
+RewriteCond %{QUERY_STRING} error=access_denied
+RewriteRule ^.*$ /views/errors/access-denied.php? [R=302,L]
+
+RewriteCond %{QUERY_STRING} error=session_expired  
+RewriteRule ^.*$ /views/auth/login.php?error=session_expired [R=302,L]
+
+RewriteCond %{QUERY_STRING} error=permission_denied
+RewriteRule ^.*$ /views/errors/access-denied.php? [R=302,L]
 
 # === CONFIGURAÇÕES SEO FUNDAMENTAIS ===
 <IfModule mod_headers.c>
@@ -272,7 +285,10 @@ RewriteRule ^admin/comissoes/?$ views/admin/commissions.php [L]
 RewriteRule ^admin/pagamentos/?$ views/admin/payments.php [L]
 RewriteRule ^admin/relatorios/?$ views/admin/reports.php [L]
 
-
+# === ROTAS DE AUDITORIA (SISTEMA SIMPLIFICADO) ===
+RewriteRule ^admin/auditoria/?$ views/admin/audit-log.php [L]
+RewriteRule ^admin/logs-funcionarios/?$ views/admin/employee-logs.php [L]
+RewriteRule ^api/audit/?$ api/audit.php [L,QSA]
 
 
 # PIX e Mercado Pago (OTIMIZADO)
