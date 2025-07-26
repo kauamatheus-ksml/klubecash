@@ -111,36 +111,26 @@ class AuthController {
                 }
             }
 
-            // Sexta etapa: Configurar dados específicos para funcionários
-            // (resto do código dos funcionários...)
-
-
-
-            
-
-            
-            // Sexta etapa: Configurar dados específicos para funcionários
-            // CORREÇÃO: Agora verificamos se $storeData não é null para evitar erros
-            if ($user['tipo'] === 'funcionario' && $storeData !== null) {
-                
-                // Definir informações básicas do funcionário
-                $_SESSION['employee_subtype'] = $user['subtipo_funcionario'];
+            // === CONFIGURAR DADOS ESPECÍFICOS PARA FUNCIONÁRIOS ===
+            if ($user['tipo'] === USER_TYPE_EMPLOYEE && $storeData !== null) {
+                // Sistema simplificado: funcionários têm acesso igual ao lojista
+                $_SESSION['employee_subtype'] = $user['subtipo_funcionario'] ?? 'funcionario';
                 $_SESSION['store_id'] = $user['loja_vinculada_id'];
                 $_SESSION['store_name'] = $storeData['nome_fantasia'];
+                $_SESSION['loja_vinculada_id'] = $user['loja_vinculada_id']; // Compatibilidade
+                $_SESSION['subtipo_funcionario'] = $user['subtipo_funcionario'] ?? 'funcionario';
                 
-                // Definir permissões baseadas no subtipo do funcionário
-                // Este sistema de permissões permite controle granular de acesso futuro
-                $_SESSION['loja_vinculada_id'] = $user['loja_vinculada_id'];
-                $_SESSION['subtipo_funcionario'] = $user['subtipo_funcionario']; 
+                // Log de auditoria
+                if (defined('TRACK_USER_ACTIONS') && TRACK_USER_ACTIONS) {
+                    error_log("KLUBE_AUDIT: Funcionário logado - ID: {$user['id']}, Subtipo: {$user['subtipo_funcionario']}, Loja: {$user['loja_vinculada_id']}");
+                }
             }
-            
+
             // Sétima etapa: Registrar o login no banco de dados
-            // Atualizar o timestamp do último login para fins de auditoria
             $updateStmt = $db->prepare("UPDATE usuarios SET ultimo_login = NOW() WHERE id = ?");
             $updateStmt->execute([$user['id']]);
-            
+
             // Oitava etapa: Preparar dados de retorno
-            // Estas informações podem ser usadas pela aplicação após o login
             $result = [
                 'status' => true,
                 'message' => 'Login realizado com sucesso!',
@@ -151,30 +141,29 @@ class AuthController {
                     'tipo' => $user['tipo']
                 ]
             ];
-            
+
             // Adicionar informações específicas de funcionário ao resultado
-            // Isso permite que a aplicação saiba detalhes sobre o funcionário logado
-            if ($user['tipo'] === 'funcionario' && $storeData !== null) {
-                // Buscar o nome de exibição do subtipo usando as constantes definidas
-                $subtypeDisplay = EMPLOYEE_SUBTYPES[$user['subtipo_funcionario']] ?? 'Não definido';
+            if ($user['tipo'] === USER_TYPE_EMPLOYEE && $storeData !== null) {
+                $subtypeDisplay = defined('EMPLOYEE_DISPLAY_TYPES') && isset(EMPLOYEE_DISPLAY_TYPES[$user['subtipo_funcionario']]) 
+                                    ? EMPLOYEE_DISPLAY_TYPES[$user['subtipo_funcionario']] 
+                                    : 'Funcionário';
                 
                 $result['employee_info'] = [
-                    'subtipo' => $user['subtipo_funcionario'],
+                    'subtipo' => $user['subtipo_funcionario'] ?? 'funcionario',
                     'subtipo_display' => $subtypeDisplay,
                     'loja_id' => $user['loja_vinculada_id'],
                     'loja_nome' => $storeData['nome_fantasia']
                 ];
             }
-            
+
             // Retornar resultado de sucesso com todas as informações
             return $result;
-            
-        } catch (PDOException $e) {
-            // Tratamento de erro: registrar o erro e retornar mensagem genérica
-            // Isso evita exposição de detalhes técnicos sensíveis ao usuário final
-            error_log('Erro no login: ' . $e->getMessage());
-            return ['status' => false, 'message' => 'Erro interno do sistema. Tente novamente.'];
-        }
+
+            } catch (PDOException $e) {
+                // Tratamento de erro: registrar o erro e retornar mensagem genérica
+                error_log('Erro no login: ' . $e->getMessage());
+                return ['status' => false, 'message' => 'Erro interno do sistema. Tente novamente.'];
+            }
     }
 
     /**
@@ -227,6 +216,17 @@ class AuthController {
             error_log("Erro ao buscar dados da loja: " . $e->getMessage());
             return null;
         }
+    }
+
+    /**
+     * Verifica se o usuário pode gerenciar funcionários (sistema simplificado)
+     */
+    public static function canManageEmployees() {
+        if (!self::hasStoreAccess()) return false;
+        
+        // Sistema simplificado: lojistas sempre podem, funcionários também (mesmo acesso)
+        $userType = $_SESSION['user_type'];
+        return in_array($userType, [USER_TYPE_STORE, USER_TYPE_EMPLOYEE]);
     }
     /**
      * Obtém o subtipo do funcionário atual
