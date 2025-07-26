@@ -1046,22 +1046,21 @@ if (basename($_SERVER['PHP_SELF']) === 'AuthController.php') {
                 $result = AuthController::login($email, $password);
                 
                 if ($result['status']) {
-                    // CORREÇÃO: Redirecionar com base no tipo de usuário
+                    // CORREÇÃO: Redirecionar baseado no tipo correto
                     $userType = $_SESSION['user_type'] ?? '';
                     
-                    if ($userType == 'admin' || (defined('USER_TYPE_ADMIN') && $userType == USER_TYPE_ADMIN)) {
+                    if ($userType == 'admin') {
                         header('Location: ' . ADMIN_DASHBOARD_URL);
-                    } else if ($userType == 'loja' || (defined('USER_TYPE_STORE') && $userType == USER_TYPE_STORE)) {
+                    } else if ($userType == 'loja') {
                         header('Location: ' . STORE_DASHBOARD_URL);
                     } else if ($userType == 'funcionario') {
-                        // FUNCIONÁRIO VAI PARA ÁREA DA LOJA (MESMO QUE LOJISTA)
+                        // FUNCIONÁRIO VAI PARA STORE (SISTEMA SIMPLIFICADO)
                         header('Location: ' . STORE_DASHBOARD_URL);
                     } else {
                         header('Location: ' . CLIENT_DASHBOARD_URL);
                     }
                     exit;
                 } else {
-                    // Redirecionar de volta com mensagem de erro
                     header('Location: ' . SITE_URL . '/login?error=' . urlencode($result['message']));
                     exit;
                 }
@@ -1074,7 +1073,7 @@ if (basename($_SERVER['PHP_SELF']) === 'AuthController.php') {
                     $email = $_POST['email'] ?? '';
                     $telefone = $_POST['telefone'] ?? '';
                     $senha = $_POST['senha'] ?? '';
-                    $tipo = $_POST['tipo'] ?? null; // Adicionado suporte para o tipo
+                    $tipo = $_POST['tipo'] ?? 'cliente'; // CORREÇÃO
                     
                     $result = AuthController::register($nome, $email, $telefone, $senha, $tipo);
                     
