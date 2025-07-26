@@ -1,22 +1,17 @@
 <?php
-// views/auth/login.php - VERSÃO COMPLETAMENTE CORRIGIDA
+// views/auth/login.php - VERSÃO CORRIGIDA
 require_once '../../config/constants.php';
 require_once '../../config/database.php';
-require_once '../../controllers/AuthController.php';
+require_once '../../controllers/AuthController.php'; // ADICIONADO
 
 // Verificar se já existe uma sessão ativa
 session_start();
 if (isset($_SESSION['user_id']) && !isset($_GET['force_login'])) {
-    // CORREÇÃO LINHA 18 - Redirecionar corretamente baseado no tipo
-    $userType = $_SESSION['user_type'] ?? '';
-    if ($userType == 'admin') {
+    // Redirecionar com base no tipo de usuário
+    if ($_SESSION['user_type'] == 'admin') {
         header('Location: ' . ADMIN_DASHBOARD_URL);
         exit;
-    } else if ($userType == 'loja') {
-        header('Location: ' . STORE_DASHBOARD_URL);
-        exit;
-    } else if ($userType == 'funcionario') {
-        // CORREÇÃO CRÍTICA: FUNCIONÁRIO VAI PARA STORE
+    } else if ($_SESSION['user_type'] == 'loja') {
         header('Location: ' . STORE_DASHBOARD_URL);
         exit;
     } else {
@@ -34,22 +29,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($email) || empty($password)) {
         $error = 'Por favor, preencha todos os campos.';
     } else {
-        // Usar AuthController::login()
+        // === USAR O MÉTODO AuthController::login() ===
         $result = AuthController::login($email, $password);
         
         if ($result['status']) {
-            // CORREÇÃO LINHA 48 - Login bem-sucedido
+            // Login bem-sucedido - Redirecionar com base no tipo de usuário
             $userType = $_SESSION['user_type'] ?? '';
             
+            // CORREÇÃO DEFINITIVA
             if ($userType == 'admin') {
-                header('Location: ' . ADMIN_DASHBOARD_URL);
+                header('Location: /views/admin/dashboard.php');
             } else if ($userType == 'loja') {
-                header('Location: ' . STORE_DASHBOARD_URL);
+                header('Location: /store/dashboard/');
             } else if ($userType == 'funcionario') {
-                // CORREÇÃO CRÍTICA: FUNCIONÁRIO VAI PARA STORE
-                header('Location: ' . STORE_DASHBOARD_URL);
+                // FUNCIONÁRIO VAI PARA ÁREA DA LOJA (CRÍTICO!)
+                header('Location: /store/dashboard/');
             } else {
-                header('Location: ' . CLIENT_DASHBOARD_URL);
+                header('Location: /views/client/dashboard.php');
             }
             exit;
         } else {
@@ -63,6 +59,9 @@ $urlError = $_GET['error'] ?? '';
 $urlSuccess = $_GET['success'] ?? '';
 if (!empty($urlError)) {
     $error = urldecode($urlError);
+}
+if (!empty($urlSuccess)) {
+    $success = urldecode($urlSuccess);
 }
 ?>
 <!DOCTYPE html>
