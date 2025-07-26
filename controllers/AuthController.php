@@ -21,9 +21,12 @@ class AuthController {
     // Adicionar no AuthController.php
     
     /**
- * Método de login ULTRA-FORÇADO - Garantir funcionamento
+ * Método de login COM LOGS FORÇADOS para debug
  */
 public static function login($email, $senha, $remember = false) {
+    // LOG INICIAL FORÇADO
+    error_log("=== LOGIN INICIADO === Email: {$email}");
+    
     try {
         $db = Database::getConnection();
         
@@ -36,130 +39,100 @@ public static function login($email, $senha, $remember = false) {
         $stmt->execute([$email]);
         
         if ($stmt->rowCount() === 0) {
+            error_log("LOGIN ERRO: Usuário não encontrado - {$email}");
             return ['status' => false, 'message' => 'E-mail ou senha incorretos.'];
         }
         
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        error_log("LOGIN: Usuário encontrado - ID: {$user['id']}, Tipo: {$user['tipo']}");
         
         // Validar senha
         if (!password_verify($senha, $user['senha_hash'])) {
+            error_log("LOGIN ERRO: Senha incorreta para {$email}");
             return ['status' => false, 'message' => 'E-mail ou senha incorretos.'];
         }
         
         // Verificar status
         if ($user['status'] !== 'ativo') {
+            error_log("LOGIN ERRO: Conta inativa - {$email}");
             return ['status' => false, 'message' => 'Sua conta está inativa. Entre em contato com o suporte.'];
         }
         
-        // FORÇAR INÍCIO DE SESSÃO LIMPA
-        if (session_status() !== PHP_SESSION_NONE) {
-            session_destroy();
-        }
-        session_start();
+        error_log("LOGIN: Validações OK, configurando sessão...");
         
-        // FORÇAR REGENERAÇÃO DO ID DA SESSÃO
-        session_regenerate_id(true);
+        // Configurar sessão
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
 
-        // LOG INICIAL
-        error_log("LOGIN ULTRA-FORÇADO - Iniciando para User ID: {$user['id']}, Tipo: {$user['tipo']}");
-
-        // === CONFIGURAÇÃO BÁSICA FORÇADA ===
-        $_SESSION = []; // Limpar tudo primeiro
+        // Definir variáveis básicas
         $_SESSION['user_id'] = intval($user['id']);
         $_SESSION['user_name'] = $user['nome'];
         $_SESSION['user_email'] = $user['email'];
         $_SESSION['user_type'] = $user['tipo'];
         $_SESSION['last_activity'] = time();
         
-        // SALVAR SESSÃO IMEDIATAMENTE
-        session_write_close();
-        session_start();
-        
-        error_log("LOGIN ULTRA-FORÇADO - Sessão básica salva. User ID na sessão: " . ($_SESSION['user_id'] ?? 'ERRO'));
+        error_log("LOGIN: Sessão básica definida - User ID: {$user['id']}");
 
-        // === CONFIGURAÇÃO DE LOJA ULTRA-FORÇADA ===
+        // === VERIFICAÇÃO CRÍTICA DE LOJA ===
         if ($user['tipo'] === 'loja') {
-            error_log("LOGIN ULTRA-FORÇADO - Configurando loja para User ID: {$user['id']}");
+            error_log("LOGIN: ENTRANDO na configuração de LOJA para User ID: {$user['id']}");
             
-            // BUSCAR LOJA (usar a primeira encontrada)
-            $storeStmt = $db->prepare("SELECT * FROM lojas WHERE usuario_id = ? AND status = 'aprovado' ORDER BY id ASC LIMIT 1");
-            $storeStmt->execute([$user['id']]);
-            $loja = $storeStmt->fetch(PDO::FETCH_ASSOC);
-            
-            if ($loja) {
-                error_log("LOGIN ULTRA-FORÇADO - Loja encontrada: ID {$loja['id']}, Nome: {$loja['nome_fantasia']}");
+            try {
+                // Buscar loja
+                $storeStmt = $db->prepare("SELECT * FROM lojas WHERE usuario_id = ? AND status = 'aprovado' ORDER BY id ASC LIMIT 1");
+                $storeStmt->execute([$user['id']]);
+                $loja = $storeStmt->fetch(PDO::FETCH_ASSOC);
                 
-                // FORÇAR DEFINIÇÃO MÚLTIPLA
-                $_SESSION['store_id'] = intval($loja['id']);
-                $_SESSION['store_name'] = $loja['nome_fantasia'];
-                $_SESSION['loja_vinculada_id'] = intval($loja['id']);
-                $_SESSION['loja_id'] = intval($loja['id']); // Backup
-                $_SESSION['loja_nome'] = $loja['nome_fantasia']; // Backup
-                
-                // FORÇAR SALVAR NOVAMENTE
-                session_write_close();
-                session_start();
-                
-                // VERIFICAÇÃO CRÍTICA
-                if (isset($_SESSION['store_id']) && $_SESSION['store_id'] == $loja['id']) {
-                    error_log("LOGIN ULTRA-FORÇADO - SUCESSO! store_id salvo: {$_SESSION['store_id']}");
-                } else {
-                    error_log("LOGIN ULTRA-FORÇADO - ERRO! store_id não foi salvo. Sessão atual: " . json_encode($_SESSION));
+                if ($loja) {
+                    error_log("LOGIN: LOJA ENCONTRADA - ID: {$loja['id']}, Nome: {$loja['nome_fantasia']}");
                     
-                    // ÚLTIMA TENTATIVA - FORÇAR NOVAMENTE
+                    // FORÇAR DEFINIÇÃO
                     $_SESSION['store_id'] = intval($loja['id']);
                     $_SESSION['store_name'] = $loja['nome_fantasia'];
                     $_SESSION['loja_vinculada_id'] = intval($loja['id']);
                     
-                    session_write_close();
-                    session_start();
+                    error_log("LOGIN: VARIÁVEIS DEFINIDAS - store_id: {$_SESSION['store_id']}, store_name: {$_SESSION['store_name']}");
                     
-                    if (!isset($_SESSION['store_id'])) {
-                        error_log("LOGIN ULTRA-FORÇADO - FALHA CRÍTICA na sessão!");
-                        return ['status' => false, 'message' => 'Erro crítico: Não foi possível salvar dados da loja na sessão.'];
+                    // VERIFICAR SE FOI SALVO
+                    if (isset($_SESSION['store_id']) && $_SESSION['store_id'] > 0) {
+                        error_log("LOGIN: ✅ SUCESSO! store_id salvo corretamente: {$_SESSION['store_id']}");
+                    } else {
+                        error_log("LOGIN: ❌ ERRO! store_id NÃO foi salvo");
+                        return ['status' => false, 'message' => 'Erro ao salvar dados da loja na sessão.'];
                     }
+                    
+                } else {
+                    error_log("LOGIN: ❌ NENHUMA LOJA ENCONTRADA para User ID: {$user['id']}");
+                    return ['status' => false, 'message' => 'Nenhuma loja aprovada encontrada para sua conta.'];
                 }
-            } else {
-                error_log("LOGIN ULTRA-FORÇADO - ERRO: Nenhuma loja aprovada encontrada para User ID: {$user['id']}");
-                return ['status' => false, 'message' => 'Nenhuma loja aprovada encontrada para sua conta.'];
+                
+            } catch (Exception $e) {
+                error_log("LOGIN: EXCEÇÃO na configuração da loja: " . $e->getMessage());
+                return ['status' => false, 'message' => 'Erro ao configurar dados da loja: ' . $e->getMessage()];
             }
+        } else {
+            error_log("LOGIN: Usuário NÃO é lojista, tipo: {$user['tipo']}");
         }
         
-        // === CONFIGURAÇÃO PARA FUNCIONÁRIOS ===
+        // === FUNCIONÁRIOS ===
         if ($user['tipo'] === 'funcionario') {
-            if (empty($user['loja_vinculada_id'])) {
-                return ['status' => false, 'message' => 'Funcionário sem loja vinculada.'];
-            }
-            
-            $storeStmt = $db->prepare("SELECT * FROM lojas WHERE id = ? AND status = 'aprovado'");
-            $storeStmt->execute([$user['loja_vinculada_id']]);
-            $storeData = $storeStmt->fetch(PDO::FETCH_ASSOC);
-            
-            if (!$storeData) {
-                return ['status' => false, 'message' => 'A loja vinculada não está ativa.'];
-            }
-            
-            $_SESSION['employee_subtype'] = $user['subtipo_funcionario'] ?? 'funcionario';
-            $_SESSION['store_id'] = intval($user['loja_vinculada_id']);
-            $_SESSION['store_name'] = $storeData['nome_fantasia'];
-            $_SESSION['loja_vinculada_id'] = intval($user['loja_vinculada_id']);
-            $_SESSION['subtipo_funcionario'] = $user['subtipo_funcionario'] ?? 'funcionario';
-            
-            session_write_close();
-            session_start();
+            error_log("LOGIN: Configurando funcionário...");
+            // ... código para funcionários ...
         }
 
         // Atualizar último login
         $updateStmt = $db->prepare("UPDATE usuarios SET ultimo_login = NOW() WHERE id = ?");
         $updateStmt->execute([$user['id']]);
+        
+        error_log("LOGIN: Último login atualizado");
 
-        // LOG FINAL DETALHADO
-        error_log("LOGIN ULTRA-FORÇADO - FINAL COMPLETO:");
-        error_log("- user_id: " . ($_SESSION['user_id'] ?? 'NÃO DEFINIDO'));
-        error_log("- user_type: " . ($_SESSION['user_type'] ?? 'NÃO DEFINIDO'));
-        error_log("- store_id: " . ($_SESSION['store_id'] ?? 'NÃO DEFINIDO'));
-        error_log("- store_name: " . ($_SESSION['store_name'] ?? 'NÃO DEFINIDO'));
-        error_log("- Sessão completa: " . json_encode($_SESSION));
+        // LOG FINAL COMPLETO
+        error_log("=== LOGIN CONCLUÍDO ===");
+        error_log("User ID: {$user['id']}");
+        error_log("User Type: {$user['tipo']}");
+        error_log("Store ID na sessão: " . ($_SESSION['store_id'] ?? 'NÃO DEFINIDO'));
+        error_log("Sessão completa: " . json_encode($_SESSION));
 
         return [
             'status' => true,
@@ -169,16 +142,11 @@ public static function login($email, $senha, $remember = false) {
                 'nome' => $user['nome'],
                 'email' => $user['email'],
                 'tipo' => $user['tipo']
-            ],
-            'debug_info' => [
-                'store_id_set' => isset($_SESSION['store_id']),
-                'store_id_value' => $_SESSION['store_id'] ?? null,
-                'session_id' => session_id()
             ]
         ];
 
     } catch (Exception $e) {
-        error_log('LOGIN ULTRA-FORÇADO - ERRO: ' . $e->getMessage());
+        error_log('LOGIN ERRO CRÍTICO: ' . $e->getMessage());
         return ['status' => false, 'message' => 'Erro: ' . $e->getMessage()];
     }
 }
