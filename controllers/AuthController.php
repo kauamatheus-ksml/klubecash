@@ -117,8 +117,42 @@ public static function login($email, $senha, $remember = false) {
         
         // === FUNCIONÁRIOS ===
         if ($user['tipo'] === 'funcionario') {
-            error_log("LOGIN: Configurando funcionário...");
-            // ... código para funcionários ...
+            error_log("LOGIN: CONFIGURANDO FUNCIONÁRIO - User ID: {$user['id']}");
+            
+            if (empty($user['loja_vinculada_id'])) {
+                error_log("LOGIN ERRO: Funcionário {$user['id']} sem loja_vinculada_id");
+                return ['status' => false, 'message' => 'Funcionário sem loja vinculada. Entre em contato com o suporte.'];
+            }
+            
+            // Buscar dados COMPLETOS da loja vinculada
+            $storeStmt = $db->prepare("SELECT * FROM lojas WHERE id = ? AND status = 'aprovado'");
+            $storeStmt->execute([$user['loja_vinculada_id']]);
+            $storeData = $storeStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$storeData) {
+                error_log("LOGIN ERRO: Loja {$user['loja_vinculada_id']} não encontrada ou não aprovada");
+                return ['status' => false, 'message' => 'A loja vinculada não está ativa.'];
+            }
+            
+            // SISTEMA SIMPLIFICADO: Funcionários têm acesso igual ao lojista
+            $_SESSION['employee_subtype'] = $user['subtipo_funcionario'] ?? 'funcionario';
+            $_SESSION['store_id'] = intval($storeData['id']); // USAR ID DA LOJA, NÃO DO USUÁRIO
+            $_SESSION['store_name'] = $storeData['nome_fantasia'];
+            $_SESSION['loja_vinculada_id'] = intval($storeData['id']);
+            $_SESSION['subtipo_funcionario'] = $user['subtipo_funcionario'] ?? 'funcionario';
+            
+            // VERIFICAÇÃO FORÇADA
+            session_write_close();
+            session_start();
+            
+            error_log("LOGIN: FUNCIONÁRIO CONFIGURADO - Store ID: {$_SESSION['store_id']}, Nome: {$storeData['nome_fantasia']}");
+            
+            // VERIFICAÇÃO FINAL CRÍTICA
+            if (!isset($_SESSION['store_id']) || empty($_SESSION['store_id']) || $_SESSION['store_id'] != $storeData['id']) {
+                error_log("LOGIN ERRO CRÍTICO: store_id não foi salvo corretamente para funcionário {$user['id']}");
+                error_log("Esperado: {$storeData['id']}, Atual: " . ($_SESSION['store_id'] ?? 'NULL'));
+                return ['status' => false, 'message' => 'Erro crítico ao configurar acesso à loja.'];
+            }
         }
 
         // Atualizar último login
