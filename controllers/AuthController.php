@@ -94,27 +94,54 @@ class AuthController {
             $_SESSION['last_activity'] = time();
 
             // === SISTEMA SIMPLIFICADO: CONFIGURAR DADOS DA LOJA ===
-            if ($user['tipo'] === USER_TYPE_STORE) {
-                // Para lojistas, buscar dados da loja associada
+            // === CORREÇÃO DEFINITIVA: DADOS DA LOJA ===
+            if ($user['tipo'] === 'loja' || (defined('USER_TYPE_STORE') && $user['tipo'] === USER_TYPE_STORE)) {
                 try {
                     $storeStmt = $db->prepare("SELECT * FROM lojas WHERE usuario_id = ? LIMIT 1");
                     $storeStmt->execute([$user['id']]);
                     $lojaDados = $storeStmt->fetch(PDO::FETCH_ASSOC);
                     
                     if ($lojaDados) {
-                        $_SESSION['store_id'] = $lojaDados['id'];
+                        // FORÇAR CONVERSÃO PARA INT E SALVAR
+                        $_SESSION['store_id'] = intval($lojaDados['id']);
                         $_SESSION['store_name'] = $lojaDados['nome_fantasia'];
-                        $_SESSION['loja_vinculada_id'] = $lojaDados['id']; // Para compatibilidade
+                        $_SESSION['loja_vinculada_id'] = intval($lojaDados['id']);
                         
-                        // Log de auditoria
-                        if (defined('TRACK_USER_ACTIONS') && TRACK_USER_ACTIONS) {
-                            error_log("KLUBE_AUDIT: Loja logada - User ID: {$user['id']}, Store ID: {$lojaDados['id']}, Nome: {$lojaDados['nome_fantasia']}");
-                        }
+                        // LOG DE SUCESSO
+                        error_log("LOGIN LOJA SUCESSO - User: {$user['id']}, Store: {$lojaDados['id']}, Nome: {$lojaDados['nome_fantasia']}");
+                        
                     } else {
-                        error_log("ERRO: Usuário lojista {$user['id']} sem loja associada");
+                        // TENTAR BUSCAR LOJA POR EMAIL E AUTO-ASSOCIAR
+                        $emailStmt = $db->prepare("
+                            SELECT l.* FROM lojas l 
+                            JOIN usuarios u ON l.email = u.email 
+                            WHERE u.id = ? AND (l.usuario_id IS NULL OR l.usuario_id = 0)
+                            LIMIT 1
+                        ");
+                        $emailStmt->execute([$user['id']]);
+                        $lojaEmail = $emailStmt->fetch(PDO::FETCH_ASSOC);
+                        
+                        if ($lojaEmail) {
+                            // ASSOCIAR AUTOMATICAMENTE
+                            $linkStmt = $db->prepare("UPDATE lojas SET usuario_id = ? WHERE id = ?");
+                            if ($linkStmt->execute([$user['id'], $lojaEmail['id']])) {
+                                $_SESSION['store_id'] = intval($lojaEmail['id']);
+                                $_SESSION['store_name'] = $lojaEmail['nome_fantasia'];
+                                $_SESSION['loja_vinculada_id'] = intval($lojaEmail['id']);
+                                
+                                error_log("LOJA AUTO-ASSOCIADA - User: {$user['id']}, Store: {$lojaEmail['id']}");
+                            } else {
+                                error_log("ERRO: Falha ao auto-associar loja");
+                                return ['status' => false, 'message' => 'Erro ao associar loja.'];
+                            }
+                        } else {
+                            error_log("ERRO: Usuário lojista {$user['id']} sem loja associada");
+                            return ['status' => false, 'message' => 'Sua conta não está associada a nenhuma loja. Entre em contato com o suporte.'];
+                        }
                     }
                 } catch (Exception $e) {
                     error_log("Erro ao buscar dados da loja: " . $e->getMessage());
+                    return ['status' => false, 'message' => 'Erro ao acessar dados da loja.'];
                 }
             }
 
