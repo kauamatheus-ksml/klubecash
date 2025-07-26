@@ -21,16 +21,14 @@ class AuthController {
     // Adicionar no AuthController.php
     
     /**
-     * Método de login atualizado e corrigido para funcionários
-     * Esta versão resolve o problema de escopo de variável que impedia
-     * as variáveis de sessão específicas de funcionários de serem definidas
+     * Método de login CORRIGIDO DEFINITIVAMENTE - Klube Cash v2.1
+     * Esta versão resolve todos os problemas de sessão de loja
      */
     public static function login($email, $senha, $remember = false) {
         try {
             $db = Database::getConnection();
             
             // Primeira etapa: Buscar o usuário no banco de dados
-            // Esta consulta inclui todos os campos necessários para funcionários
             $stmt = $db->prepare("
                 SELECT id, nome, email, senha_hash, tipo, status, loja_vinculada_id, subtipo_funcionario
                 FROM usuarios 
@@ -45,8 +43,7 @@ class AuthController {
             
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
             
-            // Segunda etapa: Validar a senha fornecida
-            // O password_verify compara a senha em texto plano com o hash armazenado
+            // Segunda etapa: Validar a senha
             if (!password_verify($senha, $user['senha_hash'])) {
                 return ['status' => false, 'message' => 'E-mail ou senha incorretos.'];
             }
@@ -56,89 +53,96 @@ class AuthController {
                 return ['status' => false, 'message' => 'Sua conta está inativa. Entre em contato com o suporte.'];
             }
             
-            // CORREÇÃO PRINCIPAL: Inicializar a variável $storeData
-            // Isso garante que a variável sempre exista, evitando erros de "variável não definida"
+            // Inicializar variável para dados da loja
             $storeData = null;
             
             // Quarta etapa: Validações específicas para funcionários
-            // Para funcionários, precisamos verificar se a loja vinculada está ativa
             if ($user['tipo'] === 'funcionario') {
+                if (empty($user['loja_vinculada_id'])) {
+                    return ['status' => false, 'message' => 'Funcionário sem loja vinculada.'];
+                }
+                
                 // Buscar dados da loja vinculada
                 $storeStmt = $db->prepare("
-                    SELECT status, nome_fantasia 
-                    FROM lojas 
+                    SELECT * FROM lojas 
                     WHERE id = ? AND status = 'aprovado'
                 ");
                 $storeStmt->execute([$user['loja_vinculada_id']]);
                 
-                // Se a loja não estiver aprovada, impedir o login
                 if ($storeStmt->rowCount() === 0) {
                     return ['status' => false, 'message' => 'A loja vinculada não está ativa.'];
                 }
                 
-                // IMPORTANTE: Definir $storeData aqui garante que ela esteja disponível depois
                 $storeData = $storeStmt->fetch(PDO::FETCH_ASSOC);
             }
 
             // Quinta etapa: Configurar a sessão PHP
-            // Garantir que a sessão esteja iniciada antes de definir variáveis
             if (session_status() === PHP_SESSION_NONE) {
                 session_start();
             }
 
-            // Definir variáveis básicas de sessão (para todos os tipos de usuário)
-            $_SESSION['user_id'] = $user['id'];
+            // Definir variáveis básicas de sessão
+            $_SESSION['user_id'] = intval($user['id']);
             $_SESSION['user_name'] = $user['nome'];
             $_SESSION['user_email'] = $user['email'];
             $_SESSION['user_type'] = $user['tipo'];
             $_SESSION['last_activity'] = time();
 
-            // === SISTEMA SIMPLIFICADO: CONFIGURAR DADOS DA LOJA ===
-            // === CORREÇÃO DEFINITIVA: DADOS DA LOJA ===
+            // === CORREÇÃO DEFINITIVA: CONFIGURAR DADOS DA LOJA ===
             if ($user['tipo'] === 'loja' || (defined('USER_TYPE_STORE') && $user['tipo'] === USER_TYPE_STORE)) {
                 try {
+                    // Buscar dados da loja associada
                     $storeStmt = $db->prepare("SELECT * FROM lojas WHERE usuario_id = ? LIMIT 1");
                     $storeStmt->execute([$user['id']]);
                     $lojaDados = $storeStmt->fetch(PDO::FETCH_ASSOC);
                     
                     if ($lojaDados) {
-                        // FORÇAR CONVERSÃO PARA INT E SALVAR
+                        // SALVAR DADOS DA LOJA NA SESSÃO
                         $_SESSION['store_id'] = intval($lojaDados['id']);
                         $_SESSION['store_name'] = $lojaDados['nome_fantasia'];
                         $_SESSION['loja_vinculada_id'] = intval($lojaDados['id']);
                         
-                        // LOG DE SUCESSO
-                        error_log("LOGIN LOJA SUCESSO - User: {$user['id']}, Store: {$lojaDados['id']}, Nome: {$lojaDados['nome_fantasia']}");
+                        // Log de sucesso
+                        if (defined('TRACK_USER_ACTIONS') && TRACK_USER_ACTIONS) {
+                            error_log("KLUBE_AUDIT: Loja logada - User ID: {$user['id']}, Store ID: {$lojaDados['id']}, Nome: {$lojaDados['nome_fantasia']}");
+                        }
                         
                     } else {
-                        // TENTAR BUSCAR LOJA POR EMAIL E AUTO-ASSOCIAR
+                        // TENTAR AUTO-ASSOCIAÇÃO POR EMAIL
                         $emailStmt = $db->prepare("
                             SELECT l.* FROM lojas l 
                             JOIN usuarios u ON l.email = u.email 
-                            WHERE u.id = ? AND (l.usuario_id IS NULL OR l.usuario_id = 0)
+                            WHERE u.id = ? AND l.status = 'aprovado' AND (l.usuario_id IS NULL OR l.usuario_id = 0)
                             LIMIT 1
                         ");
                         $emailStmt->execute([$user['id']]);
                         $lojaEmail = $emailStmt->fetch(PDO::FETCH_ASSOC);
                         
                         if ($lojaEmail) {
-                            // ASSOCIAR AUTOMATICAMENTE
+                            // AUTO-ASSOCIAR LOJA
                             $linkStmt = $db->prepare("UPDATE lojas SET usuario_id = ? WHERE id = ?");
                             if ($linkStmt->execute([$user['id'], $lojaEmail['id']])) {
                                 $_SESSION['store_id'] = intval($lojaEmail['id']);
                                 $_SESSION['store_name'] = $lojaEmail['nome_fantasia'];
                                 $_SESSION['loja_vinculada_id'] = intval($lojaEmail['id']);
                                 
-                                error_log("LOJA AUTO-ASSOCIADA - User: {$user['id']}, Store: {$lojaEmail['id']}");
+                                error_log("KLUBE_AUDIT: Loja auto-associada - User: {$user['id']}, Store: {$lojaEmail['id']}");
                             } else {
-                                error_log("ERRO: Falha ao auto-associar loja");
-                                return ['status' => false, 'message' => 'Erro ao associar loja.'];
+                                error_log("ERRO: Falha ao auto-associar loja para usuário {$user['id']}");
+                                return ['status' => false, 'message' => 'Erro ao associar loja à sua conta.'];
                             }
                         } else {
-                            error_log("ERRO: Usuário lojista {$user['id']} sem loja associada");
-                            return ['status' => false, 'message' => 'Sua conta não está associada a nenhuma loja. Entre em contato com o suporte.'];
+                            error_log("ERRO CRÍTICO: Usuário lojista {$user['id']} ({$user['email']}) sem loja associada");
+                            return ['status' => false, 'message' => 'Sua conta não está associada a nenhuma loja aprovada. Entre em contato com o suporte.'];
                         }
                     }
+                    
+                    // VERIFICAÇÃO FINAL: Garantir que store_id foi definido
+                    if (!isset($_SESSION['store_id']) || empty($_SESSION['store_id'])) {
+                        error_log("ERRO CRÍTICO: store_id não foi definido na sessão para usuário {$user['id']}");
+                        return ['status' => false, 'message' => 'Erro ao configurar sessão da loja.'];
+                    }
+                    
                 } catch (Exception $e) {
                     error_log("Erro ao buscar dados da loja: " . $e->getMessage());
                     return ['status' => false, 'message' => 'Erro ao acessar dados da loja.'];
@@ -146,58 +150,82 @@ class AuthController {
             }
 
             // === CONFIGURAR DADOS ESPECÍFICOS PARA FUNCIONÁRIOS ===
-            if ($user['tipo'] === USER_TYPE_EMPLOYEE && $storeData !== null) {
-                // Sistema simplificado: funcionários têm acesso igual ao lojista
-                $_SESSION['employee_subtype'] = $user['subtipo_funcionario'] ?? 'funcionario';
-                $_SESSION['store_id'] = $user['loja_vinculada_id'];
-                $_SESSION['store_name'] = $storeData['nome_fantasia'];
-                $_SESSION['loja_vinculada_id'] = $user['loja_vinculada_id']; // Compatibilidade
-                $_SESSION['subtipo_funcionario'] = $user['subtipo_funcionario'] ?? 'funcionario';
-                
-                // Log de auditoria
-                if (defined('TRACK_USER_ACTIONS') && TRACK_USER_ACTIONS) {
-                    error_log("KLUBE_AUDIT: Funcionário logado - ID: {$user['id']}, Subtipo: {$user['subtipo_funcionario']}, Loja: {$user['loja_vinculada_id']}");
+            if ($user['tipo'] === 'funcionario' || (defined('USER_TYPE_EMPLOYEE') && $user['tipo'] === USER_TYPE_EMPLOYEE)) {
+                if ($storeData !== null) {
+                    // Sistema simplificado: funcionários têm acesso igual ao lojista
+                    $_SESSION['employee_subtype'] = $user['subtipo_funcionario'] ?? 'funcionario';
+                    $_SESSION['store_id'] = intval($user['loja_vinculada_id']);
+                    $_SESSION['store_name'] = $storeData['nome_fantasia'];
+                    $_SESSION['loja_vinculada_id'] = intval($user['loja_vinculada_id']);
+                    $_SESSION['subtipo_funcionario'] = $user['subtipo_funcionario'] ?? 'funcionario';
+                    
+                    // Log de auditoria
+                    if (defined('TRACK_USER_ACTIONS') && TRACK_USER_ACTIONS) {
+                        error_log("KLUBE_AUDIT: Funcionário logado - ID: {$user['id']}, Subtipo: {$user['subtipo_funcionario']}, Loja: {$user['loja_vinculada_id']}");
+                    }
+                    
+                    // VERIFICAÇÃO FINAL para funcionários
+                    if (!isset($_SESSION['store_id']) || empty($_SESSION['store_id'])) {
+                        error_log("ERRO: store_id não definido para funcionário {$user['id']}");
+                        return ['status' => false, 'message' => 'Erro ao configurar acesso à loja.'];
+                    }
+                } else {
+                    error_log("ERRO: Dados da loja não encontrados para funcionário {$user['id']}");
+                    return ['status' => false, 'message' => 'Erro ao acessar dados da loja vinculada.'];
                 }
             }
 
-            // Sétima etapa: Registrar o login no banco de dados
+            // Registrar o login no banco de dados
             $updateStmt = $db->prepare("UPDATE usuarios SET ultimo_login = NOW() WHERE id = ?");
             $updateStmt->execute([$user['id']]);
 
-            // Oitava etapa: Preparar dados de retorno
+            // Preparar dados de retorno
             $result = [
                 'status' => true,
                 'message' => 'Login realizado com sucesso!',
                 'user_data' => [
-                    'id' => $user['id'],
+                    'id' => intval($user['id']),
                     'nome' => $user['nome'],
                     'email' => $user['email'],
                     'tipo' => $user['tipo']
                 ]
             ];
 
-            // Adicionar informações específicas de funcionário ao resultado
-            if ($user['tipo'] === USER_TYPE_EMPLOYEE && $storeData !== null) {
-                $subtypeDisplay = defined('EMPLOYEE_DISPLAY_TYPES') && isset(EMPLOYEE_DISPLAY_TYPES[$user['subtipo_funcionario']]) 
-                                    ? EMPLOYEE_DISPLAY_TYPES[$user['subtipo_funcionario']] 
-                                    : 'Funcionário';
+            // Adicionar informações específicas de funcionário
+            if (($user['tipo'] === 'funcionario' || (defined('USER_TYPE_EMPLOYEE') && $user['tipo'] === USER_TYPE_EMPLOYEE)) && $storeData !== null) {
+                $subtypeDisplay = 'Funcionário';
+                if (defined('EMPLOYEE_DISPLAY_TYPES') && isset(EMPLOYEE_DISPLAY_TYPES[$user['subtipo_funcionario']])) {
+                    $subtypeDisplay = EMPLOYEE_DISPLAY_TYPES[$user['subtipo_funcionario']];
+                }
                 
                 $result['employee_info'] = [
                     'subtipo' => $user['subtipo_funcionario'] ?? 'funcionario',
                     'subtipo_display' => $subtypeDisplay,
-                    'loja_id' => $user['loja_vinculada_id'],
+                    'loja_id' => intval($user['loja_vinculada_id']),
                     'loja_nome' => $storeData['nome_fantasia']
                 ];
             }
 
-            // Retornar resultado de sucesso com todas as informações
+            // Adicionar informações da loja para lojistas
+            if ($user['tipo'] === 'loja' && isset($_SESSION['store_id'])) {
+                $result['store_info'] = [
+                    'store_id' => intval($_SESSION['store_id']),
+                    'store_name' => $_SESSION['store_name']
+                ];
+            }
+
+            // Log final de sucesso
+            error_log("LOGIN COMPLETO - User: {$user['id']} ({$user['tipo']}), Store ID: " . ($_SESSION['store_id'] ?? 'N/A'));
+
             return $result;
 
-            } catch (PDOException $e) {
-                // Tratamento de erro: registrar o erro e retornar mensagem genérica
-                error_log('Erro no login: ' . $e->getMessage());
-                return ['status' => false, 'message' => 'Erro interno do sistema. Tente novamente.'];
-            }
+        } catch (PDOException $e) {
+            error_log('Erro no login: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro interno do sistema. Tente novamente.'];
+        } catch (Exception $e) {
+            error_log('Erro geral no login: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro inesperado. Tente novamente.'];
+        }
     }
 
     /**
