@@ -19,18 +19,7 @@ class AuthController {
         }
     }
     // Adicionar no AuthController.php
-    public static function setupEmployeeSession($employeeData) {
-        $_SESSION['user_id'] = $employeeData['id'];
-        $_SESSION['user_type'] = USER_TYPE_EMPLOYEE;
-        $_SESSION['user_name'] = $employeeData['nome'];
-        $_SESSION['user_email'] = $employeeData['email'];
-        $_SESSION['employee_subtype'] = $employeeData['subtipo_funcionario'];
-        $_SESSION['store_id'] = $employeeData['loja_vinculada_id'];
-        
-        // Definir permissões baseadas no subtipo
-        $permissions = EMPLOYEE_PERMISSIONS[$employeeData['subtipo_funcionario']] ?? [];
-        $_SESSION['employee_permissions'] = $permissions;
-    }
+    
     /**
      * Método de login atualizado e corrigido para funcionários
      * Esta versão resolve o problema de escopo de variável que impedia
@@ -103,7 +92,46 @@ class AuthController {
             $_SESSION['user_email'] = $user['email'];
             $_SESSION['user_type'] = $user['tipo'];
             $_SESSION['last_activity'] = time();
+            // === SISTEMA SIMPLIFICADO: CONFIGURAR DADOS DA LOJA ===
+            if ($user['tipo'] === USER_TYPE_STORE) {
+                // Para lojistas, buscar dados da loja associada
+                try {
+                    $storeStmt = $db->prepare("SELECT * FROM lojas WHERE usuario_id = ? LIMIT 1");
+                    $storeStmt->execute([$user['id']]);
+                    $lojaDados = $storeStmt->fetch(PDO::FETCH_ASSOC);
+                    
+                    if ($lojaDados) {
+                        $_SESSION['store_id'] = $lojaDados['id'];
+                        $_SESSION['store_name'] = $lojaDados['nome_fantasia'];
+                        $_SESSION['loja_vinculada_id'] = $lojaDados['id']; // Para compatibilidade
+                    }
+                } catch (Exception $e) {
+                    error_log("Erro ao buscar dados da loja: " . $e->getMessage());
+                }
+            }
 
+
+            // === SISTEMA SIMPLIFICADO: CONFIGURAR DADOS DA LOJA ===
+            if ($user['tipo'] === USER_TYPE_STORE) {
+                // Para lojistas, buscar dados da loja associada
+                try {
+                    $storeStmt = $db->prepare("SELECT * FROM lojas WHERE usuario_id = ? LIMIT 1");
+                    $storeStmt->execute([$user['id']]);
+                    $storeData = $storeStmt->fetch(PDO::FETCH_ASSOC);
+                    
+                    if ($storeData) {
+                        $_SESSION['store_id'] = $storeData['id'];
+                        $_SESSION['store_name'] = $storeData['nome_fantasia'];
+                        $_SESSION['loja_vinculada_id'] = $storeData['id']; // Para compatibilidade
+                    }
+                } catch (Exception $e) {
+                    error_log("Erro ao buscar dados da loja: " . $e->getMessage());
+                }
+            }
+
+            if ($user['tipo'] === 'funcionario' && $storeData !== null) {
+                // ... código existente dos funcionários...
+            }
             // Sexta etapa: Configurar dados específicos para funcionários
             // CORREÇÃO: Agora verificamos se $storeData não é null para evitar erros
             if ($user['tipo'] === 'funcionario' && $storeData !== null) {
@@ -185,17 +213,7 @@ class AuthController {
     public static function isEmployee() {
         return isset($_SESSION['user_type']) && $_SESSION['user_type'] === USER_TYPE_EMPLOYEE;
     }
-    public static function canManageEmployees() {
-        if (self::isStore()) {
-            return true;
-        }
-        
-        if (self::isEmployee()) {
-            return isset($_SESSION['employee_subtype']) && $_SESSION['employee_subtype'] === EMPLOYEE_TYPE_MANAGER;
-        }
-        
-        return false;
-    }
+    
 
     public static function getStoreId() {
         if ($_SESSION['user_type'] === USER_TYPE_STORE) {
@@ -215,13 +233,11 @@ class AuthController {
 
         try {
             $db = Database::getConnection();
-            $stmt = $db->prepare("SELECT * FROM usuarios WHERE id = :id AND tipo = :tipo");
-            $stmt->bindParam(':id', $storeId);
-            $tipo = USER_TYPE_STORE;
-            $stmt->bindParam(':tipo', $tipo);
-            $stmt->execute();
+            $stmt = $db->prepare("SELECT * FROM lojas WHERE id = ?");
+            $stmt->execute([$storeId]);
             return $stmt->fetch(PDO::FETCH_ASSOC);
         } catch (Exception $e) {
+            error_log("Erro ao buscar dados da loja: " . $e->getMessage());
             return null;
         }
     }
