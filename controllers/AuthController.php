@@ -1004,7 +1004,7 @@ if (basename($_SERVER['PHP_SELF']) === 'AuthController.php') {
     $action = $_REQUEST['action'] ?? '';
     
     switch ($action) {
-        case 'login':
+         case 'login':
             if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $email = $_POST['email'] ?? '';
                 $password = $_POST['password'] ?? '';
@@ -1012,10 +1012,15 @@ if (basename($_SERVER['PHP_SELF']) === 'AuthController.php') {
                 $result = AuthController::login($email, $password);
                 
                 if ($result['status']) {
-                    // Redirecionar com base no tipo de usuário
-                    if ($_SESSION['user_type'] == USER_TYPE_ADMIN) {
+                    // CORREÇÃO: Redirecionar com base no tipo de usuário
+                    $userType = $_SESSION['user_type'] ?? '';
+                    
+                    if ($userType == 'admin' || (defined('USER_TYPE_ADMIN') && $userType == USER_TYPE_ADMIN)) {
                         header('Location: ' . ADMIN_DASHBOARD_URL);
-                    } else if ($_SESSION['user_type'] == USER_TYPE_STORE) {
+                    } else if ($userType == 'loja' || (defined('USER_TYPE_STORE') && $userType == USER_TYPE_STORE)) {
+                        header('Location: ' . STORE_DASHBOARD_URL);
+                    } else if ($userType == 'funcionario') {
+                        // FUNCIONÁRIO VAI PARA ÁREA DA LOJA (MESMO QUE LOJISTA)
                         header('Location: ' . STORE_DASHBOARD_URL);
                     } else {
                         header('Location: ' . CLIENT_DASHBOARD_URL);

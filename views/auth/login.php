@@ -36,13 +36,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Login bem-sucedido - Redirecionar com base no tipo de usuário
             $userType = $_SESSION['user_type'] ?? '';
             
+            error_log("LOGIN REDIRECT: User Type = {$userType}");
+            
             if ($userType == 'admin' || (defined('USER_TYPE_ADMIN') && $userType == USER_TYPE_ADMIN)) {
                 header('Location: ' . ADMIN_DASHBOARD_URL);
             } else if ($userType == 'loja' || (defined('USER_TYPE_STORE') && $userType == USER_TYPE_STORE)) {
                 header('Location: ' . STORE_DASHBOARD_URL);
-            } else if ($userType == 'funcionario' || (defined('USER_TYPE_EMPLOYEE') && $userType == USER_TYPE_EMPLOYEE)) {
+            } else if ($userType == 'funcionario') { 
+                // CORREÇÃO CRÍTICA: FUNCIONÁRIO VAI PARA ÁREA DA LOJA
+                error_log("LOGIN REDIRECT: Funcionário redirecionado para STORE_DASHBOARD");
                 header('Location: ' . STORE_DASHBOARD_URL);
             } else {
+                error_log("LOGIN REDIRECT: Cliente redirecionado para CLIENT_DASHBOARD");
                 header('Location: ' . CLIENT_DASHBOARD_URL);
             }
             exit;
