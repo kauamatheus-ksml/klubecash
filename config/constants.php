@@ -100,7 +100,9 @@ define('EMPLOYEE_DISPLAY_TYPES', [
     'funcionario' => 'Funcionário',
     'gerente' => 'Gerente', 
     'coordenador' => 'Coordenador',
-    'assistente' => 'Assistente'
+    'assistente' => 'Assistente',
+    'vendedor' => 'Vendedor',
+    'financeiro' => 'Financeiro'
 ]);
 
 // Campo opcional para organização interna (não afeta permissões)
