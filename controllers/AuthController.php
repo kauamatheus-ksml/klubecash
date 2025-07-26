@@ -92,6 +92,7 @@ class AuthController {
             $_SESSION['user_email'] = $user['email'];
             $_SESSION['user_type'] = $user['tipo'];
             $_SESSION['last_activity'] = time();
+            
             // === SISTEMA SIMPLIFICADO: CONFIGURAR DADOS DA LOJA ===
             if ($user['tipo'] === USER_TYPE_STORE) {
                 // Para lojistas, buscar dados da loja associada
@@ -111,27 +112,10 @@ class AuthController {
             }
 
 
-            // === SISTEMA SIMPLIFICADO: CONFIGURAR DADOS DA LOJA ===
-            if ($user['tipo'] === USER_TYPE_STORE) {
-                // Para lojistas, buscar dados da loja associada
-                try {
-                    $storeStmt = $db->prepare("SELECT * FROM lojas WHERE usuario_id = ? LIMIT 1");
-                    $storeStmt->execute([$user['id']]);
-                    $storeData = $storeStmt->fetch(PDO::FETCH_ASSOC);
-                    
-                    if ($storeData) {
-                        $_SESSION['store_id'] = $storeData['id'];
-                        $_SESSION['store_name'] = $storeData['nome_fantasia'];
-                        $_SESSION['loja_vinculada_id'] = $storeData['id']; // Para compatibilidade
-                    }
-                } catch (Exception $e) {
-                    error_log("Erro ao buscar dados da loja: " . $e->getMessage());
-                }
-            }
 
-            if ($user['tipo'] === 'funcionario' && $storeData !== null) {
-                // ... código existente dos funcionários...
-            }
+            
+
+            
             // Sexta etapa: Configurar dados específicos para funcionários
             // CORREÇÃO: Agora verificamos se $storeData não é null para evitar erros
             if ($user['tipo'] === 'funcionario' && $storeData !== null) {
