@@ -1,22 +1,29 @@
 <?php
 // views/stores/dashboard.php
-session_start();
-if (isset($_GET['bypass']) && $_SESSION['user_type'] === 'funcionario') {
-    // BYPASS TOTAL - sem verificações
-} else {
-    // Verificações normais apenas para outros tipos
-}
 require_once '../../config/constants.php';
 require_once '../../config/database.php';
 require_once '../../controllers/AuthController.php';
 require_once '../../controllers/StoreController.php';
 require_once '../../controllers/TransactionController.php';
+require_once '../../utils/StoreHelper.php';
 
-$storeId = $_SESSION['store_id'];
+// Iniciar sessão
+session_start();
+
+// Verificação ultra-simples - substitui TODAS as verificações anteriores
+StoreHelper::requireStoreAccess();
+
+// Registrar acesso para auditoria
+StoreHelper::logUserAction($_SESSION['user_id'], 'acessou_dashboard', [
+    'loja_id' => StoreHelper::getCurrentStoreId()
+]);
+
+// Obter dados da loja - funciona para lojista E funcionário
+$storeId = StoreHelper::getCurrentStoreId();
 $store = AuthController::getStoreData();
 
 if (!$storeId || !$store) {
-    header('Location: /login?error=' . urlencode('Erro ao acessar dados da loja.'));
+    header('Location: ' . LOGIN_URL . '?error=' . urlencode('Erro ao acessar dados da loja.'));
     exit;
 }
 
