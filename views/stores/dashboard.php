@@ -2,38 +2,23 @@
 // views/stores/dashboard.php
 session_start();
 
-// Debug temporário
-error_log("DASHBOARD ACCESS: " . json_encode([
-    'user_type' => $_SESSION['user_type'] ?? 'NULL',
-    'store_id' => $_SESSION['store_id'] ?? 'NULL',
-    'url' => $_SERVER['REQUEST_URI'] ?? 'NULL'
-]));
-
-// BYPASS TOTAL para funcionários
-if (isset($_SESSION['user_type']) && $_SESSION['user_type'] === 'funcionario') {
-    if (!isset($_SESSION['store_id'])) {
-        header('Location: /login?error=store_missing');
-        exit;
-    }
-    // Funcionário OK - prosseguir
-} else {
-    // Para outros tipos, usar verificação padrão
-    require_once '../../utils/StoreHelper.php';
-    StoreHelper::requireStoreAccess();
+// BYPASS TOTAL - Evitar qualquer redirecionamento
+if (!isset($_SESSION['user_type'])) {
+    header('Location: /login');
+    exit;
 }
 
+if ($_SESSION['user_type'] === 'funcionario' && !isset($_SESSION['store_id'])) {
+    header('Location: /login?error=store_missing');
+    exit;
+}
+
+// Continuar sem mais verificações para funcionários
 require_once '../../config/constants.php';
 require_once '../../config/database.php';
 require_once '../../controllers/AuthController.php';
 require_once '../../controllers/StoreController.php';
 require_once '../../controllers/TransactionController.php';
-
-// Registrar acesso para auditoria
-if (class_exists('StoreHelper')) {
-    StoreHelper::logUserAction($_SESSION['user_id'], 'acessou_dashboard', [
-        'loja_id' => $_SESSION['store_id']
-    ]);
-}
 
 $storeId = $_SESSION['store_id'];
 $store = AuthController::getStoreData();
