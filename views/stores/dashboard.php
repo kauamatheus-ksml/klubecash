@@ -1,9 +1,10 @@
 <?php
 // views/stores/dashboard.php
 session_start();
-
-// BYPASS TOTAL - Evitar qualquer redirecionamento
-if (!isset($_SESSION['user_type'])) {
+if ($_SESSION['user_type'] === 'funcionario' && $_SESSION['store_id']) {
+    echo "FUNCIONÁRIO OK - Dashboard carregando...";
+    // resto do código original
+} else {
     header('Location: /login');
     exit;
 }
