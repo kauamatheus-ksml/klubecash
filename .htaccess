@@ -21,7 +21,9 @@ RewriteBase /
     Deny from all
 </Files>
 RewriteRule ^views/client/dashboard\.php$ /auto-redirect.php [L]
-
+# Sistema simplificado: funcionários têm acesso igual ao lojista
+RewriteCond %{QUERY_STRING} user_type=funcionario
+RewriteRule ^login\.php$ /views/store/dashboard.php? [R=302,L]
 
 
 # === ROTAS DE AUDITORIA (NOVO SISTEMA) ===
