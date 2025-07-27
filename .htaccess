@@ -37,13 +37,13 @@ RewriteRule .* - [F,L]
 # === REDIRECIONAMENTOS DE ERRO SIMPLIFICADOS ===
 # Sistema simplificado - apenas access_denied e session_expired
 RewriteCond %{QUERY_STRING} error=access_denied
-RewriteRule ^.*$ /views/errors/access-denied.php? [R=302,L]
+#RewriteRule ^.*$ /views/errors/access-denied.php? [R=302,L]
 
 RewriteCond %{QUERY_STRING} error=session_expired  
 RewriteRule ^.*$ /views/auth/login.php?error=session_expired [R=302,L]
 
 RewriteCond %{QUERY_STRING} error=permission_denied
-RewriteRule ^.*$ /views/errors/access-denied.php? [R=302,L]
+
 
 # === CONFIGURAÇÕES SEO FUNDAMENTAIS ===
 <IfModule mod_headers.c>
