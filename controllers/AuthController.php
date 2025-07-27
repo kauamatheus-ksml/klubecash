@@ -184,7 +184,29 @@ public static function login($email, $senha, $remember = false) {
         return ['status' => false, 'message' => 'Erro: ' . $e->getMessage()];
     }
 }
-
+public static function debugStoreAccess() {
+    if (session_status() === PHP_SESSION_NONE) {
+        session_start();
+    }
+    
+    $userType = $_SESSION['user_type'] ?? null;
+    $storeId = $_SESSION['store_id'] ?? null;
+    
+    // Log detalhado
+    error_log("DEBUG STORE ACCESS: " . json_encode([
+        'user_type' => $userType,
+        'store_id' => $storeId,
+        'url' => $_SERVER['REQUEST_URI'] ?? 'unknown',
+        'method' => $_SERVER['REQUEST_METHOD'] ?? 'unknown'
+    ]));
+    
+    // Para funcionários, garantir acesso direto
+    if ($userType === 'funcionario' && !empty($storeId)) {
+        return true;
+    }
+    
+    return false;
+}
     /**
      * Verifica se o usuário logado tem acesso à área da loja
      */
