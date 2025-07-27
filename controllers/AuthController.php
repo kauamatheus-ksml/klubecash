@@ -13,8 +13,13 @@ require_once __DIR__ . '/../utils/Validator.php';
 class AuthController {
 
     public static function requireStoreAccess() {
+        // CORREÇÃO: Bypass para funcionários
+        if (isset($_SESSION['user_type']) && $_SESSION['user_type'] === 'funcionario' && isset($_SESSION['store_id'])) {
+            return; // Funcionário com store_id = OK
+        }
+        
         if (!self::hasStoreAccess()) {
-            header("Location: " . LOGIN_URL . "?error=access_denied");
+            header("Location: " . LOGIN_URL . "?error=acesso_restrito");
             exit;
         }
     }
@@ -217,13 +222,21 @@ public static function debugStoreAccess() {
         
         $userType = $_SESSION['user_type'];
         
-        // Verificar tipo de usuário
-        $allowedTypes = [USER_TYPE_STORE, USER_TYPE_EMPLOYEE, 'loja', 'funcionario'];
+        // CORREÇÃO: Incluir 'funcionario' explicitamente
+        $allowedTypes = ['loja', 'funcionario'];
+        if (defined('USER_TYPE_STORE')) $allowedTypes[] = USER_TYPE_STORE;
+        if (defined('USER_TYPE_EMPLOYEE')) $allowedTypes[] = USER_TYPE_EMPLOYEE;
+        
         if (!in_array($userType, $allowedTypes)) {
             return false;
         }
         
-        // Verificar se tem store_id definido
+        // CORREÇÃO: Para funcionários, verificar store_id diretamente
+        if ($userType === 'funcionario') {
+            return !empty($_SESSION['store_id']);
+        }
+        
+        // Para outros tipos
         $storeId = self::getStoreId();
         return !empty($storeId);
     }
@@ -1008,11 +1021,7 @@ public static function debugStoreAccess() {
      * @return bool Verdadeiro se o usuário estiver autenticado
      */
     public static function isAuthenticated() {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
-        
-        return isset($_SESSION['user_id']);
+        return isset($_SESSION['user_id']) && isset($_SESSION['user_type']);
     }
     
     /**
