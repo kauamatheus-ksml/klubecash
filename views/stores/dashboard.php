@@ -7,20 +7,19 @@ require_once '../../controllers/StoreController.php';
 require_once '../../controllers/TransactionController.php';
 require_once '../../utils/StoreHelper.php';
 
-// Iniciar sessão
 session_start();
 
-// Verificação ultra-simples - substitui TODAS as verificações anteriores
-StoreHelper::requireStoreAccess();
-
-// Registrar acesso para auditoria
-StoreHelper::logUserAction($_SESSION['user_id'], 'acessou_dashboard', [
-    'loja_id' => StoreHelper::getCurrentStoreId()
-]);
-
-// Obter dados da loja - funciona para lojista E funcionário
-$storeId = StoreHelper::getCurrentStoreId();
-$store = AuthController::getStoreData();
+// CORREÇÃO: Bypass direto para funcionários
+if (isset($_SESSION['user_type']) && $_SESSION['user_type'] === 'funcionario' && isset($_SESSION['store_id'])) {
+    // Funcionário com store_id = acesso garantido
+    $storeId = $_SESSION['store_id'];
+    $store = AuthController::getStoreData();
+} else {
+    // Para outros tipos, usar verificação padrão
+    StoreHelper::requireStoreAccess();
+    $storeId = StoreHelper::getCurrentStoreId();
+    $store = AuthController::getStoreData();
+}
 
 if (!$storeId || !$store) {
     header('Location: ' . LOGIN_URL . '?error=' . urlencode('Erro ao acessar dados da loja.'));
