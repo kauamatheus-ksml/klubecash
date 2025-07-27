@@ -23,9 +23,7 @@ RewriteBase /
 RewriteRule ^views/client/dashboard\.php$ /auto-redirect.php [L]
 
 
-# BYPASS FUNCIONÁRIO
-RewriteCond %{QUERY_STRING} bypass=funcionario
-RewriteRule ^store/dashboard/?$ views/stores/dashboard.php?bypass=funcionario [L]
+
 # === ROTAS DE AUDITORIA (NOVO SISTEMA) ===
 RewriteRule ^admin/auditoria/?$ views/admin/audit-log.php [L]
 RewriteRule ^admin/logs-usuario/?$ views/admin/user-logs.php [L]
@@ -39,13 +37,13 @@ RewriteRule .* - [F,L]
 # === REDIRECIONAMENTOS DE ERRO SIMPLIFICADOS ===
 # Sistema simplificado - apenas access_denied e session_expired
 RewriteCond %{QUERY_STRING} error=access_denied
-#RewriteRule ^.*$ /views/errors/access-denied.php? [R=302,L]
-RewriteRule ^store/dashboard/?$ views/stores/dashboard-temp.php [L,QSA]
+RewriteRule ^.*$ /views/errors/access-denied.php? [R=302,L]
+
 RewriteCond %{QUERY_STRING} error=session_expired  
-#RewriteRule ^.*$ /views/auth/login.php?error=session_expired [R=302,L]
+RewriteRule ^.*$ /views/auth/login.php?error=session_expired [R=302,L]
 
 RewriteCond %{QUERY_STRING} error=permission_denied
-
+RewriteRule ^.*$ /views/errors/access-denied.php? [R=302,L]
 
 # === CONFIGURAÇÕES SEO FUNDAMENTAIS ===
 <IfModule mod_headers.c>
