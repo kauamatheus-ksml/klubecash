@@ -115,7 +115,6 @@ define('ADMIN_DASHBOARD_URL', SITE_URL . '/views/admin/dashboard.php');
 define('STORE_DASHBOARD_URL', SITE_URL . '/store/dashboard/');
 define('CLIENT_DASHBOARD_URL', SITE_URL . '/views/client/dashboard.php');
 
-
 define('STORE_PENDING', 'pendente');
 define('STORE_APPROVED', 'aprovado');
 define('STORE_REJECTED', 'rejeitado');
