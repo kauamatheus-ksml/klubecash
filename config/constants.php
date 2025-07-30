@@ -67,7 +67,7 @@ define('TOKEN_EXPIRATION', 7200); // 2 horas para recuperação de senha
 
 
 // === CONFIGURAÇÕES WHATSAPP BOT ===
-define('WHATSAPP_BOT_URL', 'https://f49c-2804-690-33ce-3000-c32-7891-4174-5fcb.ngrok-free.app');
+define('WHATSAPP_BOT_URL', 'https://b7cedf07e3df.ngrok-free.app');
 define('WHATSAPP_BOT_SECRET', 'klube-cash-2024');
 define('WHATSAPP_ENABLED', true);
 define('WHATSAPP_TIMEOUT', 30);
