@@ -254,7 +254,7 @@ class CashbackNotifier {
                        "2️⃣ Em até 7 dias seu cashback estará disponível\n" .
                        "3️⃣ Você poderá usar o dinheiro em novas compras na mesma loja\n\n" .
                        "📱 Acompanhe pelo app: " . SITE_URL . "\n\n" .
-                       "Bem-vindo(a) ao *Klube Cash*! 💜";
+                       "Bem-vindo(a) ao *Klube Cash*! 🧡";
                        
             case 'big_purchase':
                 return "🚀 *Uau, {$nome}!*\n\n" .
@@ -264,7 +264,7 @@ class CashbackNotifier {
                        "🎯 Cashback de {$percentual}%\n\n" .
                        "🕐 *Prazo de liberação:* até 7 dias úteis\n\n" .
                        "💡 *Dica:* Com esse valor você já pode fazer uma nova compra na {$loja} usando seu cashback!\n\n" .
-                       "Continue economizando no *Klube Cash*! 🌟";
+                       "Continue economizando no *Klube Cash*! 🧡";
                        
             case 'vip_client':
                 return "⭐ *{$nome}*, sua compra foi registrada!*\n\n" .
@@ -272,7 +272,7 @@ class CashbackNotifier {
                        "💰 Compra: {$valorCompra}\n" .
                        "🎁 Cashback: *{$valorCashback}*\n\n" .
                        "⏰ Liberação em até 7 dias úteis.\n\n" .
-                       "Obrigado por ser um cliente *Klube Cash*! 💜";
+                       "Obrigado por ser um cliente *Klube Cash*! 🧡";
                        
             default: // regular_client
                 return "✅ *{$nome}, tudo certo!*\n\n" .
@@ -282,7 +282,7 @@ class CashbackNotifier {
                        "🕐 *Status:* Aguardando validação da loja\n" .
                        "📅 *Previsão:* Até 7 dias úteis para liberação\n\n" .
                        "📱 Acompanhe no app: " . SITE_URL . "\n\n" .
-                       "Qualquer dúvida, estamos aqui! 💜";
+                       "Qualquer dúvida, estamos aqui! 🧡";
         }
     }
     
