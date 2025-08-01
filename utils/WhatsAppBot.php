@@ -219,7 +219,7 @@ public static function sendMessage($phone, $message) {
             'messageId' => $messageId,
             'phone' => $phone,
             'timestamp' => date('Y-m-d H:i:s'),
-            'simulation' => false,
+            'simulation' => true,
             'note' => 'Mensagem registrada no log do servidor (modo desenvolvimento)'
         ];
     }
