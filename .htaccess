@@ -54,7 +54,17 @@ RewriteRule ^api/whatsapp-saldo/?$ api/whatsapp-saldo.php [L,QSA]
 # Tratamento para requisições OPTIONS (CORS)
 RewriteCond %{REQUEST_METHOD} OPTIONS
 RewriteRule ^api/whatsapp-saldo/?$ [R=200,L]
+# ===== ROTA API NOTIFICAÇÕES CASHBACK =====
+RewriteRule ^api/cashback-notificacao/?$ api/cashback-notificacao.php [L,QSA]
 
+# Headers para API de notificações
+<FilesMatch "cashback-notificacao\.php$">
+    ExpiresActive on
+    ExpiresDefault "access plus 0 seconds"
+    Header always set Access-Control-Allow-Origin "*"
+    Header always set Access-Control-Allow-Methods "POST, OPTIONS"
+    Header always set Access-Control-Allow-Headers "Content-Type, Authorization"
+</FilesMatch>
 # === REDIRECIONAMENTOS DE ERRO SIMPLIFICADOS ===
 # Sistema simplificado - apenas access_denied e session_expired
 RewriteCond %{QUERY_STRING} error=access_denied

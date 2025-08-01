@@ -63,7 +63,13 @@ define('TOKEN_EXPIRATION', 7200); // 2 horas para recuperação de senha
 
 
 
+// ===== CONFIGURAÇÕES NOTIFICAÇÕES CASHBACK =====
+define('CASHBACK_NOTIFICATIONS_ENABLED', true);
+define('CASHBACK_NOTIFICATION_API_URL', SITE_URL . '/api/cashback-notificacao.php');
 
+// Configurações de retry para notificações falhadas
+define('CASHBACK_NOTIFICATION_MAX_RETRIES', 3);
+define('CASHBACK_NOTIFICATION_RETRY_INTERVAL', 3600); // 1 hora em segundos
 
 
 // === CONFIGURAÇÕES WHATSAPP BOT ===
