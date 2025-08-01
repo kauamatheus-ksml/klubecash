@@ -133,9 +133,9 @@ class SaldoConsulta {
         $sqlDisponivel = "SELECT 
                             COUNT(*) as quantidade_aprovadas,
                             COALESCE(SUM(valor_cashback), 0) as saldo_disponivel 
-                         FROM transacoes_cashback 
-                         WHERE usuario_id = :usuario_id 
-                         AND status = 'aprovado'";
+                          FROM transacoes_cashback 
+                          WHERE usuario_id = :usuario_id 
+                          AND status = 'aprovado'";
         
         $stmt = $this->db->prepare($sqlDisponivel);
         $stmt->bindParam(':usuario_id', $usuarioId);
@@ -148,11 +148,11 @@ class SaldoConsulta {
         
         // === SALDO PENDENTE ===
         $sqlPendente = "SELECT 
-                          COUNT(*) as quantidade_pendentes,
-                          COALESCE(SUM(valor_cashback), 0) as saldo_pendente 
-                       FROM transacoes_cashback 
-                       WHERE usuario_id = :usuario_id 
-                       AND status = 'pendente'";
+                            COUNT(*) as quantidade_pendentes,
+                            COALESCE(SUM(valor_cashback), 0) as saldo_pendente 
+                          FROM transacoes_cashback 
+                          WHERE usuario_id = :usuario_id 
+                          AND status = 'pendente'";
         
         $stmt = $this->db->prepare($sqlPendente);
         $stmt->bindParam(':usuario_id', $usuarioId);
@@ -165,16 +165,16 @@ class SaldoConsulta {
         
         // === DETALHES DAS ÚLTIMAS TRANSAÇÕES ===
         $sqlDetalhes = "SELECT 
-                          id, 
-                          valor_total, 
-                          valor_cashback, 
-                          status, 
-                          data_transacao,
-                          loja_id
-                       FROM transacoes_cashback 
-                       WHERE usuario_id = :usuario_id 
-                       ORDER BY data_transacao DESC 
-                       LIMIT 5";
+                           id, 
+                           valor_total, 
+                           valor_cashback, 
+                           status, 
+                           data_transacao,
+                           loja_id
+                         FROM transacoes_cashback 
+                         WHERE usuario_id = :usuario_id 
+                         ORDER BY data_transacao DESC 
+                         LIMIT 5";
         
         $stmt = $this->db->prepare($sqlDetalhes);
         $stmt->bindParam(':usuario_id', $usuarioId);
@@ -204,7 +204,7 @@ class SaldoConsulta {
         return $saldos;
     }
     
-    // === MÉTODOS AUXILIARES (mantidos iguais) ===
+    // === MÉTODOS AUXILIARES ===
     
     private function limparTelefone($telefone) {
         $limpo = preg_replace('/\D/', '', $telefone);
@@ -222,37 +222,43 @@ class SaldoConsulta {
         return $limpo;
     }
     
+    /**
+     * MÉTODO MODIFICADO PARA MOSTRAR APENAS O SALDO DISPONÍVEL
+     */
     private function gerarMensagemSaldo($nomeUsuario, $saldos) {
         $nome = ucfirst(explode(' ', $nomeUsuario)[0]);
         
-        if ($saldos['total'] == 0) {
-            return "💰 *Klube Cash - Seu Saldo*\n\n" .
-                   "👋 Olá, {$nome}!\n\n" .
-                   "💳 Você ainda não possui cashback acumulado.\n\n" .
-                   "🛍️ Faça compras em nossas lojas parceiras e ganhe cashback em cada transação!\n\n" .
-                   "📱 Acesse: https://klubecash.com\n\n" .
-                   "🎯 *Klube Cash - Seu dinheiro de volta!*";
+        // Se o saldo disponível for zero (ignora o pendente)
+        if ($saldos['disponivel'] == 0) {
+            $mensagem = "💰 *Klube Cash - Seu Saldo*\n\n" .
+                        "👋 Olá, {$nome}!\n\n";
+
+            // Mensagem adicional se houver saldo pendente
+            if ($saldos['pendente'] > 0) {
+                 $mensagem .= "💳 Você ainda não possui saldo disponível para uso.\n\n" .
+                              "⏳ *Saldo Pendente:* R$ " . number_format($saldos['pendente'], 2, ',', '.') . "\n" .
+                              "⏰ Seu saldo pendente será liberado em breve!\n\n";
+            } else {
+                 $mensagem .= "💳 Você ainda não possui cashback acumulado.\n\n" .
+                              "🛍️ Faça compras em nossas lojas parceiras e ganhe cashback em cada transação!\n\n";
+            }
+            
+            $mensagem .= "📱 Acesse: https://klubecash.com\n\n" .
+                         "🎯 *Klube Cash - Seu dinheiro de volta!*";
+            return $mensagem;
         }
         
+        // Mensagem principal quando há saldo disponível
         $mensagem = "💰 *Klube Cash - Seu Saldo*\n\n";
         $mensagem .= "👋 Olá, {$nome}!\n\n";
         
-        if ($saldos['disponivel'] > 0) {
-            $mensagem .= "💳 *Saldo Disponível:* R$ " . number_format($saldos['disponivel'], 2, ',', '.') . "\n";
-        }
+        $mensagem .= "💳 *Saldo Disponível:* R$ " . number_format($saldos['disponivel'], 2, ',', '.') . "\n\n";
         
+        $mensagem .= "✅ Você já pode usar seu saldo em suas próximas compras!\n\n";
+
+        // Opcional: Adiciona uma nota sobre o saldo pendente, se existir
         if ($saldos['pendente'] > 0) {
-            $mensagem .= "⏳ *Saldo Pendente:* R$ " . number_format($saldos['pendente'], 2, ',', '.') . "\n";
-        }
-        
-        $mensagem .= "\n";
-        
-        if ($saldos['disponivel'] > 0) {
-            $mensagem .= "✅ Você pode usar seu saldo disponível em suas próximas compras!\n\n";
-        }
-        
-        if ($saldos['pendente'] > 0) {
-            $mensagem .= "⏰ Seu saldo pendente será liberado após confirmação da loja.\n\n";
+            $mensagem .= "⏳ _Você também tem R$ " . number_format($saldos['pendente'], 2, ',', '.') . " pendentes que serão liberados em breve._\n\n";
         }
         
         $mensagem .= "📱 Acesse: https://klubecash.com\n\n";
