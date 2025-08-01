@@ -63,13 +63,24 @@ define('TOKEN_EXPIRATION', 7200); // 2 horas para recuperação de senha
 
 
 
-// ===== CONFIGURAÇÕES NOTIFICAÇÕES CASHBACK =====
+// === CONFIGURAÇÕES NOTIFICAÇÕES CASHBACK ===
 define('CASHBACK_NOTIFICATIONS_ENABLED', true);
 define('CASHBACK_NOTIFICATION_API_URL', SITE_URL . '/api/cashback-notificacao.php');
 
 // Configurações de retry para notificações falhadas
 define('CASHBACK_NOTIFICATION_MAX_RETRIES', 3);
 define('CASHBACK_NOTIFICATION_RETRY_INTERVAL', 3600); // 1 hora em segundos
+
+// === TIPOS DE MENSAGEM PARA CUSTOMIZAÇÃO ===
+define('NOTIFICATION_TYPE_FIRST_PURCHASE', 'first_purchase');
+define('NOTIFICATION_TYPE_BIG_PURCHASE', 'big_purchase');
+define('NOTIFICATION_TYPE_VIP_CLIENT', 'vip_client');
+define('NOTIFICATION_TYPE_REGULAR_CLIENT', 'regular_client');
+
+// Valores para determinação de perfil do cliente
+define('VIP_CLIENT_MIN_CASHBACK', 500.00);
+define('VIP_CLIENT_MIN_TRANSACTIONS', 20);
+define('BIG_PURCHASE_THRESHOLD', 200.00);
 
 
 // === CONFIGURAÇÕES WHATSAPP BOT ===

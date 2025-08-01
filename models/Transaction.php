@@ -183,8 +183,15 @@ class Transaction {
             // Se for um novo registro, obter o ID gerado
             if (!$this->id && $result) {
                 $this->id = $this->db->lastInsertId();
+                
+                // === INTEGRAÇÃO WHATSAPP: Notificação automática de nova transação ===
+                // Disparar notificação apenas para transações pendentes (novas)
+                if ($this->status === TRANSACTION_PENDING) {
+                    require_once __DIR__ . '/../utils/NotificationTrigger.php';
+                    NotificationTrigger::send($this->id);
+                }
             }
-            
+
             return $result;
         } catch (Exception $e) {
             error_log('Erro ao salvar transação: ' . $e->getMessage());
