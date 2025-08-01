@@ -1388,10 +1388,7 @@ class ClientController {
             $stmt->execute();
             
             $transactionId = $db->lastInsertId();
-            // === INTEGRAÇÃO WHATSAPP: Notificação automática de nova transação ===
-            // Disparar notificação para transações criadas via interface do cliente
-            require_once __DIR__ . '/../utils/NotificationTrigger.php';
-            NotificationTrigger::send($transactionId);
+            
             // Registrar transação para o administrador (comissão admin)
             if ($valorCashbackAdmin > 0) {
                 $adminStmt = $db->prepare("
