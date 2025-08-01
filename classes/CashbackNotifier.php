@@ -97,6 +97,8 @@ class CashbackNotifier {
             $stmt = $this->db->prepare("
                 SELECT 
                     t.id,
+                    t.usuario_id,
+                    t.loja_id,
                     t.valor_total,
                     t.valor_cashback,
                     t.valor_cliente,
