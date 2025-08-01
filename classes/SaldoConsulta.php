@@ -1,15 +1,9 @@
 <?php
-// classes/SaldoConsulta.php
+// classes/SaldoConsulta.php - Versão com Debug Detalhado
 
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../config/constants.php';
 
-/**
- * Classe SaldoConsulta - Gerencia consultas de saldo via WhatsApp
- * 
- * Esta classe é responsável por buscar e calcular o saldo de cashback
- * dos usuários quando eles enviam mensagem "saldo" no WhatsApp
- */
 class SaldoConsulta {
     private $db;
     
@@ -18,20 +12,23 @@ class SaldoConsulta {
     }
     
     /**
-     * Busca usuário por telefone e retorna mensagem de saldo formatada
-     * 
-     * @param string $telefone Número de telefone do usuário
-     * @return array Array com success, message e dados do usuário
+     * Versão com debug detalhado para investigar problemas de saldo
      */
     public function consultarSaldoPorTelefone($telefone) {
         try {
-            // Limpar telefone - remover máscaras e caracteres especiais
+            // === ETAPA 1: LIMPEZA DO TELEFONE ===
             $telefoneLimpo = $this->limparTelefone($telefone);
             
-            // Buscar usuário por telefone (busca inteligente pelos últimos 9 dígitos)
-            $usuario = $this->buscarUsuarioPorTelefone($telefoneLimpo);
+            // Log detalhado da limpeza
+            error_log("=== DEBUG SALDO ===");
+            error_log("Telefone original: " . $telefone);
+            error_log("Telefone limpo: " . $telefoneLimpo);
+            
+            // === ETAPA 2: BUSCA DO USUÁRIO ===
+            $usuario = $this->buscarUsuarioPorTelefoneComDebug($telefoneLimpo);
             
             if (!$usuario) {
+                error_log("RESULTADO: Usuário não encontrado");
                 return [
                     'success' => false,
                     'message' => $this->gerarMensagemUsuarioNaoEncontrado(),
@@ -39,11 +36,19 @@ class SaldoConsulta {
                 ];
             }
             
-            // Calcular saldos do usuário
-            $saldos = $this->calcularSaldos($usuario['id']);
+            // Log do usuário encontrado
+            error_log("USUÁRIO ENCONTRADO:");
+            error_log("- ID: " . $usuario['id']);
+            error_log("- Nome: " . $usuario['nome']);
+            error_log("- Telefone cadastrado: " . $usuario['telefone']);
+            
+            // === ETAPA 3 e 4: CÁLCULO DOS SALDOS ===
+            $saldos = $this->calcularSaldosComDebug($usuario['id']);
             
             // Gerar mensagem de resposta
             $mensagem = $this->gerarMensagemSaldo($usuario['nome'], $saldos);
+            
+            error_log("=== FIM DEBUG SALDO ===");
             
             return [
                 'success' => true,
@@ -54,7 +59,7 @@ class SaldoConsulta {
             ];
             
         } catch (Exception $e) {
-            error_log('Erro na consulta de saldo: ' . $e->getMessage());
+            error_log('ERRO na consulta de saldo: ' . $e->getMessage());
             
             return [
                 'success' => false,
@@ -65,32 +70,17 @@ class SaldoConsulta {
     }
     
     /**
-     * Limpa o telefone removendo caracteres especiais e formatações
+     * Busca usuário com logs detalhados para debug
      */
-    private function limparTelefone($telefone) {
-        // Remove tudo que não é número
-        $limpo = preg_replace('/\D/', '', $telefone);
+    private function buscarUsuarioPorTelefoneComDebug($telefoneLimpo) {
+        // Primeiro, vamos ver quantos usuários têm telefone cadastrado
+        $sqlCount = "SELECT COUNT(*) as total FROM usuarios WHERE telefone IS NOT NULL";
+        $stmt = $this->db->prepare($sqlCount);
+        $stmt->execute();
+        $totalUsuarios = $stmt->fetch(PDO::FETCH_ASSOC)['total'];
+        error_log("Total de usuários com telefone: " . $totalUsuarios);
         
-        // Remove código do país se presente (55)
-        if (strlen($limpo) >= 11 && substr($limpo, 0, 2) == '55') {
-            $limpo = substr($limpo, 2);
-        }
-        
-        // Remove código de área se tiver 11 dígitos (deixa apenas os 9 últimos)
-        if (strlen($limpo) == 11) {
-            $limpo = substr($limpo, -9);
-        } elseif (strlen($limpo) == 10) {
-            $limpo = substr($limpo, -8); // Para números fixos
-        }
-        
-        return $limpo;
-    }
-    
-    /**
-     * Busca usuário por telefone usando busca inteligente
-     */
-    private function buscarUsuarioPorTelefone($telefoneLimpo) {
-        // Busca pelos últimos dígitos do telefone
+        // Agora vamos fazer a busca atual
         $sql = "SELECT id, nome, email, telefone, status 
                 FROM usuarios 
                 WHERE status = 'ativo' 
@@ -108,15 +98,41 @@ class SaldoConsulta {
         $stmt->bindValue(':telefone3', '%' . $telefoneLimpo . '%');
         $stmt->execute();
         
-        return $stmt->fetch(PDO::FETCH_ASSOC);
+        $resultado = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        // Log da busca
+        error_log("BUSCA POR TELEFONE:");
+        error_log("- Procurando por: " . $telefoneLimpo);
+        error_log("- SQL executado: " . $sql);
+        error_log("- Resultado encontrado: " . ($resultado ? 'SIM' : 'NÃO'));
+        
+        // Se não encontrou, vamos listar alguns telefones para comparar
+        if (!$resultado) {
+            error_log("TELEFONES CADASTRADOS (primeiros 5):");
+            $sqlTelefones = "SELECT id, nome, telefone FROM usuarios WHERE telefone IS NOT NULL LIMIT 5";
+            $stmtTel = $this->db->prepare($sqlTelefones);
+            $stmtTel->execute();
+            $telefones = $stmtTel->fetchAll(PDO::FETCH_ASSOC);
+            
+            foreach ($telefones as $tel) {
+                $telLimpo = preg_replace('/\D/', '', $tel['telefone']);
+                error_log("- ID {$tel['id']}: {$tel['nome']} - {$tel['telefone']} (limpo: $telLimpo)");
+            }
+        }
+        
+        return $resultado;
     }
     
     /**
-     * Calcula os saldos disponível e pendente do usuário
+     * Calcula saldos com debug detalhado
      */
-    private function calcularSaldos($usuarioId) {
-        // Saldo disponível (transações aprovadas)
-        $sqlDisponivel = "SELECT COALESCE(SUM(valor_cashback), 0) as saldo_disponivel 
+    private function calcularSaldosComDebug($usuarioId) {
+        error_log("CALCULANDO SALDOS PARA USUÁRIO ID: " . $usuarioId);
+        
+        // === SALDO DISPONÍVEL ===
+        $sqlDisponivel = "SELECT 
+                            COUNT(*) as quantidade_aprovadas,
+                            COALESCE(SUM(valor_cashback), 0) as saldo_disponivel 
                          FROM transacoes_cashback 
                          WHERE usuario_id = :usuario_id 
                          AND status = 'aprovado'";
@@ -124,10 +140,16 @@ class SaldoConsulta {
         $stmt = $this->db->prepare($sqlDisponivel);
         $stmt->bindParam(':usuario_id', $usuarioId);
         $stmt->execute();
-        $saldoDisponivel = $stmt->fetch(PDO::FETCH_ASSOC)['saldo_disponivel'];
+        $resultDisponivel = $stmt->fetch(PDO::FETCH_ASSOC);
         
-        // Saldo pendente (transações pendentes)
-        $sqlPendente = "SELECT COALESCE(SUM(valor_cashback), 0) as saldo_pendente 
+        error_log("TRANSAÇÕES APROVADAS:");
+        error_log("- Quantidade: " . $resultDisponivel['quantidade_aprovadas']);
+        error_log("- Valor total: R$ " . number_format($resultDisponivel['saldo_disponivel'], 2, ',', '.'));
+        
+        // === SALDO PENDENTE ===
+        $sqlPendente = "SELECT 
+                          COUNT(*) as quantidade_pendentes,
+                          COALESCE(SUM(valor_cashback), 0) as saldo_pendente 
                        FROM transacoes_cashback 
                        WHERE usuario_id = :usuario_id 
                        AND status = 'pendente'";
@@ -135,35 +157,74 @@ class SaldoConsulta {
         $stmt = $this->db->prepare($sqlPendente);
         $stmt->bindParam(':usuario_id', $usuarioId);
         $stmt->execute();
-        $saldoPendente = $stmt->fetch(PDO::FETCH_ASSOC)['saldo_pendente'];
+        $resultPendente = $stmt->fetch(PDO::FETCH_ASSOC);
         
-        // Buscar última transação para mostrar data
-        $sqlUltima = "SELECT data_transacao 
-                     FROM transacoes_cashback 
-                     WHERE usuario_id = :usuario_id 
-                     ORDER BY data_transacao DESC 
-                     LIMIT 1";
+        error_log("TRANSAÇÕES PENDENTES:");
+        error_log("- Quantidade: " . $resultPendente['quantidade_pendentes']);
+        error_log("- Valor total: R$ " . number_format($resultPendente['saldo_pendente'], 2, ',', '.'));
         
-        $stmt = $this->db->prepare($sqlUltima);
+        // === DETALHES DAS ÚLTIMAS TRANSAÇÕES ===
+        $sqlDetalhes = "SELECT 
+                          id, 
+                          valor_total, 
+                          valor_cashback, 
+                          status, 
+                          data_transacao,
+                          loja_id
+                       FROM transacoes_cashback 
+                       WHERE usuario_id = :usuario_id 
+                       ORDER BY data_transacao DESC 
+                       LIMIT 5";
+        
+        $stmt = $this->db->prepare($sqlDetalhes);
         $stmt->bindParam(':usuario_id', $usuarioId);
         $stmt->execute();
-        $ultimaTransacao = $stmt->fetch(PDO::FETCH_ASSOC);
+        $transacoes = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
-        return [
-            'disponivel' => floatval($saldoDisponivel),
-            'pendente' => floatval($saldoPendente),
-            'total' => floatval($saldoDisponivel) + floatval($saldoPendente),
-            'ultima_transacao' => $ultimaTransacao ? $ultimaTransacao['data_transacao'] : null
+        error_log("ÚLTIMAS 5 TRANSAÇÕES:");
+        foreach ($transacoes as $trans) {
+            error_log("- ID {$trans['id']}: R$ {$trans['valor_cashback']} ({$trans['status']}) - {$trans['data_transacao']}");
+        }
+        
+        // Buscar última transação para mostrar data
+        $ultimaTransacao = count($transacoes) > 0 ? $transacoes[0]['data_transacao'] : null;
+        
+        $saldos = [
+            'disponivel' => floatval($resultDisponivel['saldo_disponivel']),
+            'pendente' => floatval($resultPendente['saldo_pendente']),
+            'total' => floatval($resultDisponivel['saldo_disponivel']) + floatval($resultPendente['saldo_pendente']),
+            'ultima_transacao' => $ultimaTransacao
         ];
+        
+        error_log("RESUMO FINAL DOS SALDOS:");
+        error_log("- Disponível: R$ " . number_format($saldos['disponivel'], 2, ',', '.'));
+        error_log("- Pendente: R$ " . number_format($saldos['pendente'], 2, ',', '.'));
+        error_log("- Total: R$ " . number_format($saldos['total'], 2, ',', '.'));
+        
+        return $saldos;
     }
     
-    /**
-     * Gera mensagem formatada com o saldo do usuário
-     */
-    private function gerarMensagemSaldo($nomeUsuario, $saldos) {
-        $nome = ucfirst(explode(' ', $nomeUsuario)[0]); // Primeiro nome
+    // === MÉTODOS AUXILIARES (mantidos iguais) ===
+    
+    private function limparTelefone($telefone) {
+        $limpo = preg_replace('/\D/', '', $telefone);
         
-        // Se não tem saldo nenhum
+        if (strlen($limpo) >= 11 && substr($limpo, 0, 2) == '55') {
+            $limpo = substr($limpo, 2);
+        }
+        
+        if (strlen($limpo) == 11) {
+            $limpo = substr($limpo, -9);
+        } elseif (strlen($limpo) == 10) {
+            $limpo = substr($limpo, -8);
+        }
+        
+        return $limpo;
+    }
+    
+    private function gerarMensagemSaldo($nomeUsuario, $saldos) {
+        $nome = ucfirst(explode(' ', $nomeUsuario)[0]);
+        
         if ($saldos['total'] == 0) {
             return "💰 *Klube Cash - Seu Saldo*\n\n" .
                    "👋 Olá, {$nome}!\n\n" .
@@ -173,7 +234,6 @@ class SaldoConsulta {
                    "🎯 *Klube Cash - Seu dinheiro de volta!*";
         }
         
-        // Se tem saldo
         $mensagem = "💰 *Klube Cash - Seu Saldo*\n\n";
         $mensagem .= "👋 Olá, {$nome}!\n\n";
         
@@ -201,9 +261,6 @@ class SaldoConsulta {
         return $mensagem;
     }
     
-    /**
-     * Mensagem para usuário não encontrado
-     */
     private function gerarMensagemUsuarioNaoEncontrado() {
         return "🔍 *Klube Cash*\n\n" .
                "❌ Não encontramos seu cadastro com este número de telefone.\n\n" .
@@ -216,9 +273,6 @@ class SaldoConsulta {
                "🎯 *Klube Cash - Seu dinheiro de volta!*";
     }
     
-    /**
-     * Mensagem de erro genérico
-     */
     private function gerarMensagemErro() {
         return "⚠️ *Klube Cash*\n\n" .
                "Ocorreu um erro temporário ao consultar seu saldo.\n\n" .
