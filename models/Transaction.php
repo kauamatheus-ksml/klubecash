@@ -122,6 +122,11 @@ class Transaction {
      */
     public function save() {
         try {
+            // === MARCADOR DE TRACE: Início do processo de salvamento ===
+            if (file_exists('trace-integration.php')) {
+                error_log("[TRACE] Transaction::save() - Iniciando salvamento. Status: {$this->status}, ID atual: " . ($this->id ?: 'novo'), 3, 'integration_trace.log');
+            }
+            
             // Validação básica
             if ($this->valorTotal < MIN_TRANSACTION_VALUE) {
                 throw new Exception("Valor mínimo para transação é de R$ " . MIN_TRANSACTION_VALUE);
@@ -136,8 +141,17 @@ class Transaction {
                 $this->calcularDistribuicao();
             }
             
+            // === MARCADOR DE TRACE: Dados validados e preparados ===
+            if (file_exists('trace-integration.php')) {
+                error_log("[TRACE] Transaction::save() - Dados validados. Usuario: {$this->usuarioId}, Loja: {$this->lojaId}, Valor: {$this->valorTotal}", 3, 'integration_trace.log');
+            }
+            
             // Se já existe um ID, atualizar o registro
             if ($this->id) {
+                if (file_exists('trace-integration.php')) {
+                    error_log("[TRACE] Transaction::save() - Atualizando transação existente ID: {$this->id}", 3, 'integration_trace.log');
+                }
+                
                 $stmt = $this->db->prepare("
                     UPDATE transacoes_cashback 
                     SET usuario_id = :usuario_id, 
@@ -153,6 +167,10 @@ class Transaction {
                 ");
                 $stmt->bindParam(':id', $this->id);
             } else {
+                if (file_exists('trace-integration.php')) {
+                    error_log("[TRACE] Transaction::save() - Criando nova transação", 3, 'integration_trace.log');
+                }
+                
                 // Caso contrário, inserir novo registro
                 $stmt = $this->db->prepare("
                     INSERT INTO transacoes_cashback (
@@ -180,20 +198,80 @@ class Transaction {
             
             $result = $stmt->execute();
             
+            // === MARCADOR DE TRACE: Query executada ===
+            if (file_exists('trace-integration.php')) {
+                error_log("[TRACE] Transaction::save() - Query executada. Resultado: " . ($result ? 'SUCESSO' : 'FALHA'), 3, 'integration_trace.log');
+            }
+            
             // Se for um novo registro, obter o ID gerado
             if (!$this->id && $result) {
                 $this->id = $this->db->lastInsertId();
                 
+                // === MARCADOR DE TRACE: ID gerado ===
+                if (file_exists('trace-integration.php')) {
+                    error_log("[TRACE] Transaction::save() - Novo ID gerado: {$this->id}. Status da transação: {$this->status}", 3, 'integration_trace.log');
+                }
+                
                 // === INTEGRAÇÃO WHATSAPP: Notificação automática de nova transação ===
                 // Disparar notificação apenas para transações pendentes (novas)
                 if ($this->status === TRANSACTION_PENDING) {
-                    require_once __DIR__ . '/../utils/NotificationTrigger.php';
-                    NotificationTrigger::send($this->id);
+                    try {
+                        if (file_exists('trace-integration.php')) {
+                            error_log("[TRACE] Transaction::save() - Status é PENDENTE, iniciando processo de notificação", 3, 'integration_trace.log');
+                        }
+                        
+                        // Verificar se o arquivo NotificationTrigger existe antes de incluir
+                        $triggerPath = __DIR__ . '/../utils/NotificationTrigger.php';
+                        if (file_exists($triggerPath)) {
+                            require_once $triggerPath;
+                            
+                            if (file_exists('trace-integration.php')) {
+                                error_log("[TRACE] Transaction::save() - NotificationTrigger carregado, chamando send({$this->id})", 3, 'integration_trace.log');
+                            }
+                            
+                            // Verificar se a classe foi carregada corretamente
+                            if (class_exists('NotificationTrigger')) {
+                                $notificationResult = NotificationTrigger::send($this->id);
+                                
+                                if (file_exists('trace-integration.php')) {
+                                    error_log("[TRACE] Transaction::save() - Notificação enviada. Resultado: " . json_encode($notificationResult), 3, 'integration_trace.log');
+                                }
+                            } else {
+                                if (file_exists('trace-integration.php')) {
+                                    error_log("[TRACE] Transaction::save() - ERRO: Classe NotificationTrigger não encontrada após require_once", 3, 'integration_trace.log');
+                                }
+                            }
+                        } else {
+                            if (file_exists('trace-integration.php')) {
+                                error_log("[TRACE] Transaction::save() - ERRO: Arquivo NotificationTrigger.php não encontrado em: {$triggerPath}", 3, 'integration_trace.log');
+                            }
+                        }
+                    } catch (Exception $e) {
+                        if (file_exists('trace-integration.php')) {
+                            error_log("[TRACE] Transaction::save() - EXCEÇÃO na notificação: " . $e->getMessage(), 3, 'integration_trace.log');
+                        }
+                        // Não quebrar o fluxo principal se a notificação falhar
+                    }
+                } else {
+                    if (file_exists('trace-integration.php')) {
+                        error_log("[TRACE] Transaction::save() - Status NÃO é pendente ({$this->status}), pulando notificação", 3, 'integration_trace.log');
+                    }
+                }
+            } else if ($this->id) {
+                if (file_exists('trace-integration.php')) {
+                    error_log("[TRACE] Transaction::save() - Transação atualizada (não enviando notificação para update)", 3, 'integration_trace.log');
                 }
             }
-
+            
+            if (file_exists('trace-integration.php')) {
+                error_log("[TRACE] Transaction::save() - Processo concluído com sucesso. ID final: {$this->id}", 3, 'integration_trace.log');
+            }
+            
             return $result;
         } catch (Exception $e) {
+            if (file_exists('trace-integration.php')) {
+                error_log("[TRACE] Transaction::save() - ERRO FATAL: " . $e->getMessage(), 3, 'integration_trace.log');
+            }
             error_log('Erro ao salvar transação: ' . $e->getMessage());
             return false;
         }
