@@ -72,24 +72,107 @@ async function initializeBot() {
  */
 async function handleIncomingMessage(message) {
     try {
-        console.log('📨 Mensagem recebida:', {
+        console.log('📥 Mensagem recebida:');
+        console.log('   📞 De:', message.from);
+        console.log('   💬 Texto:', message.body);
+        console.log('   📋 Tipo:', message.type);
+        
+        // Log estruturado para análise posterior
+        console.log({
+            timestamp: new Date().toISOString(),
             from: message.from,
-            body: message.body.substring(0, 50) + (message.body.length > 50 ? '...' : ''),
+            body: message.body.substring(0, 100) + (message.body.length > 100 ? '...' : ''),
             type: message.type,
             timestamp: new Date().toISOString()
         });
 
-        // Futura implementação de comandos automáticos
-        // Por exemplo: se alguém enviar "saldo", podemos consultar o sistema e responder
-        if (message.body.toLowerCase().includes('saldo') && message.from.includes('seu_numero_teste')) {
-            await client.sendText(message.from, '💰 Consultando seu saldo de cashback...');
-            // Aqui poderíamos fazer uma consulta ao sistema PHP
+        // ===== NOVA FUNCIONALIDADE: CONSULTA DE SALDO =====
+        
+        // Verificar se é mensagem de texto e contém palavra-chave de saldo
+        if (message.type === 'chat' && message.body) {
+            const messageText = message.body.toLowerCase().trim();
+            const saldoKeywords = ['saldo', 'extrato', 'cashback', 'consulta'];
+            
+            // Verificar se contém alguma palavra-chave
+            const isSaldoRequest = saldoKeywords.some(keyword => 
+                messageText.includes(keyword) || messageText === keyword
+            );
+            
+            if (isSaldoRequest) {
+                console.log('💰 Detectada consulta de saldo!');
+                await processarConsultaSaldo(message.from);
+                return; // Não processar outras funcionalidades
+            }
         }
+        
+        // Aqui podem vir outras funcionalidades futuras
+        // Por exemplo: cadastro, dúvidas, etc.
+        
     } catch (error) {
         console.error('❌ Erro ao processar mensagem:', error);
     }
 }
+/**
+ * Processa consulta de saldo do usuário
+ * Faz requisição para o PHP e envia resposta
+ */
+async function processarConsultaSaldo(phoneNumber) {
+    try {
+        console.log('🔍 Iniciando consulta de saldo para:', phoneNumber);
+        
+        // Enviar mensagem de "aguarde"
+        await client.sendText(phoneNumber, '💰 Consultando seu saldo de cashback... ⏳');
+        
+        // Extrair apenas o número do telefone (remover @c.us)
+        const cleanPhone = phoneNumber.replace('@c.us', '');
+        
+        // Fazer requisição para API PHP
+        const axios = require('axios');
+        const response = await axios.post('https://klubecash.com/api/whatsapp-saldo.php', {
+            phone: cleanPhone,
+            secret: CONFIG.webhookSecret
+        }, {
+            timeout: 15000, // 15 segundos
+            headers: {
+                'Content-Type': 'application/json',
+                'User-Agent': 'KlubeCash-WhatsApp-Bot/1.0'
+            }
+        });
+        
+        console.log('📊 Resposta da API:', response.data);
+        
+        // Verificar resposta
+        if (response.data && response.data.message) {
+            // Enviar mensagem de resposta com saldo
+            await client.sendText(phoneNumber, response.data.message);
+            console.log('✅ Saldo enviado com sucesso para:', phoneNumber);
+        } else {
+            throw new Error('Resposta inválida da API');
+        }
+        
+    } catch (error) {
+        console.error('❌ Erro na consulta de saldo:', error.message);
+        
+        // Enviar mensagem de erro para o usuário
+        const errorMessage = `⚠️ *Klube Cash*
 
+Ocorreu um erro temporário ao consultar seu saldo.
+
+🔄 Tente novamente em alguns instantes ou acesse:
+https://klubecash.com
+
+📞 Se o problema persistir, entre em contato:
+https://klubecash.com/contato
+
+🎯 *Klube Cash - Seu dinheiro de volta!*`;
+
+        try {
+            await client.sendText(phoneNumber, errorMessage);
+        } catch (sendError) {
+            console.error('❌ Erro ao enviar mensagem de erro:', sendError);
+        }
+    }
+}
 /**
  * Monitora mudanças no estado da conexão
  * Essencial para manter o sistema estável e confiável
