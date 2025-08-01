@@ -25,7 +25,7 @@ class WhatsAppBot {
         self::$timeout = defined('WHATSAPP_TIMEOUT') ? WHATSAPP_TIMEOUT : 30;
         
         // Lógica de detecção automática de modo produção vs simulação
-        if (strpos(self::$botUrl, 'ngrok') !== false) {
+        if (strpos(self::$botUrl, 'ngrok') !== false || strpos(self::$botUrl, '54.207.165.92') !== false) {
             // Detectamos conexão via ngrok = modo produção real
             self::$accessToken = 'REAL_CONNECTION_VIA_NGROK';
             self::$phoneNumberId = 'PRODUCTION_MODE_ACTIVE';
