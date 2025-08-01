@@ -1033,7 +1033,10 @@ class TransactionController {
                 
                 $stmt->execute();
                 $transactionId = $db->lastInsertId();
-                
+                // === INTEGRAÇÃO WHATSAPP: Notificação automática de nova transação ===
+                // Disparar notificação imediatamente após criação da transação
+                require_once __DIR__ . '/../utils/NotificationTrigger.php';
+                NotificationTrigger::send($transactionId);
                 // CORREÇÃO 5: Se usou saldo, debitar do saldo do cliente IMEDIATAMENTE
                 if ($usarSaldo && $valorSaldoUsado > 0) {
                     $descricaoUso = "Uso do saldo na compra - Código: " . $data['codigo_transacao'] . " - Transação #" . $transactionId;
