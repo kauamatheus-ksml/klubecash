@@ -54,7 +54,15 @@ RewriteRule ^api/whatsapp-saldo/?$ api/whatsapp-saldo.php [L,QSA]
 # Tratamento para requisições OPTIONS (CORS)
 RewriteCond %{REQUEST_METHOD} OPTIONS
 RewriteRule ^api/whatsapp-saldo/?$ [R=200,L]
+# === REGRAS PARA NOTIFICAÇÕES DE CASHBACK ===
+# Permitir acesso direto à API de notificação
+RewriteRule ^api/cashback-notificacao/?$ api/cashback-notificacao.php [L,QSA]
 
+# Regra para teste de notificações (apenas em desenvolvimento)
+RewriteRule ^api/cashback-notificacao/test/?$ api/cashback-notificacao.php?test=1 [L,QSA]
+
+# === REGRAS EXISTENTES MANTIDAS ===
+# Suas regras atuais permanecem inalteradas...
 # === REDIRECIONAMENTOS DE ERRO SIMPLIFICADOS ===
 # Sistema simplificado - apenas access_denied e session_expired
 RewriteCond %{QUERY_STRING} error=access_denied
