@@ -94,8 +94,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Debug dos dados enviados
                 error_log("FORM DEBUG: Dados para TransactionController: " . print_r($transactionData, true));
                 
+                // === TRACE: REGISTRO VIA INTERFACE DA LOJA ===
+                if (file_exists('trace-integration.php')) {
+                    error_log("[TRACE] register-transaction.php - Chamando TransactionController::registerTransaction", 3, 'integration_trace.log');
+                    error_log("[TRACE] register-transaction.php - Dados enviados: " . json_encode($transactionData), 3, 'integration_trace.log');
+                }
+                
                 // Registrar transação
                 $result = TransactionController::registerTransaction($transactionData);
+                
+                // === TRACE: RESULTADO DA CHAMADA ===
+                if (file_exists('trace-integration.php')) {
+                    error_log("[TRACE] register-transaction.php - Resultado recebido: " . json_encode($result), 3, 'integration_trace.log');
+                    if ($result['status'] && isset($result['data']['transaction_id'])) {
+                        error_log("[TRACE] register-transaction.php - Transação criada com ID: " . $result['data']['transaction_id'], 3, 'integration_trace.log');
+                    } else {
+                        error_log("[TRACE] register-transaction.php - FALHA no registro: " . ($result['message'] ?? 'Sem mensagem'), 3, 'integration_trace.log');
+                    }
+                }
                 
                 if ($result['status']) {
                     $success = true;
