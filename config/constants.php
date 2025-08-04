@@ -127,10 +127,10 @@ define('EMPLOYEE_POSITION_FIELD', 'cargo_display');
 
 
 // === URLs DE REDIRECIONAMENTO ===
-define('LOGIN_URL', SITE_URL . '/views/auth/login.php');
-define('ADMIN_DASHBOARD_URL', SITE_URL . '/views/admin/dashboard.php');
-define('STORE_DASHBOARD_URL', SITE_URL . '/store/dashboard/');
-define('CLIENT_DASHBOARD_URL', SITE_URL . '/views/client/dashboard.php');
+define('LOGIN_URL', SITE_URL . '/login');
+define('ADMIN_DASHBOARD_URL', SITE_URL . '/admin/dashboard');
+define('STORE_DASHBOARD_URL', SITE_URL . '/store/dashboard');
+define('CLIENT_DASHBOARD_URL', SITE_URL . '/cliente/dashboard');
 
 define('STORE_PENDING', 'pendente');
 define('STORE_APPROVED', 'aprovado');
