@@ -66,18 +66,18 @@ class SaldoConsulta {
     private function calcularSaldosHibrido($usuarioId) {
         // 1. Busca o Saldo Disponível (valor exato e rápido da tabela de saldos)
         $sqlDisponivel = "SELECT COALESCE(SUM(saldo_disponivel), 0) as saldo_disponivel
-                          FROM cashback_saldos
-                          WHERE usuario_id = :usuario_id";
+                        FROM cashback_saldos
+                        WHERE usuario_id = :usuario_id";
         
         $stmtDisponivel = $this->db->prepare($sqlDisponivel);
         $stmtDisponivel->bindParam(':usuario_id', $usuarioId, PDO::PARAM_INT);
         $stmtDisponivel->execute();
         $saldoDisponivel = floatval($stmtDisponivel->fetch(PDO::FETCH_ASSOC)['saldo_disponivel']);
 
-        // 2. Calcula o Saldo Pendente (a partir das transações com status 'pendente')
-        $sqlPendente = "SELECT COALESCE(SUM(valor_cashback), 0) as saldo_pendente
+        // 2. CORREÇÃO: Usa valor_cliente ao invés de valor_cashback para evitar duplicação
+        $sqlPendente = "SELECT COALESCE(SUM(valor_cliente), 0) as saldo_pendente
                         FROM transacoes_cashback
-                        WHERE usuario_id = :usuario_id AND status = 'pendente'";
+                        WHERE usuario_id = :usuario_id AND status IN ('pendente', 'pagamento_pendente')";
                         
         $stmtPendente = $this->db->prepare($sqlPendente);
         $stmtPendente->bindParam(':usuario_id', $usuarioId, PDO::PARAM_INT);
