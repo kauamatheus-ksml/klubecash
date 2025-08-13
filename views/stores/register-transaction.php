@@ -1082,7 +1082,9 @@ $activeMenu = 'register-transaction';
             }
         }
 
-        <style>
+        
+    </style>
+    <style>
 /* Estilos específicos para cliente visitante nesta página */
 .visitor-client-section {
     background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
@@ -1178,7 +1180,6 @@ $activeMenu = 'register-transaction';
     }
 }
 </style>
-    </style>
 </head>
 <body>
     <div class="dashboard-container">
