@@ -11,20 +11,28 @@ require_once '../models/CashbackBalance.php';
 
 session_start();
 
+// Log para debug
+error_log("API CLIENT SEARCH - Início da requisição");
+
 // Verificar autenticação
 if (!AuthController::isAuthenticated()) {
+    error_log("API CLIENT SEARCH - Usuário não autenticado");
     echo json_encode(['status' => false, 'message' => 'Usuário não autenticado']);
     exit;
 }
 
 // Verificar se é loja
 if (!AuthController::isStore()) {
+    error_log("API CLIENT SEARCH - Acesso não é de loja");
     echo json_encode(['status' => false, 'message' => 'Acesso restrito a lojas']);
     exit;
 }
 
 $input = json_decode(file_get_contents('php://input'), true);
 $action = $input['action'] ?? '';
+
+error_log("API CLIENT SEARCH - Ação recebida: " . $action);
+error_log("API CLIENT SEARCH - Dados recebidos: " . json_encode($input));
 
 // === AÇÃO PRINCIPAL: BUSCAR CLIENTE ===
 if ($action === 'search_client') {
@@ -152,22 +160,29 @@ if ($action === 'search_client') {
 
 // === NOVA AÇÃO: CRIAR CLIENTE VISITANTE ===
 elseif ($action === 'create_visitor_client') {
+    error_log("API CLIENT SEARCH - Criando cliente visitante");
+    
     $nome = trim($input['nome'] ?? '');
     $telefone = preg_replace('/[^0-9]/', '', $input['telefone'] ?? '');
     $storeId = intval($input['store_id'] ?? 0);
 
+    error_log("API CLIENT SEARCH - Dados: nome=$nome, telefone=$telefone, storeId=$storeId");
+
     // Validações
     if (empty($nome) || strlen($nome) < 2) {
+        error_log("API CLIENT SEARCH - Erro: Nome inválido");
         echo json_encode(['status' => false, 'message' => 'Nome é obrigatório e deve ter pelo menos 2 caracteres']);
         exit;
     }
 
     if (empty($telefone) || strlen($telefone) < VISITOR_PHONE_MIN_LENGTH) {
+        error_log("API CLIENT SEARCH - Erro: Telefone inválido");
         echo json_encode(['status' => false, 'message' => 'Telefone é obrigatório e deve ter pelo menos 10 dígitos']);
         exit;
     }
 
     if ($storeId <= 0) {
+        error_log("API CLIENT SEARCH - Erro: Store ID inválido");
         echo json_encode(['status' => false, 'message' => 'ID da loja é obrigatório']);
         exit;
     }
@@ -192,6 +207,7 @@ elseif ($action === 'create_visitor_client') {
         $checkStmt->execute();
         
         if ($checkStmt->rowCount() > 0) {
+            error_log("API CLIENT SEARCH - Cliente visitante já existe");
             echo json_encode(['status' => false, 'message' => MSG_VISITOR_EXISTS]);
             exit;
         }
@@ -208,9 +224,18 @@ elseif ($action === 'create_visitor_client') {
         $insertStmt->bindParam(':loja_id', $storeId);
         $status = USER_ACTIVE;
         $insertStmt->bindParam(':status', $status);
-        $insertStmt->execute();
+        
+        $result = $insertStmt->execute();
+        
+        if (!$result) {
+            error_log("API CLIENT SEARCH - Erro ao inserir no banco: " . print_r($insertStmt->errorInfo(), true));
+            echo json_encode(['status' => false, 'message' => 'Erro ao criar cliente no banco de dados']);
+            exit;
+        }
         
         $clientId = $db->lastInsertId();
+        
+        error_log("API CLIENT SEARCH - Cliente visitante criado com ID: " . $clientId);
         
         echo json_encode([
             'status' => true,
@@ -236,13 +261,14 @@ elseif ($action === 'create_visitor_client') {
         error_log('Erro ao criar cliente visitante: ' . $e->getMessage());
         echo json_encode([
             'status' => false, 
-            'message' => 'Erro interno do servidor. Tente novamente.'
+            'message' => 'Erro interno do servidor: ' . $e->getMessage()
         ]);
     }
 }
 
 else {
-    echo json_encode(['status' => false, 'message' => 'Ação inválida']);
+    error_log("API CLIENT SEARCH - Ação inválida: " . $action);
+    echo json_encode(['status' => false, 'message' => 'Ação inválida: ' . $action]);
     exit;
 }
 
@@ -260,4 +286,6 @@ function determineSearchType($searchTerm) {
         return 'unknown';
     }
 }
+
+error_log("API CLIENT SEARCH - Fim da requisição");
 ?>

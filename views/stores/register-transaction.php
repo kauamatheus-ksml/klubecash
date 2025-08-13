@@ -2060,42 +2060,38 @@ $activeMenu = 'register-transaction';
         }
 
         function validateForm(e) {
-            console.log('🔍 Validando formulário...', {
-                clientData: clientData,
-                currentStep: currentStep
-            });
-
-            // Verificar se cliente foi selecionado
+            console.log('🔍 VALIDAÇÃO INICIADA');
+            console.log('Cliente atual:', clientData);
+            console.log('Evento:', e);
+            
             if (!clientData) {
                 e.preventDefault();
+                console.log('❌ Cliente não selecionado');
                 showNotification('Por favor, selecione um cliente primeiro', 'error');
                 goToStep(1);
                 return false;
             }
 
-            // Verificar valor total
             const valorTotal = parseFloat(document.getElementById('valor_total').value) || 0;
             if (valorTotal <= 0) {
                 e.preventDefault();
+                console.log('❌ Valor inválido:', valorTotal);
                 showNotification('Por favor, informe o valor total da venda', 'error');
                 goToStep(2);
                 return false;
             }
 
-            // Verificar código da transação
             const codigoTransacao = document.getElementById('codigo_transacao').value.trim();
             if (!codigoTransacao) {
                 e.preventDefault();
+                console.log('❌ Código não informado');
                 showNotification('Por favor, informe o código da transação', 'error');
                 goToStep(2);
                 return false;
             }
 
-            // Se chegou até aqui, está tudo ok
-            console.log('✅ Validação passou - enviando formulário');
+            console.log('✅ VALIDAÇÃO PASSOU - Enviando formulário');
             showNotification('Registrando venda...', 'info');
-            
-            // Deixar o formulário ser enviado normalmente
             return true;
         }
 
