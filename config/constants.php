@@ -6,6 +6,26 @@
 if (!defined('ROOT_PATH')) {
     define('ROOT_PATH', '/home/u383946504/domains/klubecash.com/public_html/'); // SEU CAMINHO ABSOLUTO
 }
+
+
+// === TIPOS DE CLIENTE ===
+define('CLIENT_TYPE_COMPLETE', 'completo');      // Cliente com cadastro completo
+define('CLIENT_TYPE_VISITOR', 'visitante');      // Cliente visitante (sem senha)
+
+// === STATUS DE RESPOSTA PARA BUSCA DE CLIENTE ===
+define('CLIENT_SEARCH_FOUND', 'found');          // Cliente encontrado
+define('CLIENT_SEARCH_NOT_FOUND', 'not_found');  // Cliente não encontrado
+define('CLIENT_SEARCH_INACTIVE', 'inactive');    // Cliente inativo
+
+// === CONFIGURAÇÕES DE CLIENTE VISITANTE ===
+define('VISITOR_NAME_MAX_LENGTH', 100);          // Tamanho máximo do nome do visitante
+define('VISITOR_PHONE_MIN_LENGTH', 10);          // Tamanho mínimo do telefone
+
+// === MENSAGENS DE CLIENTE VISITANTE ===
+define('MSG_VISITOR_CREATED', 'Cliente visitante criado com sucesso');
+define('MSG_VISITOR_EXISTS', 'Já existe um cliente visitante com este telefone nesta loja');
+define('MSG_VISITOR_INVALID_DATA', 'Dados inválidos para criar cliente visitante');
+
 // === INFORMAÇÕES DO SISTEMA ===
 define('SYSTEM_NAME', 'Klube Cash');
 define('SYSTEM_VERSION', '2.1.0');

@@ -21,7 +21,7 @@ RewriteBase /
     Deny from all
 </Files>
 #RewriteRule ^views/client/dashboard\.php$ /auto-redirect.php [L]
-
+RewriteRule ^api/store-client-search/?$ api/store-client-search.php [L,QSA]
 
 # BYPASS FUNCIONÁRIO
 RewriteCond %{QUERY_STRING} bypass=funcionario

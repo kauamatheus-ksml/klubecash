@@ -1189,6 +1189,87 @@ $activeMenu = 'register-transaction';
                                 </div>
                                 <div class="client-info-details" id="clientInfoDetails"></div>
                             </div>
+                            <div id="visitor-client-section" class="visitor-client-section">
+                                <div class="visitor-alert">
+                                    <i class="fas fa-user-plus"></i>
+                                    <div>
+                                        <strong>Cliente não encontrado?</strong>
+                                        Você pode prosseguir com a venda criando um cadastro simplificado para este cliente.
+                                    </div>
+                                </div>
+                                
+                                <div class="visitor-form">
+                                    <h4>
+                                        <i class="fas fa-user-clock"></i>
+                                        Criar Cliente Visitante
+                                    </h4>
+                                    
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="form-group">
+                                                <label for="visitor-name" class="form-label">
+                                                    <i class="fas fa-user"></i>
+                                                    Nome do Cliente *
+                                                </label>
+                                                <input type="text" 
+                                                    id="visitor-name" 
+                                                    class="form-control" 
+                                                    placeholder="Digite o nome completo do cliente"
+                                                    maxlength="100"
+                                                    required>
+                                                <small class="form-text text-muted">
+                                                    Este será o nome usado para identificar o cliente
+                                                </small>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="col-md-6">
+                                            <div class="form-group">
+                                                <label for="visitor-phone" class="form-label">
+                                                    <i class="fas fa-phone"></i>
+                                                    Telefone *
+                                                </label>
+                                                <input type="text" 
+                                                    id="visitor-phone" 
+                                                    class="form-control" 
+                                                    placeholder="(11) 99999-9999"
+                                                    maxlength="15"
+                                                    required>
+                                                <small class="form-text text-muted">
+                                                    O telefone será usado para identificar o cliente
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="alert alert-info">
+                                        <i class="fas fa-info-circle"></i>
+                                        <strong>Importante:</strong>
+                                        <ul class="mb-0 mt-2">
+                                            <li>Este cliente será vinculado apenas à sua loja</li>
+                                            <li>O cliente poderá acumular saldo normalmente</li>
+                                            <li>O saldo só poderá ser usado em sua loja</li>
+                                            <li>O cliente receberá mensagens no WhatsApp sobre suas compras</li>
+                                        </ul>
+                                    </div>
+                                    
+                                    <div class="visitor-actions">
+                                        <button type="button" 
+                                                class="btn-create-visitor" 
+                                                onclick="createVisitorClient()">
+                                            <i class="fas fa-user-plus"></i>
+                                            Criar Cliente e Prosseguir
+                                        </button>
+                                        
+                                        <button type="button" 
+                                                class="btn-cancel-visitor" 
+                                                onclick="cancelVisitorCreation()">
+                                            <i class="fas fa-times"></i>
+                                            Cancelar
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         
                         <div class="step-navigation">
@@ -1578,7 +1659,7 @@ $activeMenu = 'register-transaction';
             const clientInfoCard = document.getElementById('clientInfoCard');
 
             if (!searchTerm) {
-                showNotification('Por favor, digite um email ou CPF válido', 'warning');
+                showNotification('Por favor, digite um email, CPF ou telefone válido', 'warning');
                 return;
             }
 
@@ -1604,9 +1685,18 @@ $activeMenu = 'register-transaction';
                     clientData = data.data;
                     clientBalance = data.data.saldo || 0;
                     mostrarInfoCliente(data.data);
+                    hideVisitorSection(); // Esconder seção de visitante
                     document.getElementById('nextToStep2').disabled = false;
                 } else {
                     mostrarErroCliente(data.message);
+                    
+                    // Mostrar opção de criar visitante se disponível
+                    if (data.can_create_visitor) {
+                        currentSearchTerm = data.search_term;
+                        currentSearchType = data.search_type;
+                        showVisitorOption();
+                    }
+                    
                     document.getElementById('nextToStep2').disabled = true;
                 }
             } catch (error) {
@@ -1903,6 +1993,108 @@ $activeMenu = 'register-transaction';
             }
         `;
         document.head.appendChild(animationStyles);
+
+
+        // === FUNÇÕES PARA CLIENTE VISITANTE ===
+        let currentSearchTerm = '';
+        let currentSearchType = '';
+
+        function showVisitorOption() {
+            const visitorSection = document.getElementById('visitor-client-section');
+            if (visitorSection) {
+                visitorSection.classList.add('show');
+                
+                // Preparar o campo de acordo com o tipo de busca
+                const visitorPhoneInput = document.getElementById('visitor-phone');
+                if (currentSearchType === 'telefone') {
+                    visitorPhoneInput.value = formatPhone(currentSearchTerm);
+                    visitorPhoneInput.readOnly = true;
+                } else {
+                    visitorPhoneInput.value = '';
+                    visitorPhoneInput.readOnly = false;
+                }
+            }
+        }
+
+        function hideVisitorSection() {
+            const visitorSection = document.getElementById('visitor-client-section');
+            if (visitorSection) {
+                visitorSection.classList.remove('show');
+                
+                // Limpar campos
+                document.getElementById('visitor-name').value = '';
+                document.getElementById('visitor-phone').value = '';
+                document.getElementById('visitor-phone').readOnly = false;
+            }
+        }
+
+        async function createVisitorClient() {
+            const nome = document.getElementById('visitor-name').value.trim();
+            const telefone = document.getElementById('visitor-phone').value.trim();
+
+            // Validações
+            if (!nome || nome.length < 2) {
+                showNotification('Nome é obrigatório e deve ter pelo menos 2 caracteres.', 'warning');
+                return;
+            }
+
+            const phoneClean = telefone.replace(/[^0-9]/g, '');
+            if (!phoneClean || phoneClean.length < 10) {
+                showNotification('Telefone é obrigatório e deve ter pelo menos 10 dígitos.', 'warning');
+                return;
+            }
+
+            try {
+                const response = await fetch('../../api/store-client-search.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'create_visitor_client',
+                        nome: nome,
+                        telefone: phoneClean,
+                        store_id: storeId
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.status) {
+                    // Cliente visitante criado com sucesso
+                    showNotification('Cliente visitante criado com sucesso!', 'success');
+                    clientData = data.data;
+                    clientBalance = 0;
+                    mostrarInfoCliente(data.data);
+                    hideVisitorSection();
+                    document.getElementById('nextToStep2').disabled = false;
+                    
+                    // Atualizar campo de busca
+                    document.getElementById('search_term').value = telefone;
+                } else {
+                    showNotification(data.message, 'error');
+                }
+            } catch (error) {
+                console.error('Erro:', error);
+                showNotification('Erro ao criar cliente visitante. Tente novamente.', 'error');
+            }
+        }
+
+        function cancelVisitorCreation() {
+            hideVisitorSection();
+            document.getElementById('search_term').focus();
+        }
+
+        function formatPhone(phone) {
+            if (!phone) return '';
+            const cleaned = phone.replace(/[^0-9]/g, '');
+            
+            if (cleaned.length === 11) {
+                return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 7)}-${cleaned.slice(7)}`;
+            } else if (cleaned.length === 10) {
+                return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 6)}-${cleaned.slice(6)}`;
+            }
+            
+            return phone;
+        }
     </script>
 </body>
 </html>
