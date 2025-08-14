@@ -2300,7 +2300,56 @@ $activeMenu = 'register-transaction';
             return phone;
         }
 
+// === CORREÇÃO PARA VALIDAÇÃO DE CAMPOS OCULTOS ===
+function toggleVisitorFieldsRequired(required) {
+    const visitorName = document.getElementById('visitor-name');
+    const visitorPhone = document.getElementById('visitor-phone');
+    
+    if (visitorName && visitorPhone) {
+        if (required) {
+            visitorName.setAttribute('required', 'required');
+            visitorPhone.setAttribute('required', 'required');
+        } else {
+            visitorName.removeAttribute('required');
+            visitorPhone.removeAttribute('required');
+        }
+    }
+}
 
+// ATUALIZAR AS FUNÇÕES EXISTENTES:
+function showVisitorOption() {
+    const visitorSection = document.getElementById('visitor-client-section');
+    if (visitorSection) {
+        visitorSection.classList.add('show');
+        toggleVisitorFieldsRequired(true); // Ativar required quando mostrar
+        
+        const visitorPhoneInput = document.getElementById('visitor-phone');
+        if (currentSearchType === 'telefone') {
+            visitorPhoneInput.value = formatPhone(currentSearchTerm);
+            visitorPhoneInput.readOnly = true;
+        } else {
+            visitorPhoneInput.value = '';
+            visitorPhoneInput.readOnly = false;
+        }
+    }
+}
+
+function hideVisitorSection() {
+    const visitorSection = document.getElementById('visitor-client-section');
+    if (visitorSection) {
+        visitorSection.classList.remove('show');
+        toggleVisitorFieldsRequired(false); // Desativar required quando esconder
+        
+        document.getElementById('visitor-name').value = '';
+        document.getElementById('visitor-phone').value = '';
+        document.getElementById('visitor-phone').readOnly = false;
+    }
+}
+
+// GARANTIR QUE OS CAMPOS COMEÇEM SEM REQUIRED
+document.addEventListener('DOMContentLoaded', function() {
+    toggleVisitorFieldsRequired(false); // Começar sempre sem required
+});
         
     </script>
 </body>
