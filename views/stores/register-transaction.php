@@ -1605,18 +1605,49 @@ $activeMenu = 'register-transaction';
         let currentStep = 1;
         let clientData = null;
         let clientBalance = 0;
+        // SUBSTITUIR A LINHA const storeId = <?php echo $storeId; ?>; POR:
+
         const storeId = <?php 
-            // Usar store_id da sessão ou padrão 34
+            // Pegar store_id dinamicamente da sessão ou buscar no banco
+            $currentStoreId = 0;
+            
             if (isset($_SESSION['store_id']) && $_SESSION['store_id'] > 0) {
-                echo $_SESSION['store_id'];
-            } else if (isset($storeId) && $storeId > 0) {
-                echo $storeId;
-            } else {
-                echo '34'; // Padrão para loja existente
+                $currentStoreId = $_SESSION['store_id'];
+            } else if (isset($_SESSION['user_id']) && $_SESSION['user_type'] === 'loja') {
+                // Se é lojista, buscar a loja dele
+                try {
+                    $db = Database::getConnection();
+                    $stmt = $db->prepare("SELECT id FROM lojas WHERE usuario_id = ? AND status = 'aprovado' LIMIT 1");
+                    $stmt->execute([$_SESSION['user_id']]);
+                    $loja = $stmt->fetch();
+                    if ($loja) {
+                        $currentStoreId = $loja['id'];
+                        $_SESSION['store_id'] = $currentStoreId; // Salvar na sessão
+                    }
+                } catch (Exception $e) {
+                    error_log("Erro ao buscar loja: " . $e->getMessage());
+                }
             }
+            
+            // Se ainda não encontrou, pegar a primeira loja ativa
+            if ($currentStoreId <= 0) {
+                try {
+                    $db = Database::getConnection();
+                    $stmt = $db->query("SELECT id FROM lojas WHERE status = 'aprovado' ORDER BY id LIMIT 1");
+                    $loja = $stmt->fetch();
+                    if ($loja) {
+                        $currentStoreId = $loja['id'];
+                    }
+                } catch (Exception $e) {
+                    error_log("Erro ao buscar primeira loja: " . $e->getMessage());
+                    $currentStoreId = 34; // Fallback
+                }
+            }
+            
+            echo $currentStoreId;
         ?>;
 
-        console.log('🏪 Store ID configurado:', storeId);
+        console.log('🏪 Store ID configurado dinamicamente:', storeId);
 
         // ========================================
         // INICIALIZAÇÃO
