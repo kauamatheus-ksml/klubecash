@@ -11,7 +11,31 @@ require_once '../../utils/StoreHelper.php';
 
 // Iniciar sessão
 session_start();
-
+if (isset($_GET['debug'])) {
+    echo "<div style='background: #f8f9fa; padding: 15px; border: 1px solid #dee2e6; margin: 10px 0;'>";
+    echo "<h4>🔍 DEBUG - Informações da Sessão</h4>";
+    echo "<strong>User ID:</strong> " . ($_SESSION['user_id'] ?? 'não definido') . "<br>";
+    echo "<strong>User Type:</strong> " . ($_SESSION['user_type'] ?? 'não definido') . "<br>";
+    echo "<strong>Store ID (sessão):</strong> " . ($_SESSION['store_id'] ?? 'não definido') . "<br>";
+    
+    // Buscar loja do usuário atual
+    if (isset($_SESSION['user_id']) && $_SESSION['user_type'] === 'loja') {
+        try {
+            $db = Database::getConnection();
+            $stmt = $db->prepare("SELECT * FROM lojas WHERE usuario_id = ?");
+            $stmt->execute([$_SESSION['user_id']]);
+            $userStore = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($userStore) {
+                echo "<strong>Loja do usuário:</strong> ID " . $userStore['id'] . " - " . $userStore['nome_fantasia'] . "<br>";
+            } else {
+                echo "<strong>Loja do usuário:</strong> Não encontrada<br>";
+            }
+        } catch (Exception $e) {
+            echo "<strong>Erro ao buscar loja:</strong> " . $e->getMessage() . "<br>";
+        }
+    }
+    echo "</div>";
+}
 // Verificação simplificada
 StoreHelper::requireStoreAccess();
 
@@ -1605,49 +1629,72 @@ $activeMenu = 'register-transaction';
         let currentStep = 1;
         let clientData = null;
         let clientBalance = 0;
-        // SUBSTITUIR A LINHA const storeId = <?php echo $storeId; ?>; POR:
-
         const storeId = <?php 
-            // Pegar store_id dinamicamente da sessão ou buscar no banco
+            // Detectar store_id dinamicamente
             $currentStoreId = 0;
             
+            // Primeiro: tentar pegar da sessão
             if (isset($_SESSION['store_id']) && $_SESSION['store_id'] > 0) {
                 $currentStoreId = $_SESSION['store_id'];
+                
             } else if (isset($_SESSION['user_id']) && $_SESSION['user_type'] === 'loja') {
-                // Se é lojista, buscar a loja dele
+                // Se é lojista, buscar a loja dele no banco
                 try {
                     $db = Database::getConnection();
                     $stmt = $db->prepare("SELECT id FROM lojas WHERE usuario_id = ? AND status = 'aprovado' LIMIT 1");
                     $stmt->execute([$_SESSION['user_id']]);
-                    $loja = $stmt->fetch();
+                    $loja = $stmt->fetch(PDO::FETCH_ASSOC);
                     if ($loja) {
                         $currentStoreId = $loja['id'];
-                        $_SESSION['store_id'] = $currentStoreId; // Salvar na sessão
+                        $_SESSION['store_id'] = $currentStoreId; // Salvar na sessão para próximas vezes
                     }
                 } catch (Exception $e) {
-                    error_log("Erro ao buscar loja: " . $e->getMessage());
+                    error_log("Erro ao buscar loja do usuário: " . $e->getMessage());
+                }
+                
+            } else if (isset($_SESSION['user_type']) && $_SESSION['user_type'] === 'funcionario') {
+                // Se é funcionário, pegar loja vinculada
+                try {
+                    $db = Database::getConnection();
+                    $stmt = $db->prepare("
+                        SELECT l.id 
+                        FROM lojas l 
+                        INNER JOIN usuarios u ON l.usuario_id = u.loja_vinculada_id 
+                        WHERE u.id = ? AND l.status = 'aprovado' 
+                        LIMIT 1
+                    ");
+                    $stmt->execute([$_SESSION['user_id']]);
+                    $loja = $stmt->fetch(PDO::FETCH_ASSOC);
+                    if ($loja) {
+                        $currentStoreId = $loja['id'];
+                        $_SESSION['store_id'] = $currentStoreId;
+                    }
+                } catch (Exception $e) {
+                    error_log("Erro ao buscar loja do funcionário: " . $e->getMessage());
                 }
             }
             
-            // Se ainda não encontrou, pegar a primeira loja ativa
+            // Se ainda não encontrou, pegar a primeira loja ativa do sistema
             if ($currentStoreId <= 0) {
                 try {
                     $db = Database::getConnection();
                     $stmt = $db->query("SELECT id FROM lojas WHERE status = 'aprovado' ORDER BY id LIMIT 1");
-                    $loja = $stmt->fetch();
+                    $loja = $stmt->fetch(PDO::FETCH_ASSOC);
                     if ($loja) {
                         $currentStoreId = $loja['id'];
                     }
                 } catch (Exception $e) {
-                    error_log("Erro ao buscar primeira loja: " . $e->getMessage());
-                    $currentStoreId = 34; // Fallback
+                    error_log("Erro ao buscar primeira loja ativa: " . $e->getMessage());
+                    $currentStoreId = 34; // Fallback final
                 }
             }
             
             echo $currentStoreId;
         ?>;
 
-        console.log('🏪 Store ID configurado dinamicamente:', storeId);
+        console.log('🏪 Store ID detectado dinamicamente:', storeId);
+        console.log('👤 Usuário tipo:', '<?php echo $_SESSION['user_type'] ?? 'não definido'; ?>');
+        console.log('🆔 User ID:', <?php echo $_SESSION['user_id'] ?? 'null'; ?>);
 
         // ========================================
         // INICIALIZAÇÃO
