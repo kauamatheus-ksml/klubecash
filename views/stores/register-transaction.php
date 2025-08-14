@@ -11,31 +11,7 @@ require_once '../../utils/StoreHelper.php';
 
 // Iniciar sessão
 session_start();
-if (isset($_GET['debug'])) {
-    echo "<div style='background: #f8f9fa; padding: 15px; border: 1px solid #dee2e6; margin: 10px 0;'>";
-    echo "<h4>🔍 DEBUG - Informações da Sessão</h4>";
-    echo "<strong>User ID:</strong> " . ($_SESSION['user_id'] ?? 'não definido') . "<br>";
-    echo "<strong>User Type:</strong> " . ($_SESSION['user_type'] ?? 'não definido') . "<br>";
-    echo "<strong>Store ID (sessão):</strong> " . ($_SESSION['store_id'] ?? 'não definido') . "<br>";
-    
-    // Buscar loja do usuário atual
-    if (isset($_SESSION['user_id']) && $_SESSION['user_type'] === 'loja') {
-        try {
-            $db = Database::getConnection();
-            $stmt = $db->prepare("SELECT * FROM lojas WHERE usuario_id = ?");
-            $stmt->execute([$_SESSION['user_id']]);
-            $userStore = $stmt->fetch(PDO::FETCH_ASSOC);
-            if ($userStore) {
-                echo "<strong>Loja do usuário:</strong> ID " . $userStore['id'] . " - " . $userStore['nome_fantasia'] . "<br>";
-            } else {
-                echo "<strong>Loja do usuário:</strong> Não encontrada<br>";
-            }
-        } catch (Exception $e) {
-            echo "<strong>Erro ao buscar loja:</strong> " . $e->getMessage() . "<br>";
-        }
-    }
-    echo "</div>";
-}
+
 // Verificação simplificada
 StoreHelper::requireStoreAccess();
 
@@ -1692,9 +1668,7 @@ $activeMenu = 'register-transaction';
             echo $currentStoreId;
         ?>;
 
-        console.log('🏪 Store ID detectado dinamicamente:', storeId);
-        console.log('👤 Usuário tipo:', '<?php echo $_SESSION['user_type'] ?? 'não definido'; ?>');
-        console.log('🆔 User ID:', <?php echo $_SESSION['user_id'] ?? 'null'; ?>);
+        
 
         // ========================================
         // INICIALIZAÇÃO

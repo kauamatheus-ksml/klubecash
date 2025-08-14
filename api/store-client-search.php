@@ -12,7 +12,7 @@ require_once '../models/CashbackBalance.php';
 session_start();
 
 // Log para debug
-error_log("API CLIENT SEARCH - Início da requisição");
+
 
 // Verificar autenticação
 if (!AuthController::isAuthenticated()) {
@@ -31,8 +31,6 @@ if (!AuthController::isStore()) {
 $input = json_decode(file_get_contents('php://input'), true);
 $action = $input['action'] ?? '';
 
-error_log("API CLIENT SEARCH - Ação recebida: " . $action);
-error_log("API CLIENT SEARCH - Dados recebidos: " . json_encode($input));
 
 // === AÇÃO PRINCIPAL: BUSCAR CLIENTE ===
 if ($action === 'search_client') {
