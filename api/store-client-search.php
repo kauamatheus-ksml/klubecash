@@ -158,7 +158,7 @@ if ($action === 'search_client') {
     }
 }
 
-// === NOVA AÇÃO: CRIAR CLIENTE VISITANTE ===
+// === NOVA AÇÃO: CRIAR CLIENTE VISITANTE (VERSÃO CORRIGIDA) ===
 elseif ($action === 'create_visitor_client') {
     error_log("API CLIENT SEARCH - Criando cliente visitante");
     
@@ -212,12 +212,16 @@ elseif ($action === 'create_visitor_client') {
             exit;
         }
         
-        // Criar cliente visitante
+        // CORREÇÃO: Gerar email único fictício para evitar constraint violation
+        $emailFicticio = 'visitante_' . $telefone . '_loja_' . $storeId . '@klubecash.local';
+        
+        // Criar cliente visitante COM EMAIL FICTÍCIO
         $insertStmt = $db->prepare("
-            INSERT INTO usuarios (nome, telefone, tipo, tipo_cliente, loja_criadora_id, status, data_criacao)
-            VALUES (:nome, :telefone, :tipo, :tipo_cliente, :loja_id, :status, NOW())
+            INSERT INTO usuarios (nome, email, telefone, tipo, tipo_cliente, loja_criadora_id, status, data_criacao)
+            VALUES (:nome, :email, :telefone, :tipo, :tipo_cliente, :loja_id, :status, NOW())
         ");
         $insertStmt->bindParam(':nome', $nome);
+        $insertStmt->bindParam(':email', $emailFicticio);  // ADICIONADO EMAIL FICTÍCIO
         $insertStmt->bindParam(':telefone', $telefone);
         $insertStmt->bindParam(':tipo', $tipo);
         $insertStmt->bindParam(':tipo_cliente', $tipoCliente);
@@ -243,6 +247,7 @@ elseif ($action === 'create_visitor_client') {
             'data' => [
                 'id' => $clientId,
                 'nome' => $nome,
+                'email' => null,  // Não mostrar o email fictício para o usuário
                 'telefone' => $telefone,
                 'tipo_cliente' => 'visitante',
                 'tipo_cliente_label' => 'Cliente Visitante',
