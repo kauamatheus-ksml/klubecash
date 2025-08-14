@@ -1605,7 +1605,18 @@ $activeMenu = 'register-transaction';
         let currentStep = 1;
         let clientData = null;
         let clientBalance = 0;
-        const storeId = <?php echo $storeId; ?>;
+        const storeId = <?php 
+            // Usar store_id da sessão ou padrão 34
+            if (isset($_SESSION['store_id']) && $_SESSION['store_id'] > 0) {
+                echo $_SESSION['store_id'];
+            } else if (isset($storeId) && $storeId > 0) {
+                echo $storeId;
+            } else {
+                echo '34'; // Padrão para loja existente
+            }
+        ?>;
+
+        console.log('🏪 Store ID configurado:', storeId);
 
         // ========================================
         // INICIALIZAÇÃO

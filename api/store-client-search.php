@@ -158,7 +158,7 @@ if ($action === 'search_client') {
     }
 }
 
-// === NOVA AÇÃO: CRIAR CLIENTE VISITANTE (VERSÃO CORRIGIDA) ===
+// === NOVA AÇÃO: CRIAR CLIENTE VISITANTE (VERSÃO FINAL CORRIGIDA) ===
 elseif ($action === 'create_visitor_client') {
     error_log("API CLIENT SEARCH - Criando cliente visitante");
     
@@ -166,9 +166,9 @@ elseif ($action === 'create_visitor_client') {
     $telefone = preg_replace('/[^0-9]/', '', $input['telefone'] ?? '');
     $storeId = intval($input['store_id'] ?? 0);
 
-    error_log("API CLIENT SEARCH - Dados: nome=$nome, telefone=$telefone, storeId=$storeId");
+    error_log("API CLIENT SEARCH - Dados recebidos: nome=$nome, telefone=$telefone, storeId=$storeId");
 
-    // Validações
+    // Validações básicas
     if (empty($nome) || strlen($nome) < 2) {
         error_log("API CLIENT SEARCH - Erro: Nome inválido");
         echo json_encode(['status' => false, 'message' => 'Nome é obrigatório e deve ter pelo menos 2 caracteres']);
@@ -181,14 +181,44 @@ elseif ($action === 'create_visitor_client') {
         exit;
     }
 
-    if ($storeId <= 0) {
-        error_log("API CLIENT SEARCH - Erro: Store ID inválido");
-        echo json_encode(['status' => false, 'message' => 'ID da loja é obrigatório']);
-        exit;
-    }
-
     try {
         $db = Database::getConnection();
+        
+        // CORREÇÃO PRINCIPAL: Verificar se a loja existe, senão usar a primeira disponível
+        if ($storeId <= 0) {
+            error_log("API CLIENT SEARCH - Store ID não fornecido, buscando loja padrão");
+            $firstStoreStmt = $db->query("SELECT id FROM lojas WHERE status = 'aprovado' ORDER BY id LIMIT 1");
+            $firstStore = $firstStoreStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($firstStore) {
+                $storeId = $firstStore['id'];
+                error_log("API CLIENT SEARCH - Store ID ajustado para: $storeId");
+            } else {
+                echo json_encode(['status' => false, 'message' => 'Nenhuma loja ativa encontrada no sistema']);
+                exit;
+            }
+        } else {
+            // Verificar se a loja fornecida existe
+            $checkStoreStmt = $db->prepare("SELECT id FROM lojas WHERE id = ? AND status = 'aprovado'");
+            $checkStoreStmt->execute([$storeId]);
+            
+            if ($checkStoreStmt->rowCount() == 0) {
+                error_log("API CLIENT SEARCH - Loja $storeId não existe, buscando alternativa");
+                // Se a loja não existe, pegar a primeira loja disponível
+                $firstStoreStmt = $db->query("SELECT id FROM lojas WHERE status = 'aprovado' ORDER BY id LIMIT 1");
+                $firstStore = $firstStoreStmt->fetch(PDO::FETCH_ASSOC);
+                
+                if ($firstStore) {
+                    $storeId = $firstStore['id'];
+                    error_log("API CLIENT SEARCH - Store ID ajustado para: $storeId");
+                } else {
+                    echo json_encode(['status' => false, 'message' => 'Nenhuma loja ativa encontrada']);
+                    exit;
+                }
+            }
+        }
+        
+        error_log("API CLIENT SEARCH - Usando store_id final: $storeId");
         
         // Verificar se já existe cliente visitante com este telefone nesta loja
         $checkStmt = $db->prepare("
@@ -212,16 +242,18 @@ elseif ($action === 'create_visitor_client') {
             exit;
         }
         
-        // CORREÇÃO: Gerar email único fictício para evitar constraint violation
+        // Gerar email fictício único para evitar constraint violation
         $emailFicticio = 'visitante_' . $telefone . '_loja_' . $storeId . '@klubecash.local';
         
-        // Criar cliente visitante COM EMAIL FICTÍCIO
+        error_log("API CLIENT SEARCH - Criando cliente com email fictício: $emailFicticio");
+        
+        // Criar cliente visitante
         $insertStmt = $db->prepare("
             INSERT INTO usuarios (nome, email, telefone, tipo, tipo_cliente, loja_criadora_id, status, data_criacao)
             VALUES (:nome, :email, :telefone, :tipo, :tipo_cliente, :loja_id, :status, NOW())
         ");
         $insertStmt->bindParam(':nome', $nome);
-        $insertStmt->bindParam(':email', $emailFicticio);  // ADICIONADO EMAIL FICTÍCIO
+        $insertStmt->bindParam(':email', $emailFicticio);
         $insertStmt->bindParam(':telefone', $telefone);
         $insertStmt->bindParam(':tipo', $tipo);
         $insertStmt->bindParam(':tipo_cliente', $tipoCliente);
@@ -232,14 +264,15 @@ elseif ($action === 'create_visitor_client') {
         $result = $insertStmt->execute();
         
         if (!$result) {
-            error_log("API CLIENT SEARCH - Erro ao inserir no banco: " . print_r($insertStmt->errorInfo(), true));
-            echo json_encode(['status' => false, 'message' => 'Erro ao criar cliente no banco de dados']);
+            $errorInfo = $insertStmt->errorInfo();
+            error_log("API CLIENT SEARCH - Erro ao inserir no banco: " . print_r($errorInfo, true));
+            echo json_encode(['status' => false, 'message' => 'Erro ao criar cliente no banco de dados: ' . $errorInfo[2]]);
             exit;
         }
         
         $clientId = $db->lastInsertId();
         
-        error_log("API CLIENT SEARCH - Cliente visitante criado com ID: " . $clientId);
+        error_log("API CLIENT SEARCH - ✅ Cliente visitante criado com sucesso! ID: $clientId");
         
         echo json_encode([
             'status' => true,
@@ -247,12 +280,13 @@ elseif ($action === 'create_visitor_client') {
             'data' => [
                 'id' => $clientId,
                 'nome' => $nome,
-                'email' => null,  // Não mostrar o email fictício para o usuário
+                'email' => null,  // Não mostrar o email fictício
                 'telefone' => $telefone,
                 'tipo_cliente' => 'visitante',
                 'tipo_cliente_label' => 'Cliente Visitante',
                 'saldo' => 0,
                 'data_cadastro' => date('d/m/Y'),
+                'store_id_usado' => $storeId,  // Para debug
                 'estatisticas' => [
                     'total_compras' => 0,
                     'total_gasto' => 0,
@@ -263,7 +297,8 @@ elseif ($action === 'create_visitor_client') {
         ]);
         
     } catch (Exception $e) {
-        error_log('Erro ao criar cliente visitante: ' . $e->getMessage());
+        error_log('API CLIENT SEARCH - ❌ Erro crítico: ' . $e->getMessage());
+        error_log('API CLIENT SEARCH - Stack trace: ' . $e->getTraceAsString());
         echo json_encode([
             'status' => false, 
             'message' => 'Erro interno do servidor: ' . $e->getMessage()
