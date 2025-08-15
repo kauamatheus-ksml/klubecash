@@ -123,16 +123,14 @@ async function processarConsultaSaldo(phoneNumber) {
         // Enviar mensagem de "aguarde"
         await client.sendText(phoneNumber, '💰 Consultando seu saldo de cashback... ⏳');
         
-        // Extrair apenas o número do telefone (remover @c.us)
         const cleanPhone = phoneNumber.replace('@c.us', '');
-        
-        // Fazer requisição para API PHP
         const axios = require('axios');
+        
         const response = await axios.post('https://klubecash.com/api/whatsapp-saldo.php', {
             phone: cleanPhone,
             secret: CONFIG.webhookSecret
         }, {
-            timeout: 15000, // 15 segundos
+            timeout: 15000,
             headers: {
                 'Content-Type': 'application/json',
                 'User-Agent': 'KlubeCash-WhatsApp-Bot/1.0'
@@ -141,11 +139,26 @@ async function processarConsultaSaldo(phoneNumber) {
         
         console.log('📊 Resposta da API:', response.data);
         
-        // Verificar resposta
-        if (response.data && response.data.message) {
-            // Enviar mensagem de resposta com saldo
-            await client.sendText(phoneNumber, response.data.message);
-            console.log('✅ Saldo enviado com sucesso para:', phoneNumber);
+        if (response.data && response.data.success) {
+            // ENVIAR IMAGEM PRIMEIRO (se disponível)
+            if (response.data.send_image && response.data.image_url) {
+                try {
+                    console.log('🖼️ Enviando imagem:', response.data.image_url);
+                    await client.sendImage(phoneNumber, response.data.image_url, 'seu-saldo-klube-cash.png', '💰 Seu Saldo Atualizado');
+                    console.log('✅ Imagem enviada com sucesso');
+                    
+                    // Pausa entre imagem e texto
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                } catch (imageError) {
+                    console.error('❌ Erro ao enviar imagem:', imageError);
+                }
+            }
+            
+            // ENVIAR MENSAGEM DE TEXTO
+            if (response.data.message) {
+                await client.sendText(phoneNumber, response.data.message);
+                console.log('✅ Saldo enviado com sucesso para:', phoneNumber);
+            }
         } else {
             throw new Error('Resposta inválida da API');
         }
@@ -153,18 +166,11 @@ async function processarConsultaSaldo(phoneNumber) {
     } catch (error) {
         console.error('❌ Erro na consulta de saldo:', error.message);
         
-        // Enviar mensagem de erro para o usuário
         const errorMessage = `⚠️ *Klube Cash*
 
 Ocorreu um erro temporário ao consultar seu saldo.
 
-🔄 Tente novamente em alguns instantes ou acesse:
-https://klubecash.com
-
-📞 Se o problema persistir, entre em contato:
-https://klubecash.com/contato
-
-🎯 *Klube Cash - Seu dinheiro de volta!*`;
+🔄 Tente novamente em alguns instantes.`;
 
         try {
             await client.sendText(phoneNumber, errorMessage);
