@@ -22,13 +22,11 @@ class SaldoConsulta {
      */
     public function consultarSaldoPorTelefone($telefone) {
         try {
-            error_log("=== DEBUG INÍCIO CONSULTA SALDO ===");
-            error_log("TELEFONE: {$telefone}");
+            error_log("=== CONSULTA SALDO CONSOLIDADA ===");
             
             $usuario = $this->buscarUsuarioPorTelefone($telefone);
             
             if (!$usuario) {
-                error_log("USUÁRIO NÃO ENCONTRADO");
                 return [
                     'success' => false,
                     'user_found' => false,
@@ -36,17 +34,13 @@ class SaldoConsulta {
                 ];
             }
             
-            error_log("USUÁRIO: {$usuario['nome']} (ID: {$usuario['id']})");
+            error_log("USUÁRIO: {$usuario['nome']}");
             
-            // FORÇA VERIFICAÇÃO DIRETA
-            $this->debugTransacoesCompletas($usuario['id']);
-            
-            // Usar busca forçada
-            $saldosLojas = $this->buscarSaldosForcado($usuario['id']);
+            // Buscar saldos (consolidados se necessário)
+            $saldosLojas = $this->buscarSaldosConsolidados($usuario);
             $saldoTotal = $this->calcularSaldoTotalForcado($saldosLojas);
             
-            error_log("TOTAL LOJAS FORÇADO: " . count($saldosLojas));
-            error_log("SALDO TOTAL FORÇADO: R$ {$saldoTotal}");
+            error_log("TOTAL LOJAS ENCONTRADAS: " . count($saldosLojas));
             
             if (empty($saldosLojas)) {
                 return [
@@ -75,7 +69,57 @@ class SaldoConsulta {
             ];
         }
     }
-
+/**
+     * Busca saldos consolidados de múltiplos usuários
+     */
+    private function buscarSaldosConsolidados($usuario) {
+        try {
+            if (!isset($usuario['tipo_consolidado'])) {
+                // Usuário normal, usar método padrão
+                $balanceModel = new CashbackBalance();
+                return $balanceModel->getAllUserBalances($usuario['id']);
+            }
+            
+            error_log("=== BUSCANDO SALDOS CONSOLIDADOS ===");
+            
+            $usuariosIds = $usuario['usuarios_ids'];
+            error_log("IDs para consolidar: " . implode(', ', $usuariosIds));
+            
+            $placeholders = implode(',', array_fill(0, count($usuariosIds), '?'));
+            
+            $stmt = $this->db->prepare("
+                SELECT 
+                    t.loja_id,
+                    l.nome_fantasia,
+                    l.logo,
+                    l.categoria,
+                    l.porcentagem_cashback,
+                    SUM(CASE WHEN t.status = 'aprovado' THEN t.valor_cliente ELSE 0 END) as saldo_disponivel,
+                    SUM(CASE WHEN t.status IN ('pendente', 'pagamento_pendente') THEN t.valor_cliente ELSE 0 END) as saldo_pendente
+                FROM transacoes_cashback t
+                INNER JOIN lojas l ON t.loja_id = l.id
+                WHERE t.usuario_id IN ($placeholders)
+                GROUP BY t.loja_id, l.nome_fantasia, l.logo, l.categoria, l.porcentagem_cashback
+                HAVING (saldo_disponivel > 0 OR saldo_pendente > 0)
+                ORDER BY saldo_disponivel DESC
+            ");
+            
+            $stmt->execute($usuariosIds);
+            $saldosConsolidados = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            error_log("SALDOS CONSOLIDADOS: " . count($saldosConsolidados));
+            
+            foreach ($saldosConsolidados as $saldo) {
+                error_log("LOJA: {$saldo['nome_fantasia']} - R$ {$saldo['saldo_disponivel']}");
+            }
+            
+            return $saldosConsolidados;
+            
+        } catch (Exception $e) {
+            error_log("ERRO ao buscar saldos consolidados: " . $e->getMessage());
+            return [];
+        }
+    }
     /**
      * Debug completo das transações
      */
@@ -304,25 +348,23 @@ class SaldoConsulta {
     }
     
     /**
-     * Busca usuário pelo telefone INCLUINDO CLIENTES VISITANTES
+     * Busca TODOS os usuários com o mesmo telefone (CORREÇÃO PARA VISITANTES)
      */
     private function buscarUsuarioPorTelefone($telefone) {
         try {
-            error_log("=== BUSCA TELEFONE (INCLUINDO VISITANTES) ===");
-            error_log("TELEFONE RECEBIDO: {$telefone}");
+            error_log("=== BUSCA USUÁRIOS MÚLTIPLOS ===");
+            error_log("TELEFONE: {$telefone}");
             
             // Limpar telefone
             $telefoneClean = preg_replace('/[^0-9]/', '', $telefone);
-            error_log("TELEFONE LIMPO: {$telefoneClean}");
             
-            // Criar variantes de busca
+            // Variantes de busca
             $searchVariants = [
                 $telefoneClean,
                 '55' . $telefoneClean,
                 (strlen($telefoneClean) >= 12 && substr($telefoneClean, 0, 2) === '55') ? substr($telefoneClean, 2) : $telefoneClean
             ];
             
-            // Correção para números de 12 dígitos
             if (strlen($telefoneClean) === 12 && substr($telefoneClean, 0, 2) === '55') {
                 $ddd = substr($telefoneClean, 2, 2);
                 $numero = substr($telefoneClean, 4);
@@ -331,18 +373,15 @@ class SaldoConsulta {
             }
             
             $searchVariants = array_unique($searchVariants);
-            error_log("VARIANTES: " . implode(', ', $searchVariants));
             
-            // BUSCAR EM USUÁRIOS NORMAIS E VISITANTES
+            // BUSCAR TODOS OS USUÁRIOS (não apenas o primeiro)
             foreach ($searchVariants as $variant) {
-                // Query que inclui visitantes e todos os tipos de cliente
                 $stmt = $this->db->prepare("
-                    SELECT id, nome, email, telefone, status 
+                    SELECT id, nome, email, telefone, status, tipo_cliente
                     FROM usuarios 
                     WHERE REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(telefone, '(', ''), ')', ''), '-', ''), ' ', ''), '.', '') = :telefone
                     AND tipo = :tipo 
                     AND status = :status
-                    LIMIT 1
                 ");
                 
                 $stmt->bindParam(':telefone', $variant);
@@ -352,51 +391,69 @@ class SaldoConsulta {
                 $stmt->bindParam(':status', $status);
                 
                 $stmt->execute();
-                $result = $stmt->fetch(PDO::FETCH_ASSOC);
+                $usuarios = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 
-                if ($result) {
-                    error_log("✅ USUÁRIO ENCONTRADO: {$result['nome']} - Email: {$result['email']}");
+                if (!empty($usuarios)) {
+                    error_log("✅ ENCONTRADOS " . count($usuarios) . " usuários com telefone {$variant}");
                     
-                    // Verificar se tem saldos via busca direta nas transações
-                    $this->verificarSaldosUsuario($result['id']);
-                    
-                    return $result;
+                    // Se encontrou múltiplos usuários visitantes, consolidar
+                    if (count($usuarios) > 1) {
+                        return $this->consolidarUsuariosVisitantes($usuarios, $telefone);
+                    } else {
+                        // Usuário único
+                        error_log("USUÁRIO ÚNICO: {$usuarios[0]['nome']}");
+                        return $usuarios[0];
+                    }
                 }
             }
             
-            // Busca flexível com LIKE
-            $ultimosDigitos = substr($telefoneClean, -8);
-            $stmt = $this->db->prepare("
-                SELECT id, nome, email, telefone, status 
-                FROM usuarios 
-                WHERE REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(telefone, '(', ''), ')', ''), '-', ''), ' ', ''), '.', '') LIKE :telefone_like
-                AND tipo = :tipo 
-                AND status = :status
-                LIMIT 1
-            ");
-            
-            $likePattern = '%' . $ultimosDigitos;
-            $stmt->bindParam(':telefone_like', $likePattern);
-            $tipo = USER_TYPE_CLIENT;
-            $stmt->bindParam(':tipo', $tipo);
-            $status = USER_ACTIVE;
-            $stmt->bindParam(':status', $status);
-            
-            $stmt->execute();
-            $result = $stmt->fetch(PDO::FETCH_ASSOC);
-            
-            if ($result) {
-                error_log("✅ ENCONTRADO COM LIKE: {$result['nome']}");
-                $this->verificarSaldosUsuario($result['id']);
-                return $result;
-            }
-            
-            error_log("❌ NENHUM USUÁRIO ENCONTRADO");
             return null;
             
         } catch (PDOException $e) {
-            error_log('ERRO ao buscar usuário: ' . $e->getMessage());
+            error_log('ERRO ao buscar usuários: ' . $e->getMessage());
             return null;
+        }
+    }
+    
+    /**
+     * Consolida múltiplos usuários visitantes em um virtual
+     */
+    private function consolidarUsuariosVisitantes($usuarios, $telefone) {
+        try {
+            error_log("=== CONSOLIDANDO USUÁRIOS VISITANTES ===");
+            
+            // Pegar o nome do primeiro usuário (geralmente é o mesmo)
+            $nomeBase = $usuarios[0]['nome'];
+            
+            // Se os nomes forem diferentes, usar o primeiro nome
+            $nomes = array_column($usuarios, 'nome');
+            $nomesUnicos = array_unique($nomes);
+            
+            if (count($nomesUnicos) > 1) {
+                error_log("NOMES DIFERENTES ENCONTRADOS: " . implode(', ', $nomesUnicos));
+                // Usar o nome mais completo
+                usort($nomesUnicos, function($a, $b) {
+                    return strlen($b) - strlen($a);
+                });
+                $nomeBase = $nomesUnicos[0];
+            }
+            
+            error_log("NOME CONSOLIDADO: {$nomeBase}");
+            
+            // Retornar usuário virtual consolidado
+            return [
+                'id' => 'CONSOLIDADO_' . implode('_', array_column($usuarios, 'id')),
+                'nome' => $nomeBase,
+                'email' => $usuarios[0]['email'], // Email do primeiro
+                'telefone' => $telefone,
+                'status' => 'ativo',
+                'usuarios_ids' => array_column($usuarios, 'id'), // IDs para buscar saldos
+                'tipo_consolidado' => true
+            ];
+            
+        } catch (Exception $e) {
+            error_log("ERRO ao consolidar usuários: " . $e->getMessage());
+            return $usuarios[0]; // Fallback para o primeiro
         }
     }
     
