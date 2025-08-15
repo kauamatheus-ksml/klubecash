@@ -225,10 +225,10 @@ class SaldoConsulta {
      */
     public function consultarSaldoLoja($telefone, $identificacaoLoja) {
         try {
-            error_log("=== INICIO consultarSaldoLoja ===");
+            error_log("=== CONSULTA SALDO LOJA CONSOLIDADA ===");
             error_log("PARAMETROS: telefone={$telefone}, loja={$identificacaoLoja}");
             
-            // 1. Buscar usuário pelo telefone
+            // 1. Buscar usuário pelo telefone (COM CONSOLIDAÇÃO)
             $usuario = $this->buscarUsuarioPorTelefone($telefone);
             
             if (!$usuario) {
@@ -240,11 +240,10 @@ class SaldoConsulta {
                 ];
             }
             
-            error_log("SUCCESS: Usuário encontrado: {$usuario['nome']} (ID: {$usuario['id']})");
+            error_log("SUCCESS: Usuário encontrado: {$usuario['nome']}");
             
-            // 2. Obter todos os saldos do usuário
-            $balanceModel = new CashbackBalance();
-            $saldosLojas = $balanceModel->getAllUserBalances($usuario['id']);
+            // 2. USAR BUSCA CONSOLIDADA (igual ao consultarSaldoPorTelefone)
+            $saldosLojas = $this->buscarSaldosConsolidados($usuario);
             
             error_log("INFO: Total de lojas com saldo: " . count($saldosLojas));
             
@@ -310,8 +309,6 @@ class SaldoConsulta {
             
         } catch (Exception $e) {
             error_log('ERRO CRÍTICO em consultarSaldoLoja: ' . $e->getMessage());
-            error_log('Stack trace: ' . $e->getTraceAsString());
-            
             return [
                 'success' => false,
                 'user_found' => false,
@@ -529,9 +526,9 @@ class SaldoConsulta {
      */
     private function gerarRespostaLojaEspecifica($usuario, $loja) {
         try {
-            error_log("=== GERANDO RESPOSTA LOJA ESPECÍFICA ===");
-            error_log("Usuário: {$usuario['nome']} (ID: {$usuario['id']})");
-            error_log("Loja: {$loja['nome_fantasia']} (ID: " . ($loja['loja_id'] ?? $loja['id'] ?? 'N/A') . ")");
+            error_log("=== GERANDO RESPOSTA LOJA ESPECÍFICA CONSOLIDADA ===");
+            error_log("Usuário: {$usuario['nome']}");
+            error_log("Loja: {$loja['nome_fantasia']}");
             error_log("Saldo Disponível: R$ {$loja['saldo_disponivel']}");
             
             $nome = explode(' ', $usuario['nome'])[0];
@@ -543,17 +540,22 @@ class SaldoConsulta {
             
             if (!$lojaId) {
                 error_log("ERRO: ID da loja não encontrado no array");
-                error_log("DADOS DA LOJA: " . print_r($loja, true));
-                
-                // Fallback: buscar ID pela nome
                 $lojaId = $this->buscarIdLojaPorNome($loja['nome_fantasia']);
                 error_log("ID encontrado por nome: {$lojaId}");
             }
             
-            // BUSCAR SALDO PENDENTE
+            // BUSCAR SALDO PENDENTE (CONSOLIDADO SE NECESSÁRIO)
             $saldoPendente = 0;
             if ($lojaId) {
-                $saldoPendente = $this->buscarSaldoPendenteLoja($usuario['id'], $lojaId);
+                if (isset($usuario['tipo_consolidado'])) {
+                    // Para usuário consolidado, somar saldos pendentes de todos os IDs
+                    foreach ($usuario['usuarios_ids'] as $userId) {
+                        $saldoPendente += $this->buscarSaldoPendenteLoja($userId, $lojaId);
+                    }
+                } else {
+                    // Usuário normal
+                    $saldoPendente = $this->buscarSaldoPendenteLoja($usuario['id'], $lojaId);
+                }
             }
             
             error_log("Saldo Pendente final: R$ {$saldoPendente}");
@@ -606,7 +608,6 @@ class SaldoConsulta {
             
         } catch (Exception $e) {
             error_log("ERRO ao gerar resposta específica: " . $e->getMessage());
-            
             return [
                 'success' => true,
                 'user_found' => true,
