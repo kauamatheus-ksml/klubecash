@@ -22,13 +22,13 @@ class SaldoConsulta {
      */
     public function consultarSaldoPorTelefone($telefone) {
         try {
-            error_log("=== INICIO consultarSaldoPorTelefone: {$telefone} ===");
+            error_log("=== DEBUG INÍCIO CONSULTA SALDO ===");
+            error_log("TELEFONE: {$telefone}");
             
-            // Buscar usuário pelo telefone
             $usuario = $this->buscarUsuarioPorTelefone($telefone);
             
             if (!$usuario) {
-                error_log("ERRO: Usuário não encontrado para telefone: {$telefone}");
+                error_log("USUÁRIO NÃO ENCONTRADO");
                 return [
                     'success' => false,
                     'user_found' => false,
@@ -36,15 +36,17 @@ class SaldoConsulta {
                 ];
             }
             
-            error_log("SUCCESS: Usuário encontrado: {$usuario['nome']} (ID: {$usuario['id']})");
+            error_log("USUÁRIO: {$usuario['nome']} (ID: {$usuario['id']})");
             
-            // Obter saldos do usuário
-            $balanceModel = new CashbackBalance();
-            $saldosLojas = $balanceModel->getAllUserBalances($usuario['id']);
-            $saldoTotal = $balanceModel->getTotalBalance($usuario['id']);
+            // FORÇA VERIFICAÇÃO DIRETA
+            $this->debugTransacoesCompletas($usuario['id']);
             
-            error_log("INFO: Total de lojas com saldo: " . count($saldosLojas));
+            // Usar busca forçada
+            $saldosLojas = $this->buscarSaldosForcado($usuario['id']);
+            $saldoTotal = $this->calcularSaldoTotalForcado($saldosLojas);
             
+            error_log("TOTAL LOJAS FORÇADO: " . count($saldosLojas));
+            error_log("SALDO TOTAL FORÇADO: R$ {$saldoTotal}");
             
             if (empty($saldosLojas)) {
                 return [
@@ -54,10 +56,7 @@ class SaldoConsulta {
                 ];
             }
             
-            // Gerar mensagem completa
             $mensagem = $this->gerarMensagemSaldoCompleto($usuario, $saldosLojas, $saldoTotal);
-            
-            error_log("=== FIM consultarSaldoPorTelefone ===");
             
             return [
                 'success' => true,
@@ -68,15 +67,115 @@ class SaldoConsulta {
             ];
             
         } catch (Exception $e) {
-            error_log('ERRO na consulta de saldo por telefone: ' . $e->getMessage());
+            error_log('ERRO: ' . $e->getMessage());
             return [
                 'success' => false,
                 'user_found' => false,
-                'message' => 'Ocorreu um erro interno. Tente novamente em alguns instantes.'
+                'message' => 'Erro interno.'
             ];
         }
     }
+
+    /**
+     * Debug completo das transações
+     */
+    private function debugTransacoesCompletas($userId) {
+        try {
+            error_log("=== DEBUG TRANSAÇÕES COMPLETAS ===");
+            
+            $stmt = $this->db->prepare("
+                SELECT t.id, t.loja_id, l.nome_fantasia, t.valor_cliente, t.status, t.data_transacao
+                FROM transacoes_cashback t
+                LEFT JOIN lojas l ON t.loja_id = l.id
+                WHERE t.usuario_id = :user_id
+                ORDER BY t.data_transacao DESC
+            ");
+            $stmt->bindParam(':user_id', $userId);
+            $stmt->execute();
+            
+            $transacoes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            error_log("TOTAL TRANSAÇÕES USUÁRIO: " . count($transacoes));
+            
+            $lojas = [];
+            foreach ($transacoes as $t) {
+                if (!isset($lojas[$t['loja_id']])) {
+                    $lojas[$t['loja_id']] = [
+                        'nome' => $t['nome_fantasia'],
+                        'aprovado' => 0,
+                        'pendente' => 0
+                    ];
+                }
+                
+                if ($t['status'] === 'aprovado') {
+                    $lojas[$t['loja_id']]['aprovado'] += $t['valor_cliente'];
+                } elseif (in_array($t['status'], ['pendente', 'pagamento_pendente'])) {
+                    $lojas[$t['loja_id']]['pendente'] += $t['valor_cliente'];
+                }
+                
+                error_log("TRANS: {$t['nome_fantasia']} - R$ {$t['valor_cliente']} - {$t['status']}");
+            }
+            
+            error_log("RESUMO POR LOJA:");
+            foreach ($lojas as $lojaId => $dados) {
+                error_log("LOJA {$lojaId}: {$dados['nome']} - Aprovado: R$ {$dados['aprovado']} - Pendente: R$ {$dados['pendente']}");
+            }
+            
+        } catch (Exception $e) {
+            error_log("ERRO debug: " . $e->getMessage());
+        }
+    }
     
+    /**
+     * Calcula saldo total forçado
+     */
+    private function calcularSaldoTotalForcado($saldos) {
+        $total = 0;
+        foreach ($saldos as $saldo) {
+            $total += floatval($saldo['saldo_disponivel']);
+        }
+        return $total;
+    }
+    /**
+     * Busca saldos forçando query direta
+     */
+    private function buscarSaldosForcado($userId) {
+        try {
+            error_log("=== BUSCA SALDOS FORÇADA ===");
+            
+            $stmt = $this->db->prepare("
+                SELECT 
+                    t.loja_id,
+                    l.nome_fantasia,
+                    l.logo,
+                    l.categoria,
+                    l.porcentagem_cashback,
+                    SUM(CASE WHEN t.status = 'aprovado' THEN t.valor_cliente ELSE 0 END) as saldo_disponivel
+                FROM transacoes_cashback t
+                INNER JOIN lojas l ON t.loja_id = l.id
+                WHERE t.usuario_id = :user_id
+                GROUP BY t.loja_id, l.nome_fantasia, l.logo, l.categoria, l.porcentagem_cashback
+                ORDER BY saldo_disponivel DESC
+            ");
+            $stmt->bindParam(':user_id', $userId);
+            $stmt->execute();
+            
+            $resultado = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            error_log("RESULTADO BUSCA FORÇADA: " . count($resultado));
+            
+            foreach ($resultado as $r) {
+                error_log("FORÇADO: {$r['nome_fantasia']} = R$ {$r['saldo_disponivel']}");
+            }
+            
+            return $resultado;
+            
+        } catch (Exception $e) {
+            error_log("ERRO busca forçada: " . $e->getMessage());
+            return [];
+        }
+    }
+
     /**
      * Consulta saldo específico por loja (VERSÃO FINAL CORRIGIDA)
      */
