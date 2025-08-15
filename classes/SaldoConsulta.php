@@ -44,7 +44,7 @@ class SaldoConsulta {
             $saldoTotal = $balanceModel->getTotalBalance($usuario['id']);
             
             error_log("INFO: Total de lojas com saldo: " . count($saldosLojas));
-            error_log("INFO: Saldo total: R$ {$saldoTotal}");
+            
             
             if (empty($saldosLojas)) {
                 return [
