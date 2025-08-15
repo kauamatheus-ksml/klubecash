@@ -1166,7 +1166,33 @@ $activeMenu = 'register-transaction';
 .btn-cancel-visitor:hover {
     background: #5a6268;
 }
+/* === ESTILOS PARA CLIENTE UNIVERSAL === */
+.client-type-badge.visitante_universal {
+    background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+    color: white;
+}
 
+.client-type-badge.visitante_proprio {
+    background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+    color: white;
+}
+
+.client-type-badge.cadastrado {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    color: white;
+}
+
+.client-info-item[style*="background: #e8f4fd"] {
+    border-radius: 6px;
+    padding: 12px;
+    margin: 8px 0;
+}
+
+.client-info-item[style*="background: #d4edda"] {
+    border-radius: 6px;
+    padding: 12px;
+    margin: 8px 0;
+}
 /* Responsividade básica */
 @media (max-width: 768px) {
     .visitor-actions {
@@ -1882,27 +1908,87 @@ $activeMenu = 'register-transaction';
             clientInfoCard.style.display = 'block';
             clientInfoTitle.textContent = '✅ Cliente Encontrado';
 
+            // Determinar ícone e cor baseado no tipo
+            let typeIcon = '👤';
+            let typeColor = '#28a745';
+            let additionalInfo = '';
+
+            if (client.tipo_cliente === 'cadastrado') {
+                typeIcon = '🏆';
+                typeColor = '#28a745';
+            } else if (client.tipo_cliente === 'visitante_proprio') {
+                typeIcon = '🏪';
+                typeColor = '#f39c12';
+            } else if (client.tipo_cliente === 'visitante_universal') {
+                typeIcon = '🌐';
+                typeColor = '#17a2b8';
+                additionalInfo = `
+                    <div class="client-info-item" style="background: #e8f4fd; border-left: 4px solid #17a2b8;">
+                        <span class="client-info-value">
+                            <strong>🌐 Acesso Universal:</strong> Este cliente pode fazer compras em sua loja e acumular saldo específico aqui.
+                            ${client.is_first_purchase_in_store ? '<br><em>Esta será a primeira compra dele em sua loja!</em>' : ''}
+                        </span>
+                    </div>
+                `;
+            }
+
             clientInfoDetails.innerHTML = `
                 <div class="client-info-item">
                     <span class="client-info-label">Nome:</span>
                     <span class="client-info-value">${client.nome}</span>
                 </div>
+                
+                ${client.email ? `
                 <div class="client-info-item">
                     <span class="client-info-label">Email:</span>
                     <span class="client-info-value">${client.email}</span>
                 </div>
+                ` : ''}
+                
+                ${client.telefone ? `
                 <div class="client-info-item">
-                    <span class="client-info-label">Status:</span>
-                    <span class="client-info-value">✅ Cliente ativo</span>
+                    <span class="client-info-label">Telefone:</span>
+                    <span class="client-info-value">${formatPhone(client.telefone)}</span>
                 </div>
+                ` : ''}
+                
                 <div class="client-info-item">
-                    <span class="client-info-label">Saldo disponível:</span>
-                    <span class="client-info-value">${client.saldo > 0 ? '💰 R$ ' + formatCurrency(client.saldo) : '💰 Nenhum saldo disponível'}</span>
+                    <span class="client-info-label">Tipo:</span>
+                    <span class="client-info-value" style="color: ${typeColor};">
+                        ${typeIcon} ${client.tipo_cliente_label}
+                    </span>
+                </div>
+                
+                <div class="client-info-item">
+                    <span class="client-info-label">Saldo na sua loja:</span>
+                    <span class="client-info-value" style="color: #28a745; font-weight: bold;">
+                        ${client.saldo > 0 ? '💰 R$ ' + formatCurrency(client.saldo) : '💰 Nenhum saldo ainda'}
+                    </span>
+                </div>
+                
+                <div class="client-info-item">
+                    <span class="client-info-label">Compras na sua loja:</span>
+                    <span class="client-info-value">${client.estatisticas.total_compras} compras</span>
+                </div>
+                
+                ${additionalInfo}
+                
+                <div class="client-info-item" style="background: #d4edda; border-left: 4px solid #28a745;">
+                    <span class="client-info-value">
+                        <strong>✅ Status:</strong> ${client.access_message}
+                    </span>
                 </div>
             `;
 
             document.getElementById('cliente_id_hidden').value = client.id;
             showNotification('Cliente encontrado com sucesso!', 'success');
+            
+            // Mensagem especial para primeira compra
+            if (client.is_first_purchase_in_store && client.tipo_cliente === 'visitante_universal') {
+                setTimeout(() => {
+                    showNotification('🎉 Primeira venda para este cliente em sua loja! O saldo ficará separado aqui.', 'info');
+                }, 2000);
+            }
         }
 
         function mostrarErroCliente(message) {

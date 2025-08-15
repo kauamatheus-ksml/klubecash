@@ -32,7 +32,7 @@ $input = json_decode(file_get_contents('php://input'), true);
 $action = $input['action'] ?? '';
 
 
-// === AÇÃO PRINCIPAL: BUSCAR CLIENTE ===
+// === AÇÃO PRINCIPAL: BUSCAR CLIENTE (VERSÃO UNIVERSAL) ===
 if ($action === 'search_client') {
     $searchTerm = trim($input['search_term'] ?? '');
     $storeId = intval($input['store_id'] ?? 0);
@@ -49,18 +49,26 @@ if ($action === 'search_client') {
     try {
         $db = Database::getConnection();
         
-        // Buscar cliente por email, CPF ou telefone
+        // BUSCA UNIVERSAL: procurar cliente em qualquer lugar
         $stmt = $db->prepare("
             SELECT id, nome, email, telefone, cpf, status, data_criacao, tipo_cliente, loja_criadora_id
             FROM usuarios
             WHERE (email = :searchTerm OR cpf = :cpfSearch OR telefone = :phoneSearch) 
             AND tipo = :tipo
+            ORDER BY 
+                CASE 
+                    WHEN loja_criadora_id = :storeId THEN 1  -- Prioridade para clientes da própria loja
+                    WHEN tipo_cliente = 'completo' THEN 2    -- Depois clientes completos
+                    ELSE 3                                   -- Por último visitantes de outras lojas
+                END
+            LIMIT 1
         ");
         $stmt->bindParam(':searchTerm', $searchTerm);
         $stmt->bindParam(':cpfSearch', $cpfSearch);
         $stmt->bindParam(':phoneSearch', $phoneSearch);
         $tipo = USER_TYPE_CLIENT;
         $stmt->bindParam(':tipo', $tipo);
+        $stmt->bindParam(':storeId', $storeId);
         $stmt->execute();
         
         $client = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -70,20 +78,7 @@ if ($action === 'search_client') {
             echo json_encode([
                 'status' => false,
                 'code' => CLIENT_SEARCH_NOT_FOUND,
-                'message' => 'Cliente não encontrado. Verifique se o email, CPF ou telefone está correto e se o cliente está cadastrado no Klube Cash.',
-                'can_create_visitor' => true,
-                'search_term' => $searchTerm,
-                'search_type' => determineSearchType($searchTerm)
-            ]);
-            exit;
-        }
-        
-        // Verificar se é cliente visitante de outra loja
-        if ($client['tipo_cliente'] === CLIENT_TYPE_VISITOR && $client['loja_criadora_id'] != $storeId) {
-            echo json_encode([
-                'status' => false,
-                'code' => CLIENT_SEARCH_NOT_FOUND,
-                'message' => 'Este é um cliente visitante de outra loja. Cada loja mantém seus próprios clientes visitantes.',
+                'message' => 'Cliente não encontrado. Verifique se o email, CPF ou telefone está correto ou crie um cliente visitante.',
                 'can_create_visitor' => true,
                 'search_term' => $searchTerm,
                 'search_type' => determineSearchType($searchTerm)
@@ -100,11 +95,16 @@ if ($action === 'search_client') {
             exit;
         }
         
-        // Obter saldo do cliente na loja
+        // DETERMINAR STATUS DO CLIENTE PARA ESTA LOJA
+        $isOwnClient = ($client['loja_criadora_id'] == $storeId);
+        $isVisitorFromOtherStore = ($client['tipo_cliente'] === CLIENT_TYPE_VISITOR && !$isOwnClient);
+        $isCompleteClient = ($client['tipo_cliente'] === CLIENT_TYPE_COMPLETE || $client['tipo_cliente'] === 'completo');
+        
+        // Obter saldo específico desta loja
         $balanceModel = new CashbackBalance();
         $saldo = $balanceModel->getStoreBalance($client['id'], $storeId);
         
-        // Obter estatísticas do cliente na loja
+        // Obter estatísticas específicas desta loja
         $statsStmt = $db->prepare("
             SELECT 
                 COUNT(*) as total_compras,
@@ -119,9 +119,23 @@ if ($action === 'search_client') {
         $statsStmt->execute();
         $stats = $statsStmt->fetch(PDO::FETCH_ASSOC);
         
-        // Determinar o tipo de exibição do cliente
-        $clientType = $client['tipo_cliente'] === CLIENT_TYPE_VISITOR ? 'visitante' : 'cadastrado';
-        $clientTypeLabel = $client['tipo_cliente'] === CLIENT_TYPE_VISITOR ? 'Cliente Visitante' : 'Cliente Cadastrado';
+        // DETERMINAR TIPO DE EXIBIÇÃO E MENSAGEM
+        if ($isCompleteClient) {
+            $clientType = 'cadastrado';
+            $clientTypeLabel = 'Cliente Cadastrado';
+            $accessMessage = 'Cliente encontrado com acesso completo ao sistema.';
+        } elseif ($isOwnClient) {
+            $clientType = 'visitante_proprio';
+            $clientTypeLabel = 'Cliente Visitante (Sua Loja)';
+            $accessMessage = 'Cliente visitante criado pela sua loja.';
+        } else {
+            $clientType = 'visitante_universal';
+            $clientTypeLabel = 'Cliente Visitante (Acesso Universal)';
+            $accessMessage = 'Cliente visitante de outra loja, agora disponível para sua loja também!';
+        }
+        
+        // Verificar se é primeira compra nesta loja
+        $isFirstPurchaseInStore = ($stats['total_compras'] == 0);
         
         echo json_encode([
             'status' => true,
@@ -136,6 +150,10 @@ if ($action === 'search_client') {
                 'status' => $client['status'],
                 'tipo_cliente' => $clientType,
                 'tipo_cliente_label' => $clientTypeLabel,
+                'access_message' => $accessMessage,
+                'is_own_client' => $isOwnClient,
+                'is_first_purchase_in_store' => $isFirstPurchaseInStore,
+                'loja_criadora_id' => $client['loja_criadora_id'],
                 'data_cadastro' => date('d/m/Y', strtotime($client['data_criacao'])),
                 'saldo' => $saldo,
                 'estatisticas' => [
