@@ -4,13 +4,18 @@
 class ImageGenerator {
     
     /**
-     * Gera imagem com dados do saldo do cliente
+     * Gera imagem com dados do saldo do cliente (VERSÃO SIMPLES SEM TTF)
      */
     public static function gerarImagemSaldo($dadosUsuario, $dadosSaldo) {
         try {
+            // Verificar se GD está instalado
+            if (!extension_loaded('gd')) {
+                throw new Exception('Extensão GD não está instalada');
+            }
+            
             // Dimensões da imagem
-            $width = 800;
-            $height = 600;
+            $width = 600;
+            $height = 400;
             
             // Criar imagem
             $image = imagecreatetruecolor($width, $height);
@@ -27,53 +32,51 @@ class ImageGenerator {
             imagefill($image, 0, 0, $branco);
             
             // === HEADER ===
-            // Retângulo do header (azul)
-            imagefilledrectangle($image, 0, 0, $width, 120, $azulClaro);
+            imagefilledrectangle($image, 0, 0, $width, 80, $azulClaro);
             
-            // Logo/Título
-            $titulo = "KLUBE CASH";
-            imagettftext($image, 28, 0, 50, 50, $branco, self::getFontPath(), $titulo);
-            imagettftext($image, 16, 0, 50, 80, $branco, self::getFontPath(), "Seu Saldo de Cashback");
+            // USAR imagestring() ao invés de imagettftext()
+            imagestring($image, 5, 20, 20, "KLUBE CASH", $branco);
+            imagestring($image, 3, 20, 50, "Seu Saldo de Cashback", $branco);
             
-            // Data/hora atual
+            // Data/hora
             $dataHora = date('d/m/Y H:i');
-            imagettftext($image, 12, 0, $width - 200, 50, $branco, self::getFontPath(), $dataHora);
+            imagestring($image, 2, $width - 120, 20, $dataHora, $branco);
             
             // === SAUDAÇÃO ===
             $nome = explode(' ', $dadosUsuario['nome'])[0];
-            $saudacao = "Olá, {$nome}!";
-            imagettftext($image, 20, 0, 50, 180, $azulEscuro, self::getFontPath(), $saudacao);
+            $saudacao = "Ola, {$nome}!";
+            imagestring($image, 4, 20, 100, $saudacao, $azulEscuro);
             
             // === SALDO DISPONÍVEL ===
-            $yPos = 240;
+            $yPos = 140;
             
             // Card do saldo disponível
-            imagefilledrectangle($image, 50, $yPos, 750, $yPos + 80, $verde);
-            imagettftext($image, 16, 0, 70, $yPos + 30, $branco, self::getFontPath(), "SALDO DISPONÍVEL");
+            imagefilledrectangle($image, 20, $yPos, $width - 20, $yPos + 60, $verde);
+            imagestring($image, 3, 30, $yPos + 15, "SALDO DISPONIVEL", $branco);
             $saldoDispText = "R$ " . number_format($dadosSaldo['disponivel'], 2, ',', '.');
-            imagettftext($image, 24, 0, 70, $yPos + 60, $branco, self::getFontPath(), $saldoDispText);
+            imagestring($image, 5, 30, $yPos + 35, $saldoDispText, $branco);
             
             // === SALDO PENDENTE ===
             if ($dadosSaldo['pendente'] > 0) {
-                $yPos += 100;
+                $yPos += 80;
                 
                 // Card do saldo pendente
-                imagefilledrectangle($image, 50, $yPos, 750, $yPos + 80, $laranja);
-                imagettftext($image, 16, 0, 70, $yPos + 30, $branco, self::getFontPath(), "AGUARDANDO LIBERAÇÃO");
+                imagefilledrectangle($image, 20, $yPos, $width - 20, $yPos + 60, $laranja);
+                imagestring($image, 3, 30, $yPos + 15, "AGUARDANDO LIBERACAO", $branco);
                 $saldoPendText = "R$ " . number_format($dadosSaldo['pendente'], 2, ',', '.');
-                imagettftext($image, 24, 0, 70, $yPos + 60, $branco, self::getFontPath(), $saldoPendText);
+                imagestring($image, 5, 30, $yPos + 35, $saldoPendText, $branco);
             }
             
             // === TOTAL ===
-            $yPos += 120;
-            imagettftext($image, 14, 0, 50, $yPos, $cinza, self::getFontPath(), "TOTAL ACUMULADO");
+            $yPos += 100;
+            imagestring($image, 3, 20, $yPos, "TOTAL ACUMULADO", $cinza);
             $totalText = "R$ " . number_format($dadosSaldo['total'], 2, ',', '.');
-            imagettftext($image, 22, 0, 50, $yPos + 30, $azulEscuro, self::getFontPath(), $totalText);
+            imagestring($image, 5, 20, $yPos + 20, $totalText, $azulEscuro);
             
             // === RODAPÉ ===
-            $yPos += 80;
-            imagettftext($image, 12, 0, 50, $yPos, $cinza, self::getFontPath(), "🌐 klubecash.com");
-            imagettftext($image, 12, 0, 50, $yPos + 25, $cinza, self::getFontPath(), "Seu dinheiro de volta!");
+            $yPos += 60;
+            imagestring($image, 2, 20, $yPos, "klubecash.com", $cinza);
+            imagestring($image, 2, 20, $yPos + 15, "Seu dinheiro de volta!", $cinza);
             
             // Salvar imagem
             $fileName = self::generateFileName($dadosUsuario['id']);
@@ -84,8 +87,12 @@ class ImageGenerator {
                 mkdir(self::getUploadPath(), 0755, true);
             }
             
+            // Salvar como PNG
             imagepng($image, $filePath);
             imagedestroy($image);
+            
+            // Log de sucesso
+            error_log("ImageGenerator: Imagem gerada com sucesso - {$filePath}");
             
             return [
                 'success' => true,
@@ -95,20 +102,12 @@ class ImageGenerator {
             ];
             
         } catch (Exception $e) {
-            error_log('Erro ao gerar imagem: ' . $e->getMessage());
+            error_log('ImageGenerator: Erro - ' . $e->getMessage());
             return [
                 'success' => false,
                 'error' => $e->getMessage()
             ];
         }
-    }
-    
-    /**
-     * Caminho da fonte (usar fonte padrão se não tiver TTF)
-     */
-    private static function getFontPath() {
-        $fontPath = __DIR__ . '/../assets/fonts/arial.ttf';
-        return file_exists($fontPath) ? $fontPath : '';
     }
     
     /**

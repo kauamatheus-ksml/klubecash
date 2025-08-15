@@ -3,7 +3,7 @@
 header('Content-Type: application/json; charset=utf-8');
 require_once __DIR__ . '/../config/constants.php';
 
-$phoneNumber = '389910452056';
+$phoneNumber = '38991045205';
 
 echo "<h1>🧪 Teste de Envio WhatsApp</h1>";
 
