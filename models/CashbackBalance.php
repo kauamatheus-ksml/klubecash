@@ -67,56 +67,21 @@ class CashbackBalance {
      */
     public function getAllUserBalances($userId) {
         try {
-            error_log("=== BUSCA COMPLETA DE SALDOS USUÁRIO {$userId} ===");
+            error_log("=== BUSCA SALDOS NA TABELA CASHBACK_SALDOS (CORRETO) ===");
             
-            // FORÇA BUSCA DIRETA NAS TRANSAÇÕES (método mais confiável)
+            // PRIMEIRO: Buscar na tabela cashback_saldos (método correto)
             $stmt = $this->db->prepare("
                 SELECT 
-                    t.loja_id,
+                    cs.loja_id,
                     l.nome_fantasia,
                     l.logo,
                     l.categoria,
                     l.porcentagem_cashback,
-                    COALESCE(SUM(CASE WHEN t.status = 'aprovado' THEN t.valor_cliente ELSE 0 END), 0) as saldo_disponivel,
-                    COALESCE(SUM(CASE WHEN t.status IN ('pendente', 'pagamento_pendente') THEN t.valor_cliente ELSE 0 END), 0) as saldo_pendente,
-                    COUNT(*) as total_transacoes
-                FROM transacoes_cashback t
-                INNER JOIN lojas l ON t.loja_id = l.id
-                WHERE t.usuario_id = :user_id
-                GROUP BY t.loja_id, l.nome_fantasia, l.logo, l.categoria, l.porcentagem_cashback
-                HAVING (saldo_disponivel > 0 OR saldo_pendente > 0)
-                ORDER BY saldo_disponivel DESC, l.nome_fantasia ASC
-            ");
-            $stmt->bindParam(':user_id', $userId);
-            $stmt->execute();
-            
-            $saldosTransacoes = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            
-            error_log("TOTAL DE LOJAS ENCONTRADAS NAS TRANSAÇÕES: " . count($saldosTransacoes));
-            
-            // Log detalhado de cada loja encontrada
-            foreach ($saldosTransacoes as $index => $saldo) {
-                error_log("LOJA[{$index}]: {$saldo['nome_fantasia']} - Disponível: R$ {$saldo['saldo_disponivel']} - Pendente: R$ {$saldo['saldo_pendente']}");
-            }
-            
-            // Se encontrou nas transações, retornar
-            if (!empty($saldosTransacoes)) {
-                return $saldosTransacoes;
-            }
-            
-            // FALLBACK: Buscar na tabela cashback_saldos
-            error_log("FALLBACK: Buscando na tabela cashback_saldos...");
-            
-            $stmt = $this->db->prepare("
-                SELECT 
-                    cs.*,
-                    l.nome_fantasia,
-                    l.logo,
-                    l.categoria,
-                    l.porcentagem_cashback
+                    cs.saldo_disponivel
                 FROM cashback_saldos cs
                 JOIN lojas l ON cs.loja_id = l.id
                 WHERE cs.usuario_id = :user_id
+                AND cs.saldo_disponivel > 0
                 ORDER BY cs.saldo_disponivel DESC
             ");
             $stmt->bindParam(':user_id', $userId);
@@ -124,12 +89,46 @@ class CashbackBalance {
             
             $saldosTabela = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
-            error_log("SALDOS NA TABELA CASHBACK_SALDOS: " . count($saldosTabela));
+            error_log("SALDOS NA TABELA: " . count($saldosTabela));
             
-            return $saldosTabela;
+            foreach ($saldosTabela as $index => $saldo) {
+                error_log("TABELA[{$index}]: {$saldo['nome_fantasia']} - R$ {$saldo['saldo_disponivel']}");
+            }
+            
+            // Se encontrou na tabela, retornar (método correto)
+            if (!empty($saldosTabela)) {
+                return $saldosTabela;
+            }
+            
+            // FALLBACK: Buscar nas transações apenas se não tiver na tabela
+            error_log("FALLBACK: Buscando nas transações...");
+            
+            $stmt = $this->db->prepare("
+                SELECT 
+                    t.loja_id,
+                    l.nome_fantasia,
+                    l.logo,
+                    l.categoria,
+                    l.porcentagem_cashback,
+                    SUM(CASE WHEN t.status = 'aprovado' THEN t.valor_cliente ELSE 0 END) as saldo_disponivel
+                FROM transacoes_cashback t
+                INNER JOIN lojas l ON t.loja_id = l.id
+                WHERE t.usuario_id = :user_id
+                GROUP BY t.loja_id, l.nome_fantasia, l.logo, l.categoria, l.porcentagem_cashback
+                HAVING saldo_disponivel > 0
+                ORDER BY saldo_disponivel DESC
+            ");
+            $stmt->bindParam(':user_id', $userId);
+            $stmt->execute();
+            
+            $saldosTransacoes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            error_log("FALLBACK: " . count($saldosTransacoes) . " lojas nas transações");
+            
+            return $saldosTransacoes;
             
         } catch (PDOException $e) {
-            error_log('ERRO CRÍTICO ao obter saldos: ' . $e->getMessage());
+            error_log('ERRO ao obter saldos: ' . $e->getMessage());
             return [];
         }
     }

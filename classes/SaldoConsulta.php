@@ -74,7 +74,7 @@ class SaldoConsulta {
      */
     private function buscarSaldosConsolidados($usuario) {
         try {
-            error_log("=== BUSCA SALDOS CONSOLIDADOS (FORÇADA) ===");
+            error_log("=== BUSCA SALDOS USANDO TABELA CASHBACK_SALDOS ===");
             
             if (isset($usuario['tipo_consolidado'])) {
                 // Usuário consolidado (múltiplos IDs)
@@ -87,53 +87,78 @@ class SaldoConsulta {
                 
                 $stmt = $this->db->prepare("
                     SELECT 
-                        t.loja_id,
+                        cs.loja_id,
                         l.nome_fantasia,
                         l.logo,
                         l.categoria,
                         l.porcentagem_cashback,
-                        SUM(CASE WHEN t.status = 'aprovado' THEN t.valor_cliente ELSE 0 END) as saldo_disponivel,
-                        SUM(CASE WHEN t.status IN ('pendente', 'pagamento_pendente') THEN t.valor_cliente ELSE 0 END) as saldo_pendente
-                    FROM transacoes_cashback t
-                    INNER JOIN lojas l ON t.loja_id = l.id
-                    WHERE t.usuario_id IN ($placeholders)
-                    GROUP BY t.loja_id, l.nome_fantasia, l.logo, l.categoria, l.porcentagem_cashback
-                    HAVING (saldo_disponivel > 0 OR saldo_pendente > 0)
+                        SUM(cs.saldo_disponivel) as saldo_disponivel
+                    FROM cashback_saldos cs
+                    INNER JOIN lojas l ON cs.loja_id = l.id
+                    WHERE cs.usuario_id IN ($placeholders)
+                    AND cs.saldo_disponivel > 0
+                    GROUP BY cs.loja_id, l.nome_fantasia, l.logo, l.categoria, l.porcentagem_cashback
                     ORDER BY saldo_disponivel DESC
                 ");
                 
                 $stmt->execute($usuariosIds);
                 $resultado = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 
+                error_log("CONSOLIDADO: " . count($resultado) . " lojas encontradas");
+                
             } else {
-                // Usuário normal - SEMPRE FORÇAR BUSCA DIRETA
-                error_log("USUÁRIO NORMAL - BUSCA FORÇADA DIRETA");
+                // Usuário normal - USAR TABELA CASHBACK_SALDOS
+                error_log("USUÁRIO NORMAL - USANDO TABELA CASHBACK_SALDOS");
                 error_log("ID do usuário: {$usuario['id']}");
                 
                 $stmt = $this->db->prepare("
                     SELECT 
-                        t.loja_id,
+                        cs.loja_id,
                         l.nome_fantasia,
                         l.logo,
                         l.categoria,
                         l.porcentagem_cashback,
-                        SUM(CASE WHEN t.status = 'aprovado' THEN t.valor_cliente ELSE 0 END) as saldo_disponivel,
-                        SUM(CASE WHEN t.status IN ('pendente', 'pagamento_pendente') THEN t.valor_cliente ELSE 0 END) as saldo_pendente,
-                        COUNT(*) as total_transacoes
-                    FROM transacoes_cashback t
-                    INNER JOIN lojas l ON t.loja_id = l.id
-                    WHERE t.usuario_id = :user_id
-                    GROUP BY t.loja_id, l.nome_fantasia, l.logo, l.categoria, l.porcentagem_cashback
-                    HAVING saldo_disponivel > 0
-                    ORDER BY saldo_disponivel DESC, l.nome_fantasia ASC
+                        cs.saldo_disponivel
+                    FROM cashback_saldos cs
+                    INNER JOIN lojas l ON cs.loja_id = l.id
+                    WHERE cs.usuario_id = :user_id
+                    AND cs.saldo_disponivel > 0
+                    ORDER BY cs.saldo_disponivel DESC, l.nome_fantasia ASC
                 ");
                 
                 $stmt->bindParam(':user_id', $usuario['id']);
                 $stmt->execute();
                 $resultado = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                
+                error_log("NORMAL: " . count($resultado) . " lojas encontradas na tabela");
+                
+                // Se não encontrou na tabela, usar transações como fallback
+                if (empty($resultado)) {
+                    error_log("FALLBACK: Buscando nas transações...");
+                    
+                    $stmt = $this->db->prepare("
+                        SELECT 
+                            t.loja_id,
+                            l.nome_fantasia,
+                            l.logo,
+                            l.categoria,
+                            l.porcentagem_cashback,
+                            SUM(CASE WHEN t.status = 'aprovado' THEN t.valor_cliente ELSE 0 END) as saldo_disponivel
+                        FROM transacoes_cashback t
+                        INNER JOIN lojas l ON t.loja_id = l.id
+                        WHERE t.usuario_id = :user_id
+                        GROUP BY t.loja_id, l.nome_fantasia, l.logo, l.categoria, l.porcentagem_cashback
+                        HAVING saldo_disponivel > 0
+                        ORDER BY saldo_disponivel DESC
+                    ");
+                    
+                    $stmt->bindParam(':user_id', $usuario['id']);
+                    $stmt->execute();
+                    $resultado = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                    
+                    error_log("FALLBACK: " . count($resultado) . " lojas encontradas nas transações");
+                }
             }
-            
-            error_log("RESULTADO FINAL: " . count($resultado) . " lojas encontradas");
             
             foreach ($resultado as $index => $saldo) {
                 error_log("LOJA[{$index}]: {$saldo['nome_fantasia']} - R$ {$saldo['saldo_disponivel']}");
@@ -142,10 +167,11 @@ class SaldoConsulta {
             return $resultado;
             
         } catch (Exception $e) {
-            error_log("ERRO ao buscar saldos consolidados: " . $e->getMessage());
+            error_log("ERRO ao buscar saldos: " . $e->getMessage());
             return [];
         }
     }
+    
     /**
      * Debug completo das transações
      */
