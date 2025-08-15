@@ -313,28 +313,7 @@ function createPixPaymentWithFullData() {
         echo json_encode(['status' => false, 'message' => 'Erro interno: ' . $e->getMessage()]);
     }
 }
-/**
- * ✅ FUNÇÃO AUXILIAR: Validar dígitos verificadores do CPF
- */
-function validarDigitosCPF($cpf) {
-    // Primeiro dígito
-    $soma = 0;
-    for ($i = 0; $i < 9; $i++) {
-        $soma += $cpf[$i] * (10 - $i);
-    }
-    $digito1 = ($soma * 10) % 11;
-    if ($digito1 == 10) $digito1 = 0;
-    
-    // Segundo dígito
-    $soma = 0;
-    for ($i = 0; $i < 10; $i++) {
-        $soma += $cpf[$i] * (11 - $i);
-    }
-    $digito2 = ($soma * 10) % 11;
-    if ($digito2 == 10) $digito2 = 0;
-    
-    return ($cpf[9] == $digito1 && $cpf[10] == $digito2);
-}
+
 /**
  * Verificar status do pagamento com diagnóstico
  */
