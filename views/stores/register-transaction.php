@@ -577,7 +577,141 @@ $activeMenu = 'register-transaction';
             font-weight: 600;
             font-size: 1rem;
         }
+/* === LAYOUT COMPACTO PARA CLIENTE === */
+.client-info-compact {
+    max-width: 100%;
+    overflow: hidden;
+}
 
+.client-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.client-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: #495057;
+    flex: 1;
+    margin-right: 10px;
+    word-break: break-word;
+}
+
+.client-type {
+    font-size: 12px;
+    background: #17a2b8;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 12px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.client-details {
+    display: grid;
+    gap: 8px;
+}
+
+.client-info-row {
+    display: grid;
+    grid-template-columns: 80px 1fr;
+    gap: 10px;
+    align-items: center;
+    padding: 6px 0;
+}
+
+.client-info-row .label {
+    font-size: 12px;
+    font-weight: 500;
+    color: #6c757d;
+    text-transform: uppercase;
+}
+
+.client-info-row .value {
+    font-size: 14px;
+    color: #495057;
+    font-weight: 500;
+    word-break: break-all;
+    overflow: hidden;
+}
+
+.email-text {
+    font-size: 12px !important;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.saldo-value {
+    color: #28a745 !important;
+    font-weight: 600 !important;
+}
+
+.universal-notice {
+    background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+    border: 1px solid #f39c12;
+    color: #856404;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    text-align: center;
+    margin-top: 10px;
+}
+
+/* === RESPONSIVIDADE === */
+@media (max-width: 768px) {
+    .client-info-row {
+        grid-template-columns: 70px 1fr;
+        gap: 8px;
+    }
+    
+    .client-info-row .label {
+        font-size: 11px;
+    }
+    
+    .client-info-row .value {
+        font-size: 13px;
+    }
+    
+    .email-text {
+        font-size: 11px !important;
+    }
+    
+    .client-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    
+    .client-type {
+        align-self: flex-end;
+    }
+}
+
+@media (max-width: 480px) {
+    .client-info-row {
+        grid-template-columns: 1fr;
+        gap: 2px;
+        padding: 4px 0;
+    }
+    
+    .client-info-row .label {
+        font-size: 10px;
+        margin-bottom: 2px;
+    }
+    
+    .email-text {
+        font-size: 10px !important;
+        word-break: break-all;
+        white-space: normal;
+        line-height: 1.3;
+    }
+}
         /* ========================================
            SEÇÃO DE SALDO
         ======================================== */
@@ -1908,87 +2042,65 @@ $activeMenu = 'register-transaction';
             clientInfoCard.style.display = 'block';
             clientInfoTitle.textContent = '✅ Cliente Encontrado';
 
-            // Determinar ícone e cor baseado no tipo
+            // Determinar tipo e ícone
             let typeIcon = '👤';
-            let typeColor = '#28a745';
-            let additionalInfo = '';
+            let typeLabel = 'Cliente';
+            let statusMessage = '';
 
             if (client.tipo_cliente === 'cadastrado') {
                 typeIcon = '🏆';
-                typeColor = '#28a745';
+                typeLabel = 'Cliente Cadastrado';
             } else if (client.tipo_cliente === 'visitante_proprio') {
                 typeIcon = '🏪';
-                typeColor = '#f39c12';
+                typeLabel = 'Cliente Visitante';
             } else if (client.tipo_cliente === 'visitante_universal') {
                 typeIcon = '🌐';
-                typeColor = '#17a2b8';
-                additionalInfo = `
-                    <div class="client-info-item" style="background: #e8f4fd; border-left: 4px solid #17a2b8;">
-                        <span class="client-info-value">
-                            <strong>🌐 Acesso Universal:</strong> Este cliente pode fazer compras em sua loja e acumular saldo específico aqui.
-                            ${client.is_first_purchase_in_store ? '<br><em>Esta será a primeira compra dele em sua loja!</em>' : ''}
-                        </span>
-                    </div>
-                `;
+                typeLabel = 'Cliente Visitante (Universal)';
+                statusMessage = client.is_first_purchase_in_store ? 
+                    '<div class="universal-notice">🎉 Primeira compra nesta loja!</div>' : '';
             }
 
+            // Email simplificado (só mostrar se não for fictício)
+            const emailDisplay = (client.email && !client.email.includes('@klubecash.local')) ? 
+                `<div class="client-info-row">
+                    <span class="label">Email:</span>
+                    <span class="value email-text">${client.email}</span>
+                </div>` : '';
+
             clientInfoDetails.innerHTML = `
-                <div class="client-info-item">
-                    <span class="client-info-label">Nome:</span>
-                    <span class="client-info-value">${client.nome}</span>
-                </div>
-                
-                ${client.email ? `
-                <div class="client-info-item">
-                    <span class="client-info-label">Email:</span>
-                    <span class="client-info-value">${client.email}</span>
-                </div>
-                ` : ''}
-                
-                ${client.telefone ? `
-                <div class="client-info-item">
-                    <span class="client-info-label">Telefone:</span>
-                    <span class="client-info-value">${formatPhone(client.telefone)}</span>
-                </div>
-                ` : ''}
-                
-                <div class="client-info-item">
-                    <span class="client-info-label">Tipo:</span>
-                    <span class="client-info-value" style="color: ${typeColor};">
-                        ${typeIcon} ${client.tipo_cliente_label}
-                    </span>
-                </div>
-                
-                <div class="client-info-item">
-                    <span class="client-info-label">Saldo na sua loja:</span>
-                    <span class="client-info-value" style="color: #28a745; font-weight: bold;">
-                        ${client.saldo > 0 ? '💰 R$ ' + formatCurrency(client.saldo) : '💰 Nenhum saldo ainda'}
-                    </span>
-                </div>
-                
-                <div class="client-info-item">
-                    <span class="client-info-label">Compras na sua loja:</span>
-                    <span class="client-info-value">${client.estatisticas.total_compras} compras</span>
-                </div>
-                
-                ${additionalInfo}
-                
-                <div class="client-info-item" style="background: #d4edda; border-left: 4px solid #28a745;">
-                    <span class="client-info-value">
-                        <strong>✅ Status:</strong> ${client.access_message}
-                    </span>
+                <div class="client-info-compact">
+                    <div class="client-header">
+                        <div class="client-name">${client.nome}</div>
+                        <div class="client-type">${typeIcon} ${typeLabel}</div>
+                    </div>
+                    
+                    <div class="client-details">
+                        ${emailDisplay}
+                        
+                        <div class="client-info-row">
+                            <span class="label">Telefone:</span>
+                            <span class="value">${formatPhone(client.telefone)}</span>
+                        </div>
+                        
+                        <div class="client-info-row">
+                            <span class="label">Saldo:</span>
+                            <span class="value saldo-value">
+                                ${client.saldo > 0 ? 'R$ ' + formatCurrency(client.saldo) : 'R$ 0,00'}
+                            </span>
+                        </div>
+                        
+                        <div class="client-info-row">
+                            <span class="label">Compras aqui:</span>
+                            <span class="value">${client.estatisticas.total_compras}</span>
+                        </div>
+                    </div>
+                    
+                    ${statusMessage}
                 </div>
             `;
 
             document.getElementById('cliente_id_hidden').value = client.id;
-            showNotification('Cliente encontrado com sucesso!', 'success');
-            
-            // Mensagem especial para primeira compra
-            if (client.is_first_purchase_in_store && client.tipo_cliente === 'visitante_universal') {
-                setTimeout(() => {
-                    showNotification('🎉 Primeira venda para este cliente em sua loja! O saldo ficará separado aqui.', 'info');
-                }, 2000);
-            }
+            showNotification('Cliente encontrado!', 'success');
         }
 
         function mostrarErroCliente(message) {
