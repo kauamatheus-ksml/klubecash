@@ -62,27 +62,7 @@ try {
     
     // Consultar saldo
     $resultado = $saldoConsulta->consultarSaldoPorTelefone($data['phone']);
-    error_log('WhatsApp API - Resultado completo: ' . print_r($resultado, true));
-
-    // E antes do echo final, adicione:
-    if ($resultado['success']) {
-        // Verificar se tem dados de imagem
-        if (isset($resultado['send_image'])) {
-            error_log('WhatsApp API - send_image: ' . ($resultado['send_image'] ? 'true' : 'false'));
-        }
-        if (isset($resultado['image_url'])) {
-            error_log('WhatsApp API - image_url: ' . $resultado['image_url']);
-        }
-        
-        echo json_encode([
-            'success' => true,
-            'message' => $resultado['message'],
-            'user_found' => $resultado['user_found'],
-            'send_image' => $resultado['send_image'] ?? false,  // ADICIONAR
-            'image_url' => $resultado['image_url'] ?? null,     // ADICIONAR
-            'timestamp' => date('Y-m-d H:i:s')
-        ]);
-    }
+    
     // Log do resultado
     error_log('WhatsApp Saldo API - Resultado: ' . json_encode($resultado));
     

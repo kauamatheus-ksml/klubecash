@@ -36,14 +36,9 @@ class SaldoConsulta {
             }
             
             $saldos = $this->calcularSaldosHibrido($usuario['id']);
-            
-            // NOVO: Gerar imagem com o saldo
-            require_once __DIR__ . '/ImageGenerator.php';
-            $imagemResult = ImageGenerator::gerarImagemSaldo($usuario, $saldos);
-            
             $mensagem = $this->gerarMensagemSaldoCompleto($usuario['nome'], $saldos);
             
-            $response = [
+            return [
                 'success' => true,
                 'message' => $mensagem,
                 'user_found' => true,
@@ -51,16 +46,8 @@ class SaldoConsulta {
                 'saldos' => $saldos
             ];
             
-            // Adicionar dados da imagem se gerada com sucesso
-            if ($imagemResult['success']) {
-                $response['send_image'] = true;
-                $response['image_url'] = $imagemResult['file_url'];
-                $response['image_path'] = $imagemResult['file_path'];
-            }
-            
-            return $response;
-            
         } catch (Exception $e) {
+            // Em caso de erro, loga para análise interna e retorna mensagem genérica.
             error_log('ERRO GRAVE na consulta de saldo: ' . $e->getMessage());
             return [
                 'success' => false,
