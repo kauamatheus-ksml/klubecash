@@ -84,28 +84,52 @@ async function processarMensagem(message) {
         const phoneNumber = message.from;
         const messageText = message.body.trim();
         
-        console.log('📨 Nova mensagem de:', phoneNumber, '- Conteúdo:', messageText);
+        console.log('📨 Nova mensagem:', phoneNumber, messageText);
 
-        // VERIFICAR SE É NÚMERO DE LOJA (1, 2, 3, etc.)
-        if (/^[1-9]$/.test(messageText)) {
-            console.log('🏪 Consultando loja específica:', messageText);
+        // VERIFICAR SE É OPÇÃO DO MENU (apenas "1" para saldo)
+        if (messageText === '1') {
+            console.log('💰 Menu Opção 1 - Saldo geral');
+            await consultarSaldoGeral(phoneNumber);
+            return;
+        }
+
+        // VERIFICAR SE É NÚMERO DE LOJA (2-9, após já ter consultado saldo)
+        if (/^[2-9]$/.test(messageText)) {
+            console.log('🏪 Loja específica:', messageText);
             await consultarLojaEspecifica(phoneNumber, messageText);
             return;
         }
 
-        // VERIFICAR SE É OPÇÃO 1 DO MENU (consultar saldo geral)
-        if (messageText === '1') {
-            console.log('💰 Opção 1 - Consultando saldo geral...');
-            await consultarSaldo(phoneNumber);
-            return;
-        }
-
         // QUALQUER OUTRA MENSAGEM = MENU
-        console.log('📋 Exibindo menu principal...');
         await exibirMenu(phoneNumber);
         
     } catch (error) {
-        console.error('❌ Erro ao processar mensagem:', error);
+        console.error('❌ Erro:', error);
+        await enviarMensagemErro(phoneNumber);
+    }
+}
+
+/**
+ * CONSULTAR SALDO GERAL (SEM FINALIZAR)
+ */
+async function consultarSaldoGeral(phoneNumber) {
+    try {
+        await client.sendText(phoneNumber, '💰 Consultando saldo... ⏳');
+        
+        const cleanPhone = phoneNumber.replace('@c.us', '');
+        const response = await axios.post('https://klubecash.com/api/whatsapp-saldo.php', {
+            phone: cleanPhone,
+            secret: CONFIG.webhookSecret
+        });
+        
+        if (response.data && response.data.success && response.data.message) {
+            // APENAS enviar dados do saldo (SEM finalização)
+            await client.sendText(phoneNumber, response.data.message);
+            console.log('✅ Saldo enviado - aguardando seleção de loja');
+        }
+        
+    } catch (error) {
+        console.error('❌ Erro saldo:', error);
         await enviarMensagemErro(phoneNumber);
     }
 }
@@ -115,51 +139,33 @@ async function processarMensagem(message) {
  */
 async function consultarLojaEspecifica(phoneNumber, numeroLoja) {
     try {
-        console.log('🏪 Consultando detalhes da loja:', numeroLoja);
-        
         await client.sendText(phoneNumber, '🏪 Consultando loja... ⏳');
         
         const cleanPhone = phoneNumber.replace('@c.us', '');
-        
-        // Chamar API específica da loja
         const response = await axios.post('https://klubecash.com/api/whatsapp-saldo-loja.php', {
             phone: cleanPhone,
             loja: numeroLoja,
             secret: CONFIG.webhookSecret
-        }, {
-            timeout: 15000,
-            headers: {
-                'Content-Type': 'application/json',
-                'User-Agent': 'KlubeCash-WhatsApp-Bot/2.0'
-            }
         });
         
         if (response.data && response.data.success) {
-            
-            // PRIMEIRA MENSAGEM: Dados da loja
+            // PRIMEIRA mensagem: dados da loja
             if (response.data.message) {
-                console.log('📤 Enviando dados da loja...');
                 await client.sendText(phoneNumber, response.data.message);
-                
-                // Pausa entre mensagens
-                await new Promise(resolve => setTimeout(resolve, 3000));
+                await new Promise(resolve => setTimeout(resolve, 2000));
             }
             
-            // SEGUNDA MENSAGEM: Finalização
-            console.log('📤 Enviando finalização...');
+            // SEGUNDA mensagem: finalização
             const finalizacao = `✅ *Consulta finalizada!*
 
 Para nova consulta, envie qualquer mensagem.`;
             
             await client.sendText(phoneNumber, finalizacao);
-            console.log('✅ Consulta de loja finalizada!');
-            
-        } else {
-            throw new Error('Resposta inválida da API de loja');
+            console.log('✅ Loja consultada e finalizada');
         }
         
     } catch (error) {
-        console.error('❌ Erro na consulta de loja:', error.message);
+        console.error('❌ Erro loja:', error);
         await enviarMensagemErro(phoneNumber);
     }
 }
