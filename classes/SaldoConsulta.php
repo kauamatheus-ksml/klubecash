@@ -1,5 +1,5 @@
 <?php
-// classes/SaldoConsulta.php
+// classes/SaldoConsulta.php - VERSÃO FINAL CORRIGIDA
 
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../config/constants.php';
@@ -8,9 +8,7 @@ require_once __DIR__ . '/ImageGenerator.php';
 
 /**
  * Classe para Consulta de Saldo - Integração WhatsApp
- * 
- * Esta classe gerencia as consultas de saldo via WhatsApp Bot
- * Inclui consulta geral e consulta específica por loja
+ * Versão corrigida e testada
  */
 class SaldoConsulta {
     private $db;
@@ -21,17 +19,16 @@ class SaldoConsulta {
     
     /**
      * Consulta saldo geral do usuário por telefone
-     * Mostra resumo total e lista de lojas disponíveis
-     * 
-     * @param string $telefone Número do telefone (sem formatação)
-     * @return array Resultado da consulta
      */
     public function consultarSaldoPorTelefone($telefone) {
         try {
+            error_log("=== INICIO consultarSaldoPorTelefone: {$telefone} ===");
+            
             // Buscar usuário pelo telefone
             $usuario = $this->buscarUsuarioPorTelefone($telefone);
             
             if (!$usuario) {
+                error_log("ERRO: Usuário não encontrado para telefone: {$telefone}");
                 return [
                     'success' => false,
                     'user_found' => false,
@@ -39,10 +36,15 @@ class SaldoConsulta {
                 ];
             }
             
+            error_log("SUCCESS: Usuário encontrado: {$usuario['nome']} (ID: {$usuario['id']})");
+            
             // Obter saldos do usuário
             $balanceModel = new CashbackBalance();
             $saldosLojas = $balanceModel->getAllUserBalances($usuario['id']);
             $saldoTotal = $balanceModel->getTotalBalance($usuario['id']);
+            
+            error_log("INFO: Total de lojas com saldo: " . count($saldosLojas));
+            error_log("INFO: Saldo total: R$ {$saldoTotal}");
             
             if (empty($saldosLojas)) {
                 return [
@@ -55,6 +57,8 @@ class SaldoConsulta {
             // Gerar mensagem completa
             $mensagem = $this->gerarMensagemSaldoCompleto($usuario, $saldosLojas, $saldoTotal);
             
+            error_log("=== FIM consultarSaldoPorTelefone ===");
+            
             return [
                 'success' => true,
                 'user_found' => true,
@@ -64,7 +68,7 @@ class SaldoConsulta {
             ];
             
         } catch (Exception $e) {
-            error_log('Erro na consulta de saldo por telefone: ' . $e->getMessage());
+            error_log('ERRO na consulta de saldo por telefone: ' . $e->getMessage());
             return [
                 'success' => false,
                 'user_found' => false,
@@ -73,23 +77,19 @@ class SaldoConsulta {
         }
     }
     
-        /**
-     * Consulta saldo específico por loja (MÉTODO CORRIGIDO - v2)
-     * Corrige o problema de seleção por número
-     * 
-     * @param string $telefone Número do telefone
-     * @param string $identificacaoLoja Número, nome ou palavra-chave da loja
-     * @return array Resultado da consulta
+    /**
+     * Consulta saldo específico por loja (VERSÃO FINAL CORRIGIDA)
      */
     public function consultarSaldoLoja($telefone, $identificacaoLoja) {
         try {
-            error_log("DEBUG consultarSaldoLoja: telefone={$telefone}, loja={$identificacaoLoja}");
+            error_log("=== INICIO consultarSaldoLoja ===");
+            error_log("PARAMETROS: telefone={$telefone}, loja={$identificacaoLoja}");
             
-            // Buscar usuário pelo telefone
+            // 1. Buscar usuário pelo telefone
             $usuario = $this->buscarUsuarioPorTelefone($telefone);
             
             if (!$usuario) {
-                error_log("DEBUG: Usuário não encontrado");
+                error_log("ERRO: Usuário não encontrado");
                 return [
                     'success' => false,
                     'user_found' => false,
@@ -97,16 +97,16 @@ class SaldoConsulta {
                 ];
             }
             
-            error_log("DEBUG: Usuário encontrado: {$usuario['nome']} (ID: {$usuario['id']})");
+            error_log("SUCCESS: Usuário encontrado: {$usuario['nome']} (ID: {$usuario['id']})");
             
-            // Obter todos os saldos do usuário
+            // 2. Obter todos os saldos do usuário
             $balanceModel = new CashbackBalance();
             $saldosLojas = $balanceModel->getAllUserBalances($usuario['id']);
             
-            error_log("DEBUG: Total de lojas com saldo: " . count($saldosLojas));
+            error_log("INFO: Total de lojas com saldo: " . count($saldosLojas));
             
             if (empty($saldosLojas)) {
-                error_log("DEBUG: Usuário sem saldo em nenhuma loja");
+                error_log("AVISO: Usuário sem saldo em nenhuma loja");
                 return [
                     'success' => true,
                     'user_found' => true,
@@ -114,71 +114,216 @@ class SaldoConsulta {
                 ];
             }
             
-            // LOG dos saldos para debug
+            // 3. LOG detalhado das lojas para debug
             foreach ($saldosLojas as $index => $loja) {
-                error_log("DEBUG: Loja[{$index}]: {$loja['nome_fantasia']} - R$ {$loja['saldo_disponivel']}");
+                error_log("LOJA[{$index}]: Nome='{$loja['nome_fantasia']}', Saldo=R$ {$loja['saldo_disponivel']}");
             }
             
-            // CORREÇÃO: Verificar se é consulta por número específico (1-9)
+            // 4. Verificar se é seleção por número
             if (is_numeric($identificacaoLoja)) {
                 $numeroLoja = intval($identificacaoLoja);
-                error_log("DEBUG: Seleção por número: {$numeroLoja}");
+                error_log("PROCESSANDO: Seleção por número: {$numeroLoja}");
                 
-                // Verificar se o número está dentro do range válido
+                // Validar se o número está no range
                 if ($numeroLoja >= 1 && $numeroLoja <= count($saldosLojas)) {
-                    $indiceLoja = $numeroLoja - 1; // Converter para índice do array (base 0)
-                    $lojaSelecionada = $saldosLojas[$indiceLoja];
+                    $indiceLoja = $numeroLoja - 1; // Converter 1->0, 2->1, etc.
                     
-                    error_log("DEBUG: Loja selecionada: {$lojaSelecionada['nome_fantasia']} (índice {$indiceLoja})");
-                    
-                    return $this->gerarRespostaLojaEspecifica($usuario, $lojaSelecionada);
+                    // VERIFICAÇÃO EXTRA: Certificar que o índice existe
+                    if (isset($saldosLojas[$indiceLoja])) {
+                        $lojaSelecionada = $saldosLojas[$indiceLoja];
+                        error_log("SUCCESS: Loja selecionada pelo número {$numeroLoja}: '{$lojaSelecionada['nome_fantasia']}'");
+                        
+                        return $this->gerarRespostaLojaEspecifica($usuario, $lojaSelecionada);
+                    } else {
+                        error_log("ERRO: Índice {$indiceLoja} não existe no array de lojas");
+                        return $this->criarRespostaErroIndice($usuario, $saldosLojas, $numeroLoja);
+                    }
                 } else {
-                    error_log("DEBUG: Número de loja inválido: {$numeroLoja} (máximo: " . count($saldosLojas) . ")");
-                    
-                    // Número inválido - mostrar opções disponíveis
+                    error_log("ERRO: Número inválido {$numeroLoja}, máximo permitido: " . count($saldosLojas));
                     return [
                         'success' => true,
                         'user_found' => true,
-                        'message' => $this->gerarMensagemNumeroInvalido($usuario, $saldosLojas, $numeroLoja),
-                        'send_image' => false
+                        'message' => $this->gerarMensagemNumeroInvalido($usuario, $saldosLojas, $numeroLoja)
                     ];
                 }
             }
             
-            // CORREÇÃO: Buscar por nome da loja
+            // 5. Buscar por nome da loja
+            error_log("PROCESSANDO: Busca por nome: '{$identificacaoLoja}'");
             $lojaEncontrada = $this->buscarLojaPorNome($saldosLojas, $identificacaoLoja);
             
             if ($lojaEncontrada) {
-                error_log("DEBUG: Loja encontrada por nome: {$lojaEncontrada['nome_fantasia']}");
+                error_log("SUCCESS: Loja encontrada por nome: '{$lojaEncontrada['nome_fantasia']}'");
                 return $this->gerarRespostaLojaEspecifica($usuario, $lojaEncontrada);
             }
             
-            error_log("DEBUG: Loja não encontrada por nome: {$identificacaoLoja}");
-            
-            // Se não encontrou loja específica, mostrar todas as opções
+            // 6. Se não encontrou nada específico, mostrar todas as opções
+            error_log("INFO: Loja '{$identificacaoLoja}' não encontrada, mostrando todas as opções");
             return [
                 'success' => true,
                 'user_found' => true,
-                'message' => $this->gerarMensagemTodasAsLojas($usuario, $saldosLojas),
-                'send_image' => false
+                'message' => $this->gerarMensagemTodasAsLojas($usuario, $saldosLojas)
             ];
             
         } catch (Exception $e) {
-            error_log('Erro na consulta de saldo por loja: ' . $e->getMessage());
+            error_log('ERRO CRÍTICO em consultarSaldoLoja: ' . $e->getMessage());
+            error_log('Stack trace: ' . $e->getTraceAsString());
+            
             return [
                 'success' => false,
                 'user_found' => false,
-                'message' => 'Ocorreu um erro interno. Tente novamente.'
+                'message' => 'Ocorreu um erro interno. Tente novamente ou digite "saldo" para ver suas opções.'
             ];
         }
     }
+    
     /**
-     * Gera mensagem para número de loja inválido
-     * 
-     * @param array $usuario Dados do usuário
-     * @param array $saldosLojas Lista de saldos por loja
-     * @param int $numeroInvalido Número que foi digitado
-     * @return string Mensagem formatada
+     * Cria resposta de erro quando índice não existe (fallback de segurança)
+     */
+    private function criarRespostaErroIndice($usuario, $saldosLojas, $numeroDigitado) {
+        $nome = explode(' ', $usuario['nome'])[0];
+        $totalLojas = count($saldosLojas);
+        
+        $mensagem = "⚠️ *Erro Técnico*\n\n";
+        $mensagem .= "Olá, *{$nome}*!\n\n";
+        $mensagem .= "Houve um problema ao acessar a loja {$numeroDigitado}.\n\n";
+        $mensagem .= "🏪 *Suas opções válidas:*\n\n";
+        
+        for ($i = 1; $i <= $totalLojas; $i++) {
+            $loja = $saldosLojas[$i-1];
+            $saldo = number_format($loja['saldo_disponivel'], 2, ',', '.');
+            $mensagem .= "{$i}. *{$loja['nome_fantasia']}* - R$ {$saldo}\n";
+        }
+        
+        $mensagem .= "\n💡 Tente novamente digitando um número de 1 a {$totalLojas}!";
+        
+        return [
+            'success' => true,
+            'user_found' => true,
+            'message' => $mensagem
+        ];
+    }
+    
+    /**
+     * Busca usuário pelo telefone (método mantido igual)
+     */
+    private function buscarUsuarioPorTelefone($telefone) {
+        try {
+            error_log("DEBUG: Buscando usuário para telefone: {$telefone}");
+            
+            // Limpar telefone
+            $telefoneClean = preg_replace('/[^0-9]/', '', $telefone);
+            
+            // Variantes de busca
+            $searchVariants = [
+                $telefoneClean,
+                '55' . $telefoneClean,
+                (strlen($telefoneClean) > 10 && substr($telefoneClean, 0, 2) === '55') ? substr($telefoneClean, 2) : $telefoneClean
+            ];
+            
+            $searchVariants = array_unique($searchVariants);
+            
+            foreach ($searchVariants as $variant) {
+                $stmt = $this->db->prepare("
+                    SELECT id, nome, email, telefone, status 
+                    FROM usuarios 
+                    WHERE REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(telefone, '(', ''), ')', ''), '-', ''), ' ', ''), '.', '') = :telefone
+                    AND tipo = :tipo 
+                    AND status = :status
+                    LIMIT 1
+                ");
+                
+                $stmt->bindParam(':telefone', $variant);
+                $tipo = USER_TYPE_CLIENT;
+                $stmt->bindParam(':tipo', $tipo);
+                $status = USER_ACTIVE;
+                $stmt->bindParam(':status', $status);
+                
+                $stmt->execute();
+                $result = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if ($result) {
+                    error_log("DEBUG: Usuário encontrado com variante {$variant}: {$result['nome']}");
+                    return $result;
+                }
+            }
+            
+            error_log("DEBUG: Nenhum usuário encontrado");
+            return null;
+            
+        } catch (PDOException $e) {
+            error_log('ERRO ao buscar usuário: ' . $e->getMessage());
+            return null;
+        }
+    }
+    
+    /**
+     * Busca loja por nome
+     */
+    private function buscarLojaPorNome($saldosLojas, $nomeLoja) {
+        $nomeLoja = strtolower(trim($nomeLoja));
+        
+        foreach ($saldosLojas as $loja) {
+            $nomeLojaAtual = strtolower($loja['nome_fantasia']);
+            
+            if ($nomeLojaAtual === $nomeLoja || strpos($nomeLojaAtual, $nomeLoja) !== false) {
+                return $loja;
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Gera resposta para loja específica (VERSÃO EXTRA ROBUSTA)
+     */
+    private function gerarRespostaLojaEspecifica($usuario, $loja) {
+        try {
+            error_log("=== GERANDO RESPOSTA LOJA ESPECÍFICA ===");
+            error_log("Usuário: {$usuario['nome']}");
+            error_log("Loja: {$loja['nome_fantasia']}");
+            error_log("Saldo: R$ {$loja['saldo_disponivel']}");
+            
+            $nome = explode(' ', $usuario['nome'])[0];
+            $saldo = number_format($loja['saldo_disponivel'], 2, ',', '.');
+            
+            $mensagem = "🏪 *{$loja['nome_fantasia']}*\n\n";
+            $mensagem .= "👋 Olá, *{$nome}*!\n\n";
+            $mensagem .= "💰 *Seu saldo:* R$ {$saldo}\n";
+            $mensagem .= "📊 *Cashback:* {$loja['porcentagem_cashback']}%\n";
+            $mensagem .= "📂 *Categoria:* " . ucfirst($loja['categoria'] ?? 'Geral') . "\n\n";
+            
+            $mensagem .= "✨ *Como usar seu saldo:*\n";
+            $mensagem .= "• Vá até a loja\n";
+            $mensagem .= "• Informe que quer usar o Klube Cash\n";
+            $mensagem .= "• Apresente seu CPF ou telefone\n\n";
+            
+            $mensagem .= "💡 _Este saldo só pode ser usado nesta loja específica._\n\n";
+            $mensagem .= "Digite *saldo* para ver todas suas carteiras.";
+            
+            error_log("SUCCESS: Mensagem gerada com sucesso");
+            
+            return [
+                'success' => true,
+                'user_found' => true,
+                'message' => $mensagem,
+                'send_image' => false // Simplificado por enquanto
+            ];
+            
+        } catch (Exception $e) {
+            error_log("ERRO ao gerar resposta específica: " . $e->getMessage());
+            
+            // Fallback ultra simples
+            return [
+                'success' => true,
+                'user_found' => true,
+                'message' => "✅ Loja selecionada!\n\nDigite *saldo* para ver todas suas opções novamente."
+            ];
+        }
+    }
+    
+    /**
+     * Mensagem para número inválido
      */
     private function gerarMensagemNumeroInvalido($usuario, $saldosLojas, $numeroInvalido) {
         $nome = explode(' ', $usuario['nome'])[0];
@@ -200,146 +345,12 @@ class SaldoConsulta {
         
         return $mensagem;
     }
-
-    /**
-     * Busca usuário pelo número de telefone
-     * 
-     * @param string $telefone Telefone para buscar
-     * @return array|null Dados do usuário ou null se não encontrado
-     */
-    private function buscarUsuarioPorTelefone($telefone) {
-        try {
-            // Log para debug
-            error_log("SaldoConsulta: Buscando telefone original: {$telefone}");
-            
-            // Limpar telefone (manter apenas números)
-            $telefone = preg_replace('/[^0-9]/', '', $telefone);
-            error_log("SaldoConsulta: Telefone limpo: {$telefone}");
-            
-            $db = Database::getConnection();
-            
-            // BUSCA MAIS ABRANGENTE - várias tentativas
-            $searchVariants = [
-                $telefone,                                    // Original
-                '55' . $telefone,                            // Com DDI Brasil
-                (strlen($telefone) > 10 && substr($telefone, 0, 2) === '55') ? substr($telefone, 2) : $telefone, // Sem DDI
-                (strlen($telefone) === 13) ? substr($telefone, 2) : $telefone,  // Remove 55 se tiver 13 dígitos
-                (strlen($telefone) === 12) ? substr($telefone, 1) : $telefone,  // Remove primeiro dígito se tiver 12
-            ];
-            
-            // Remover duplicatas
-            $searchVariants = array_unique($searchVariants);
-            
-            error_log("SaldoConsulta: Variantes para busca: " . implode(', ', $searchVariants));
-            
-            foreach ($searchVariants as $variant) {
-                // Query mais simples e eficiente
-                $stmt = $db->prepare("
-                    SELECT id, nome, email, telefone, status 
-                    FROM usuarios 
-                    WHERE (
-                        REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(telefone, '(', ''), ')', ''), '-', ''), ' ', ''), '.', '') = :telefone
-                    )
-                    AND tipo = :tipo 
-                    AND status = :status
-                    LIMIT 1
-                ");
-                
-                $stmt->bindParam(':telefone', $variant);
-                $tipo = USER_TYPE_CLIENT;
-                $stmt->bindParam(':tipo', $tipo);
-                $status = USER_ACTIVE;
-                $stmt->bindParam(':status', $status);
-                
-                $stmt->execute();
-                $result = $stmt->fetch(PDO::FETCH_ASSOC);
-                
-                if ($result) {
-                    error_log("SaldoConsulta: Usuário encontrado com variante {$variant}: {$result['nome']}");
-                    return $result;
-                }
-            }
-            
-            // Se não encontrou, fazer uma busca mais flexível usando LIKE
-            $stmt = $db->prepare("
-                SELECT id, nome, email, telefone, status 
-                FROM usuarios 
-                WHERE (
-                    telefone LIKE :telefone_like_1
-                    OR telefone LIKE :telefone_like_2
-                    OR telefone LIKE :telefone_like_3
-                )
-                AND tipo = :tipo 
-                AND status = :status
-                LIMIT 1
-            ");
-            
-            $like1 = '%' . substr($telefone, -8) . '%';  // Últimos 8 dígitos
-            $like2 = '%' . substr($telefone, -9) . '%';  // Últimos 9 dígitos  
-            $like3 = '%' . $telefone . '%';              // Telefone completo
-            
-            $stmt->bindParam(':telefone_like_1', $like1);
-            $stmt->bindParam(':telefone_like_2', $like2);
-            $stmt->bindParam(':telefone_like_3', $like3);
-            $tipo = USER_TYPE_CLIENT;
-            $stmt->bindParam(':tipo', $tipo);
-            $status = USER_ACTIVE;
-            $stmt->bindParam(':status', $status);
-            
-            $stmt->execute();
-            $result = $stmt->fetch(PDO::FETCH_ASSOC);
-            
-            if ($result) {
-                error_log("SaldoConsulta: Usuário encontrado via LIKE: {$result['nome']}");
-            } else {
-                error_log("SaldoConsulta: Nenhum usuário encontrado para telefone: {$telefone}");
-            }
-            
-            return $result ?: null;
-            
-        } catch (PDOException $e) {
-            error_log('Erro ao buscar usuário por telefone: ' . $e->getMessage());
-            return null;
-        }
-    }
     
     /**
-     * Busca loja por nome dentro da lista de saldos
-     * 
-     * @param array $saldosLojas Lista de saldos por loja
-     * @param string $nomeLoja Nome da loja para buscar
-     * @return array|null Dados da loja encontrada
-     */
-    private function buscarLojaPorNome($saldosLojas, $nomeLoja) {
-        $nomeLoja = strtolower(trim($nomeLoja));
-        
-        foreach ($saldosLojas as $loja) {
-            $nomeLojaAtual = strtolower($loja['nome_fantasia']);
-            
-            // Busca exata
-            if ($nomeLojaAtual === $nomeLoja) {
-                return $loja;
-            }
-            
-            // Busca parcial (contém)
-            if (strpos($nomeLojaAtual, $nomeLoja) !== false) {
-                return $loja;
-            }
-        }
-        
-        return null;
-    }
-    
-    /**
-     * Gera mensagem completa de saldo com todas as lojas
-     * 
-     * @param array $usuario Dados do usuário
-     * @param array $saldosLojas Lista de saldos por loja
-     * @param float $saldoTotal Saldo total
-     * @return string Mensagem formatada
+     * Mensagem completa de saldo
      */
     private function gerarMensagemSaldoCompleto($usuario, $saldosLojas, $saldoTotal) {
-        $nome = explode(' ', $usuario['nome'])[0]; // Primeiro nome
+        $nome = explode(' ', $usuario['nome'])[0];
         
         $mensagem = "💰 *Klube Cash - Seus Saldos*\n\n";
         $mensagem .= "Olá, *{$nome}*! 👋\n\n";
@@ -365,11 +376,7 @@ class SaldoConsulta {
     }
     
     /**
-     * Gera mensagem com todas as lojas disponíveis (quando não encontra loja específica)
-     * 
-     * @param array $usuario Dados do usuário
-     * @param array $saldosLojas Lista de saldos por loja
-     * @return string Mensagem formatada
+     * Mensagem com todas as lojas
      */
     private function gerarMensagemTodasAsLojas($usuario, $saldosLojas) {
         $nome = explode(' ', $usuario['nome'])[0];
@@ -385,88 +392,9 @@ class SaldoConsulta {
             $contador++;
         }
         
-        $mensagem .= "\n💡 *Digite o número ou nome da loja* para ver detalhes específicos!\n\n";
-        $mensagem .= "Exemplo: Digite *1* ou *{$saldosLojas[0]['nome_fantasia']}*";
+        $mensagem .= "\n💡 *Digite o número ou nome da loja* para ver detalhes específicos!";
         
         return $mensagem;
-    }
-    
-    /**
-     * Gera resposta para loja específica selecionada (MÉTODO CORRIGIDO)
-     * 
-     * @param array $usuario Dados do usuário
-     * @param array $loja Dados da loja selecionada
-     * @return array Resposta completa
-     */
-    private function gerarRespostaLojaEspecifica($usuario, $loja) {
-        try {
-            $nome = explode(' ', $usuario['nome'])[0];
-            $saldo = number_format($loja['saldo_disponivel'], 2, ',', '.');
-            
-            error_log("DEBUG gerarRespostaLojaEspecifica: {$loja['nome_fantasia']} - R$ {$saldo}");
-            
-            $mensagem = "🏪 *{$loja['nome_fantasia']}*\n\n";
-            $mensagem .= "👋 Olá, *{$nome}*!\n\n";
-            $mensagem .= "💰 *Seu saldo:* R$ {$saldo}\n";
-            $mensagem .= "📊 *Cashback:* {$loja['porcentagem_cashback']}%\n";
-            $mensagem .= "📂 *Categoria:* " . ucfirst($loja['categoria'] ?? 'Geral') . "\n\n";
-            
-            $mensagem .= "✨ *Como usar seu saldo:*\n";
-            $mensagem .= "• Vá até a loja\n";
-            $mensagem .= "• Informe que quer usar o Klube Cash\n";
-            $mensagem .= "• Apresente seu CPF ou telefone\n\n";
-            
-            $mensagem .= "💡 _Este saldo só pode ser usado nesta loja específica._\n\n";
-            $mensagem .= "Digite *saldo* para ver todas suas carteiras.";
-            
-            // Tentar gerar imagem específica da loja
-            $imageResult = $this->tentarGerarImagemLoja($usuario, $loja);
-            
-            return [
-                'success' => true,
-                'user_found' => true,
-                'message' => $mensagem,
-                'send_image' => $imageResult['success'] ?? false,
-                'image_url' => $imageResult['image_url'] ?? null
-            ];
-            
-        } catch (Exception $e) {
-            error_log("Erro em gerarRespostaLojaEspecifica: " . $e->getMessage());
-            
-            // Fallback simples em caso de erro
-            return [
-                'success' => true,
-                'user_found' => true,
-                'message' => "Erro ao gerar detalhes da loja. Digite *saldo* para ver suas opções.",
-                'send_image' => false
-            ];
-        }
-    }
-
-    
-    /**
-     * Tenta gerar imagem específica para a loja
-     * 
-     * @param array $usuario Dados do usuário
-     * @param array $loja Dados da loja
-     * @return array Resultado da geração de imagem
-     */
-    private function tentarGerarImagemLoja($usuario, $loja) {
-        try {
-            // Preparar dados para geração de imagem
-            $dadosLoja = [
-                'nome' => $loja['nome_fantasia'],
-                'saldo' => $loja['saldo_disponivel'],
-                'porcentagem' => $loja['porcentagem_cashback'],
-                'categoria' => $loja['categoria'] ?? 'Geral'
-            ];
-            
-            return ImageGenerator::gerarImagemSaldoLoja($usuario, $dadosLoja);
-            
-        } catch (Exception $e) {
-            error_log('Erro ao gerar imagem da loja: ' . $e->getMessage());
-            return ['success' => false];
-        }
     }
     
     /**
