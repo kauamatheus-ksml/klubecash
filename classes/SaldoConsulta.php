@@ -209,21 +209,64 @@ class SaldoConsulta {
      */
     private function buscarUsuarioPorTelefone($telefone) {
         try {
-            error_log("DEBUG: Buscando usuário para telefone: {$telefone}");
+            error_log("=== BUSCA DE TELEFONE ===");
+            error_log("TELEFONE RECEBIDO: {$telefone}");
             
-            // Limpar telefone
+            // Limpar telefone (manter apenas números)
             $telefoneClean = preg_replace('/[^0-9]/', '', $telefone);
+            error_log("TELEFONE LIMPO: {$telefoneClean}");
             
-            // Variantes de busca
-            $searchVariants = [
-                $telefoneClean,
-                '55' . $telefoneClean,
-                (strlen($telefoneClean) > 10 && substr($telefoneClean, 0, 2) === '55') ? substr($telefoneClean, 2) : $telefoneClean
-            ];
+            // CRIAR TODAS AS VARIANTES POSSÍVEIS
+            $searchVariants = [];
             
+            // 1. Número original
+            $searchVariants[] = $telefoneClean;
+            
+            // 2. Com DDI 55
+            $searchVariants[] = '55' . $telefoneClean;
+            
+            // 3. Sem DDI (remover 55 do início se tiver)
+            if (strlen($telefoneClean) >= 12 && substr($telefoneClean, 0, 2) === '55') {
+                $searchVariants[] = substr($telefoneClean, 2);
+            }
+            
+            // 4. CORREÇÃO ESPECÍFICA: Se tiver 12 dígitos e começar com 55, pode estar faltando um dígito
+            if (strlen($telefoneClean) === 12 && substr($telefoneClean, 0, 2) === '55') {
+                // 553891045205 -> extrair DDD e número
+                $ddd = substr($telefoneClean, 2, 2); // 38
+                $numero = substr($telefoneClean, 4);  // 91045205
+                
+                // Reconstruir com 9 adicional para celular
+                $numeroComNove = $ddd . '9' . $numero; // 38991045205
+                $searchVariants[] = $numeroComNove;
+                
+                error_log("CORREÇÃO CELULAR: {$telefoneClean} -> {$numeroComNove}");
+            }
+            
+            // 5. Se tiver 13 dígitos, remover DDI
+            if (strlen($telefoneClean) === 13 && substr($telefoneClean, 0, 2) === '55') {
+                $searchVariants[] = substr($telefoneClean, 2);
+            }
+            
+            // 6. Se tiver 11 dígitos, pode precisar adicionar DDI
+            if (strlen($telefoneClean) === 11) {
+                $searchVariants[] = '55' . $telefoneClean;
+            }
+            
+            // 7. VARIANTE ESPECIAL para o caso específico do usuário
+            // Se receber 553891045205, tentar 38991045205
+            if ($telefoneClean === '553891045205') {
+                $searchVariants[] = '38991045205';
+            }
+            
+            // Remover duplicatas e logar
             $searchVariants = array_unique($searchVariants);
+            error_log("VARIANTES PARA BUSCA: " . implode(', ', $searchVariants));
             
+            // TENTAR BUSCAR COM CADA VARIANTE
             foreach ($searchVariants as $variant) {
+                error_log("TESTANDO VARIANTE: {$variant}");
+                
                 $stmt = $this->db->prepare("
                     SELECT id, nome, email, telefone, status 
                     FROM usuarios 
@@ -243,12 +286,55 @@ class SaldoConsulta {
                 $result = $stmt->fetch(PDO::FETCH_ASSOC);
                 
                 if ($result) {
-                    error_log("DEBUG: Usuário encontrado com variante {$variant}: {$result['nome']}");
+                    error_log("✅ SUCESSO! Usuário encontrado com variante: {$variant}");
+                    error_log("USUÁRIO: {$result['nome']} - ID: {$result['id']}");
                     return $result;
+                } else {
+                    error_log("❌ Não encontrado com variante: {$variant}");
                 }
             }
             
-            error_log("DEBUG: Nenhum usuário encontrado");
+            // SE NÃO ENCONTROU, TENTAR BUSCA MAIS FLEXÍVEL
+            error_log("TENTANDO BUSCA FLEXÍVEL COM LIKE...");
+            
+            // Pegar últimos 8 dígitos para busca flexível
+            $ultimosDigitos = substr($telefoneClean, -8);
+            error_log("ÚLTIMOS 8 DÍGITOS: {$ultimosDigitos}");
+            
+            $stmt = $this->db->prepare("
+                SELECT id, nome, email, telefone, status 
+                FROM usuarios 
+                WHERE REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(telefone, '(', ''), ')', ''), '-', ''), ' ', ''), '.', '') LIKE :telefone_like
+                AND tipo = :tipo 
+                AND status = :status
+                LIMIT 1
+            ");
+            
+            $likePattern = '%' . $ultimosDigitos;
+            $stmt->bindParam(':telefone_like', $likePattern);
+            $tipo = USER_TYPE_CLIENT;
+            $stmt->bindParam(':tipo', $tipo);
+            $status = USER_ACTIVE;
+            $stmt->bindParam(':status', $status);
+            
+            $stmt->execute();
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($result) {
+                error_log("✅ SUCESSO COM LIKE! Usuário: {$result['nome']}");
+                return $result;
+            }
+            
+            error_log("❌ NENHUM USUÁRIO ENCONTRADO PARA: {$telefone}");
+            
+            // DEBUG: Mostrar todos os telefones cadastrados para comparação
+            $allPhones = $this->db->query("SELECT telefone FROM usuarios WHERE tipo = 'cliente' AND status = 'ativo'");
+            error_log("=== TELEFONES CADASTRADOS NO SISTEMA ===");
+            while ($phone = $allPhones->fetch(PDO::FETCH_ASSOC)) {
+                $phoneClean = preg_replace('/[^0-9]/', '', $phone['telefone']);
+                error_log("TELEFONE BD: {$phone['telefone']} -> LIMPO: {$phoneClean}");
+            }
+            
             return null;
             
         } catch (PDOException $e) {
