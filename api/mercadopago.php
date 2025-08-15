@@ -125,13 +125,12 @@ function createPixPaymentWithFullData() {
     try {
         $db = Database::getConnection();
         
-        // ✅ CORREÇÃO: Buscar dados COMPLETOS incluindo CPF do proprietário da loja
+        // Buscar dados COMPLETOS do pagamento e da loja
         $stmt = $db->prepare("
             SELECT p.*, l.nome_fantasia, l.email, l.telefone, l.cnpj,
                    le.cep, le.logradouro, le.numero, le.complemento, 
                    le.bairro, le.cidade, le.estado,
-                   u.nome as loja_proprietario_nome, u.telefone as loja_proprietario_telefone,
-                   u.cpf as loja_proprietario_cpf, u.email as loja_proprietario_email
+                   u.nome as loja_proprietario_nome, u.telefone as loja_proprietario_telefone
             FROM pagamentos_comissao p
             JOIN lojas l ON p.loja_id = l.id 
             LEFT JOIN lojas_endereco le ON l.id = le.loja_id
@@ -154,39 +153,10 @@ function createPixPaymentWithFullData() {
             return;
         }
         
-        // ✅ CORREÇÃO CRÍTICA: Validar CPF do proprietário da loja
-        $proprietarioCpf = $payment['loja_proprietario_cpf'] ?? '';
-        $proprietarioCpfLimpo = preg_replace('/\D/', '', $proprietarioCpf);
-        
-        // Se não tem CPF válido, usar dados alternativos ou criar CPF de teste
-        if (empty($proprietarioCpfLimpo) || strlen($proprietarioCpfLimpo) !== 11) {
-            error_log("DIAGNÓSTICO: CPF do proprietário inválido ou vazio: '{$proprietarioCpf}'");
-            
-            // Para CNPJ, vamos usar um CPF genérico válido para testes (pode ser configurado)
-            $proprietarioCpfLimpo = '00000000191'; // CPF válido genérico para testes
-            
-            // Ou podemos recusar o pagamento e pedir para completar o cadastro
-            /*
-            echo json_encode([
-                'status' => false, 
-                'message' => 'CPF do proprietário da loja é obrigatório para pagamentos PIX. Complete o cadastro no perfil.',
-                'error_type' => 'cpf_required',
-                'action_required' => 'update_profile'
-            ]);
-            return;
-            */
-        }
-        
-        // Validar dígitos verificadores do CPF
-        if (!$this->validarDigitosCPF($proprietarioCpfLimpo)) {
-            error_log("DIAGNÓSTICO: CPF do proprietário tem dígitos verificadores inválidos");
-            $proprietarioCpfLimpo = '00000000191'; // Fallback para CPF válido
-        }
-        
         // Gerar device_id único para este pagamento (recomendado pelo MP)
         $deviceId = 'device_' . md5($payment['loja_id'] . '_' . $payment['id'] . '_' . time());
         
-        // ✅ CORREÇÃO: Preparar dados COMPLETOS com CPF VÁLIDO para Mercado Pago
+        // Preparar dados COMPLETOS para Mercado Pago (QUALIDADE MÁXIMA)
         $paymentData = [
             // Dados básicos obrigatórios
             'amount' => floatval($payment['valor_total']),
@@ -196,13 +166,13 @@ function createPixPaymentWithFullData() {
             'store_id' => $payment['loja_id'],
             'device_id' => $deviceId,
             
-            // ✅ DADOS CORRETOS DO PAGADOR (pessoa física)
-            'payer_email' => $payment['loja_proprietario_email'] ?? $payment['email'] ?? 'loja@klubecash.com',
+            // Dados COMPLETOS do pagador (MELHORA MUITO A APROVAÇÃO)
+            'payer_email' => !empty($payment['email']) ? $payment['email'] : 'loja@klubecash.com',
             'payer_name' => $payment['loja_proprietario_nome'] ?? $payment['nome_fantasia'],
-            'payer_lastname' => 'Silva', // Sobrenome genérico se não especificado
-            'payer_phone' => $payment['loja_proprietario_telefone'] ?? $payment['telefone'],
-            'payer_cpf' => $proprietarioCpfLimpo, // ✅ CPF VÁLIDO DE PESSOA FÍSICA
-            'payer_registration_date' => date('Y-m-d\TH:i:s', strtotime('-1 year')),
+            'payer_lastname' => 'Klube Cash',
+            'payer_phone' => $payment['telefone'] ?? $payment['loja_proprietario_telefone'],
+            'payer_cpf' => $payment['cnpj'], // CNPJ da loja
+            'payer_registration_date' => date('Y-m-d\TH:i:s', strtotime('-1 year')), // Data fictícia de cadastro
             
             // Endereço COMPLETO (MELHORA APROVAÇÃO)
             'payer_address' => [
@@ -214,14 +184,14 @@ function createPixPaymentWithFullData() {
                 'federal_unit' => $payment['estado'] ?? 'MG'
             ],
             
-            // Detalhes COMPLETOS do item
+            // Detalhes COMPLETOS do item (OBRIGATÓRIO PARA BOA APROVAÇÃO)
             'item_id' => 'COMISSAO_KC_' . $payment['id'],
             'item_title' => 'Comissão Klube Cash',
             'item_description' => 'Pagamento de comissão para liberação de cashback aos clientes',
             'item_category' => 'services'
         ];
         
-        error_log("DIAGNÓSTICO: Dados CORRIGIDOS preparados para MP: " . json_encode($paymentData));
+        error_log("DIAGNÓSTICO: Dados COMPLETOS preparados para MP: " . json_encode($paymentData));
         
         // Verificar se conseguimos criar o cliente do MP
         try {
@@ -269,7 +239,7 @@ function createPixPaymentWithFullData() {
                 UPDATE pagamentos_comissao 
                 SET mp_payment_id = ?, mp_qr_code = ?, mp_qr_code_base64 = ?, 
                     metodo_pagamento = 'pix_mercadopago', status = 'pix_aguardando',
-                    observacao = CONCAT(COALESCE(observacao, ''), ' - Device ID: {$deviceId} - CPF: {$proprietarioCpfLimpo}')
+                    observacao = CONCAT(COALESCE(observacao, ''), ' - Device ID: {$deviceId}')
                 WHERE id = ?
             ");
             
@@ -295,8 +265,7 @@ function createPixPaymentWithFullData() {
                     'qr_code' => $mpPayment['qr_code'],
                     'qr_code_base64' => $mpPayment['qr_code_base64'],
                     'status' => $mpPayment['status'],
-                    'device_id' => $deviceId,
-                    'cpf_usado' => substr($proprietarioCpfLimpo, 0, 3) . '***' . substr($proprietarioCpfLimpo, -2)
+                    'device_id' => $deviceId
                 ]
             ]);
         } else {
