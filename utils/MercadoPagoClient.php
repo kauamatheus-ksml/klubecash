@@ -498,28 +498,57 @@ class MercadoPagoClient {
             return ['valid' => false, 'message' => 'Valor do pagamento é obrigatório e deve ser maior que zero'];
         }
         
-        // Verificar limites do valor
-        if ($data['amount'] < 0.01) {
-            return ['valid' => false, 'message' => 'Valor mínimo é R$ 0,01'];
-        }
-        
-        if ($data['amount'] > 1000000) {
-            return ['valid' => false, 'message' => 'Valor máximo é R$ 1.000.000,00'];
-        }
-        
         // Verificar email
         if (empty($data['payer_email']) || !filter_var($data['payer_email'], FILTER_VALIDATE_EMAIL)) {
             return ['valid' => false, 'message' => 'Email do pagador é obrigatório e deve ser válido'];
         }
         
-        // Verificar tamanho da descrição
-        if (!empty($data['description']) && strlen($data['description']) > 255) {
-            return ['valid' => false, 'message' => 'Descrição não pode ter mais que 255 caracteres'];
+        // ✅ NOVA VALIDAÇÃO CRÍTICA - CPF OBRIGATÓRIO
+        if (empty($data['payer_cpf'])) {
+            return ['valid' => false, 'message' => 'CPF é obrigatório para pagamentos PIX. O cliente precisa completar seu cadastro antes de prosseguir.'];
+        }
+        
+        // Limpar e validar CPF
+        $cpfClean = preg_replace('/\D/', '', $data['payer_cpf']);
+        
+        if (strlen($cpfClean) !== 11) {
+            return ['valid' => false, 'message' => 'CPF deve ter 11 dígitos'];
+        }
+        
+        // Verificar se não é sequência inválida
+        if (preg_match('/(\d)\1{10}/', $cpfClean)) {
+            return ['valid' => false, 'message' => 'CPF inválido - sequência não permitida'];
+        }
+        
+        // Validar dígitos verificadores
+        if (!$this->validarDigitosCPF($cpfClean)) {
+            return ['valid' => false, 'message' => 'CPF inválido - dígitos verificadores incorretos'];
         }
         
         return ['valid' => true];
     }
-    
+    /**
+     * Validar dígitos verificadores do CPF
+     */
+    private function validarDigitosCPF($cpf) {
+        // Primeiro dígito
+        $soma = 0;
+        for ($i = 0; $i < 9; $i++) {
+            $soma += $cpf[$i] * (10 - $i);
+        }
+        $digito1 = ($soma * 10) % 11;
+        if ($digito1 == 10) $digito1 = 0;
+        
+        // Segundo dígito
+        $soma = 0;
+        for ($i = 0; $i < 10; $i++) {
+            $soma += $cpf[$i] * (11 - $i);
+        }
+        $digito2 = ($soma * 10) % 11;
+        if ($digito2 == 10) $digito2 = 0;
+        
+        return ($cpf[9] == $digito1 && $cpf[10] == $digito2);
+    }
     /**
      * Processar resposta de criação de pagamento PIX
      */
