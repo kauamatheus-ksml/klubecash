@@ -2342,50 +2342,7 @@ function showVisitorOption() {
         }
     }
 }
-// === CONTROLE DINÂMICO DE VALIDAÇÃO ===
-function updateFieldValidation() {
-    const valorTotalField = document.getElementById('valor_total');
-    const codigoTransacaoField = document.getElementById('codigo_transacao');
-    
-    // Se estamos no step 2 ou posterior, ativar validação
-    if (currentStep >= 2) {
-        valorTotalField.setAttribute('required', 'required');
-        codigoTransacaoField.setAttribute('required', 'required');
-    } else {
-        // Se não chegou no step 2, remover validação HTML5
-        valorTotalField.removeAttribute('required');
-        codigoTransacaoField.removeAttribute('required');
-    }
-}
 
-// ATUALIZAR A FUNÇÃO goToStep para incluir controle de validação:
-function goToStep(step) {
-    // Validar passo atual antes de prosseguir
-    if (step > currentStep && !validateCurrentStep()) {
-        return;
-    }
-
-    // Esconder todos os cards
-    document.querySelectorAll('.step-card').forEach(card => {
-        card.classList.remove('active');
-    });
-
-    // Mostrar card do passo atual
-    document.getElementById(`stepCard${step}`).classList.add('active');
-
-    // Atualizar progresso
-    currentStep = step;
-    updateProgressBar();
-    updateFieldValidation(); // ADICIONAR ESTA LINHA
-
-    // Atualizar resumo se for o último passo
-    if (step === 4) {
-        updateSummary();
-    }
-
-    // Scroll para o topo
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-}
 function hideVisitorSection() {
     const visitorSection = document.getElementById('visitor-client-section');
     if (visitorSection) {
