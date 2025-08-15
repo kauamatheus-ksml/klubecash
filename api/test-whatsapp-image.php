@@ -47,7 +47,7 @@ try {
         // Agora vamos tentar enviar via WhatsApp
         echo "<h3>📱 Enviando para WhatsApp...</h3>";
         
-        $phoneNumber = '389910452056';
+        $phoneNumber = '38991045205';
         $webhookData = [
             'phone' => $phoneNumber,
             'image_url' => $resultado['file_url'],
