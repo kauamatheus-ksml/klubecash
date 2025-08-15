@@ -360,46 +360,79 @@ class SaldoConsulta {
         return null;
     }
     
+
+
     /**
      * Gera resposta para loja específica (VERSÃO EXTRA ROBUSTA)
      */
     private function gerarRespostaLojaEspecifica($usuario, $loja) {
         try {
-            error_log("=== GERANDO RESPOSTA LOJA ESPECÍFICA ===");
+            error_log("=== GERANDO RESPOSTA LOJA ESPECÍFICA COM SALDO PENDENTE ===");
             error_log("Usuário: {$usuario['nome']}");
             error_log("Loja: {$loja['nome_fantasia']}");
-            error_log("Saldo: R$ {$loja['saldo_disponivel']}");
+            error_log("Saldo Disponível: R$ {$loja['saldo_disponivel']}");
             
             $nome = explode(' ', $usuario['nome'])[0];
-            $saldo = number_format($loja['saldo_disponivel'], 2, ',', '.');
+            $saldoDisponivel = number_format($loja['saldo_disponivel'], 2, ',', '.');
             
+            // BUSCAR SALDO PENDENTE PARA ESTA LOJA ESPECÍFICA
+            $saldoPendente = $this->buscarSaldoPendenteLoja($usuario['id'], $loja['loja_id']);
+            error_log("Saldo Pendente: R$ {$saldoPendente}");
+            
+            // INÍCIO DA MENSAGEM
             $mensagem = "🏪 *{$loja['nome_fantasia']}*\n\n";
             $mensagem .= "👋 Olá, *{$nome}*!\n\n";
-            $mensagem .= "💰 *Seu saldo:* R$ {$saldo}\n";
+            
+            // SEÇÃO DE SALDOS (DISPONÍVEL + PENDENTE)
+            $mensagem .= "💰 *Seu saldo disponível:* R$ {$saldoDisponivel}\n";
+            
+            if ($saldoPendente > 0) {
+                $saldoPendenteFormatado = number_format($saldoPendente, 2, ',', '.');
+                $mensagem .= "⏳ *Saldo pendente:* R$ {$saldoPendenteFormatado}\n";
+                $mensagem .= "   _aguardando confirmação da loja_\n\n";
+                
+                // SALDO TOTAL (DISPONÍVEL + PENDENTE)
+                $saldoTotal = $loja['saldo_disponivel'] + $saldoPendente;
+                $saldoTotalFormatado = number_format($saldoTotal, 2, ',', '.');
+                $mensagem .= "💎 *Saldo total:* R$ {$saldoTotalFormatado}\n\n";
+            } else {
+                $mensagem .= "\n";
+            }
+            
+            // INFORMAÇÕES DA LOJA
             $mensagem .= "📊 *Cashback:* {$loja['porcentagem_cashback']}%\n";
             $mensagem .= "📂 *Categoria:* " . ucfirst($loja['categoria'] ?? 'Geral') . "\n\n";
             
+            // COMO USAR O SALDO
             $mensagem .= "✨ *Como usar seu saldo:*\n";
             $mensagem .= "• Vá até a loja\n";
             $mensagem .= "• Informe que quer usar o Klube Cash\n";
             $mensagem .= "• Apresente seu CPF ou telefone\n\n";
             
+            // INFORMAÇÕES ADICIONAIS SE TIVER SALDO PENDENTE
+            if ($saldoPendente > 0) {
+                $mensagem .= "⏳ *Sobre o saldo pendente:*\n";
+                $mensagem .= "• Aguardando confirmação da loja\n";
+                $mensagem .= "• Será liberado em até 48h\n";
+                $mensagem .= "• Você receberá notificação\n\n";
+            }
+            
             $mensagem .= "💡 _Este saldo só pode ser usado nesta loja específica._\n\n";
             $mensagem .= "Digite *saldo* para ver todas suas carteiras.";
             
-            error_log("SUCCESS: Mensagem gerada com sucesso");
+            error_log("SUCCESS: Mensagem com saldo pendente gerada");
             
             return [
                 'success' => true,
                 'user_found' => true,
                 'message' => $mensagem,
-                'send_image' => false // Simplificado por enquanto
+                'send_image' => false
             ];
             
         } catch (Exception $e) {
             error_log("ERRO ao gerar resposta específica: " . $e->getMessage());
             
-            // Fallback ultra simples
+            // Fallback simples
             return [
                 'success' => true,
                 'user_found' => true,
@@ -408,6 +441,45 @@ class SaldoConsulta {
         }
     }
     
+
+    /**
+     * Busca saldo pendente do usuário em uma loja específica
+     * 
+     * @param int $userId ID do usuário
+     * @param int $lojaId ID da loja
+     * @return float Valor do saldo pendente
+     */
+    private function buscarSaldoPendenteLoja($userId, $lojaId) {
+        try {
+            error_log("BUSCANDO SALDO PENDENTE: usuário={$userId}, loja={$lojaId}");
+            
+            $stmt = $this->db->prepare("
+                SELECT COALESCE(SUM(valor_cliente), 0) as saldo_pendente
+                FROM transacoes_cashback 
+                WHERE usuario_id = :user_id 
+                AND loja_id = :loja_id 
+                AND status = :status
+            ");
+            
+            $stmt->bindParam(':user_id', $userId);
+            $stmt->bindParam(':loja_id', $lojaId);
+            $status = 'pendente'; // ou TRANSACTION_PENDING se estiver definido
+            $stmt->bindParam(':status', $status);
+            
+            $stmt->execute();
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            $saldoPendente = $result ? floatval($result['saldo_pendente']) : 0.00;
+            
+            error_log("SALDO PENDENTE ENCONTRADO: R$ {$saldoPendente}");
+            
+            return $saldoPendente;
+            
+        } catch (PDOException $e) {
+            error_log('ERRO ao buscar saldo pendente: ' . $e->getMessage());
+            return 0.00;
+        }
+    }
     /**
      * Mensagem para número inválido
      */
