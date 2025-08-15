@@ -146,35 +146,93 @@ class SaldoConsulta {
      */
     private function buscarUsuarioPorTelefone($telefone) {
         try {
+            // Log para debug
+            error_log("SaldoConsulta: Buscando telefone original: {$telefone}");
+            
             // Limpar telefone (manter apenas números)
             $telefone = preg_replace('/[^0-9]/', '', $telefone);
+            error_log("SaldoConsulta: Telefone limpo: {$telefone}");
             
-            // Buscar usuário por telefone (com diferentes formatos)
-            $stmt = $this->db->prepare("
+            $db = Database::getConnection();
+            
+            // BUSCA MAIS ABRANGENTE - várias tentativas
+            $searchVariants = [
+                $telefone,                                    // Original
+                '55' . $telefone,                            // Com DDI Brasil
+                (strlen($telefone) > 10 && substr($telefone, 0, 2) === '55') ? substr($telefone, 2) : $telefone, // Sem DDI
+                (strlen($telefone) === 13) ? substr($telefone, 2) : $telefone,  // Remove 55 se tiver 13 dígitos
+                (strlen($telefone) === 12) ? substr($telefone, 1) : $telefone,  // Remove primeiro dígito se tiver 12
+            ];
+            
+            // Remover duplicatas
+            $searchVariants = array_unique($searchVariants);
+            
+            error_log("SaldoConsulta: Variantes para busca: " . implode(', ', $searchVariants));
+            
+            foreach ($searchVariants as $variant) {
+                // Query mais simples e eficiente
+                $stmt = $db->prepare("
+                    SELECT id, nome, email, telefone, status 
+                    FROM usuarios 
+                    WHERE (
+                        REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(telefone, '(', ''), ')', ''), '-', ''), ' ', ''), '.', '') = :telefone
+                    )
+                    AND tipo = :tipo 
+                    AND status = :status
+                    LIMIT 1
+                ");
+                
+                $stmt->bindParam(':telefone', $variant);
+                $tipo = USER_TYPE_CLIENT;
+                $stmt->bindParam(':tipo', $tipo);
+                $status = USER_ACTIVE;
+                $stmt->bindParam(':status', $status);
+                
+                $stmt->execute();
+                $result = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if ($result) {
+                    error_log("SaldoConsulta: Usuário encontrado com variante {$variant}: {$result['nome']}");
+                    return $result;
+                }
+            }
+            
+            // Se não encontrou, fazer uma busca mais flexível usando LIKE
+            $stmt = $db->prepare("
                 SELECT id, nome, email, telefone, status 
                 FROM usuarios 
                 WHERE (
-                    REPLACE(REPLACE(REPLACE(REPLACE(telefone, '(', ''), ')', ''), '-', ''), ' ', '') = :telefone
-                    OR REPLACE(REPLACE(REPLACE(REPLACE(telefone, '(', ''), ')', ''), '-', ''), ' ', '') = :telefone_with_55
-                    OR REPLACE(REPLACE(REPLACE(REPLACE(telefone, '(', ''), ')', ''), '-', ''), ' ', '') = :telefone_without_55
-                ) 
+                    telefone LIKE :telefone_like_1
+                    OR telefone LIKE :telefone_like_2
+                    OR telefone LIKE :telefone_like_3
+                )
                 AND tipo = :tipo 
                 AND status = :status
+                LIMIT 1
             ");
             
-            $stmt->bindParam(':telefone', $telefone);
-            $telefoneWith55 = '55' . $telefone;
-            $stmt->bindParam(':telefone_with_55', $telefoneWith55);
-            $telefoneWithout55 = substr($telefone, 2); // Remove 55 se existir
-            $stmt->bindParam(':telefone_without_55', $telefoneWithout55);
+            $like1 = '%' . substr($telefone, -8) . '%';  // Últimos 8 dígitos
+            $like2 = '%' . substr($telefone, -9) . '%';  // Últimos 9 dígitos  
+            $like3 = '%' . $telefone . '%';              // Telefone completo
+            
+            $stmt->bindParam(':telefone_like_1', $like1);
+            $stmt->bindParam(':telefone_like_2', $like2);
+            $stmt->bindParam(':telefone_like_3', $like3);
             $tipo = USER_TYPE_CLIENT;
             $stmt->bindParam(':tipo', $tipo);
             $status = USER_ACTIVE;
             $stmt->bindParam(':status', $status);
             
             $stmt->execute();
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
             
-            return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+            if ($result) {
+                error_log("SaldoConsulta: Usuário encontrado via LIKE: {$result['nome']}");
+            } else {
+                error_log("SaldoConsulta: Nenhum usuário encontrado para telefone: {$telefone}");
+            }
+            
+            return $result ?: null;
             
         } catch (PDOException $e) {
             error_log('Erro ao buscar usuário por telefone: ' . $e->getMessage());
