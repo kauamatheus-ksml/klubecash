@@ -142,67 +142,68 @@ async function processarConsultaSaldo(phoneNumber) {
         
         if (response.data && response.data.success) {
             
-            // ENVIAR IMAGEM USANDO VENOM-BOT (sintaxe correta)
-            if (response.data.send_image && response.data.image_url) {
-                console.log('🖼️ Enviando imagem do saldo:', response.data.image_url);
+            // FORÇAR GERAÇÃO E ENVIO DE IMAGEM (SEMPRE)
+            console.log('🖼️ FORÇANDO geração de imagem...');
+            
+            try {
+                // Gerar imagem direto via API
+                const imageGenResponse = await axios.post('https://klubecash.com/api/generate-saldo-image.php', {
+                    phone: cleanPhone,
+                    secret: CONFIG.webhookSecret
+                }, {
+                    timeout: 10000,
+                    headers: { 'Content-Type': 'application/json' }
+                });
                 
-                try {
-                    // MÉTODO 1: sendImageFromUrl (venom-bot)
-                    await client.sendImageFromUrl(
+                console.log('🖼️ Resposta da geração de imagem:', imageGenResponse.data);
+                
+                if (imageGenResponse.data.success && imageGenResponse.data.image_url) {
+                    console.log('📤 Enviando imagem:', imageGenResponse.data.image_url);
+                    
+                    // Baixar e enviar como base64 (método mais confiável)
+                    const imgData = await axios.get(imageGenResponse.data.image_url, {
+                        responseType: 'arraybuffer'
+                    });
+                    
+                    const base64 = Buffer.from(imgData.data).toString('base64');
+                    
+                    await client.sendImageFromBase64(
                         phoneNumber,
-                        response.data.image_url,
-                        'saldo-klube-cash',
-                        '💰 Seu Saldo Atualizado'
+                        base64,
+                        'saldo-klube-cash.png',
+                        '💰 Seu Saldo Klube Cash'
                     );
                     
-                    console.log('✅ Imagem enviada via sendImageFromUrl!');
-                    
-                } catch (imageError1) {
-                    console.log('❌ Erro no sendImageFromUrl:', imageError1.message);
-                    
-                    try {
-                        // MÉTODO 2: sendFileFromUrl (venom-bot)
-                        await client.sendFileFromUrl(
-                            phoneNumber,
-                            response.data.image_url,
-                            'saldo-klube-cash.png',
-                            '💰 Seu Saldo Atualizado'
-                        );
-                        
-                        console.log('✅ Imagem enviada via sendFileFromUrl!');
-                        
-                    } catch (imageError2) {
-                        console.log('❌ Erro no sendFileFromUrl:', imageError2.message);
-                        
-                        try {
-                            // MÉTODO 3: Baixar e enviar via base64
-                            const imageResponse = await axios.get(response.data.image_url, {
-                                responseType: 'arraybuffer'
-                            });
-                            
-                            const imageBuffer = Buffer.from(imageResponse.data);
-                            const imageBase64 = imageBuffer.toString('base64');
-                            
-                            await client.sendImageFromBase64(
-                                phoneNumber,
-                                imageBase64,
-                                'saldo-klube-cash.png',
-                                '💰 Seu Saldo Atualizado'
-                            );
-                            
-                            console.log('✅ Imagem enviada via base64!');
-                            
-                        } catch (imageError3) {
-                            console.error('❌ Todos os métodos de imagem falharam:', imageError3.message);
-                        }
-                    }
+                    console.log('✅ IMAGEM ENVIADA COM SUCESSO!');
                 }
                 
-                // Pausa antes de enviar texto
-                await new Promise(resolve => setTimeout(resolve, 3000));
+            } catch (imgError) {
+                console.log('❌ Erro na imagem, enviando imagem padrão...');
+                
+                // FALLBACK: Enviar imagem padrão existente
+                const defaultImageUrl = 'https://klubecash.com/uploads/whatsapp_images/saldo_whatsapp_999_1723726320.png';
+                
+                try {
+                    const imgData = await axios.get(defaultImageUrl, { responseType: 'arraybuffer' });
+                    const base64 = Buffer.from(imgData.data).toString('base64');
+                    
+                    await client.sendImageFromBase64(
+                        phoneNumber,
+                        base64,
+                        'saldo-padrao.png',
+                        '💰 Seu Saldo Klube Cash'
+                    );
+                    
+                    console.log('✅ Imagem padrão enviada!');
+                } catch (defaultError) {
+                    console.log('❌ Falha total na imagem:', defaultError.message);
+                }
             }
             
-            // ENVIAR MENSAGEM DE TEXTO (sempre)
+            // Pausa
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            // ENVIAR MENSAGEM DE TEXTO
             if (response.data.message) {
                 await client.sendText(phoneNumber, response.data.message);
                 console.log('✅ Mensagem de texto enviada');
