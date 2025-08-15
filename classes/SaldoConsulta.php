@@ -205,68 +205,38 @@ class SaldoConsulta {
     }
     
     /**
-     * Busca usuário pelo telefone (método mantido igual)
+     * Busca usuário pelo telefone INCLUINDO CLIENTES VISITANTES
      */
     private function buscarUsuarioPorTelefone($telefone) {
         try {
-            error_log("=== BUSCA DE TELEFONE ===");
+            error_log("=== BUSCA TELEFONE (INCLUINDO VISITANTES) ===");
             error_log("TELEFONE RECEBIDO: {$telefone}");
             
-            // Limpar telefone (manter apenas números)
+            // Limpar telefone
             $telefoneClean = preg_replace('/[^0-9]/', '', $telefone);
             error_log("TELEFONE LIMPO: {$telefoneClean}");
             
-            // CRIAR TODAS AS VARIANTES POSSÍVEIS
-            $searchVariants = [];
+            // Criar variantes de busca
+            $searchVariants = [
+                $telefoneClean,
+                '55' . $telefoneClean,
+                (strlen($telefoneClean) >= 12 && substr($telefoneClean, 0, 2) === '55') ? substr($telefoneClean, 2) : $telefoneClean
+            ];
             
-            // 1. Número original
-            $searchVariants[] = $telefoneClean;
-            
-            // 2. Com DDI 55
-            $searchVariants[] = '55' . $telefoneClean;
-            
-            // 3. Sem DDI (remover 55 do início se tiver)
-            if (strlen($telefoneClean) >= 12 && substr($telefoneClean, 0, 2) === '55') {
-                $searchVariants[] = substr($telefoneClean, 2);
-            }
-            
-            // 4. CORREÇÃO ESPECÍFICA: Se tiver 12 dígitos e começar com 55, pode estar faltando um dígito
+            // Correção para números de 12 dígitos
             if (strlen($telefoneClean) === 12 && substr($telefoneClean, 0, 2) === '55') {
-                // 553891045205 -> extrair DDD e número
-                $ddd = substr($telefoneClean, 2, 2); // 38
-                $numero = substr($telefoneClean, 4);  // 91045205
-                
-                // Reconstruir com 9 adicional para celular
-                $numeroComNove = $ddd . '9' . $numero; // 38991045205
+                $ddd = substr($telefoneClean, 2, 2);
+                $numero = substr($telefoneClean, 4);
+                $numeroComNove = $ddd . '9' . $numero;
                 $searchVariants[] = $numeroComNove;
-                
-                error_log("CORREÇÃO CELULAR: {$telefoneClean} -> {$numeroComNove}");
             }
             
-            // 5. Se tiver 13 dígitos, remover DDI
-            if (strlen($telefoneClean) === 13 && substr($telefoneClean, 0, 2) === '55') {
-                $searchVariants[] = substr($telefoneClean, 2);
-            }
-            
-            // 6. Se tiver 11 dígitos, pode precisar adicionar DDI
-            if (strlen($telefoneClean) === 11) {
-                $searchVariants[] = '55' . $telefoneClean;
-            }
-            
-            // 7. VARIANTE ESPECIAL para o caso específico do usuário
-            // Se receber 553891045205, tentar 38991045205
-            if ($telefoneClean === '553891045205') {
-                $searchVariants[] = '38991045205';
-            }
-            
-            // Remover duplicatas e logar
             $searchVariants = array_unique($searchVariants);
-            error_log("VARIANTES PARA BUSCA: " . implode(', ', $searchVariants));
+            error_log("VARIANTES: " . implode(', ', $searchVariants));
             
-            // TENTAR BUSCAR COM CADA VARIANTE
+            // BUSCAR EM USUÁRIOS NORMAIS E VISITANTES
             foreach ($searchVariants as $variant) {
-                error_log("TESTANDO VARIANTE: {$variant}");
-                
+                // Query que inclui visitantes e todos os tipos de cliente
                 $stmt = $this->db->prepare("
                     SELECT id, nome, email, telefone, status 
                     FROM usuarios 
@@ -286,21 +256,17 @@ class SaldoConsulta {
                 $result = $stmt->fetch(PDO::FETCH_ASSOC);
                 
                 if ($result) {
-                    error_log("✅ SUCESSO! Usuário encontrado com variante: {$variant}");
-                    error_log("USUÁRIO: {$result['nome']} - ID: {$result['id']}");
+                    error_log("✅ USUÁRIO ENCONTRADO: {$result['nome']} - Email: {$result['email']}");
+                    
+                    // Verificar se tem saldos via busca direta nas transações
+                    $this->verificarSaldosUsuario($result['id']);
+                    
                     return $result;
-                } else {
-                    error_log("❌ Não encontrado com variante: {$variant}");
                 }
             }
             
-            // SE NÃO ENCONTROU, TENTAR BUSCA MAIS FLEXÍVEL
-            error_log("TENTANDO BUSCA FLEXÍVEL COM LIKE...");
-            
-            // Pegar últimos 8 dígitos para busca flexível
+            // Busca flexível com LIKE
             $ultimosDigitos = substr($telefoneClean, -8);
-            error_log("ÚLTIMOS 8 DÍGITOS: {$ultimosDigitos}");
-            
             $stmt = $this->db->prepare("
                 SELECT id, nome, email, telefone, status 
                 FROM usuarios 
@@ -321,25 +287,65 @@ class SaldoConsulta {
             $result = $stmt->fetch(PDO::FETCH_ASSOC);
             
             if ($result) {
-                error_log("✅ SUCESSO COM LIKE! Usuário: {$result['nome']}");
+                error_log("✅ ENCONTRADO COM LIKE: {$result['nome']}");
+                $this->verificarSaldosUsuario($result['id']);
                 return $result;
             }
             
-            error_log("❌ NENHUM USUÁRIO ENCONTRADO PARA: {$telefone}");
-            
-            // DEBUG: Mostrar todos os telefones cadastrados para comparação
-            $allPhones = $this->db->query("SELECT telefone FROM usuarios WHERE tipo = 'cliente' AND status = 'ativo'");
-            error_log("=== TELEFONES CADASTRADOS NO SISTEMA ===");
-            while ($phone = $allPhones->fetch(PDO::FETCH_ASSOC)) {
-                $phoneClean = preg_replace('/[^0-9]/', '', $phone['telefone']);
-                error_log("TELEFONE BD: {$phone['telefone']} -> LIMPO: {$phoneClean}");
-            }
-            
+            error_log("❌ NENHUM USUÁRIO ENCONTRADO");
             return null;
             
         } catch (PDOException $e) {
             error_log('ERRO ao buscar usuário: ' . $e->getMessage());
             return null;
+        }
+    }
+    
+    /**
+     * Verifica saldos do usuário diretamente das transações
+     */
+    private function verificarSaldosUsuario($userId) {
+        try {
+            error_log("=== VERIFICANDO SALDOS USUÁRIO {$userId} ===");
+            
+            // Buscar saldos na tabela cashback_saldos
+            $stmt1 = $this->db->prepare("
+                SELECT cs.loja_id, l.nome_fantasia, cs.saldo_disponivel
+                FROM cashback_saldos cs
+                INNER JOIN lojas l ON cs.loja_id = l.id
+                WHERE cs.usuario_id = :user_id
+                ORDER BY cs.saldo_disponivel DESC
+            ");
+            $stmt1->bindParam(':user_id', $userId);
+            $stmt1->execute();
+            $saldosTabela = $stmt1->fetchAll(PDO::FETCH_ASSOC);
+            
+            error_log("SALDOS NA TABELA: " . count($saldosTabela));
+            
+            // Buscar transações do usuário
+            $stmt2 = $this->db->prepare("
+                SELECT t.loja_id, l.nome_fantasia, 
+                       SUM(CASE WHEN t.status = 'aprovado' THEN t.valor_cliente ELSE 0 END) as aprovado,
+                       SUM(CASE WHEN t.status IN ('pendente', 'pagamento_pendente') THEN t.valor_cliente ELSE 0 END) as pendente,
+                       COUNT(*) as total_transacoes
+                FROM transacoes_cashback t
+                INNER JOIN lojas l ON t.loja_id = l.id
+                WHERE t.usuario_id = :user_id
+                GROUP BY t.loja_id, l.nome_fantasia
+                ORDER BY aprovado DESC
+            ");
+            $stmt2->bindParam(':user_id', $userId);
+            $stmt2->execute();
+            $transacoes = $stmt2->fetchAll(PDO::FETCH_ASSOC);
+            
+            error_log("TRANSAÇÕES POR LOJA: " . count($transacoes));
+            
+            foreach ($transacoes as $trans) {
+                error_log("LOJA: {$trans['nome_fantasia']}, Aprovado: R$ {$trans['aprovado']}, Pendente: R$ {$trans['pendente']}");
+            }
+            
+        } catch (Exception $e) {
+            error_log("ERRO ao verificar saldos: " . $e->getMessage());
         }
     }
     

@@ -67,6 +67,9 @@ class CashbackBalance {
      */
     public function getAllUserBalances($userId) {
         try {
+            error_log("=== BUSCANDO SALDOS COMPLETOS USUÁRIO {$userId} ===");
+            
+            // PRIMEIRO: Buscar na tabela cashback_saldos
             $stmt = $this->db->prepare("
                 SELECT 
                     cs.*,
@@ -77,16 +80,47 @@ class CashbackBalance {
                 FROM cashback_saldos cs
                 JOIN lojas l ON cs.loja_id = l.id
                 WHERE cs.usuario_id = :user_id
-                AND cs.saldo_disponivel > 0
+                AND cs.saldo_disponivel >= 0
                 ORDER BY cs.saldo_disponivel DESC
             ");
             $stmt->bindParam(':user_id', $userId);
             $stmt->execute();
+            $saldos = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+            // SE ENCONTROU SALDOS, RETORNAR
+            if (!empty($saldos)) {
+                error_log("SALDOS ENCONTRADOS NA TABELA: " . count($saldos));
+                return $saldos;
+            }
+            
+            // SE NÃO ENCONTROU, BUSCAR DIRETAMENTE NAS TRANSAÇÕES
+            error_log("BUSCANDO SALDOS NAS TRANSAÇÕES...");
+            
+            $stmt = $this->db->prepare("
+                SELECT 
+                    t.loja_id,
+                    l.nome_fantasia,
+                    l.logo,
+                    l.categoria,
+                    l.porcentagem_cashback,
+                    COALESCE(SUM(CASE WHEN t.status = 'aprovado' THEN t.valor_cliente ELSE 0 END), 0) as saldo_disponivel
+                FROM transacoes_cashback t
+                INNER JOIN lojas l ON t.loja_id = l.id
+                WHERE t.usuario_id = :user_id
+                GROUP BY t.loja_id, l.nome_fantasia, l.logo, l.categoria, l.porcentagem_cashback
+                HAVING saldo_disponivel > 0
+                ORDER BY saldo_disponivel DESC
+            ");
+            $stmt->bindParam(':user_id', $userId);
+            $stmt->execute();
+            $saldosTransacoes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            error_log("SALDOS DAS TRANSAÇÕES: " . count($saldosTransacoes));
+            
+            return $saldosTransacoes;
             
         } catch (PDOException $e) {
-            error_log('Erro ao obter todos os saldos: ' . $e->getMessage());
+            error_log('Erro ao obter saldos: ' . $e->getMessage());
             return [];
         }
     }
