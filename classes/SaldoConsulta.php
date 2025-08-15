@@ -37,9 +37,15 @@ class SaldoConsulta {
             
             $saldos = $this->calcularSaldosHibrido($usuario['id']);
             
+            // ADICIONAR LOG AQUI
+            error_log('SaldoConsulta: Tentando gerar imagem para usuário ' . $usuario['id']);
+            
             // NOVO: Gerar imagem com o saldo
             require_once __DIR__ . '/ImageGenerator.php';
             $imagemResult = ImageGenerator::gerarImagemSaldo($usuario, $saldos);
+            
+            // ADICIONAR LOG DO RESULTADO DA IMAGEM
+            error_log('SaldoConsulta: Resultado da geração de imagem: ' . print_r($imagemResult, true));
             
             $mensagem = $this->gerarMensagemSaldoCompleto($usuario['nome'], $saldos);
             
@@ -56,6 +62,13 @@ class SaldoConsulta {
                 $response['send_image'] = true;
                 $response['image_url'] = $imagemResult['file_url'];
                 $response['image_path'] = $imagemResult['file_path'];
+                
+                // LOG ADICIONAL
+                error_log('SaldoConsulta: Imagem adicionada à resposta - URL: ' . $imagemResult['file_url']);
+            } else {
+                // LOG DE ERRO
+                error_log('SaldoConsulta: Falha na geração da imagem: ' . ($imagemResult['error'] ?? 'Erro desconhecido'));
+                $response['send_image'] = false;
             }
             
             return $response;
