@@ -240,7 +240,98 @@ function formatPhoneNumber(phone) {
     console.log(`📞 Número final formatado: ${finalNumber}`);
     return finalNumber;
 }
+// ADICIONAR no final do arquivo bot.js, antes do module.exports
 
+/**
+ * Função para enviar imagem diretamente (nova funcionalidade)
+ */
+async function enviarImagemDireta(phoneNumber, imageUrl, caption = '') {
+    try {
+        if (!isReady || !client) {
+            throw new Error('Bot não está conectado');
+        }
+
+        const formattedPhone = formatPhoneNumber(phoneNumber);
+        
+        console.log(`🖼️ Enviando imagem para ${formattedPhone}`);
+        console.log(`📷 URL: ${imageUrl}`);
+        
+        await client.sendImage(formattedPhone, imageUrl, 'saldo-klube-cash.png', caption);
+        
+        console.log('✅ Imagem enviada com sucesso');
+        return { success: true, message: 'Imagem enviada' };
+        
+    } catch (error) {
+        console.error('❌ Erro ao enviar imagem:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+// MODIFICAR a função processarConsultaSaldo para incluir envio de imagem
+async function processarConsultaSaldo(phoneNumber) {
+    try {
+        console.log('🔍 Iniciando consulta de saldo para:', phoneNumber);
+        
+        // Enviar mensagem de "aguarde"
+        await client.sendText(phoneNumber, '💰 Consultando seu saldo de cashback... ⏳');
+        
+        const cleanPhone = phoneNumber.replace('@c.us', '');
+        const axios = require('axios');
+        
+        const response = await axios.post('https://klubecash.com/api/whatsapp-saldo.php', {
+            phone: cleanPhone,
+            secret: CONFIG.webhookSecret
+        }, {
+            timeout: 15000,
+            headers: {
+                'Content-Type': 'application/json',
+                'User-Agent': 'KlubeCash-WhatsApp-Bot/1.0'
+            }
+        });
+        
+        console.log('📊 Resposta da API:', response.data);
+        
+        if (response.data && response.data.success) {
+            // VERIFICAR SE TEM IMAGEM PARA ENVIAR
+            if (response.data.send_image && response.data.image_url) {
+                console.log('🖼️ Enviando imagem do saldo...');
+                try {
+                    await client.sendImage(phoneNumber, response.data.image_url, 'seu-saldo.png', '💰 Seu Saldo Klube Cash');
+                    console.log('✅ Imagem do saldo enviada');
+                    
+                    // Pausa de 2 segundos
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                } catch (imgError) {
+                    console.error('❌ Erro ao enviar imagem:', imgError);
+                    // Continue enviando só o texto
+                }
+            }
+            
+            // ENVIAR TEXTO
+            if (response.data.message) {
+                await client.sendText(phoneNumber, response.data.message);
+                console.log('✅ Mensagem de saldo enviada');
+            }
+        } else {
+            throw new Error('Resposta inválida da API');
+        }
+        
+    } catch (error) {
+        console.error('❌ Erro na consulta de saldo:', error.message);
+        
+        const errorMessage = `⚠️ *Klube Cash*
+
+Ocorreu um erro temporário ao consultar seu saldo.
+
+🔄 Tente novamente em alguns instantes.`;
+
+        try {
+            await client.sendText(phoneNumber, errorMessage);
+        } catch (sendError) {
+            console.error('❌ Erro ao enviar mensagem de erro:', sendError);
+        }
+    }
+}
 /**
  * Função principal de envio de mensagem com tratamento robusto de erros
  * Esta é a função que será chamada pelo sistema PHP
