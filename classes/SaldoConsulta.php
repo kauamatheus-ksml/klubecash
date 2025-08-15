@@ -35,19 +35,31 @@ class SaldoConsulta {
                 ];
             }
             
-            $saldos = $this->calcularSaldosHibrido($usuario['id']);
-            $mensagem = $this->gerarMensagemSaldoCompleto($usuario['nome'], $saldos);
+            // Buscar saldos por loja
+            $saldosPorLoja = $this->obterSaldosPorLoja($usuario['id']);
+            
+            if (empty($saldosPorLoja)) {
+                return [
+                    'success' => true,
+                    'message' => $this->gerarMensagemSemSaldo($usuario['nome']),
+                    'user_found' => true,
+                    'user_id' => $usuario['id']
+                ];
+            }
+            
+            // Gerar mensagem com opções de lojas
+            $mensagem = $this->gerarMensagemOpcoesLojas($usuario['nome'], $saldosPorLoja);
             
             return [
                 'success' => true,
                 'message' => $mensagem,
                 'user_found' => true,
                 'user_id' => $usuario['id'],
-                'saldos' => $saldos
+                'type' => 'menu_lojas',
+                'lojas' => $saldosPorLoja
             ];
             
         } catch (Exception $e) {
-            // Em caso de erro, loga para análise interna e retorna mensagem genérica.
             error_log('ERRO GRAVE na consulta de saldo: ' . $e->getMessage());
             return [
                 'success' => false,
@@ -57,6 +69,239 @@ class SaldoConsulta {
         }
     }
 
+    /**
+     * Mensagem quando não tem saldo
+     */
+    private function gerarMensagemSemSaldo($nomeUsuario) {
+        $nome = ucfirst(explode(' ', $nomeUsuario)[0]);
+        
+        return "💰 *Klube Cash - Seu Saldo*\n\n" .
+            "👋 Olá, {$nome}!\n\n" .
+            "💳 Você ainda não possui cashback acumulado.\n\n" .
+            "🛍️ Faça compras em nossas lojas parceiras e comece a ganhar!";
+    }
+    /**
+     * Obter saldos separados por loja
+     */
+    private function obterSaldosPorLoja($usuarioId) {
+        $sql = "
+            SELECT 
+                l.id as loja_id,
+                l.nome_fantasia,
+                cs.saldo_disponivel,
+                COALESCE(SUM(t.valor_cliente), 0) as saldo_pendente
+            FROM lojas l
+            JOIN cashback_saldos cs ON l.id = cs.loja_id
+            LEFT JOIN transacoes_cashback t ON l.id = t.loja_id 
+                AND t.usuario_id = cs.usuario_id 
+                AND t.status IN ('pendente', 'pagamento_pendente')
+            WHERE cs.usuario_id = :usuario_id 
+            AND (cs.saldo_disponivel > 0 OR COALESCE(SUM(t.valor_cliente), 0) > 0)
+            GROUP BY l.id, l.nome_fantasia, cs.saldo_disponivel
+            ORDER BY cs.saldo_disponivel DESC
+        ";
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->bindParam(':usuario_id', $usuarioId, PDO::PARAM_INT);
+        $stmt->execute();
+        
+        $lojas = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Processar dados
+        foreach ($lojas as &$loja) {
+            $loja['saldo_disponivel'] = floatval($loja['saldo_disponivel']);
+            $loja['saldo_pendente'] = floatval($loja['saldo_pendente']);
+            $loja['total'] = $loja['saldo_disponivel'] + $loja['saldo_pendente'];
+        }
+        
+        return $lojas;
+    }
+
+    /**
+     * Gerar mensagem com opções de lojas
+     */
+    private function gerarMensagemOpcoesLojas($nomeUsuario, $lojas) {
+        $nome = ucfirst(explode(' ', $nomeUsuario)[0]);
+        
+        $mensagem = "💰 *Klube Cash - Suas Lojas*\n\n";
+        $mensagem .= "👋 Olá, {$nome}!\n\n";
+        $mensagem .= "Você possui saldo nas seguintes lojas:\n\n";
+        
+        $contador = 1;
+        foreach ($lojas as $loja) {
+            $mensagem .= "*{$contador}. {$loja['nome_fantasia']}*\n";
+            
+            if ($loja['saldo_disponivel'] > 0) {
+                $mensagem .= "💳 Disponível: R$ " . number_format($loja['saldo_disponivel'], 2, ',', '.') . "\n";
+            }
+            
+            if ($loja['saldo_pendente'] > 0) {
+                $mensagem .= "⏳ Pendente: R$ " . number_format($loja['saldo_pendente'], 2, ',', '.') . "\n";
+            }
+            
+            $mensagem .= "\n";
+            $contador++;
+        }
+        
+        $mensagem .= "📋 *Como consultar:*\n";
+        $mensagem .= "• Digite o *número* da loja (ex: 1, 2, 3)\n";
+        $mensagem .= "• Ou digite o *nome* da loja\n\n";
+        $mensagem .= "🔄 Digite *saldo* para ver este menu novamente";
+        
+        return $mensagem;
+    }
+    /**
+     * Buscar loja específica por número ou nome
+     */
+    private function buscarLojaEspecifica($usuarioId, $identificacao) {
+        // Se é número, buscar por posição
+        if (is_numeric($identificacao)) {
+            $posicao = intval($identificacao) - 1; // Converter para índice (1 = posição 0)
+            
+            $sql = "
+                SELECT 
+                    l.id as loja_id,
+                    l.nome_fantasia,
+                    cs.saldo_disponivel,
+                    COALESCE(SUM(t.valor_cliente), 0) as saldo_pendente
+                FROM lojas l
+                JOIN cashback_saldos cs ON l.id = cs.loja_id
+                LEFT JOIN transacoes_cashback t ON l.id = t.loja_id 
+                    AND t.usuario_id = cs.usuario_id 
+                    AND t.status IN ('pendente', 'pagamento_pendente')
+                WHERE cs.usuario_id = :usuario_id 
+                AND (cs.saldo_disponivel > 0 OR COALESCE(SUM(t.valor_cliente), 0) > 0)
+                GROUP BY l.id, l.nome_fantasia, cs.saldo_disponivel
+                ORDER BY cs.saldo_disponivel DESC
+                LIMIT 1 OFFSET :posicao
+            ";
+            
+            $stmt = $this->db->prepare($sql);
+            $stmt->bindParam(':usuario_id', $usuarioId, PDO::PARAM_INT);
+            $stmt->bindParam(':posicao', $posicao, PDO::PARAM_INT);
+            
+        } else {
+            // Buscar por nome
+            $sql = "
+                SELECT 
+                    l.id as loja_id,
+                    l.nome_fantasia,
+                    cs.saldo_disponivel,
+                    COALESCE(SUM(t.valor_cliente), 0) as saldo_pendente
+                FROM lojas l
+                JOIN cashback_saldos cs ON l.id = cs.loja_id
+                LEFT JOIN transacoes_cashback t ON l.id = t.loja_id 
+                    AND t.usuario_id = cs.usuario_id 
+                    AND t.status IN ('pendente', 'pagamento_pendente')
+                WHERE cs.usuario_id = :usuario_id 
+                AND l.nome_fantasia LIKE :nome_loja
+                AND (cs.saldo_disponivel > 0 OR COALESCE(SUM(t.valor_cliente), 0) > 0)
+                GROUP BY l.id, l.nome_fantasia, cs.saldo_disponivel
+            ";
+            
+            $stmt = $this->db->prepare($sql);
+            $stmt->bindParam(':usuario_id', $usuarioId, PDO::PARAM_INT);
+            $nomeParam = '%' . $identificacao . '%';
+            $stmt->bindParam(':nome_loja', $nomeParam);
+        }
+        
+        $stmt->execute();
+        $loja = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($loja) {
+            $loja['saldo_disponivel'] = floatval($loja['saldo_disponivel']);
+            $loja['saldo_pendente'] = floatval($loja['saldo_pendente']);
+            $loja['total'] = $loja['saldo_disponivel'] + $loja['saldo_pendente'];
+        }
+        
+        return $loja;
+    }
+
+    /**
+     * Gerar mensagem para saldo de loja específica
+     */
+    private function gerarMensagemSaldoLoja($nomeUsuario, $loja) {
+        $nome = ucfirst(explode(' ', $nomeUsuario)[0]);
+        
+        $mensagem = "🏪 *{$loja['nome_fantasia']}*\n\n";
+        $mensagem .= "👋 Olá, {$nome}!\n\n";
+        
+        if ($loja['saldo_disponivel'] > 0) {
+            $mensagem .= "💳 *Saldo Disponível*\n";
+            $mensagem .= "R$ " . number_format($loja['saldo_disponivel'], 2, ',', '.') . "\n\n";
+        }
+        
+        if ($loja['saldo_pendente'] > 0) {
+            $mensagem .= "⏳ *Aguardando Liberação*\n";
+            $mensagem .= "R$ " . number_format($loja['saldo_pendente'], 2, ',', '.') . "\n\n";
+            $mensagem .= "ℹ️ _Será liberado após a loja pagar a comissão_\n\n";
+        }
+        
+        $mensagem .= "📊 *Total Acumulado*\n";
+        $mensagem .= "R$ " . number_format($loja['total'], 2, ',', '.') . "\n\n";
+        
+        $mensagem .= "💡 *Lembre-se:* Este saldo só pode ser usado nesta loja.\n\n";
+        $mensagem .= "🔄 Digite *saldo* para ver todas as suas lojas";
+        
+        return $mensagem;
+    }
+    /**
+     * Consultar saldo específico de uma loja
+     */
+    public function consultarSaldoLoja($telefone, $lojaIdentificacao) {
+        try {
+            $telefoneLimpo = $this->limparTelefone($telefone);
+            $usuario = $this->buscarUsuarioPorTelefone($telefoneLimpo);
+            
+            if (!$usuario) {
+                return [
+                    'success' => false,
+                    'message' => $this->gerarMensagemUsuarioNaoEncontrado(),
+                    'user_found' => false
+                ];
+            }
+            
+            // Buscar loja específica
+            $loja = $this->buscarLojaEspecifica($usuario['id'], $lojaIdentificacao);
+            
+            if (!$loja) {
+                return [
+                    'success' => true,
+                    'message' => "❌ Loja não encontrada ou você não possui saldo nela.\n\nDigite *saldo* para ver suas opções.",
+                    'user_found' => true
+                ];
+            }
+            
+            // Gerar imagem para esta loja específica
+            require_once __DIR__ . '/ImageGenerator.php';
+            $imagemResult = ImageGenerator::gerarImagemSaldoLoja($usuario, $loja);
+            
+            $mensagem = $this->gerarMensagemSaldoLoja($usuario['nome'], $loja);
+            
+            $response = [
+                'success' => true,
+                'message' => $mensagem,
+                'user_found' => true,
+                'type' => 'saldo_loja',
+                'loja' => $loja
+            ];
+            
+            // Adicionar dados da imagem se gerada com sucesso
+            if ($imagemResult['success']) {
+                $response['send_image'] = true;
+                $response['image_url'] = $imagemResult['file_url'];
+            }
+            
+            return $response;
+            
+        } catch (Exception $e) {
+            error_log('Erro ao consultar saldo da loja: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => $this->gerarMensagemErro()
+            ];
+        }
+    }
     /**
      * Calcula os saldos usando a abordagem híbrida.
      *

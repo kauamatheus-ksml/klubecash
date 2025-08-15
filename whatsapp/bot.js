@@ -13,7 +13,7 @@ let isReady = false;
 // Configurações expandidas para produção
 const CONFIG = {
     sessionName: 'klube-cash-bot',
-    port: process.env.PORT || 3001,
+    port: process.env.PORT || 3002,
     webhookSecret: process.env.WEBHOOK_SECRET || 'klube-cash-2024'
 };
 
@@ -77,44 +77,118 @@ async function handleIncomingMessage(message) {
         console.log('   💬 Texto:', message.body);
         console.log('   📋 Tipo:', message.type);
         
-        // Log estruturado para análise posterior
-        console.log({
-            timestamp: new Date().toISOString(),
-            from: message.from,
-            body: message.body.substring(0, 100) + (message.body.length > 100 ? '...' : ''),
-            type: message.type,
-            timestamp: new Date().toISOString()
-        });
-
-        // ===== NOVA FUNCIONALIDADE: CONSULTA DE SALDO =====
-        
-        // Verificar se é mensagem de texto e contém palavra-chave de saldo
         if (message.type === 'chat' && message.body) {
             const messageText = message.body.toLowerCase().trim();
-            const saldoKeywords = ['saldo', 'extrato', 'cashback', 'consulta'];
             
-            // Verificar se contém alguma palavra-chave
+            // VERIFICAR CONSULTA DE SALDO GERAL
+            const saldoKeywords = ['saldo', 'extrato', 'cashback', 'consulta'];
             const isSaldoRequest = saldoKeywords.some(keyword => 
                 messageText.includes(keyword) || messageText === keyword
             );
             
             if (isSaldoRequest) {
-                console.log('💰 Detectada consulta de saldo!');
+                console.log('💰 Detectada consulta de saldo geral!');
                 await processarConsultaSaldo(message.from);
-                return; // Não processar outras funcionalidades
+                return;
+            }
+            
+            // VERIFICAR SE É NÚMERO DE LOJA (1-9)
+            if (/^[1-9]$/.test(messageText)) {
+                console.log('🏪 Detectada consulta de loja específica:', messageText);
+                await processarConsultaSaldoLoja(message.from, messageText);
+                return;
+            }
+            
+            // VERIFICAR SE É NOME DE LOJA (palavras)
+            if (messageText.length > 2 && /^[a-záêôçàéíóúü\s]+$/i.test(messageText)) {
+                console.log('🏪 Possível nome de loja:', messageText);
+                await processarConsultaSaldoLoja(message.from, messageText);
+                return;
             }
         }
-        
-        // Aqui podem vir outras funcionalidades futuras
-        // Por exemplo: cadastro, dúvidas, etc.
         
     } catch (error) {
         console.error('❌ Erro ao processar mensagem:', error);
     }
 }
-
 /**
- * Processa consulta de saldo do usuário
+ * Processa consulta de saldo de loja específica
+ */
+async function processarConsultaSaldoLoja(phoneNumber, lojaIdentificacao) {
+    try {
+        console.log('🏪 Consultando saldo da loja:', lojaIdentificacao, 'para:', phoneNumber);
+        
+        await client.sendText(phoneNumber, '🏪 Consultando saldo da loja... ⏳');
+        
+        const cleanPhone = phoneNumber.replace('@c.us', '');
+        const axios = require('axios');
+        
+        const response = await axios.post('https://klubecash.com/api/whatsapp-saldo-loja.php', {
+            phone: cleanPhone,
+            loja: lojaIdentificacao,
+            secret: CONFIG.webhookSecret
+        }, {
+            timeout: 15000,
+            headers: {
+                'Content-Type': 'application/json',
+                'User-Agent': 'KlubeCash-WhatsApp-Bot/1.0'
+            }
+        });
+        
+        console.log('📊 Resposta da API de loja:', response.data);
+        
+        if (response.data && response.data.success) {
+            
+            // ENVIAR IMAGEM SE DISPONÍVEL
+            if (response.data.send_image && response.data.image_url) {
+                try {
+                    const imgData = await axios.get(response.data.image_url, {
+                        responseType: 'arraybuffer',
+                        timeout: 10000
+                    });
+                    
+                    const base64 = Buffer.from(imgData.data).toString('base64');
+                    
+                    await client.sendImageFromBase64(
+                        phoneNumber,
+                        base64,
+                        'saldo-loja.png',
+                        '🏪 Saldo da Loja'
+                    );
+                    
+                    console.log('✅ Imagem da loja enviada!');
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                } catch (imgError) {
+                    console.log('❌ Erro na imagem da loja:', imgError.message);
+                }
+            }
+            
+            // ENVIAR MENSAGEM DE TEXTO
+            if (response.data.message) {
+                await client.sendText(phoneNumber, response.data.message);
+                console.log('✅ Mensagem da loja enviada');
+            }
+            
+        } else {
+            throw new Error('Resposta inválida da API de loja');
+        }
+        
+    } catch (error) {
+        console.error('❌ Erro na consulta de loja:', error.message);
+        
+        const errorMessage = `❌ Não consegui encontrar essa loja ou você não possui saldo nela.
+
+🔄 Digite *saldo* para ver suas opções.`;
+
+        try {
+            await client.sendText(phoneNumber, errorMessage);
+        } catch (sendError) {
+            console.error('❌ Erro ao enviar mensagem de erro da loja:', sendError);
+        }
+    }
+}
+/**
+ * Processa consulta de saldo do usuário - VERSÃO COM IMAGEM FORÇADA
  * Faz requisição para o PHP e envia resposta
  */
 async function processarConsultaSaldo(phoneNumber) {
@@ -127,6 +201,9 @@ async function processarConsultaSaldo(phoneNumber) {
         const cleanPhone = phoneNumber.replace('@c.us', '');
         const axios = require('axios');
         
+        console.log('📞 Telefone limpo:', cleanPhone);
+        
+        // NOVA ABORDAGEM: Primeiro buscar saldo via API
         const response = await axios.post('https://klubecash.com/api/whatsapp-saldo.php', {
             phone: cleanPhone,
             secret: CONFIG.webhookSecret
@@ -138,7 +215,7 @@ async function processarConsultaSaldo(phoneNumber) {
             }
         });
         
-        console.log('📊 Resposta da API:', response.data);
+        console.log('📊 Resposta da API de saldo:', response.data);
         
         if (response.data && response.data.success) {
             
@@ -146,7 +223,7 @@ async function processarConsultaSaldo(phoneNumber) {
             console.log('🖼️ FORÇANDO geração de imagem...');
             
             try {
-                // Gerar imagem direto via API
+                // Gerar imagem direto via API específica
                 const imageGenResponse = await axios.post('https://klubecash.com/api/generate-saldo-image.php', {
                     phone: cleanPhone,
                     secret: CONFIG.webhookSecret
@@ -162,10 +239,14 @@ async function processarConsultaSaldo(phoneNumber) {
                     
                     // Baixar e enviar como base64 (método mais confiável)
                     const imgData = await axios.get(imageGenResponse.data.image_url, {
-                        responseType: 'arraybuffer'
+                        responseType: 'arraybuffer',
+                        timeout: 10000
                     });
                     
+                    console.log('✅ Imagem baixada, tamanho:', imgData.data.length);
+                    
                     const base64 = Buffer.from(imgData.data).toString('base64');
+                    console.log('✅ Convertida para base64, tamanho:', base64.length);
                     
                     await client.sendImageFromBase64(
                         phoneNumber,
@@ -175,16 +256,22 @@ async function processarConsultaSaldo(phoneNumber) {
                     );
                     
                     console.log('✅ IMAGEM ENVIADA COM SUCESSO!');
+                } else {
+                    console.log('❌ Falha na geração da imagem:', imageGenResponse.data);
                 }
                 
             } catch (imgError) {
-                console.log('❌ Erro na imagem, enviando imagem padrão...');
+                console.log('❌ Erro na imagem personalizada:', imgError.message);
                 
                 // FALLBACK: Enviar imagem padrão existente
+                console.log('🔄 Tentando imagem padrão...');
                 const defaultImageUrl = 'https://klubecash.com/uploads/whatsapp_images/saldo_whatsapp_999_1723726320.png';
                 
                 try {
-                    const imgData = await axios.get(defaultImageUrl, { responseType: 'arraybuffer' });
+                    const imgData = await axios.get(defaultImageUrl, { 
+                        responseType: 'arraybuffer',
+                        timeout: 10000
+                    });
                     const base64 = Buffer.from(imgData.data).toString('base64');
                     
                     await client.sendImageFromBase64(
@@ -200,21 +287,24 @@ async function processarConsultaSaldo(phoneNumber) {
                 }
             }
             
-            // Pausa
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            // Pausa entre imagem e texto
+            console.log('⏳ Aguardando 3 segundos antes do texto...');
+            await new Promise(resolve => setTimeout(resolve, 3000));
             
             // ENVIAR MENSAGEM DE TEXTO
             if (response.data.message) {
+                console.log('📤 Enviando mensagem de texto...');
                 await client.sendText(phoneNumber, response.data.message);
                 console.log('✅ Mensagem de texto enviada');
             }
             
         } else {
-            throw new Error('Resposta inválida da API');
+            throw new Error('Resposta inválida da API de saldo');
         }
         
     } catch (error) {
         console.error('❌ Erro na consulta de saldo:', error.message);
+        console.error('   Stack:', error.stack);
         
         const errorMessage = `⚠️ *Klube Cash*
 
@@ -308,13 +398,8 @@ async function sendMessage(phone, message) {
         console.log(`   📞 Para: ${formattedPhone}`);
         console.log(`   💬 Mensagem: ${message.substring(0, 100)}${message.length > 100 ? '...' : ''}`);
         
-        // Verificar se o número é válido no WhatsApp
-        //const isValidNumber = await client.checkNumberStatus(formattedPhone);
-        
-        //if (!isValidNumber.exists) {
-        //    throw new Error(`Número ${phone} não possui WhatsApp`);
-        //}
         console.log('Pulando verificação de WhatsApp para teste');
+        
         // Enviar a mensagem
         const result = await client.sendText(formattedPhone, message);
         
@@ -434,8 +519,8 @@ app.post('/send-test', async (req, res) => {
             });
         }
 
-        // Usar seu próprio número para teste
-        const testPhone = '38991045205'; // Substitua pelo seu número
+        // Usar número para teste
+        const testPhone = '38991045205';
         const testMessage = `🧪 Teste do Klube Cash WhatsApp Bot
         
 Esta é uma mensagem de teste enviada em ${new Date().toLocaleString('pt-BR')}.
