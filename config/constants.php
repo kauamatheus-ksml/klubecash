@@ -215,6 +215,12 @@ define('CLIENT_PROFILE_URL', SITE_URL . '/cliente/perfil');
 define('CLIENT_BALANCE_URL', SITE_URL . '/cliente/saldo');
 define('CLIENT_ACTIONS_URL', SITE_URL . '/cliente/actions');
 
+
+// === CONFIGURAÇÕES DE CPF ===
+define('CPF_TESTE_VALIDO', '00000000191'); // CPF válido para testes quando loja não tem CPF
+define('CPF_OBRIGATORIO_PIX', true); // Exigir CPF para pagamentos PIX
+
+
 // === URLs DO ADMIN ===
 define('ADMIN_DASHBOARD_URL', SITE_URL . '/admin/dashboard');
 define('ADMIN_USERS_URL', SITE_URL . '/admin/usuarios');
