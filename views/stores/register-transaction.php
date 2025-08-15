@@ -2124,9 +2124,18 @@ $activeMenu = 'register-transaction';
 
         function validateForm(e) {
             console.log('🔍 VALIDAÇÃO INICIADA');
+            console.log('Step atual:', currentStep);
             console.log('Cliente atual:', clientData);
-            console.log('Evento:', e);
             
+            // Só validar se estamos no último step (4)
+            if (currentStep !== 4) {
+                console.log('❌ Não está no step final, impedindo submissão');
+                e.preventDefault();
+                showNotification('Complete todos os passos antes de registrar a venda', 'warning');
+                return false;
+            }
+            
+            // Validação 1: Cliente selecionado
             if (!clientData) {
                 e.preventDefault();
                 console.log('❌ Cliente não selecionado');
@@ -2135,21 +2144,47 @@ $activeMenu = 'register-transaction';
                 return false;
             }
 
-            const valorTotal = parseFloat(document.getElementById('valor_total').value) || 0;
+            // Validação 2: Valor total
+            const valorTotalField = document.getElementById('valor_total');
+            const valorTotal = parseFloat(valorTotalField.value) || 0;
+            
             if (valorTotal <= 0) {
                 e.preventDefault();
                 console.log('❌ Valor inválido:', valorTotal);
                 showNotification('Por favor, informe o valor total da venda', 'error');
                 goToStep(2);
+                // Focar no campo após mostrar o step
+                setTimeout(() => {
+                    valorTotalField.focus();
+                    valorTotalField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 300);
+                return false;
+            }
+            
+            if (valorTotal < 5) {
+                e.preventDefault();
+                console.log('❌ Valor menor que mínimo:', valorTotal);
+                showNotification('Valor mínimo da venda é R$ 5,00', 'error');
+                goToStep(2);
+                setTimeout(() => {
+                    valorTotalField.focus();
+                    valorTotalField.select();
+                }, 300);
                 return false;
             }
 
-            const codigoTransacao = document.getElementById('codigo_transacao').value.trim();
+            // Validação 3: Código da transação
+            const codigoTransacaoField = document.getElementById('codigo_transacao');
+            const codigoTransacao = codigoTransacaoField.value.trim();
+            
             if (!codigoTransacao) {
                 e.preventDefault();
                 console.log('❌ Código não informado');
                 showNotification('Por favor, informe o código da transação', 'error');
                 goToStep(2);
+                setTimeout(() => {
+                    codigoTransacaoField.focus();
+                }, 300);
                 return false;
             }
 
