@@ -15,7 +15,7 @@ class ImageGenerator {
             
             // Dimensões da imagem
             $width = 600;
-            $height = 400;
+            $height = 410;
             
             // Criar imagem
             $image = imagecreatetruecolor($width, $height);
