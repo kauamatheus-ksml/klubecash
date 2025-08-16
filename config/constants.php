@@ -215,33 +215,6 @@ define('CLIENT_PROFILE_URL', SITE_URL . '/cliente/perfil');
 define('CLIENT_BALANCE_URL', SITE_URL . '/cliente/saldo');
 define('CLIENT_ACTIONS_URL', SITE_URL . '/cliente/actions');
 
-// === CONFIGURAÇÕES CADASTRO COMPLETO WHATSAPP ===
-define('WHATSAPP_CADASTRO_STATES', [
-    'inicial' => 'inicial',
-    'aguardando_email' => 'aguardando_email', 
-    'confirmando_email' => 'confirmando_email',
-    'aguardando_senha' => 'aguardando_senha',
-    'confirmando_senha' => 'confirmando_senha',
-    'aguardando_cpf' => 'aguardando_cpf',
-    'finalizado' => 'finalizado'
-]);
-
-// === MENSAGENS DO SISTEMA ===
-define('WHATSAPP_MENU_VISITANTE', '🏪 *Klube Cash* - Bem-vindo!
-
-Digite o número da opção desejada:
-
-1️⃣ Consultar Saldo
-2️⃣ Completar Cadastro');
-
-define('WHATSAPP_MENU_CADASTRADO', '🏪 *Klube Cash* - Bem-vindo!
-
-Digite o número da opção desejada:
-
-1️⃣ Consultar Saldo
-2️⃣ Atualizar Cadastro');
-
-define('WHATSAPP_TIMEOUT_CADASTRO', 600); // 10 minutos para completar cadastro
 
 // === CONFIGURAÇÕES DE CPF ===
 define('CPF_TESTE_VALIDO', '00000000191'); // CPF válido para testes quando loja não tem CPF
@@ -259,6 +232,30 @@ define('ADMIN_REPORTS_URL', SITE_URL . '/admin/relatorios');
 define('ADMIN_COMMISSIONS_URL', SITE_URL . '/admin/comissoes');
 define('ADMIN_PAYMENTS_URL', SITE_URL . '/admin/pagamentos');
 define('ADMIN_BALANCE_URL', SITE_URL . '/admin/saldo');
+
+// === CONFIGURAÇÕES WHATSAPP CADASTRO COMPLETO ===
+define('WHATSAPP_CADASTRO_ATUALIZADO', [
+    'inicial' => 'inicial',
+    'aguardando_email' => 'aguardando_email', 
+    'confirmando_email' => 'confirmando_email',
+    'aguardando_senha' => 'aguardando_senha',
+    'confirmando_senha' => 'confirmando_senha',
+    'aguardando_cpf' => 'aguardando_cpf',
+    'selecionando_campo_atualizacao' => 'selecionando_campo_atualizacao',
+    'finalizado' => 'finalizado'
+]);
+
+// === TIPOS DE CLIENTE WHATSAPP ===
+define('CLIENT_TYPE_VISITANTE', 'visitante');
+define('CLIENT_TYPE_COMPLETO', 'completo');
+
+// === CAMPOS ATUALIZÁVEIS ===
+define('CAMPOS_ATUALIZAVEIS', [
+    'nome' => 'Nome Completo',
+    'email' => 'E-mail',
+    'senha' => 'Senha',
+    'cpf' => 'CPF'
+]);
 
 // === URLs DA LOJA ===
 define('STORE_REGISTER_URL', SITE_URL . '/lojas/cadastro');

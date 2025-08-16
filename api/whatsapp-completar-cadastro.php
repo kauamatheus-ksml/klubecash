@@ -1,413 +1,438 @@
 <?php
 // api/whatsapp-completar-cadastro.php
+// API para gerenciar o fluxo de completar/atualizar cadastro via WhatsApp
 
-header('Content-Type: application/json; charset=utf-8');
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
+header('Content-Type: application/json; charset=UTF-8');
 header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: POST');
-header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    exit(0);
+}
 
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../config/constants.php';
 require_once __DIR__ . '/../utils/Validator.php';
+require_once __DIR__ . '/../classes/SaldoConsulta.php';
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode(['success' => false, 'error' => 'Método não permitido']);
-    exit;
-}
-
-try {
-    $input = file_get_contents('php://input');
-    $data = json_decode($input, true);
-    
-    if (!isset($data['secret']) || $data['secret'] !== WHATSAPP_BOT_SECRET) {
-        http_response_code(401);
-        echo json_encode(['success' => false, 'error' => 'Acesso não autorizado']);
-        exit;
-    }
-    
-    $phone = $data['phone'] ?? '';
-    $message = $data['message'] ?? '';
-    $action = $data['action'] ?? 'iniciar';
-    
-    if (empty($phone)) {
-        http_response_code(400);
-        echo json_encode(['success' => false, 'error' => 'Telefone obrigatório']);
-        exit;
-    }
-    
-    $cadastroProcessor = new WhatsAppCadastroProcessor();
-    $resultado = $cadastroProcessor->processarMensagem($phone, $message, $action);
-    
-    echo json_encode($resultado);
-    
-} catch (Exception $e) {
-    error_log('WhatsApp Cadastro API - Erro: ' . $e->getMessage());
-    http_response_code(500);
-    echo json_encode([
-        'success' => false,
-        'error' => 'Erro interno do servidor',
-        'message' => 'Tente novamente em alguns instantes.'
-    ]);
-}
-
-class WhatsAppCadastroProcessor {
+class WhatsAppCadastroAPI {
     private $db;
-    private $sessionTable = 'whatsapp_cadastro_sessions';
+    private $saldoConsulta;
     
     public function __construct() {
-        $this->db = Database::getConnection();
-        $this->createSessionTableIfNotExists();
+        $this->db = getConnection();
+        $this->saldoConsulta = new SaldoConsulta($this->db);
     }
     
-    private function createSessionTableIfNotExists() {
-        $sql = "
-            CREATE TABLE IF NOT EXISTS {$this->sessionTable} (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                phone VARCHAR(20) UNIQUE,
-                user_id INT,
-                state VARCHAR(50),
-                data JSON,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                expires_at TIMESTAMP
-            )
-        ";
-        $this->db->exec($sql);
+    public function handleRequest() {
+        try {
+            // Verificar secret
+            $input = json_decode(file_get_contents('php://input'), true);
+            if (!$input || !isset($input['secret']) || $input['secret'] !== WHATSAPP_BOT_SECRET) {
+                return $this->errorResponse('Acesso não autorizado', 401);
+            }
+            
+            $phone = $this->cleanPhone($input['phone'] ?? '');
+            $action = $input['action'] ?? '';
+            $message = $input['message'] ?? '';
+            
+            if (empty($phone)) {
+                return $this->errorResponse('Telefone é obrigatório');
+            }
+            
+            switch ($action) {
+                case 'iniciar':
+                    return $this->iniciarCadastro($phone);
+                case 'processar':
+                    return $this->processarMensagem($phone, $message);
+                case 'cancelar':
+                    return $this->cancelarCadastro($phone);
+                default:
+                    return $this->errorResponse('Ação inválida');
+            }
+            
+        } catch (Exception $e) {
+            error_log("ERRO WhatsApp Cadastro API: " . $e->getMessage());
+            return $this->errorResponse('Erro interno do servidor');
+        }
     }
     
-    public function processarMensagem($phone, $message, $action) {
-        $cleanPhone = preg_replace('/[^0-9]/', '', $phone);
-        
+    private function iniciarCadastro($phone) {
         // Buscar usuário
-        $user = $this->buscarUsuario($cleanPhone);
-        if (!$user) {
-            return [
-                'success' => false,
-                'message' => 'Usuário não encontrado. Consulte primeiro seu saldo.'
-            ];
+        $usuario = $this->saldoConsulta->buscarUsuarioPorTelefone($phone);
+        
+        if (!$usuario) {
+            return $this->errorResponse('Usuário não encontrado. Entre em contato com nosso suporte.');
         }
         
-        // Verificar se já é cadastrado
-        if ($user['tipo_cliente'] === 'completo') {
-            return $this->processarAtualizarCadastro($user, $message, $action);
-        }
+        // Verificar tipo de cliente
+        $tipoCliente = $this->determinarTipoCliente($usuario);
         
-        // Processar completar cadastro
-        return $this->processarCompletarCadastro($user, $cleanPhone, $message, $action);
-    }
-    
-    private function buscarUsuario($phone) {
-        $stmt = $this->db->prepare("
-            SELECT id, nome, email, telefone, tipo_cliente, cpf 
-            FROM usuarios 
-            WHERE telefone = ? AND tipo = 'cliente' AND status = 'ativo'
-        ");
-        $stmt->execute([$phone]);
-        return $stmt->fetch(PDO::FETCH_ASSOC);
-    }
-    
-    private function processarCompletarCadastro($user, $phone, $message, $action) {
-        if ($action === 'iniciar') {
-            // Iniciar processo
-            $this->salvarSessao($phone, $user['id'], 'aguardando_email', [
-                'nome' => $user['nome']
-            ]);
-            
-            return [
-                'success' => true,
-                'message' => "📝 *Completar Cadastro*
-
-Olá, {$user['nome']}! 👋
-
-Vamos completar seu cadastro para ter acesso total ao Klube Cash.
-
-📧 Primeiro, preciso do seu e-mail.
-Digite seu melhor e-mail:",
-                'state' => 'aguardando_email'
-            ];
-        }
-        
-        // Recuperar sessão
-        $session = $this->recuperarSessao($phone);
-        if (!$session || $session['expires_at'] < date('Y-m-d H:i:s')) {
-            return [
-                'success' => false,
-                'message' => '⏰ Sessão expirada. Digite *2* novamente para reiniciar.'
-            ];
-        }
-        
-        $state = $session['state'];
-        $sessionData = json_decode($session['data'], true);
-        
-        switch ($state) {
-            case 'aguardando_email':
-                return $this->processarEmail($phone, $message, $sessionData);
-                
-            case 'confirmando_email':
-                return $this->confirmarEmail($phone, $message, $sessionData);
-                
-            case 'aguardando_senha':
-                return $this->processarSenha($phone, $message, $sessionData);
-                
-            case 'confirmando_senha':
-                return $this->confirmarSenha($phone, $message, $sessionData);
-                
-            case 'aguardando_cpf':
-                return $this->processarCPF($phone, $message, $sessionData);
-                
-            default:
-                return [
-                    'success' => false,
-                    'message' => '❌ Estado inválido. Digite *2* para reiniciar.'
-                ];
-        }
-    }
-    
-    private function processarEmail($phone, $email, $sessionData) {
-        if (!Validator::isValidEmail($email)) {
-            return [
-                'success' => true,
-                'message' => '❌ E-mail inválido. Digite um e-mail válido:',
-                'state' => 'aguardando_email'
-            ];
-        }
-        
-        // Verificar se email já existe
-        $stmt = $this->db->prepare("SELECT id FROM usuarios WHERE email = ? AND id != ?");
-        $stmt->execute([$email, $sessionData['user_id'] ?? 0]);
-        if ($stmt->rowCount() > 0) {
-            return [
-                'success' => true,
-                'message' => '❌ Este e-mail já está em uso. Digite outro e-mail:',
-                'state' => 'aguardando_email'
-            ];
-        }
-        
-        $sessionData['email'] = $email;
-        $this->salvarSessao($phone, $sessionData['user_id'], 'confirmando_email', $sessionData);
-        
-        return [
-            'success' => true,
-            'message' => "✅ E-mail: {$email}
-
-Confirma que este e-mail está correto?
-
-Digite *SIM* para confirmar ou *NÃO* para digitar novamente:",
-            'state' => 'confirmando_email'
-        ];
-    }
-    
-    private function confirmarEmail($phone, $message, $sessionData) {
-        $resposta = strtoupper(trim($message));
-        
-        if ($resposta === 'SIM' || $resposta === 'S') {
-            $this->salvarSessao($phone, $sessionData['user_id'], 'aguardando_senha', $sessionData);
-            
-            return [
-                'success' => true,
-                'message' => "🔐 *Criar Senha*
-
-Agora crie uma senha segura para sua conta.
-
-A senha deve ter pelo menos 8 caracteres.
-
-Digite sua senha:",
-                'state' => 'aguardando_senha'
-            ];
-        } elseif ($resposta === 'NÃO' || $resposta === 'NAO' || $resposta === 'N') {
-            $this->salvarSessao($phone, $sessionData['user_id'], 'aguardando_email', $sessionData);
-            
-            return [
-                'success' => true,
-                'message' => "📧 Digite seu e-mail novamente:",
-                'state' => 'aguardando_email'
-            ];
+        if ($tipoCliente === CLIENT_TYPE_VISITANTE) {
+            return $this->iniciarCompletarCadastro($phone, $usuario);
         } else {
-            return [
-                'success' => true,
-                'message' => "❌ Digite *SIM* para confirmar ou *NÃO* para corrigir:",
-                'state' => 'confirmando_email'
-            ];
+            return $this->iniciarAtualizarCadastro($phone, $usuario);
         }
     }
     
-    private function processarSenha($phone, $senha, $sessionData) {
-        if (strlen($senha) < 8) {
-            return [
-                'success' => true,
-                'message' => '❌ Senha deve ter pelo menos 8 caracteres. Digite novamente:',
-                'state' => 'aguardando_senha'
-            ];
+    private function determinarTipoCliente($usuario) {
+        // Cliente completo precisa ter: nome, telefone, email e senha
+        if (!empty($usuario['email']) && !empty($usuario['senha_hash'])) {
+            return CLIENT_TYPE_COMPLETO;
         }
-        
-        $sessionData['senha'] = $senha;
-        $this->salvarSessao($phone, $sessionData['user_id'], 'confirmando_senha', $sessionData);
-        
-        return [
-            'success' => true,
-            'message' => "🔐 *Confirmar Senha*
-
-Digite a senha novamente para confirmar:",
-            'state' => 'confirmando_senha'
-        ];
+        return CLIENT_TYPE_VISITANTE;
     }
     
-    private function confirmarSenha($phone, $senhaConfirma, $sessionData) {
-        if ($sessionData['senha'] !== $senhaConfirma) {
-            $this->salvarSessao($phone, $sessionData['user_id'], 'aguardando_senha', $sessionData);
+    private function iniciarCompletarCadastro($phone, $usuario) {
+        // Verificar o que falta no cadastro
+        $camposFaltantes = [];
+        
+        if (empty($usuario['email'])) {
+            $camposFaltantes[] = 'email';
+        }
+        
+        if (empty($usuario['senha_hash'])) {
+            $camposFaltantes[] = 'senha';
+        }
+        
+        if (empty($camposFaltantes)) {
+            // Usuário já está completo, atualizar tipo
+            $this->atualizarTipoCliente($usuario['id'], CLIENT_TYPE_COMPLETO);
+            return $this->successResponse('✅ Seu cadastro já está completo!');
+        }
+        
+        // Iniciar processo de cadastro
+        $proximoCampo = $camposFaltantes[0];
+        $this->salvarEstadoCadastro($phone, 'aguardando_' . $proximoCampo, [
+            'usuario_id' => $usuario['id'],
+            'campos_faltantes' => $camposFaltantes,
+            'dados_temporarios' => []
+        ]);
+        
+        if ($proximoCampo === 'email') {
+            $mensagem = "📧 Para completar seu cadastro, preciso do seu *e-mail*.\n\nDigite seu e-mail:";
+        } else {
+            $mensagem = "🔒 Para completar seu cadastro, preciso criar uma *senha*.\n\nDigite uma senha (mínimo 6 caracteres):";
+        }
+        
+        return $this->successResponse($mensagem);
+    }
+    
+    private function iniciarAtualizarCadastro($phone, $usuario) {
+        $this->salvarEstadoCadastro($phone, 'selecionando_campo_atualizacao', [
+            'usuario_id' => $usuario['id'],
+            'dados_atuais' => $usuario
+        ]);
+        
+        $mensagem = "📝 *Atualizar Cadastro*\n\n";
+        $mensagem .= "Escolha o que deseja atualizar:\n\n";
+        $mensagem .= "1️⃣ Nome: " . ($usuario['nome'] ?: 'Não informado') . "\n";
+        $mensagem .= "2️⃣ E-mail: " . ($usuario['email'] ?: 'Não informado') . "\n";
+        $mensagem .= "3️⃣ Senha: ••••••••\n";
+        $mensagem .= "4️⃣ CPF: " . ($usuario['cpf'] ? $this->mascaraCPF($usuario['cpf']) : 'Não informado') . "\n\n";
+        $mensagem .= "Digite o *número* da opção ou *0* para cancelar:";
+        
+        return $this->successResponse($mensagem);
+    }
+    
+    private function processarMensagem($phone, $message) {
+        $estado = $this->obterEstadoCadastro($phone);
+        
+        if (!$estado) {
+            return $this->errorResponse('Sessão de cadastro não encontrada. Digite *2* para iniciar novamente.');
+        }
+        
+        switch ($estado['estado']) {
+            case 'aguardando_email':
+                return $this->processarEmail($phone, $message, $estado);
+            case 'confirmando_email':
+                return $this->confirmarEmail($phone, $message, $estado);
+            case 'aguardando_senha':
+                return $this->processarSenha($phone, $message, $estado);
+            case 'confirmando_senha':
+                return $this->confirmarSenha($phone, $message, $estado);
+            case 'aguardando_cpf':
+                return $this->processarCPF($phone, $message, $estado);
+            case 'selecionando_campo_atualizacao':
+                return $this->processarSelecaoAtualizacao($phone, $message, $estado);
+            default:
+                return $this->errorResponse('Estado inválido.');
+        }
+    }
+    
+    private function processarEmail($phone, $email, $estado) {
+        if (!Validator::validateEmail($email)) {
+            return $this->successResponse('❌ E-mail inválido. Digite um e-mail válido:');
+        }
+        
+        // Verificar se e-mail já existe
+        if ($this->emailJaExiste($email, $estado['dados']['usuario_id'])) {
+            return $this->successResponse('❌ Este e-mail já está cadastrado. Digite outro e-mail:');
+        }
+        
+        // Salvar temporariamente
+        $dados = $estado['dados'];
+        $dados['dados_temporarios']['email'] = $email;
+        
+        $this->salvarEstadoCadastro($phone, 'confirmando_email', $dados);
+        
+        return $this->successResponse("📧 Confirme seu e-mail:\n*{$email}*\n\nDigite *1* para confirmar ou *2* para corrigir:");
+    }
+    
+    private function confirmarEmail($phone, $message, $estado) {
+        $message = trim($message);
+        
+        if ($message === '1') {
+            // E-mail confirmado, próximo passo
+            $camposFaltantes = $estado['dados']['campos_faltantes'];
+            $proximoCampo = null;
             
-            return [
-                'success' => true,
-                'message' => "❌ Senhas não coincidem. Digite sua senha novamente:",
-                'state' => 'aguardando_senha'
-            ];
+            foreach ($camposFaltantes as $campo) {
+                if ($campo !== 'email') {
+                    $proximoCampo = $campo;
+                    break;
+                }
+            }
+            
+            if ($proximoCampo === 'senha') {
+                $dados = $estado['dados'];
+                $this->salvarEstadoCadastro($phone, 'aguardando_senha', $dados);
+                return $this->successResponse("🔒 Agora crie uma *senha* para sua conta.\n\nDigite uma senha (mínimo 6 caracteres):");
+            } else {
+                // Finalizar cadastro
+                return $this->finalizarCadastro($phone, $estado);
+            }
+        } elseif ($message === '2') {
+            // Corrigir e-mail
+            $dados = $estado['dados'];
+            unset($dados['dados_temporarios']['email']);
+            $this->salvarEstadoCadastro($phone, 'aguardando_email', $dados);
+            return $this->successResponse("📧 Digite seu e-mail novamente:");
+        } else {
+            return $this->successResponse("Digite *1* para confirmar ou *2* para corrigir o e-mail:");
         }
-        
-        $this->salvarSessao($phone, $sessionData['user_id'], 'aguardando_cpf', $sessionData);
-        
-        return [
-            'success' => true,
-            'message' => "📄 *CPF (Opcional)*
-
-Deseja adicionar seu CPF? (Recomendado para maior segurança)
-
-Digite seu CPF ou *PULAR* para finalizar:",
-            'state' => 'aguardando_cpf'
-        ];
     }
     
-    private function processarCPF($phone, $message, $sessionData) {
-        $message = strtoupper(trim($message));
+    private function processarSenha($phone, $senha, $estado) {
+        if (strlen($senha) < 6) {
+            return $this->successResponse('❌ A senha deve ter pelo menos 6 caracteres. Digite novamente:');
+        }
         
-        if ($message === 'PULAR') {
-            return $this->finalizarCadastro($phone, $sessionData, null);
+        // Salvar temporariamente
+        $dados = $estado['dados'];
+        $dados['dados_temporarios']['senha'] = $senha;
+        
+        $this->salvarEstadoCadastro($phone, 'confirmando_senha', $dados);
+        
+        return $this->successResponse("🔒 Confirme sua senha digitando-a novamente:");
+    }
+    
+    private function confirmarSenha($phone, $senha, $estado) {
+        $senhaAnterior = $estado['dados']['dados_temporarios']['senha'] ?? '';
+        
+        if ($senha !== $senhaAnterior) {
+            $dados = $estado['dados'];
+            unset($dados['dados_temporarios']['senha']);
+            $this->salvarEstadoCadastro($phone, 'aguardando_senha', $dados);
+            return $this->successResponse("❌ Senhas não coincidem. Digite sua senha novamente:");
+        }
+        
+        // Senhas coincidem, perguntar sobre CPF
+        $dados = $estado['dados'];
+        $this->salvarEstadoCadastro($phone, 'aguardando_cpf', $dados);
+        
+        return $this->successResponse("📄 Deseja informar seu *CPF*? (opcional)\n\nDigite seu CPF ou *pular* para finalizar:");
+    }
+    
+    private function processarCPF($phone, $message, $estado) {
+        $message = strtolower(trim($message));
+        
+        if ($message === 'pular') {
+            return $this->finalizarCadastro($phone, $estado);
         }
         
         $cpf = preg_replace('/[^0-9]/', '', $message);
         
-        if (!Validator::isValidCPF($cpf)) {
-            return [
-                'success' => true,
-                'message' => '❌ CPF inválido. Digite um CPF válido ou *PULAR*:',
-                'state' => 'aguardando_cpf'
-            ];
+        if (!Validator::validateCPF($cpf)) {
+            return $this->successResponse("❌ CPF inválido. Digite um CPF válido ou *pular*:");
         }
         
         // Verificar se CPF já existe
-        $stmt = $this->db->prepare("SELECT id FROM usuarios WHERE cpf = ? AND id != ?");
-        $stmt->execute([$cpf, $sessionData['user_id']]);
-        if ($stmt->rowCount() > 0) {
-            return [
-                'success' => true,
-                'message' => '❌ Este CPF já está em uso. Digite outro CPF ou *PULAR*:',
-                'state' => 'aguardando_cpf'
-            ];
+        if ($this->cpfJaExiste($cpf, $estado['dados']['usuario_id'])) {
+            return $this->successResponse("❌ Este CPF já está cadastrado. Digite outro CPF ou *pular*:");
         }
         
-        return $this->finalizarCadastro($phone, $sessionData, $cpf);
+        // Salvar CPF e finalizar
+        $dados = $estado['dados'];
+        $dados['dados_temporarios']['cpf'] = $cpf;
+        
+        return $this->finalizarCadastro($phone, ['dados' => $dados]);
     }
     
-    private function finalizarCadastro($phone, $sessionData, $cpf) {
+    private function processarSelecaoAtualizacao($phone, $message, $estado) {
+        $opcao = trim($message);
+        
+        if ($opcao === '0') {
+            $this->limparEstadoCadastro($phone);
+            return $this->successResponse("❌ Atualização cancelada.");
+        }
+        
+        $campos = ['1' => 'nome', '2' => 'email', '3' => 'senha', '4' => 'cpf'];
+        
+        if (!isset($campos[$opcao])) {
+            return $this->successResponse("Opção inválida. Digite um número de 1 a 4 ou *0* para cancelar:");
+        }
+        
+        $campoSelecionado = $campos[$opcao];
+        $dados = $estado['dados'];
+        $dados['campo_atualizando'] = $campoSelecionado;
+        
+        switch ($campoSelecionado) {
+            case 'nome':
+                $this->salvarEstadoCadastro($phone, 'aguardando_nome', $dados);
+                return $this->successResponse("📝 Digite seu *nome completo*:");
+                
+            case 'email':
+                $this->salvarEstadoCadastro($phone, 'aguardando_email_atualizacao', $dados);
+                return $this->successResponse("📧 Digite seu *novo e-mail*:");
+                
+            case 'senha':
+                $this->salvarEstadoCadastro($phone, 'aguardando_senha_atualizacao', $dados);
+                return $this->successResponse("🔒 Digite sua *nova senha* (mínimo 6 caracteres):");
+                
+            case 'cpf':
+                $this->salvarEstadoCadastro($phone, 'aguardando_cpf_atualizacao', $dados);
+                return $this->successResponse("📄 Digite seu *CPF*:");
+        }
+    }
+    
+    private function finalizarCadastro($phone, $estado) {
         try {
             $this->db->beginTransaction();
             
+            $userId = $estado['dados']['usuario_id'];
+            $dadosTemporarios = $estado['dados']['dados_temporarios'] ?? [];
+            
             // Atualizar usuário
-            $sql = "UPDATE usuarios SET email = ?, senha_hash = ?, tipo_cliente = ?, cpf = ? WHERE id = ?";
+            $sql = "UPDATE usuarios SET ";
+            $params = [];
+            $updates = [];
+            
+            if (!empty($dadosTemporarios['email'])) {
+                $updates[] = "email = :email";
+                $params[':email'] = $dadosTemporarios['email'];
+            }
+            
+            if (!empty($dadosTemporarios['senha'])) {
+                $updates[] = "senha_hash = :senha";
+                $params[':senha'] = password_hash($dadosTemporarios['senha'], PASSWORD_BCRYPT);
+            }
+            
+            if (!empty($dadosTemporarios['cpf'])) {
+                $updates[] = "cpf = :cpf";
+                $params[':cpf'] = $dadosTemporarios['cpf'];
+            }
+            
+            // Atualizar tipo_cliente para completo
+            $updates[] = "tipo_cliente = :tipo_cliente";
+            $params[':tipo_cliente'] = CLIENT_TYPE_COMPLETO;
+            
+            $sql .= implode(', ', $updates) . " WHERE id = :id";
+            $params[':id'] = $userId;
+            
             $stmt = $this->db->prepare($sql);
-            $stmt->execute([
-                $sessionData['email'],
-                password_hash($sessionData['senha'], PASSWORD_DEFAULT),
-                'completo',
-                $cpf,
-                $sessionData['user_id']
-            ]);
+            $stmt->execute($params);
             
             $this->db->commit();
-            $this->limparSessao($phone);
+            $this->limparEstadoCadastro($phone);
             
-            return [
-                'success' => true,
-                'message' => "🎉 *Cadastro Completo!*
-
-Parabéns! Seu cadastro foi finalizado com sucesso.
-
-✅ Agora você tem acesso total ao Klube Cash:
-- Login no site e app
-- Notificações por email  
-- Maior segurança
-- Todas as funcionalidades
-
-🌐 Acesse: https://klubecash.com
-
-─────────────────────────
-✅ *Processo finalizado!*
-
-Para nova consulta, envie qualquer mensagem.",
-                'user_upgraded' => true
-            ];
+            return $this->successResponse("🎉 *Cadastro completado com sucesso!*\n\nAgora você tem acesso completo ao Klube Cash. Digite *1* para consultar seu saldo!");
             
         } catch (Exception $e) {
             $this->db->rollBack();
-            error_log('Erro ao finalizar cadastro: ' . $e->getMessage());
-            
-            return [
-                'success' => false,
-                'message' => '❌ Erro ao salvar cadastro. Tente novamente mais tarde.'
-            ];
+            error_log("ERRO ao finalizar cadastro: " . $e->getMessage());
+            return $this->errorResponse("Erro ao finalizar cadastro. Tente novamente.");
         }
     }
     
-    private function processarAtualizarCadastro($user, $message, $action) {
-        // Implementar atualização de cadastro
-        return [
-            'success' => true,
-            'message' => "🔧 *Atualizar Cadastro*
-
-Em breve você poderá atualizar:
-- E-mail
-- Senha  
-- CPF
-- Dados pessoais
-
-Esta funcionalidade estará disponível em breve!
-
-Para nova consulta, envie qualquer mensagem."
+    // Métodos auxiliares
+    private function salvarEstadoCadastro($phone, $estado, $dados) {
+        $cacheFile = sys_get_temp_dir() . "/whatsapp_cadastro_{$phone}.json";
+        $estadoData = [
+            'estado' => $estado,
+            'dados' => $dados,
+            'timestamp' => time()
         ];
+        file_put_contents($cacheFile, json_encode($estadoData));
     }
     
-    private function salvarSessao($phone, $userId, $state, $data) {
-        $expiresAt = date('Y-m-d H:i:s', time() + WHATSAPP_TIMEOUT_CADASTRO);
+    private function obterEstadoCadastro($phone) {
+        $cacheFile = sys_get_temp_dir() . "/whatsapp_cadastro_{$phone}.json";
         
-        $sql = "
-            INSERT INTO {$this->sessionTable} (phone, user_id, state, data, expires_at)
-            VALUES (?, ?, ?, ?, ?)
-            ON DUPLICATE KEY UPDATE
-                user_id = VALUES(user_id),
-                state = VALUES(state),
-                data = VALUES(data),
-                expires_at = VALUES(expires_at),
-                updated_at = CURRENT_TIMESTAMP
-        ";
+        if (!file_exists($cacheFile)) {
+            return null;
+        }
         
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute([$phone, $userId, $state, json_encode($data), $expiresAt]);
+        $data = json_decode(file_get_contents($cacheFile), true);
+        
+        // Verificar timeout (10 minutos)
+        if (time() - $data['timestamp'] > WHATSAPP_TIMEOUT_CADASTRO) {
+            unlink($cacheFile);
+            return null;
+        }
+        
+        return $data;
     }
     
-    private function recuperarSessao($phone) {
-        $stmt = $this->db->prepare("
-            SELECT * FROM {$this->sessionTable} 
-            WHERE phone = ? 
-            ORDER BY updated_at DESC 
-            LIMIT 1
-        ");
-        $stmt->execute([$phone]);
-        return $stmt->fetch(PDO::FETCH_ASSOC);
+    private function limparEstadoCadastro($phone) {
+        $cacheFile = sys_get_temp_dir() . "/whatsapp_cadastro_{$phone}.json";
+        if (file_exists($cacheFile)) {
+            unlink($cacheFile);
+        }
     }
     
-    private function limparSessao($phone) {
-        $stmt = $this->db->prepare("DELETE FROM {$this->sessionTable} WHERE phone = ?");
-        $stmt->execute([$phone]);
+    private function emailJaExiste($email, $userId) {
+        $stmt = $this->db->prepare("SELECT id FROM usuarios WHERE email = :email AND id != :id");
+        $stmt->execute([':email' => $email, ':id' => $userId]);
+        return $stmt->fetch() !== false;
+    }
+    
+    private function cpfJaExiste($cpf, $userId) {
+        $stmt = $this->db->prepare("SELECT id FROM usuarios WHERE cpf = :cpf AND id != :id");
+        $stmt->execute([':cpf' => $cpf, ':id' => $userId]);
+        return $stmt->fetch() !== false;
+    }
+    
+    private function atualizarTipoCliente($userId, $tipo) {
+        $stmt = $this->db->prepare("UPDATE usuarios SET tipo_cliente = :tipo WHERE id = :id");
+        $stmt->execute([':tipo' => $tipo, ':id' => $userId]);
+    }
+    
+    private function mascaraCPF($cpf) {
+        return substr($cpf, 0, 3) . '.***.**' . substr($cpf, -2);
+    }
+    
+    private function cleanPhone($phone) {
+        return preg_replace('/[^0-9]/', '', $phone);
+    }
+    
+    private function successResponse($message) {
+        return ['success' => true, 'message' => $message];
+    }
+    
+    private function errorResponse($message, $code = 400) {
+        return ['success' => false, 'message' => $message, 'code' => $code];
     }
 }
+
+// Processar requisição
+$api = new WhatsAppCadastroAPI();
+$response = $api->handleRequest();
+
+header('Content-Type: application/json');
+echo json_encode($response);
 ?>

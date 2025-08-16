@@ -69,6 +69,22 @@ class SaldoConsulta {
             ];
         }
     }
+
+    /**
+ * Determina o tipo de cliente baseado nos dados cadastrais
+ */
+public function determinarTipoCliente($usuario) {
+    if (!$usuario) {
+        return 'unknown';
+    }
+    
+    // Cliente completo precisa ter: nome, telefone, email e senha
+    if (!empty($usuario['email']) && !empty($usuario['senha_hash'])) {
+        return 'completo';
+    }
+    
+    return 'visitante';
+}
 /**
      * Busca saldos consolidados de múltiplos usuários
      */

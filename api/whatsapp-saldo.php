@@ -15,6 +15,9 @@ require_once __DIR__ . '/../config/constants.php';
  * 
  * Este endpoint recebe requisições do bot WhatsApp quando um usuário
  * envia a palavra "saldo" e retorna o saldo formatado do usuário
+ * 
+ * ATUALIZAÇÃO: Agora também retorna o tipo de cliente (visitante/completo)
+ * para que o bot possa exibir o menu adequado
  */
 
 // Verificar se é POST
@@ -63,15 +66,31 @@ try {
     // Consultar saldo
     $resultado = $saldoConsulta->consultarSaldoPorTelefone($data['phone']);
     
+    // Determinar tipo de cliente para o menu dinâmico
+    $tipoCliente = 'unknown';
+    $userName = '';
+    
+    if ($resultado['user_found'] && isset($resultado['user_data'])) {
+        $userData = $resultado['user_data'];
+        $tipoCliente = $saldoConsulta->determinarTipoCliente($userData);
+        $userName = $userData['nome'] ?? '';
+        
+        error_log("WhatsApp Saldo API - Usuário encontrado: {$userName}, Tipo: {$tipoCliente}");
+    } else {
+        error_log("WhatsApp Saldo API - Usuário não encontrado para telefone: " . $data['phone']);
+    }
+    
     // Log do resultado
     error_log('WhatsApp Saldo API - Resultado: ' . json_encode($resultado));
     
-    // Retornar resposta
+    // Retornar resposta com tipo de cliente
     if ($resultado['success']) {
         echo json_encode([
             'success' => true,
             'message' => $resultado['message'],
             'user_found' => $resultado['user_found'],
+            'client_type' => $tipoCliente, // NOVO: Tipo de cliente para menu dinâmico
+            'user_name' => $userName, // NOVO: Nome do usuário
             'timestamp' => date('Y-m-d H:i:s')
         ]);
     } else {
@@ -79,6 +98,8 @@ try {
             'success' => true, // True para o bot processar a mensagem
             'message' => $resultado['message'],
             'user_found' => isset($resultado['user_found']) ? $resultado['user_found'] : false,
+            'client_type' => $tipoCliente, // NOVO: Tipo de cliente
+            'user_name' => $userName, // NOVO: Nome do usuário
             'timestamp' => date('Y-m-d H:i:s')
         ]);
     }
@@ -91,6 +112,10 @@ try {
         'success' => false,
         'error' => 'Erro interno do servidor',
         'message' => 'Ocorreu um erro temporário. Tente novamente em alguns instantes.',
+        'user_found' => false,
+        'client_type' => 'unknown', // NOVO: Tipo unknown em caso de erro
+        'user_name' => '', // NOVO: Nome vazio em caso de erro
         'timestamp' => date('Y-m-d H:i:s')
     ]);
 }
+?>
