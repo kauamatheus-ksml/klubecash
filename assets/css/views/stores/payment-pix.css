@@ -755,6 +755,9 @@ body {
 @media (max-width: 1024px) {
     .main-content {
         margin-left: 0;
+        padding: 0;
+        width: 100vw;
+        overflow-x: hidden;
     }
     
     .pix-container {
@@ -762,11 +765,16 @@ body {
         gap: 1.5rem;
         padding: 1.5rem;
         max-width: 800px;
+        margin: 0 auto;
+        width: 100%;
+        box-sizing: border-box;
     }
     
     .steps-panel {
         order: -1;
         position: static;
+        width: 100%;
+        margin: 0;
     }
     
     .step {
@@ -776,6 +784,8 @@ body {
     .info-panel {
         order: 1;
         position: static;
+        width: 100%;
+        margin: 0;
     }
     
     .qr-image-container {
@@ -791,8 +801,10 @@ body {
     
     .fixed-back-btn {
         position: static;
-        margin: 1rem;
+        margin: 1rem auto;
         transform: none;
+        width: 100%;
+        max-width: 300px;
     }
     
     .back-btn {
@@ -805,20 +817,39 @@ body {
 @media (max-width: 768px) {
     body {
         overflow-x: hidden;
+        margin: 0;
+        padding: 0;
+    }
+    
+    .main-content {
+        margin-left: 0;
+        padding: 0;
+        width: 100vw;
+        min-height: 100vh;
+    }
+    
+    .pix-header {
+        padding: 1rem 0;
+        margin: 0;
+        width: 100%;
     }
     
     .header-content {
         flex-direction: column;
         text-align: center;
-        gap: 0.5rem;
-        padding: 0 0.5rem;
+        gap: 0.8rem;
+        padding: 0 1rem;
+        max-width: 100%;
+        margin: 0 auto;
     }
     
     .header-amount {
-        align-self: stretch;
+        align-self: center;
         text-align: center;
-        margin: 0 0.5rem;
-        padding: 0.8rem;
+        margin: 0;
+        padding: 1rem;
+        max-width: 280px;
+        width: 100%;
     }
     
     .amount-value {
@@ -826,49 +857,70 @@ body {
     }
     
     .pix-container {
-        padding: 0.5rem;
-        gap: 0.8rem;
+        padding: 0;
+        gap: 1rem;
         width: 100%;
         max-width: 100vw;
         box-sizing: border-box;
+        margin: 0;
+        grid-template-columns: 1fr;
     }
     
     .payment-state {
-        padding: 1rem 0.25rem;
+        padding: 1rem;
         width: 100%;
         box-sizing: border-box;
+        margin: 0;
     }
     
     .qr-display {
-        gap: 1rem;
+        gap: 1.5rem;
         width: 100%;
         max-width: 100%;
         overflow: hidden;
+        padding: 0;
+        margin: 0;
+    }
+    
+    .qr-section {
+        padding: 0 1rem;
+        margin: 0;
+    }
+    
+    .qr-section h2 {
+        text-align: center;
+        margin-bottom: 1rem;
+    }
+    
+    .qr-instruction {
+        text-align: center;
+        margin-bottom: 1.5rem;
+        padding: 0 0.5rem;
     }
     
     .qr-image-container {
-        width: calc(100vw - 3rem);
-        height: calc(100vw - 3rem);
-        max-width: 260px;
-        max-height: 260px;
-        padding: 0.5rem;
+        width: 280px;
+        height: 280px;
+        max-width: calc(100vw - 2rem);
+        max-height: calc(100vw - 2rem);
+        padding: 1rem;
         margin: 0 auto;
         box-sizing: border-box;
         border-width: 2px;
     }
     
     .qr-image-container img {
-        width: calc(100% - 1rem);
-        height: calc(100% - 1rem);
+        width: calc(100% - 2rem);
+        height: calc(100% - 2rem);
         max-width: 200px;
         max-height: 200px;
     }
     
     .qr-code-section {
         width: 100%;
-        max-width: calc(100vw - 1rem);
+        max-width: calc(100vw - 2rem);
         margin: 0 auto;
-        padding: 0 0.25rem;
+        padding: 0 1rem;
         box-sizing: border-box;
     }
     
@@ -876,43 +928,46 @@ body {
         width: 100%;
         max-width: 100%;
         overflow: hidden;
-        margin: 0 auto;
+        margin: 0;
     }
     
     #pixCode {
         height: 50px;
-        font-size: 0.7rem;
-        padding: 0.5rem;
+        font-size: 0.75rem;
+        padding: 0.8rem;
         min-width: 0;
         flex: 1;
     }
     
     .copy-btn {
         height: 50px;
-        padding: 0 0.6rem;
-        min-width: 70px;
-        font-size: 0.7rem;
+        padding: 0 1rem;
+        min-width: 90px;
+        font-size: 0.75rem;
         flex-shrink: 0;
     }
     
     .success-actions {
         flex-direction: column;
         width: 100%;
-        gap: 0.5rem;
-        padding: 0 0.5rem;
+        gap: 0.8rem;
+        padding: 0 1rem;
+        margin: 1rem 0;
     }
     
     .pix-action-btn {
         width: 100%;
         justify-content: center;
-        margin: 0.25rem 0;
-        padding: 0.8rem;
+        margin: 0;
+        padding: 1rem;
+        max-width: 300px;
+        margin: 0 auto;
     }
     
     .notification {
         top: 1rem;
-        right: 0.5rem;
-        left: 0.5rem;
+        right: 1rem;
+        left: 1rem;
         max-width: none;
     }
     
@@ -922,8 +977,38 @@ body {
         width: 100%;
         max-width: 100%;
         box-sizing: border-box;
-        margin: 0;
-        padding: 0.8rem;
+        margin: 0 auto;
+        padding: 1rem;
+    }
+    
+    .content-panel {
+        border-radius: 0;
+        box-shadow: none;
+        border: none;
+        background: var(--white);
+    }
+    
+    .steps-panel {
+        order: -1;
+        position: static;
+        background: var(--gray-50);
+        margin-bottom: 0;
+    }
+    
+    .info-panel {
+        order: 1;
+        position: static;
+        background: var(--gray-50);
+        margin-top: 0;
+    }
+    
+    .fixed-back-btn {
+        position: static;
+        margin: 1rem auto;
+        transform: none;
+        width: 100%;
+        max-width: 300px;
+        padding: 0 1rem;
     }
 }
 
@@ -939,90 +1024,133 @@ body {
         padding: 0;
     }
     
+    .main-content {
+        margin-left: 0;
+        padding: 0;
+        width: 100vw;
+        min-height: 100vh;
+    }
+    
     .pix-header {
-        padding: 0.8rem 0.25rem;
+        padding: 0.8rem 0;
         width: 100%;
         box-sizing: border-box;
+        margin: 0;
     }
     
     .header-content {
-        padding: 0 0.25rem;
-        max-width: 100%;
-    }
-    
-    .header-text h1 {
-        font-size: 1.1rem;
-        word-break: break-word;
-    }
-    
-    .header-text p {
-        font-size: 0.8rem;
-    }
-    
-    .header-amount {
-        margin: 0 0.25rem;
-        padding: 0.6rem 0.8rem;
-    }
-    
-    .amount-value {
-        font-size: 1.1rem;
-    }
-    
-    .pix-container {
-        padding: 0.25rem;
-        gap: 0.5rem;
-        width: 100%;
-        max-width: 100vw;
-    }
-    
-    .steps-panel,
-    .content-panel,
-    .info-panel {
-        padding: 0.5rem;
-        width: 100%;
+        padding: 0 0.8rem;
         max-width: 100%;
         margin: 0;
     }
     
+    .header-text h1 {
+        font-size: 1.2rem;
+        word-break: break-word;
+        margin-bottom: 0.5rem;
+    }
+    
+    .header-text p {
+        font-size: 0.9rem;
+    }
+    
+    .header-amount {
+        margin: 0.8rem auto 0;
+        padding: 0.8rem 1rem;
+        max-width: 250px;
+        width: calc(100% - 1.6rem);
+    }
+    
+    .amount-value {
+        font-size: 1.2rem;
+    }
+    
+    .pix-container {
+        padding: 0;
+        gap: 0.8rem;
+        width: 100%;
+        max-width: 100vw;
+        margin: 0;
+    }
+    
+    .steps-panel,
+    .info-panel {
+        padding: 0.8rem;
+        width: 100%;
+        max-width: 100%;
+        margin: 0;
+        border-radius: 0;
+    }
+    
+    .content-panel {
+        padding: 0;
+        width: 100%;
+        max-width: 100%;
+        margin: 0;
+        border-radius: 0;
+        box-shadow: none;
+        border: none;
+    }
+    
     .payment-state {
-        padding: 0.5rem 0.1rem;
+        padding: 1rem 0.8rem;
+        margin: 0;
     }
     
     .state-description {
-        font-size: 0.8rem;
-        padding: 0 0.25rem;
+        font-size: 0.9rem;
+        padding: 0 0.5rem;
+        text-align: center;
+        line-height: 1.5;
     }
     
     #initialState h2,
     .success-state h2 {
-        font-size: 1.1rem;
+        font-size: 1.3rem;
+        text-align: center;
     }
     
     .qr-section h2 {
-        font-size: 1rem;
+        font-size: 1.1rem;
+        text-align: center;
+        margin-bottom: 0.8rem;
+    }
+    
+    .qr-instruction {
+        text-align: center;
+        font-size: 0.85rem;
+        padding: 0 0.8rem;
+        margin-bottom: 1.5rem;
+        line-height: 1.4;
     }
     
     .qr-image-container {
-        width: calc(100vw - 1.5rem);
-        height: calc(100vw - 1.5rem);
-        max-width: 220px;
-        max-height: 220px;
-        padding: 0.3rem;
+        width: 240px;
+        height: 240px;
+        max-width: calc(100vw - 1.6rem);
+        max-height: calc(100vw - 1.6rem);
+        padding: 0.8rem;
         margin: 0 auto;
         border-width: 2px;
     }
     
     .qr-image-container img {
-        width: calc(100% - 0.6rem);
-        height: calc(100% - 0.6rem);
-        max-width: 160px;
-        max-height: 160px;
+        width: calc(100% - 1.6rem);
+        height: calc(100% - 1.6rem);
+        max-width: 170px;
+        max-height: 170px;
     }
     
     .qr-code-section {
-        max-width: calc(100vw - 0.5rem);
-        padding: 0 0.25rem;
+        max-width: calc(100vw - 1.6rem);
+        padding: 0 0.8rem;
         margin: 0 auto;
+    }
+    
+    .code-label {
+        font-size: 0.9rem;
+        margin-bottom: 0.8rem;
+        justify-content: center;
     }
     
     .code-input-container {
@@ -1036,36 +1164,38 @@ body {
         border-radius: var(--border-radius) var(--border-radius) 0 0;
         border-right: 2px solid var(--primary-color);
         border-bottom: none;
-        height: 40px;
-        font-size: 0.65rem;
-        padding: 0.4rem;
+        height: 45px;
+        font-size: 0.7rem;
+        padding: 0.6rem;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
         width: 100%;
         min-width: 0;
+        text-align: center;
     }
     
     .copy-btn {
         border-radius: 0 0 var(--border-radius) var(--border-radius);
-        height: 40px;
+        height: 45px;
         min-width: auto;
         width: 100%;
-        font-size: 0.65rem;
-        padding: 0 0.4rem;
+        font-size: 0.75rem;
+        padding: 0 0.6rem;
     }
     
     .pix-action-btn {
         width: 100%;
-        padding: 0.6rem 0.8rem;
-        font-size: 0.8rem;
-        margin: 0.2rem 0;
+        max-width: 280px;
+        margin: 0.5rem auto;
+        padding: 0.8rem 1rem;
+        font-size: 0.9rem;
     }
     
     .payment-details-summary {
-        max-width: 100%;
-        padding: 0.8rem;
-        margin: 0.8rem 0;
+        max-width: calc(100% - 1.6rem);
+        padding: 1rem;
+        margin: 1rem auto;
     }
     
     .info-item {
@@ -1074,93 +1204,142 @@ body {
     
     .info-text strong,
     .info-text p {
-        font-size: 0.75rem;
+        font-size: 0.8rem;
     }
     
     .security-info {
-        padding: 0.6rem;
-        font-size: 0.75rem;
+        padding: 0.8rem;
+        font-size: 0.8rem;
     }
     
     .fixed-back-btn {
         position: static;
-        margin: 0.25rem;
+        margin: 1rem auto;
         transform: none;
+        width: 100%;
+        max-width: 280px;
+        padding: 0 0.8rem;
     }
     
     .back-btn {
         width: 100%;
         justify-content: center;
-        padding: 0.6rem;
+        padding: 0.8rem;
+    }
+    
+    .qr-actions {
+        text-align: center;
+        margin-top: 1rem;
+    }
+    
+    .payment-timer {
+        margin-top: 1.5rem;
+        margin-bottom: 0;
     }
 }
 
 @media (max-width: 360px) {
     .pix-header {
-        padding: 0.5rem 0.1rem;
+        padding: 0.6rem 0;
     }
     
     .header-content {
-        padding: 0 0.1rem;
-    }
-    
-    .qr-image-container {
-        width: calc(100vw - 1rem);
-        height: calc(100vw - 1rem);
-        max-width: 180px;
-        max-height: 180px;
-        padding: 0.2rem;
-        border-width: 1px;
-    }
-    
-    .qr-image-container img {
-        width: calc(100% - 0.4rem);
-        height: calc(100% - 0.4rem);
-        max-width: 140px;
-        max-height: 140px;
+        padding: 0 0.6rem;
     }
     
     .header-text h1 {
         font-size: 1rem;
     }
     
+    .header-text p {
+        font-size: 0.8rem;
+    }
+    
     .amount-value {
         font-size: 1rem;
     }
     
+    .header-amount {
+        max-width: 220px;
+        padding: 0.6rem 0.8rem;
+    }
+    
     .pix-container {
-        padding: 0.1rem;
+        padding: 0;
+        gap: 0.6rem;
     }
     
     .steps-panel,
-    .content-panel,
     .info-panel {
-        padding: 0.4rem;
+        padding: 0.6rem;
+        border-radius: 0;
     }
     
-    .qr-section h2 {
-        font-size: 0.9rem;
-    }
-    
-    .qr-code-section {
-        max-width: calc(100vw - 0.2rem);
-        padding: 0 0.1rem;
-    }
-    
-    #pixCode {
-        height: 35px;
-        font-size: 0.6rem;
-        padding: 0.3rem;
-    }
-    
-    .copy-btn {
-        height: 35px;
-        font-size: 0.6rem;
-        padding: 0 0.3rem;
+    .content-panel {
+        padding: 0;
+        border-radius: 0;
     }
     
     .payment-state {
-        padding: 0.3rem 0.05rem;
+        padding: 0.8rem 0.6rem;
+    }
+    
+    .qr-section h2 {
+        font-size: 1rem;
+    }
+    
+    .qr-instruction {
+        font-size: 0.8rem;
+        padding: 0 0.6rem;
+    }
+    
+    .qr-image-container {
+        width: 200px;
+        height: 200px;
+        max-width: calc(100vw - 1.2rem);
+        max-height: calc(100vw - 1.2rem);
+        padding: 0.6rem;
+        border-width: 2px;
+    }
+    
+    .qr-image-container img {
+        width: calc(100% - 1.2rem);
+        height: calc(100% - 1.2rem);
+        max-width: 130px;
+        max-height: 130px;
+    }
+    
+    .qr-code-section {
+        max-width: calc(100vw - 1.2rem);
+        padding: 0 0.6rem;
+    }
+    
+    #pixCode {
+        height: 40px;
+        font-size: 0.65rem;
+        padding: 0.5rem;
+    }
+    
+    .copy-btn {
+        height: 40px;
+        font-size: 0.65rem;
+        padding: 0 0.5rem;
+    }
+    
+    .pix-action-btn {
+        max-width: 240px;
+        padding: 0.7rem 0.8rem;
+        font-size: 0.85rem;
+    }
+    
+    .fixed-back-btn {
+        max-width: 240px;
+        padding: 0 0.6rem;
+    }
+    
+    .payment-details-summary {
+        max-width: calc(100% - 1.2rem);
+        padding: 0.8rem;
     }
 }
 
