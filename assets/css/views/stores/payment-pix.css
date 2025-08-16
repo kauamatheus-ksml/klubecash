@@ -368,7 +368,7 @@ body {
     display: flex;
     flex-direction: column;
     width: 100%;
-    max-width: 500px;
+    max-width: 600px;
     margin: 0 auto;
 }
 
@@ -383,6 +383,9 @@ body {
 
 .code-input-container {
     position: relative;
+    display: flex;
+    align-items: stretch;
+    gap: 0;
 }
 
 #pixCode {
