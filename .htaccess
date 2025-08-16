@@ -39,55 +39,7 @@ RewriteRule .* - [F,L]
 # ===== ROTAS API WHATSAPP =====
 # Permitir acesso à API de saldo do WhatsApp
 RewriteRule ^api/whatsapp-saldo/?$ api/whatsapp-saldo.php [L,QSA]
-# === ROTAS API WHATSAPP CADASTRO ===
-# Permitir acesso à API de completar cadastro do WhatsApp
-RewriteRule ^api/whatsapp-completar-cadastro/?$ api/whatsapp-completar-cadastro.php [L,QSA]
 
-# Headers específicos para API de cadastro
-<FilesMatch "whatsapp-completar-cadastro\.php$">
-    ExpiresActive on
-    ExpiresDefault "access plus 0 seconds"
-    
-    Header always set Access-Control-Allow-Origin "*"
-    Header always set Access-Control-Allow-Methods "POST, OPTIONS"
-    Header always set Access-Control-Allow-Headers "Content-Type, Authorization"
-</FilesMatch>
-
-# Tratamento para requisições OPTIONS da API de cadastro
-RewriteCond %{REQUEST_METHOD} OPTIONS
-RewriteRule ^api/whatsapp-completar-cadastro/?$ [R=200,L]# === ROTAS API WHATSAPP CADASTRO ===
-# Permitir acesso à API de completar cadastro do WhatsApp
-RewriteRule ^api/whatsapp-completar-cadastro/?$ api/whatsapp-completar-cadastro.php [L,QSA]
-
-# Headers específicos para API de cadastro
-<FilesMatch "whatsapp-completar-cadastro\.php$">
-    ExpiresActive on
-    ExpiresDefault "access plus 0 seconds"
-    
-    Header always set Access-Control-Allow-Origin "*"
-    Header always set Access-Control-Allow-Methods "POST, OPTIONS"
-    Header always set Access-Control-Allow-Headers "Content-Type, Authorization"
-</FilesMatch>
-
-# Tratamento para requisições OPTIONS da API de cadastro
-RewriteCond %{REQUEST_METHOD} OPTIONS
-RewriteRule ^api/whatsapp-completar-cadastro/?$ [R=200,L]# === ROTAS API WHATSAPP CADASTRO ===
-# Permitir acesso à API de completar cadastro do WhatsApp
-RewriteRule ^api/whatsapp-completar-cadastro/?$ api/whatsapp-completar-cadastro.php [L,QSA]
-
-# Headers específicos para API de cadastro
-<FilesMatch "whatsapp-completar-cadastro\.php$">
-    ExpiresActive on
-    ExpiresDefault "access plus 0 seconds"
-    
-    Header always set Access-Control-Allow-Origin "*"
-    Header always set Access-Control-Allow-Methods "POST, OPTIONS"
-    Header always set Access-Control-Allow-Headers "Content-Type, Authorization"
-</FilesMatch>
-
-# Tratamento para requisições OPTIONS da API de cadastro
-RewriteCond %{REQUEST_METHOD} OPTIONS
-RewriteRule ^api/whatsapp-completar-cadastro/?$ [R=200,L]
 # Melhorar performance para requisições da API
 <FilesMatch "whatsapp-saldo\.php$">
     # Cache por 0 segundos (não cachear)

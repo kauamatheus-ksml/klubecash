@@ -233,30 +233,6 @@ define('ADMIN_COMMISSIONS_URL', SITE_URL . '/admin/comissoes');
 define('ADMIN_PAYMENTS_URL', SITE_URL . '/admin/pagamentos');
 define('ADMIN_BALANCE_URL', SITE_URL . '/admin/saldo');
 
-// === CONFIGURAÇÕES WHATSAPP CADASTRO COMPLETO ===
-define('WHATSAPP_CADASTRO_ATUALIZADO', [
-    'inicial' => 'inicial',
-    'aguardando_email' => 'aguardando_email', 
-    'confirmando_email' => 'confirmando_email',
-    'aguardando_senha' => 'aguardando_senha',
-    'confirmando_senha' => 'confirmando_senha',
-    'aguardando_cpf' => 'aguardando_cpf',
-    'selecionando_campo_atualizacao' => 'selecionando_campo_atualizacao',
-    'finalizado' => 'finalizado'
-]);
-
-// === TIPOS DE CLIENTE WHATSAPP ===
-define('CLIENT_TYPE_VISITANTE', 'visitante');
-define('CLIENT_TYPE_COMPLETO', 'completo');
-
-// === CAMPOS ATUALIZÁVEIS ===
-define('CAMPOS_ATUALIZAVEIS', [
-    'nome' => 'Nome Completo',
-    'email' => 'E-mail',
-    'senha' => 'Senha',
-    'cpf' => 'CPF'
-]);
-
 // === URLs DA LOJA ===
 define('STORE_REGISTER_URL', SITE_URL . '/lojas/cadastro');
 define('STORE_DASHBOARD_URL', SITE_URL . '/store/dashboard');
