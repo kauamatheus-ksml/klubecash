@@ -84,26 +84,38 @@ async function processarMensagem(message) {
         const phoneNumber = message.from;
         const messageText = message.body.trim();
         
-        // Se for opção 1 (saldo)
-        if (messageText === '1') {
-            await consultarSaldoGeral(phoneNumber);
+        console.log('📨 Mensagem:', phoneNumber, messageText);
+
+        // VERIFICAR SE ESTÁ EM PROCESSO DE CADASTRO
+        if (await estaCadastrandoOuAtualizando(phoneNumber)) {
+            await processarMensagemCadastro(phoneNumber, messageText);
             return;
         }
 
-        // Se for número de loja (2-9)
-        if (/^[2-9]$/.test(messageText)) {
+        // OPÇÕES DO MENU
+        if (messageText === '1') {
+            await consultarSaldoComTipo(phoneNumber);
+            return;
+        }
+
+        if (messageText === '2') {
+            await iniciarCadastroOuAtualizacao(phoneNumber);
+            return;
+        }
+
+        // NÚMEROS DE LOJA
+        if (/^[3-9]$/.test(messageText)) {
             await consultarLojaEspecifica(phoneNumber, messageText);
             return;
         }
 
-        // QUALQUER OUTRA MENSAGEM = CANCELAR TIMEOUT E MOSTRAR MENU
+        // CANCELAR TIMEOUTS E MOSTRAR MENU
         if (activeTimeouts.has(phoneNumber)) {
             clearTimeout(activeTimeouts.get(phoneNumber));
             activeTimeouts.delete(phoneNumber);
-            console.log('⏰ Timeout cancelado - novo menu solicitado');
         }
         
-        await exibirMenu(phoneNumber);
+        await exibirMenuDinamico(phoneNumber);
         
     } catch (error) {
         console.error('❌ Erro:', error);
@@ -111,6 +123,130 @@ async function processarMensagem(message) {
     }
 }
 
+/**
+ * VERIFICAR SE ESTÁ EM PROCESSO DE CADASTRO
+ */
+async function estaCadastrandoOuAtualizando(phoneNumber) {
+    try {
+        const cleanPhone = phoneNumber.replace('@c.us', '');
+        const response = await axios.post('https://klubecash.com/api/whatsapp-completar-cadastro.php', {
+            phone: cleanPhone,
+            action: 'verificar_estado',
+            secret: CONFIG.webhookSecret
+        }, { timeout: 5000 });
+        
+        return response.data && response.data.em_processo;
+    } catch (error) {
+        return false;
+    }
+}
+
+/**
+ * PROCESSAR MENSAGEM DURANTE CADASTRO
+ */
+async function processarMensagemCadastro(phoneNumber, messageText) {
+    try {
+        const cleanPhone = phoneNumber.replace('@c.us', '');
+        const response = await axios.post('https://klubecash.com/api/whatsapp-completar-cadastro.php', {
+            phone: cleanPhone,
+            message: messageText,
+            action: 'processar',
+            secret: CONFIG.webhookSecret
+        }, { timeout: 15000 });
+        
+        if (response.data && response.data.success) {
+            await client.sendText(phoneNumber, response.data.message);
+            
+            // Se finalizou o cadastro, resetar menu
+            if (response.data.user_upgraded) {
+                console.log('✅ Cliente upgradado para completo:', phoneNumber);
+            }
+        } else {
+            await client.sendText(phoneNumber, response.data.message || 'Erro no processo. Tente novamente.');
+        }
+        
+    } catch (error) {
+        console.error('❌ Erro no cadastro:', error);
+        await client.sendText(phoneNumber, '❌ Erro temporário. Digite *2* para tentar novamente.');
+    }
+}
+
+
+/**
+ * INICIAR CADASTRO OU ATUALIZAÇÃO
+ */
+async function iniciarCadastroOuAtualizacao(phoneNumber) {
+    try {
+        const cleanPhone = phoneNumber.replace('@c.us', '');
+        const response = await axios.post('https://klubecash.com/api/whatsapp-completar-cadastro.php', {
+            phone: cleanPhone,
+            action: 'iniciar',
+            secret: CONFIG.webhookSecret
+        }, { timeout: 15000 });
+        
+        if (response.data && response.data.success) {
+            await client.sendText(phoneNumber, response.data.message);
+        } else {
+            await client.sendText(phoneNumber, response.data.message || 'Erro ao iniciar processo.');
+        }
+        
+    } catch (error) {
+        console.error('❌ Erro ao iniciar cadastro:', error);
+        await enviarMensagemErro(phoneNumber);
+    }
+}
+
+/**
+ * MENU DINÂMICO ATUALIZADO
+ */
+async function exibirMenuDinamico(phoneNumber) {
+    try {
+        const cleanPhone = phoneNumber.replace('@c.us', '');
+        
+        const response = await axios.post('https://klubecash.com/api/whatsapp-saldo.php', {
+            phone: cleanPhone,
+            secret: CONFIG.webhookSecret
+        }, { timeout: 10000 });
+        
+        let clientType = 'unknown';
+        if (response.data && response.data.user_found) {
+            clientType = response.data.client_type || 'unknown';
+        }
+        
+        let menuMessage;
+        
+        if (clientType === 'visitante') {
+            menuMessage = `🏪 *Klube Cash* - Bem-vindo!
+
+Digite o número da opção desejada:
+
+1️⃣ Consultar Saldo
+2️⃣ Completar Cadastro`;
+        } else if (clientType === 'completo') {
+            menuMessage = `🏪 *Klube Cash* - Bem-vindo!
+
+Digite o número da opção desejada:
+
+1️⃣ Consultar Saldo
+2️⃣ Atualizar Cadastro`;
+        } else {
+            menuMessage = `🏪 *Klube Cash* - Bem-vindo!
+
+Digite o número da opção desejada:
+
+1️⃣ Consultar Saldo`;
+        }
+        
+        await client.sendText(phoneNumber, menuMessage);
+        console.log('✅ Menu enviado - Tipo:', clientType);
+        
+    } catch (error) {
+        console.error('❌ Erro no menu:', error);
+        await client.sendText(phoneNumber, `🏪 *Klube Cash* - Bem-vindo!
+
+1️⃣ Consultar Saldo`);
+    }
+}
 /**
  * CONSULTAR SALDO GERAL (SEM FINALIZAR)
  */
