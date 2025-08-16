@@ -908,6 +908,28 @@ body {
     .qr-section h2 {
         font-size: 1.25rem;
     }
+    
+    .code-input-container {
+        flex-direction: column;
+        gap: 0;
+    }
+    
+    #pixCode {
+        border-radius: var(--border-radius) var(--border-radius) 0 0;
+        border-right: 2px solid var(--primary-color);
+        border-bottom: none;
+        height: 50px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    
+    .copy-btn {
+        border-radius: 0 0 var(--border-radius) var(--border-radius);
+        height: 50px;
+        min-width: auto;
+        width: 100%;
+    }
 }
 
 /* Estados de carregamento e transições suaves */
