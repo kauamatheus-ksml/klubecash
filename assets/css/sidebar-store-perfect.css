@@ -501,7 +501,7 @@ main {
     /* Para sidebar colapsada - SUAS ALTERAÇÕES MANTIDAS */
     .klube-sidebar.collapsed ~ .klube-main-adjusted,
     body:has(.klube-sidebar.collapsed) .klube-main-adjusted {
-        margin-left: 5px !important;
+        margin-left: -100px !important;
     }
 }
 
