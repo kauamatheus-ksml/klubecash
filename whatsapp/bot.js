@@ -15,15 +15,15 @@ const CONFIG = {
 let client = null;
 let isReady = false;
 const activeTimeouts = new Map();
-// === INICIALIZAÇÃO DO EXPRESS ===
+
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-console.log('🚀 Iniciando Klube Cash WhatsApp Bot...');
+console.log('🚀 Iniciando Klube Cash WhatsApp Bot com Menu Dinâmico...');
 
 /**
- * INICIALIZAR O BOT WHATSAPP
+ * INICIALIZAR O BOT
  */
 async function initializeBot() {
     try {
@@ -59,7 +59,6 @@ async function initializeBot() {
 
         console.log('✅ Bot inicializado com sucesso!');
 
-        // === LISTENERS DE EVENTOS ===
         client.onStateChange(handleStateChange);
         client.onMessage(processarMensagem);
         client.onAck(handleMessageAck);
@@ -73,7 +72,7 @@ async function initializeBot() {
 }
 
 /**
- * PROCESSAR MENSAGENS RECEBIDAS - SISTEMA DE MENU LINEAR
+ * PROCESSAR MENSAGENS - SISTEMA DE MENU DINÂMICO
  */
 async function processarMensagem(message) {
     try {
@@ -84,14 +83,25 @@ async function processarMensagem(message) {
         const phoneNumber = message.from;
         const messageText = message.body.trim();
         
-        // Se for opção 1 (saldo)
+        console.log('📨 Nova mensagem de:', phoneNumber, '- Conteúdo:', messageText);
+
+        // VERIFICAR SE É OPÇÃO 1 (SALDO)
         if (messageText === '1') {
-            await consultarSaldoGeral(phoneNumber);
+            console.log('💰 Opção 1 - Consultando saldo...');
+            await consultarSaldoComTipo(phoneNumber);
             return;
         }
 
-        // Se for número de loja (2-9)
-        if (/^[2-9]$/.test(messageText)) {
+        // VERIFICAR SE É OPÇÃO 2 (COMPLETAR CADASTRO)
+        if (messageText === '2') {
+            console.log('📝 Opção 2 - Completar cadastro...');
+            await completarCadastro(phoneNumber);
+            return;
+        }
+
+        // VERIFICAR SE É NÚMERO DE LOJA (3-9)
+        if (/^[3-9]$/.test(messageText)) {
+            console.log('🏪 Loja específica:', messageText);
             await consultarLojaEspecifica(phoneNumber, messageText);
             return;
         }
@@ -103,18 +113,19 @@ async function processarMensagem(message) {
             console.log('⏰ Timeout cancelado - novo menu solicitado');
         }
         
-        await exibirMenu(phoneNumber);
+        // EXIBIR MENU (será determinado quando consultar o tipo de cliente)
+        await exibirMenuDinamico(phoneNumber);
         
     } catch (error) {
-        console.error('❌ Erro:', error);
+        console.error('❌ Erro ao processar mensagem:', error);
         await enviarMensagemErro(phoneNumber);
     }
 }
 
 /**
- * CONSULTAR SALDO GERAL (SEM FINALIZAR)
+ * CONSULTAR SALDO COM IDENTIFICAÇÃO DE TIPO
  */
-async function consultarSaldoGeral(phoneNumber) {
+async function consultarSaldoComTipo(phoneNumber) {
     try {
         await client.sendText(phoneNumber, '💰 Consultando saldo... ⏳');
         
@@ -122,35 +133,102 @@ async function consultarSaldoGeral(phoneNumber) {
         const response = await axios.post('https://klubecash.com/api/whatsapp-saldo.php', {
             phone: cleanPhone,
             secret: CONFIG.webhookSecret
+        }, {
+            timeout: 15000,
+            headers: {
+                'Content-Type': 'application/json',
+                'User-Agent': 'KlubeCash-WhatsApp-Bot/2.1'
+            }
         });
         
-        if (response.data && response.data.success && response.data.message) {
-            // Enviar dados do saldo
-            await client.sendText(phoneNumber, response.data.message);
-            console.log('✅ Saldo enviado - iniciando timeout de 30min');
+        if (response.data && response.data.success) {
             
-            // INICIAR TIMEOUT DE 30 MINUTOS
-            const timeoutId = setTimeout(async () => {
-                console.log('⏰ Timeout atingido para:', phoneNumber);
-                await finalizarConsultaPorTimeout(phoneNumber);
-            }, 30 * 60 * 1000); // 30 minutos
+            // ENVIAR IMAGEM SE DISPONÍVEL
+            if (response.data.send_image && response.data.image_url) {
+                try {
+                    const imgData = await axios.get(response.data.image_url, {
+                        responseType: 'arraybuffer',
+                        timeout: 10000
+                    });
+                    
+                    const base64 = Buffer.from(imgData.data).toString('base64');
+                    
+                    await client.sendImageFromBase64(
+                        phoneNumber,
+                        base64,
+                        'saldo-klube-cash.png',
+                        '💰 Seu Saldo Klube Cash'
+                    );
+                    
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    
+                } catch (imgError) {
+                    console.log('⚠️ Erro ao enviar imagem:', imgError.message);
+                }
+            }
             
-            // Salvar timeout ativo
-            activeTimeouts.set(phoneNumber, timeoutId);
+            // ENVIAR DADOS DO SALDO (SEM FINALIZAÇÃO)
+            if (response.data.message) {
+                await client.sendText(phoneNumber, response.data.message);
+                console.log('✅ Saldo enviado - iniciando timeout');
+                
+                // INICIAR TIMEOUT DE 30 MINUTOS
+                const timeoutId = setTimeout(async () => {
+                    console.log('⏰ Timeout atingido para:', phoneNumber);
+                    await finalizarConsultaPorTimeout(phoneNumber);
+                }, 30 * 60 * 1000);
+                
+                activeTimeouts.set(phoneNumber, timeoutId);
+            }
+            
+        } else {
+            throw new Error('Resposta inválida da API de saldo');
         }
         
     } catch (error) {
-        console.error('❌ Erro saldo:', error);
+        console.error('❌ Erro na consulta de saldo:', error.message);
         await enviarMensagemErro(phoneNumber);
     }
 }
 
 /**
- * CONSULTAR LOJA ESPECÍFICA (DUAS MENSAGENS)
+ * COMPLETAR CADASTRO (OPÇÃO 2)
+ */
+async function completarCadastro(phoneNumber) {
+    try {
+        await client.sendText(phoneNumber, '📝 Preparando informações... ⏳');
+        
+        const cleanPhone = phoneNumber.replace('@c.us', '');
+        const response = await axios.post('https://klubecash.com/api/whatsapp-completar-cadastro.php', {
+            phone: cleanPhone,
+            secret: CONFIG.webhookSecret
+        }, {
+            timeout: 15000,
+            headers: {
+                'Content-Type': 'application/json',
+                'User-Agent': 'KlubeCash-WhatsApp-Bot/2.1'
+            }
+        });
+        
+        if (response.data && response.data.success) {
+            // Enviar mensagem de completar cadastro
+            await client.sendText(phoneNumber, response.data.message);
+            console.log('✅ Informações de cadastro enviadas e finalizadas');
+        } else {
+            throw new Error('Resposta inválida da API de completar cadastro');
+        }
+        
+    } catch (error) {
+        console.error('❌ Erro ao completar cadastro:', error.message);
+        await enviarMensagemErro(phoneNumber);
+    }
+}
+
+/**
+ * CONSULTAR LOJA ESPECÍFICA
  */
 async function consultarLojaEspecifica(phoneNumber, numeroLoja) {
     try {
-        // CANCELAR TIMEOUT SE EXISTIR
         if (activeTimeouts.has(phoneNumber)) {
             clearTimeout(activeTimeouts.get(phoneNumber));
             activeTimeouts.delete(phoneNumber);
@@ -188,6 +266,83 @@ Para nova consulta, envie qualquer mensagem.`;
     }
 }
 
+/**
+ * EXIBIR MENU DINÂMICO (DESCOBRE TIPO DE CLIENTE)
+ */
+async function exibirMenuDinamico(phoneNumber) {
+    try {
+        console.log('🔍 Descobrindo tipo de cliente para:', phoneNumber);
+        
+        const cleanPhone = phoneNumber.replace('@c.us', '');
+        
+        // Fazer consulta rápida para descobrir tipo de cliente
+        const response = await axios.post('https://klubecash.com/api/whatsapp-saldo.php', {
+            phone: cleanPhone,
+            secret: CONFIG.webhookSecret
+        }, {
+            timeout: 10000,
+            headers: {
+                'Content-Type': 'application/json',
+                'User-Agent': 'KlubeCash-WhatsApp-Bot/2.1'
+            }
+        });
+        
+        let clientType = 'unknown';
+        if (response.data && response.data.user_found) {
+            clientType = response.data.client_type || 'unknown';
+        }
+        
+        console.log('👤 Tipo de cliente identificado:', clientType);
+        
+        // ESCOLHER MENU BASEADO NO TIPO
+        let menuMessage;
+        
+        if (clientType === 'visitante') {
+            // Menu para visitantes (com opção de completar cadastro)
+            menuMessage = `🏪 *Klube Cash* - Bem-vindo!
+
+Escolha uma das opções abaixo:
+
+1️⃣ Consultar Saldo
+2️⃣ Completar Cadastro
+
+Digite o número da opção desejada:`;
+        } else if (clientType === 'completo') {
+            // Menu para clientes cadastrados (só saldo)
+            menuMessage = `🏪 *Klube Cash* - Bem-vindo!
+
+Escolha uma das opções abaixo:
+
+1️⃣ Consultar Saldo
+
+Digite o número da opção desejada:`;
+        } else {
+            // Menu padrão para usuários não encontrados
+            menuMessage = `🏪 *Klube Cash* - Bem-vindo!
+
+Para consultar seu saldo, digite:
+
+1️⃣ Consultar Saldo
+
+Digite o número da opção desejada:`;
+        }
+        
+        await client.sendText(phoneNumber, menuMessage);
+        console.log('✅ Menu dinâmico enviado para:', phoneNumber, '- Tipo:', clientType);
+        
+    } catch (error) {
+        console.error('❌ Erro ao exibir menu dinâmico:', error);
+        
+        // Menu de fallback
+        const menuFallback = `🏪 *Klube Cash* - Bem-vindo!
+
+Digite o número da opção desejada:
+
+1️⃣ Consultar Saldo`;
+        
+        await client.sendText(phoneNumber, menuFallback);
+    }
+}
 
 /**
  * FINALIZAR POR TIMEOUT
@@ -201,118 +356,12 @@ Sua consulta foi finalizada automaticamente após 30 minutos.
 Para nova consulta, envie qualquer mensagem.`;
 
         await client.sendText(phoneNumber, mensagemTimeout);
-        
-        // Remover timeout do mapa
         activeTimeouts.delete(phoneNumber);
         
         console.log('✅ Consulta finalizada por timeout:', phoneNumber);
         
     } catch (error) {
         console.error('❌ Erro ao finalizar por timeout:', error);
-    }
-}
-
-/**
- * EXIBIR MENU PRINCIPAL
- */
-async function exibirMenu(phoneNumber) {
-    try {
-        const menuMessage = `🏪 *Klube Cash* - Bem-vindo!
-
-Escolha uma das opções abaixo:
-
-1️⃣ Consultar Saldo
-
-Digite o número da opção desejada:`;
-
-        await client.sendText(phoneNumber, menuMessage);
-        console.log('✅ Menu enviado para:', phoneNumber);
-        
-    } catch (error) {
-        console.error('❌ Erro ao enviar menu:', error);
-    }
-}
-
-/**
- * CONSULTAR SALDO (OPÇÃO 1)
- */
-async function consultarSaldo(phoneNumber) {
-    try {
-        console.log('💰 Iniciando consulta de saldo para:', phoneNumber);
-        
-        // Enviar mensagem de aguarde
-        await client.sendText(phoneNumber, '💰 Consultando seu saldo... ⏳');
-        
-        // Limpar formatação do telefone para API
-        const cleanPhone = phoneNumber.replace('@c.us', '');
-        
-        // Chamar API de saldo
-        const response = await axios.post('https://klubecash.com/api/whatsapp-saldo.php', {
-            phone: cleanPhone,
-            secret: CONFIG.webhookSecret
-        }, {
-            timeout: 15000,
-            headers: {
-                'Content-Type': 'application/json',
-                'User-Agent': 'KlubeCash-WhatsApp-Bot/2.0'
-            }
-        });
-        
-        console.log('📊 Resposta da API de saldo:', response.data);
-        
-        if (response.data && response.data.success) {
-            
-            // ENVIAR IMAGEM SE DISPONÍVEL
-            if (response.data.send_image && response.data.image_url) {
-                try {
-                    console.log('🖼️ Baixando e enviando imagem...');
-                    const imgData = await axios.get(response.data.image_url, {
-                        responseType: 'arraybuffer',
-                        timeout: 10000
-                    });
-                    
-                    const base64 = Buffer.from(imgData.data).toString('base64');
-                    
-                    await client.sendImageFromBase64(
-                        phoneNumber,
-                        base64,
-                        'saldo-klube-cash.png',
-                        '💰 Seu Saldo Klube Cash'
-                    );
-                    
-                    console.log('✅ Imagem enviada com sucesso!');
-                    
-                    // Pausa entre imagem e texto
-                    await new Promise(resolve => setTimeout(resolve, 2000));
-                    
-                } catch (imgError) {
-                    console.log('⚠️ Erro ao enviar imagem (continuando com texto):', imgError.message);
-                }
-            }
-            
-            // ENVIAR MENSAGEM DE TEXTO COM SALDO
-            if (response.data.message) {
-                console.log('📤 Enviando mensagem de saldo...');
-                
-                // Adicionar mensagem de encerramento
-                const mensagemCompleta = response.data.message + `
-
-─────────────────────────
-✅ *Consulta finalizada!*
-
-Para nova consulta, envie qualquer mensagem.`;
-                
-                await client.sendText(phoneNumber, mensagemCompleta);
-                console.log('✅ Saldo enviado e conversa encerrada!');
-            }
-            
-        } else {
-            throw new Error('Resposta inválida da API de saldo');
-        }
-        
-    } catch (error) {
-        console.error('❌ Erro na consulta de saldo:', error.message);
-        await enviarMensagemErro(phoneNumber);
     }
 }
 
@@ -337,23 +386,20 @@ Para acessar o menu, envie qualquer mensagem.`;
 }
 
 /**
- * MONITORAR MUDANÇAS DE ESTADO
+ * EVENTOS DE ESTADO E ACK
  */
 function handleStateChange(state) {
     console.log('🔄 Estado da conexão:', state, new Date().toISOString());
     
     if (state === 'CONNECTED') {
-        console.log('✅ WhatsApp conectado e operacional!');
+        console.log('✅ WhatsApp conectado - Menu dinâmico ativo!');
         isReady = true;
     } else if (state === 'DISCONNECTED') {
-        console.log('❌ WhatsApp desconectado - tentando reconectar...');
+        console.log('❌ WhatsApp desconectado');
         isReady = false;
     }
 }
 
-/**
- * MONITORAR CONFIRMAÇÕES DE ENTREGA
- */
 function handleMessageAck(ack) {
     const statusMap = {
         1: 'Enviada',
@@ -365,8 +411,34 @@ function handleMessageAck(ack) {
 }
 
 /**
- * FORMATAR NÚMERO DE TELEFONE
+ * FUNÇÃO DE ENVIO PARA NOTIFICAÇÕES
  */
+async function sendMessage(phone, message) {
+    try {
+        if (!isReady || !client) {
+            throw new Error('Bot não está conectado');
+        }
+
+        const formattedPhone = formatPhoneNumber(phone);
+        const result = await client.sendText(formattedPhone, message);
+        
+        return { 
+            success: true, 
+            messageId: result.id,
+            phone: formattedPhone,
+            timestamp: new Date().toISOString()
+        };
+        
+    } catch (error) {
+        return { 
+            success: false, 
+            error: error.message,
+            phone: phone,
+            timestamp: new Date().toISOString()
+        };
+    }
+}
+
 function formatPhoneNumber(phone) {
     let cleanPhone = phone.replace(/\D/g, '');
     
@@ -381,71 +453,28 @@ function formatPhoneNumber(phone) {
     return cleanPhone + '@c.us';
 }
 
-/**
- * FUNÇÃO DE ENVIO DE MENSAGEM (PARA NOTIFICAÇÕES)
- */
-async function sendMessage(phone, message) {
-    try {
-        if (!isReady || !client) {
-            throw new Error('Bot não está conectado');
-        }
-
-        const formattedPhone = formatPhoneNumber(phone);
-        
-        console.log(`📤 Enviando notificação para: ${formattedPhone}`);
-        
-        const result = await client.sendText(formattedPhone, message);
-        
-        console.log('✅ Notificação enviada com sucesso!');
-        
-        return { 
-            success: true, 
-            messageId: result.id,
-            phone: formattedPhone,
-            timestamp: new Date().toISOString()
-        };
-        
-    } catch (error) {
-        console.error('❌ Erro ao enviar notificação:', error.message);
-        
-        return { 
-            success: false, 
-            error: error.message,
-            phone: phone,
-            timestamp: new Date().toISOString()
-        };
-    }
-}
-
 // === ROTAS DA API ===
 
-/**
- * VERIFICAR STATUS DO BOT
- */
 app.get('/status', (req, res) => {
     const status = {
         status: isReady ? 'connected' : 'disconnected',
         bot_ready: isReady,
         session_name: CONFIG.sessionName,
         uptime: process.uptime(),
-        menu_system: 'linear',
+        menu_system: 'dynamic',
+        features: ['client_type_detection', 'complete_registration'],
         timestamp: new Date().toISOString(),
-        version: '2.1.0'
+        version: '2.2.0'
     };
     
-    console.log('📊 Status consultado:', status);
     res.json(status);
 });
 
-/**
- * ENVIO DE NOTIFICAÇÕES (MANTÉM COMPATIBILIDADE)
- */
 app.post('/send-message', async (req, res) => {
     try {
         const { phone, message, secret } = req.body;
 
         if (secret !== CONFIG.webhookSecret) {
-            console.log('❌ Tentativa de acesso com secret inválido');
             return res.status(401).json({ 
                 success: false, 
                 error: 'Acesso não autorizado' 
@@ -459,20 +488,10 @@ app.post('/send-message', async (req, res) => {
             });
         }
 
-        console.log(`📥 Nova notificação para ${phone}`);
-        
         const result = await sendMessage(phone, message);
-        
-        if (result.success) {
-            console.log(`✅ Notificação enviada para ${phone}`);
-        } else {
-            console.log(`❌ Falha no envio para ${phone}: ${result.error}`);
-        }
-        
         res.json(result);
         
     } catch (error) {
-        console.error('❌ Erro na API de envio:', error);
         res.status(500).json({ 
             success: false, 
             error: 'Erro interno do servidor',
@@ -481,66 +500,18 @@ app.post('/send-message', async (req, res) => {
     }
 });
 
-/**
- * TESTE DE ENVIO
- */
-app.post('/send-test', async (req, res) => {
-    try {
-        const { secret } = req.body;
-
-        if (secret !== CONFIG.webhookSecret) {
-            return res.status(401).json({ 
-                success: false, 
-                error: 'Acesso não autorizado' 
-            });
-        }
-
-        const testPhone = '38991045205';
-        const testMessage = `🧪 *Teste Klube Cash WhatsApp Bot*
-
-Sistema de Menu Linear Ativado! ✅
-
-Data: ${new Date().toLocaleString('pt-BR')}
-
-Se recebeu esta mensagem, o sistema está funcionando perfeitamente!
-
-Para testar o menu, envie qualquer mensagem.`;
-
-        const result = await sendMessage(testPhone, testMessage);
-        res.json(result);
-        
-    } catch (error) {
-        console.error('❌ Erro no teste:', error);
-        res.status(500).json({ 
-            success: false, 
-            error: 'Erro interno do servidor' 
-        });
-    }
-});
-
-// === INICIALIZAR SERVIDOR ===
+// === INICIALIZAR ===
 app.listen(CONFIG.port, () => {
-    console.log(`🌐 Servidor WhatsApp Bot rodando na porta ${CONFIG.port}`);
-    console.log(`📱 Status: http://localhost:${CONFIG.port}/status`);
-    console.log(`📤 Envio: POST http://localhost:${CONFIG.port}/send-message`);
-    console.log(`🧪 Teste: POST http://localhost:${CONFIG.port}/send-test`);
-    console.log(`📋 Sistema de Menu Linear ATIVADO`);
+    console.log(`🌐 Servidor WhatsApp Bot na porta ${CONFIG.port}`);
+    console.log(`📋 Sistema de Menu Dinâmico ATIVADO`);
+    console.log(`👥 Detecta automaticamente: Visitante vs Cliente Completo`);
 });
 
-// Inicializar o bot
 initializeBot();
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
     console.log('🛑 Encerrando bot...');
-    if (client) {
-        await client.close();
-    }
-    process.exit(0);
-});
-
-process.on('SIGTERM', async () => {
-    console.log('🛑 Recebido sinal de término...');
     if (client) {
         await client.close();
     }
