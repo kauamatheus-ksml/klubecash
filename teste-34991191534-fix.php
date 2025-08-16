@@ -1,6 +1,6 @@
 <?php
-// teste-34991191534-fix.php
-// DEBUG URGENTE CORRIGIDO
+// teste-34991191534-fix.php - VERSÃO CORRIGIDA
+// DEBUG URGENTE CORRIGIDO - 34991191534
 
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
@@ -10,60 +10,16 @@ echo "<p>Executado em: " . date('Y-m-d H:i:s') . "</p>";
 
 $telefone = '34991191534';
 
-// PRIMEIRO: Descobrir a estrutura de arquivos
-echo "<h2>1. ESTRUTURA DE ARQUIVOS:</h2>";
-echo "Diretório atual: " . __DIR__ . "<br>";
-echo "Arquivos no diretório atual:<br>";
+// CARREGAR AS CREDENCIAIS CORRETAS DO DATABASE.PHP
+require_once __DIR__ . '/config/database.php';
 
-$files = scandir(__DIR__);
-foreach ($files as $file) {
-    if ($file != '.' && $file != '..') {
-        if (is_dir(__DIR__ . '/' . $file)) {
-            echo "📁 {$file}/<br>";
-        } else {
-            echo "📄 {$file}<br>";
-        }
-    }
-}
-
-// TENTAR DIFERENTES CAMINHOS
-$possiveisCaminhos = [
-    __DIR__ . '/classes/SaldoConsulta.php',
-    __DIR__ . '/../classes/SaldoConsulta.php',
-    __DIR__ . '/../../classes/SaldoConsulta.php',
-    __DIR__ . '/config/database.php',
-    __DIR__ . '/config/constants.php'
-];
-
-echo "<h2>2. TESTANDO CAMINHOS:</h2>";
-foreach ($possiveisCaminhos as $caminho) {
-    if (file_exists($caminho)) {
-        echo "✅ EXISTE: {$caminho}<br>";
-    } else {
-        echo "❌ NÃO EXISTE: {$caminho}<br>";
-    }
-}
-
-// TESTE DIRETO NO BANCO SEM INCLUDES
 echo "<h2>3. TESTE DIRETO NO BANCO:</h2>";
 
 try {
-    // Configuração de banco (copie da constants.php)
-    $host = 'localhost';
-    $dbname = 'u383946504_klube_cash';
-    $username = 'u383946504_admin';
-    $password = '!#Klube2024@Cash';
+    // USAR A CLASSE DATABASE DO SISTEMA
+    $pdo = Database::getConnection();
     
-    $dsn = "mysql:host={$host};dbname={$dbname};charset=utf8mb4";
-    $options = [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        PDO::ATTR_EMULATE_PREPARES => false,
-    ];
-    
-    $pdo = new PDO($dsn, $username, $password, $options);
-    
-    echo "✅ Conexão com banco estabelecida!<br><br>";
+    echo "✅ Conexão com banco estabelecida usando Database::getConnection()!<br><br>";
     
     // BUSCAR O USUÁRIO COM DIFERENTES VARIAÇÕES
     echo "<h3>A) Busca por telefone exato:</h3>";
@@ -122,9 +78,9 @@ try {
         $stmt = $pdo->prepare("
             SELECT id, nome, telefone 
             FROM usuarios 
-            WHERE telefone LIKE :telefone1 
+            WHERE (telefone LIKE :telefone1 
             OR telefone LIKE :telefone2 
-            OR telefone LIKE :telefone3
+            OR telefone LIKE :telefone3)
             AND tipo = 'cliente'
             LIMIT 10
         ");
@@ -199,22 +155,89 @@ try {
         
         if ($saldos) {
             echo "💰 Saldos por loja:<br>";
+            $totalDisponivel = 0;
+            $totalPendente = 0;
             foreach ($saldos as $saldo) {
                 echo "- {$saldo['nome_fantasia']}: R$ " . number_format($saldo['saldo_disponivel'], 2, ',', '.') . " (disponível)<br>";
                 if ($saldo['saldo_pendente'] > 0) {
                     echo "  + R$ " . number_format($saldo['saldo_pendente'], 2, ',', '.') . " (pendente)<br>";
                 }
+                $totalDisponivel += $saldo['saldo_disponivel'];
+                $totalPendente += $saldo['saldo_pendente'];
+            }
+            echo "<br><strong>TOTAL: R$ " . number_format($totalDisponivel, 2, ',', '.') . " disponível</strong><br>";
+            if ($totalPendente > 0) {
+                echo "<strong>PENDENTE: R$ " . number_format($totalPendente, 2, ',', '.') . "</strong><br>";
             }
         } else {
             echo "❌ Usuário sem saldo em nenhuma loja<br>";
         }
+        
+        // TESTE DA API WHATSAPP-SALDO
+        echo "<h3>F) Teste da API WhatsApp-Saldo:</h3>";
+        
+        // Incluir constants para pegar o secret
+        require_once __DIR__ . '/config/constants.php';
+        
+        $postData = json_encode([
+            'phone' => $telefone,
+            'secret' => WHATSAPP_BOT_SECRET
+        ]);
+        
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, 'https://klubecash.com/api/whatsapp-saldo.php');
+        curl_setopt($ch, CURLOPT_POST, 1);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        
+        echo "<strong>Resposta da API (HTTP {$httpCode}):</strong><br>";
+        echo "<pre style='background: #f8f9fa; padding: 10px; border-radius: 5px; font-size: 12px;'>";
+        
+        if ($response) {
+            $jsonResponse = json_decode($response, true);
+            if ($jsonResponse) {
+                echo json_encode($jsonResponse, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+                
+                // ANALISAR A RESPOSTA
+                echo "\n\n=== ANÁLISE DA RESPOSTA ===\n";
+                echo "User Found: " . ($jsonResponse['user_found'] ? 'SIM' : 'NÃO') . "\n";
+                echo "Client Type: " . ($jsonResponse['client_type'] ?? 'NÃO INFORMADO') . "\n";
+                echo "Success: " . ($jsonResponse['success'] ? 'SIM' : 'NÃO') . "\n";
+                
+                if (isset($jsonResponse['client_type'])) {
+                    echo "\n=== MENU QUE O BOT DEVERIA EXIBIR ===\n";
+                    if ($jsonResponse['client_type'] === 'visitante') {
+                        echo "MENU VISITANTE (2️⃣ Completar Cadastro)\n";
+                    } elseif ($jsonResponse['client_type'] === 'completo') {
+                        echo "MENU COMPLETO (2️⃣ Atualizar Cadastro)\n";
+                    } else {
+                        echo "MENU BÁSICO (apenas 1️⃣ Consultar Saldo)\n";
+                    }
+                }
+                
+            } else {
+                echo "ERRO: Resposta não é JSON válido\n";
+                echo $response;
+            }
+        } else {
+            echo "ERRO: Sem resposta da API";
+        }
+        
+        echo "</pre>";
     }
     
 } catch (Exception $e) {
     echo "<div style='background: #f8d7da; padding: 10px; border-radius: 5px;'>";
-    echo "❌ <strong>ERRO DE BANCO:</strong> " . $e->getMessage();
+    echo "❌ <strong>ERRO CRÍTICO:</strong> " . $e->getMessage();
+    echo "<br>Stack trace: " . $e->getTraceAsString();
     echo "</div>";
 }
 
-echo "<br><p><strong>RESULTADO:</strong> Execute este arquivo agora para ver o que está acontecendo com o número 34991191534!</p>";
+echo "<br><p><strong>🚨 DIAGNÓSTICO COMPLETO EXECUTADO!</strong></p>";
 ?>
