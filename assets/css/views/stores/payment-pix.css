@@ -352,12 +352,13 @@ body {
     border-radius: var(--border-radius-lg);
     padding: 2rem;
     border: 2px dashed var(--gray-300);
-    min-height: 300px;
+    min-height: 400px;
 }
 
 .qr-image-container img {
+    width: 320px;
+    height: 320px;
     max-width: 100%;
-    max-height: 280px;
     border-radius: var(--border-radius);
     box-shadow: var(--shadow-md);
 }
@@ -797,8 +798,13 @@ body {
     }
     
     .qr-image-container {
-        min-height: 250px;
+        min-height: 320px;
         padding: 1.5rem;
+    }
+    
+    .qr-image-container img {
+        width: 280px;
+        height: 280px;
     }
     
     #pixCode {

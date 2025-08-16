@@ -1,5 +1,0 @@
-[2025-07-24 09:45:07] PONTO 1: Script profile.php iniciado.
-[2025-07-24 09:45:07] PONTO 2: Headers CORS definidos. Iniciando bloco try-catch principal.
-[2025-07-24 09:45:07] PONTO 3: Tentando incluir dependências...
-[2025-07-24 09:45:07] PONTO 4: Dependências incluídas com sucesso.
-[2025-07-24 09:45:07] PONTO 5: Autenticação falhou. Token ausente ou inválido.
