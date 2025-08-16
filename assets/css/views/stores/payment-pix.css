@@ -389,18 +389,22 @@ body {
 }
 
 #pixCode {
-    width: 100%;
-    height: 140px;
-    padding: 1rem;
+    flex: 1;
+    height: 60px;
+    padding: 1rem 1rem 1rem 1rem;
     border: 2px solid var(--primary-color);
-    border-radius: var(--border-radius);
+    border-radius: var(--border-radius) 0 0 var(--border-radius);
+    border-right: none;
     font-family: 'Monaco', 'Menlo', monospace;
-    font-size: 0.8rem;
+    font-size: 0.875rem;
     background: var(--white);
     resize: none;
     transition: var(--transition);
     word-break: break-all;
     line-height: 1.4;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
 }
 
 #pixCode:focus {
