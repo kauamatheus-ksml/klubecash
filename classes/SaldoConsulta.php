@@ -21,45 +21,54 @@ class SaldoConsulta {
      * Consulta saldo geral do usuário por telefone
      */
     public function consultarSaldoPorTelefone($telefone) {
-    try {
-        // [código existente para buscar usuário...]
-        
-        if ($stmt->rowCount() > 0) {
-            $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
+        try {
+            error_log("=== CONSULTA SALDO CONSOLIDADA ===");
             
-            // NOVO: Determinar tipo de cliente
-            $tipoCliente = $usuario['tipo_cliente'] ?? 'unknown';
+            $usuario = $this->buscarUsuarioPorTelefone($telefone);
             
-            // [resto do código existente...]
+            if (!$usuario) {
+                return [
+                    'success' => false,
+                    'user_found' => false,
+                    'message' => $this->getMensagemUsuarioNaoEncontrado($telefone)
+                ];
+            }
+            
+            error_log("USUÁRIO: {$usuario['nome']}");
+            
+            // Buscar saldos (consolidados se necessário)
+            $saldosLojas = $this->buscarSaldosConsolidados($usuario);
+            $saldoTotal = $this->calcularSaldoTotalForcado($saldosLojas);
+            
+            error_log("TOTAL LOJAS ENCONTRADAS: " . count($saldosLojas));
+            
+            if (empty($saldosLojas)) {
+                return [
+                    'success' => true,
+                    'user_found' => true,
+                    'message' => $this->getMensagemSemSaldo($usuario['nome'])
+                ];
+            }
+            
+            $mensagem = $this->gerarMensagemSaldoCompleto($usuario, $saldosLojas, $saldoTotal);
             
             return [
                 'success' => true,
                 'user_found' => true,
-                'client_type' => $tipoCliente, // NOVO
-                'message' => $mensagemSaldo,
-                'send_image' => $this->shouldSendImage($dadosSaldo),
-                'image_url' => $this->shouldSendImage($dadosSaldo) ? 
-                    $this->gerarImagemSaldo($usuario, $dadosSaldo) : null
+                'message' => $mensagem,
+                'total_lojas' => count($saldosLojas),
+                'saldo_total' => $saldoTotal
             ];
-        } else {
+            
+        } catch (Exception $e) {
+            error_log('ERRO: ' . $e->getMessage());
             return [
-                'success' => true,
+                'success' => false,
                 'user_found' => false,
-                'client_type' => 'unknown', // NOVO
-                'message' => $this->getMensagemUsuarioNaoEncontrado()
+                'message' => 'Erro interno.'
             ];
         }
-        
-    } catch (Exception $e) {
-        error_log('Erro na consulta de saldo: ' . $e->getMessage());
-        return [
-            'success' => false,
-            'user_found' => false,
-            'client_type' => 'unknown', // NOVO
-            'message' => 'Erro temporário. Tente novamente.'
-        ];
     }
-}
 /**
      * Busca saldos consolidados de múltiplos usuários
      */
