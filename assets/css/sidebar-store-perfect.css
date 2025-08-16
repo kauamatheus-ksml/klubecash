@@ -508,8 +508,7 @@ main {
 @media (max-width: 768px) {
     /* Mobile: sempre sem margem - SUAS ALTERAÇÕES MANTIDAS */
     .klube-main-adjusted {
-        margin-left: 10px !important;
-        padding-left: 10px !important;
+        
     }
 }
 
