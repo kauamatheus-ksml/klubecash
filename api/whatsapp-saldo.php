@@ -13,11 +13,8 @@ require_once __DIR__ . '/../config/constants.php';
 /**
  * API Endpoint para Consulta de Saldo via WhatsApp
  * 
- * Este endpoint recebe requisições do bot WhatsApp quando um usuário
- * envia a palavra "saldo" e retorna o saldo formatado do usuário
- * 
- * ATUALIZAÇÃO: Agora também retorna o tipo de cliente (visitante/completo)
- * para que o bot possa exibir o menu adequado
+ * VERSÃO ATUALIZADA COM MENU DINÂMICO
+ * Agora retorna tipo de cliente para menu correto
  */
 
 // Verificar se é POST
@@ -63,25 +60,34 @@ try {
     // Instanciar classe de consulta
     $saldoConsulta = new SaldoConsulta();
     
-    // Consultar saldo
-    $resultado = $saldoConsulta->consultarSaldoPorTelefone($data['phone']);
+    // NOVA VERSÃO: Buscar dados completos para API
+    $resultado = $saldoConsulta->buscarDadosParaAPI($data['phone']);
     
     // Determinar tipo de cliente para o menu dinâmico
     $tipoCliente = 'unknown';
     $userName = '';
     
-    if ($resultado['user_found'] && isset($resultado['user_data'])) {
+    if ($resultado['user_found'] && $resultado['user_data']) {
         $userData = $resultado['user_data'];
         $tipoCliente = $saldoConsulta->determinarTipoCliente($userData);
         $userName = $userData['nome'] ?? '';
         
-        error_log("WhatsApp Saldo API - Usuário encontrado: {$userName}, Tipo: {$tipoCliente}");
+        error_log("WhatsApp Saldo API - DEBUG CRÍTICO:");
+        error_log("- Telefone: " . $data['phone']);
+        error_log("- Usuário: {$userName}");
+        error_log("- Email: " . ($userData['email'] ?: 'VAZIO'));
+        error_log("- Senha: " . (empty($userData['senha_hash']) ? 'VAZIO' : 'PREENCHIDO'));
+        error_log("- Tipo Cliente Determinado: {$tipoCliente}");
     } else {
-        error_log("WhatsApp Saldo API - Usuário não encontrado para telefone: " . $data['phone']);
+        error_log("WhatsApp Saldo API - USUÁRIO NÃO ENCONTRADO: " . $data['phone']);
     }
     
     // Log do resultado
-    error_log('WhatsApp Saldo API - Resultado: ' . json_encode($resultado));
+    error_log('WhatsApp Saldo API - Resultado final: ' . json_encode([
+        'success' => $resultado['success'],
+        'user_found' => $resultado['user_found'],
+        'client_type' => $tipoCliente
+    ]));
     
     // Retornar resposta com tipo de cliente
     if ($resultado['success']) {
@@ -97,7 +103,7 @@ try {
         echo json_encode([
             'success' => true, // True para o bot processar a mensagem
             'message' => $resultado['message'],
-            'user_found' => isset($resultado['user_found']) ? $resultado['user_found'] : false,
+            'user_found' => $resultado['user_found'],
             'client_type' => $tipoCliente, // NOVO: Tipo de cliente
             'user_name' => $userName, // NOVO: Nome do usuário
             'timestamp' => date('Y-m-d H:i:s')
@@ -105,7 +111,7 @@ try {
     }
     
 } catch (Exception $e) {
-    error_log('WhatsApp Saldo API - Erro: ' . $e->getMessage());
+    error_log('WhatsApp Saldo API - Erro CRÍTICO: ' . $e->getMessage());
     
     http_response_code(500);
     echo json_encode([

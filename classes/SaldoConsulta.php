@@ -74,17 +74,55 @@ class SaldoConsulta {
  * Determina o tipo de cliente baseado nos dados cadastrais
  */
 public function determinarTipoCliente($usuario) {
-    if (!$usuario) {
-        return 'unknown';
+        if (!$usuario) {
+            return 'unknown';
+        }
+        
+        // Cliente completo precisa ter: nome, telefone, email e senha
+        if (!empty($usuario['email']) && !empty($usuario['senha_hash'])) {
+            return 'completo';
+        }
+        
+        return 'visitante';
     }
-    
-    // Cliente completo precisa ter: nome, telefone, email e senha
-    if (!empty($usuario['email']) && !empty($usuario['senha_hash'])) {
-        return 'completo';
+
+    /**
+     * Busca dados do usuário para API (com user_data)
+     * NOVO MÉTODO PARA RETORNAR DADOS COMPLETOS
+     */
+    public function buscarDadosParaAPI($telefone) {
+        try {
+            $usuario = $this->buscarUsuarioPorTelefone($telefone);
+            
+            if (!$usuario) {
+                return [
+                    'success' => false,
+                    'user_found' => false,
+                    'user_data' => null,
+                    'message' => $this->getMensagemUsuarioNaoEncontrado($telefone)
+                ];
+            }
+            
+            // Buscar saldo para mensagem
+            $resultado = $this->consultarSaldoPorTelefone($telefone);
+            
+            return [
+                'success' => $resultado['success'],
+                'user_found' => true,
+                'user_data' => $usuario,
+                'message' => $resultado['message']
+            ];
+            
+        } catch (Exception $e) {
+            error_log('ERRO buscarDadosParaAPI: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'user_found' => false,
+                'user_data' => null,
+                'message' => 'Erro interno.'
+            ];
+        }
     }
-    
-    return 'visitante';
-}
 /**
      * Busca saldos consolidados de múltiplos usuários
      */
