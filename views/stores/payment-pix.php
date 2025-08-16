@@ -58,7 +58,7 @@ $activeMenu = 'payment-pix';
     
     <script src="../../assets/js/mercadopago-sdk.js?v=2.1.0"></script>
 </head>
-<body class="payment-pix-page">
+<body>
     <?php include_once '../components/sidebar-store.php'; ?>
     
     <div class="main-content" id="mainContent">
