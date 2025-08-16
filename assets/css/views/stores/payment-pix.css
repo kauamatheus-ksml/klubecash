@@ -803,15 +803,21 @@ body {
 }
 
 @media (max-width: 768px) {
+    body {
+        overflow-x: hidden;
+    }
+    
     .header-content {
         flex-direction: column;
         text-align: center;
         gap: 1rem;
+        padding: 0 1rem;
     }
     
     .header-amount {
         align-self: stretch;
         text-align: center;
+        margin: 0 1rem;
     }
     
     .amount-value {
@@ -821,48 +827,80 @@ body {
     .pix-container {
         padding: 1rem;
         gap: 1rem;
+        width: 100%;
+        max-width: 100vw;
+        box-sizing: border-box;
     }
     
     .payment-state {
-        padding: 2rem 1rem;
+        padding: 1.5rem 0.5rem;
+        width: 100%;
+        box-sizing: border-box;
     }
     
     .qr-display {
         gap: 1.5rem;
+        width: 100%;
+        max-width: 100%;
+        overflow: hidden;
     }
     
     .qr-image-container {
-        width: 300px;
-        height: 300px;
-        padding: 1.5rem;
+        width: 280px;
+        height: 280px;
+        padding: 1rem;
+        margin: 0 auto;
+        max-width: calc(100vw - 2rem);
+        box-sizing: border-box;
     }
     
     .qr-image-container img {
-        width: 220px;
-        height: 220px;
+        width: 200px;
+        height: 200px;
+        max-width: 100%;
+        max-height: 100%;
+    }
+    
+    .qr-code-section {
+        width: 100%;
+        max-width: calc(100vw - 2rem);
+        margin: 0 auto;
+        padding: 0 0.5rem;
+        box-sizing: border-box;
+    }
+    
+    .code-input-container {
+        width: 100%;
+        max-width: 100%;
+        overflow: hidden;
     }
     
     #pixCode {
         height: 55px;
-        font-size: 0.8rem;
-        padding: 0.8rem;
+        font-size: 0.75rem;
+        padding: 0.7rem;
+        min-width: 0;
+        flex: 1;
     }
     
     .copy-btn {
         height: 55px;
-        padding: 0 1rem;
-        min-width: 100px;
-        font-size: 0.8rem;
+        padding: 0 0.8rem;
+        min-width: 80px;
+        font-size: 0.75rem;
+        flex-shrink: 0;
     }
     
     .success-actions {
         flex-direction: column;
         width: 100%;
+        gap: 0.5rem;
     }
     
     .pix-action-btn {
         width: 100%;
         justify-content: center;
+        margin: 0.25rem 0;
     }
     
     .notification {
@@ -871,64 +909,224 @@ body {
         left: 1rem;
         max-width: none;
     }
+    
+    .steps-panel,
+    .content-panel,
+    .info-panel {
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+        margin: 0;
+    }
 }
 
 @media (max-width: 480px) {
+    * {
+        box-sizing: border-box;
+    }
+    
+    body {
+        overflow-x: hidden;
+        width: 100vw;
+    }
+    
     .pix-header {
-        padding: 1.5rem 1rem;
+        padding: 1rem 0.5rem;
+        width: 100%;
+        box-sizing: border-box;
+    }
+    
+    .header-content {
+        padding: 0 0.5rem;
+        max-width: 100%;
     }
     
     .header-text h1 {
-        font-size: 1.5rem;
+        font-size: 1.3rem;
+        word-break: break-word;
     }
     
     .header-text p {
-        font-size: 1rem;
+        font-size: 0.9rem;
+    }
+    
+    .header-amount {
+        margin: 0 0.5rem;
+        padding: 0.8rem 1rem;
     }
     
     .amount-value {
-        font-size: 1.5rem;
+        font-size: 1.3rem;
+    }
+    
+    .pix-container {
+        padding: 0.5rem;
+        gap: 0.8rem;
+        width: 100%;
+        max-width: 100vw;
     }
     
     .steps-panel,
     .content-panel,
     .info-panel {
-        padding: 1rem;
+        padding: 0.8rem;
+        width: 100%;
+        max-width: 100%;
+        margin: 0;
+    }
+    
+    .payment-state {
+        padding: 1rem 0.5rem;
     }
     
     .state-description {
-        font-size: 1rem;
+        font-size: 0.9rem;
+        padding: 0 0.5rem;
     }
     
     #initialState h2,
     .success-state h2 {
-        font-size: 1.5rem;
+        font-size: 1.3rem;
     }
     
     .qr-section h2 {
-        font-size: 1.25rem;
+        font-size: 1.1rem;
+    }
+    
+    .qr-image-container {
+        width: 250px;
+        height: 250px;
+        padding: 0.8rem;
+        max-width: calc(100vw - 1rem);
+        margin: 0 auto;
+    }
+    
+    .qr-image-container img {
+        width: 170px;
+        height: 170px;
+        max-width: 100%;
+        max-height: 100%;
+    }
+    
+    .qr-code-section {
+        max-width: calc(100vw - 1rem);
+        padding: 0 0.5rem;
     }
     
     .code-input-container {
         flex-direction: column;
         gap: 0;
+        width: 100%;
+        max-width: 100%;
     }
     
     #pixCode {
         border-radius: var(--border-radius) var(--border-radius) 0 0;
         border-right: 2px solid var(--primary-color);
         border-bottom: none;
-        height: 50px;
+        height: 45px;
+        font-size: 0.7rem;
+        padding: 0.5rem;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        width: 100%;
+        min-width: 0;
     }
     
     .copy-btn {
         border-radius: 0 0 var(--border-radius) var(--border-radius);
-        height: 50px;
+        height: 45px;
         min-width: auto;
         width: 100%;
+        font-size: 0.7rem;
+        padding: 0 0.5rem;
+    }
+    
+    .pix-action-btn {
+        width: 100%;
+        padding: 0.8rem 1rem;
+        font-size: 0.9rem;
+        margin: 0.25rem 0;
+    }
+    
+    .payment-details-summary {
+        max-width: 100%;
+        padding: 1rem;
+        margin: 1rem 0;
+    }
+    
+    .info-item {
+        margin-bottom: 1rem;
+    }
+    
+    .info-text strong,
+    .info-text p {
+        font-size: 0.8rem;
+    }
+    
+    .security-info {
+        padding: 0.8rem;
+        font-size: 0.8rem;
+    }
+    
+    .fixed-back-btn {
+        position: static;
+        margin: 0.5rem;
+        transform: none;
+    }
+    
+    .back-btn {
+        width: 100%;
+        justify-content: center;
+        padding: 0.8rem;
+    }
+}
+
+@media (max-width: 360px) {
+    .qr-image-container {
+        width: 220px;
+        height: 220px;
+        padding: 0.5rem;
+        max-width: calc(100vw - 0.5rem);
+    }
+    
+    .qr-image-container img {
+        width: 150px;
+        height: 150px;
+    }
+    
+    .header-text h1 {
+        font-size: 1.1rem;
+    }
+    
+    .amount-value {
+        font-size: 1.1rem;
+    }
+    
+    .pix-container {
+        padding: 0.25rem;
+    }
+    
+    .steps-panel,
+    .content-panel,
+    .info-panel {
+        padding: 0.5rem;
+    }
+    
+    .qr-section h2 {
+        font-size: 1rem;
+    }
+    
+    #pixCode {
+        height: 40px;
+        font-size: 0.65rem;
+        padding: 0.4rem;
+    }
+    
+    .copy-btn {
+        height: 40px;
+        font-size: 0.65rem;
     }
 }
 
