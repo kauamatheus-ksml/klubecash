@@ -494,7 +494,7 @@ main {
 @media (min-width: 769px) {
     /* Desktop: sempre aplicar margem - SUAS ALTERAÇÕES MANTIDAS */
     .klube-main-adjusted {
-        margin-left: 280px !important;
+        margin-left: 100px !important;
         padding-left: 0 !important;
     }
     
