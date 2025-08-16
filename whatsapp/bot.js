@@ -14,7 +14,7 @@ const CONFIG = {
 // === VARIÁVEIS GLOBAIS ===
 let client = null;
 let isReady = false;
-
+const activeTimeouts = new Map();
 // === INICIALIZAÇÃO DO EXPRESS ===
 const app = express();
 app.use(cors());
@@ -84,23 +84,25 @@ async function processarMensagem(message) {
         const phoneNumber = message.from;
         const messageText = message.body.trim();
         
-        console.log('📨 Nova mensagem:', phoneNumber, messageText);
-
-        // VERIFICAR SE É OPÇÃO DO MENU (apenas "1" para saldo)
+        // Se for opção 1 (saldo)
         if (messageText === '1') {
-            console.log('💰 Menu Opção 1 - Saldo geral');
             await consultarSaldoGeral(phoneNumber);
             return;
         }
 
-        // VERIFICAR SE É NÚMERO DE LOJA (2-9, após já ter consultado saldo)
+        // Se for número de loja (2-9)
         if (/^[2-9]$/.test(messageText)) {
-            console.log('🏪 Loja específica:', messageText);
             await consultarLojaEspecifica(phoneNumber, messageText);
             return;
         }
 
-        // QUALQUER OUTRA MENSAGEM = MENU
+        // QUALQUER OUTRA MENSAGEM = CANCELAR TIMEOUT E MOSTRAR MENU
+        if (activeTimeouts.has(phoneNumber)) {
+            clearTimeout(activeTimeouts.get(phoneNumber));
+            activeTimeouts.delete(phoneNumber);
+            console.log('⏰ Timeout cancelado - novo menu solicitado');
+        }
+        
         await exibirMenu(phoneNumber);
         
     } catch (error) {
@@ -123,9 +125,18 @@ async function consultarSaldoGeral(phoneNumber) {
         });
         
         if (response.data && response.data.success && response.data.message) {
-            // APENAS enviar dados do saldo (SEM finalização)
+            // Enviar dados do saldo
             await client.sendText(phoneNumber, response.data.message);
-            console.log('✅ Saldo enviado - aguardando seleção de loja');
+            console.log('✅ Saldo enviado - iniciando timeout de 30min');
+            
+            // INICIAR TIMEOUT DE 30 MINUTOS
+            const timeoutId = setTimeout(async () => {
+                console.log('⏰ Timeout atingido para:', phoneNumber);
+                await finalizarConsultaPorTimeout(phoneNumber);
+            }, 30 * 60 * 1000); // 30 minutos
+            
+            // Salvar timeout ativo
+            activeTimeouts.set(phoneNumber, timeoutId);
         }
         
     } catch (error) {
@@ -139,6 +150,13 @@ async function consultarSaldoGeral(phoneNumber) {
  */
 async function consultarLojaEspecifica(phoneNumber, numeroLoja) {
     try {
+        // CANCELAR TIMEOUT SE EXISTIR
+        if (activeTimeouts.has(phoneNumber)) {
+            clearTimeout(activeTimeouts.get(phoneNumber));
+            activeTimeouts.delete(phoneNumber);
+            console.log('⏰ Timeout cancelado - loja selecionada');
+        }
+        
         await client.sendText(phoneNumber, '🏪 Consultando loja... ⏳');
         
         const cleanPhone = phoneNumber.replace('@c.us', '');
@@ -149,13 +167,13 @@ async function consultarLojaEspecifica(phoneNumber, numeroLoja) {
         });
         
         if (response.data && response.data.success) {
-            // PRIMEIRA mensagem: dados da loja
+            // Dados da loja
             if (response.data.message) {
                 await client.sendText(phoneNumber, response.data.message);
                 await new Promise(resolve => setTimeout(resolve, 2000));
             }
             
-            // SEGUNDA mensagem: finalização
+            // Finalização
             const finalizacao = `✅ *Consulta finalizada!*
 
 Para nova consulta, envie qualquer mensagem.`;
@@ -169,6 +187,31 @@ Para nova consulta, envie qualquer mensagem.`;
         await enviarMensagemErro(phoneNumber);
     }
 }
+
+
+/**
+ * FINALIZAR POR TIMEOUT
+ */
+async function finalizarConsultaPorTimeout(phoneNumber) {
+    try {
+        const mensagemTimeout = `⏰ *Tempo esgotado!*
+
+Sua consulta foi finalizada automaticamente após 30 minutos.
+
+Para nova consulta, envie qualquer mensagem.`;
+
+        await client.sendText(phoneNumber, mensagemTimeout);
+        
+        // Remover timeout do mapa
+        activeTimeouts.delete(phoneNumber);
+        
+        console.log('✅ Consulta finalizada por timeout:', phoneNumber);
+        
+    } catch (error) {
+        console.error('❌ Erro ao finalizar por timeout:', error);
+    }
+}
+
 /**
  * EXIBIR MENU PRINCIPAL
  */
