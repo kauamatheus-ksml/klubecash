@@ -217,6 +217,7 @@ async function processarOpcaoMenu(phoneNumber, opcao) {
     }
 }
 
+
 /**
  * INICIAR CADASTRO OU ATUALIZAÇÃO
  */
@@ -240,7 +241,6 @@ async function iniciarCadastroOuAtualizacao(phoneNumber) {
         await enviarMensagemErro(phoneNumber);
     }
 }
-
 /**
  * PROCESSAR MENSAGENS DURANTE CADASTRO
  */
@@ -280,7 +280,6 @@ async function verificarProcessoCadastro(phoneNumber) {
         return false;
     }
 }
-
 /**
  * ATUALIZAR FUNÇÃO PRINCIPAL DE PROCESSAMENTO DE MENSAGENS
  */
