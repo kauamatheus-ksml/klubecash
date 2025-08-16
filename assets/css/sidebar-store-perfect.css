@@ -494,21 +494,22 @@ main {
 @media (min-width: 769px) {
     /* Desktop: sempre aplicar margem - SUAS ALTERAÇÕES MANTIDAS */
     .klube-main-adjusted {
-        margin-left: 100px !important;
+        margin-left: 295px !important;
         padding-left: 0 !important;
     }
     
     /* Para sidebar colapsada - SUAS ALTERAÇÕES MANTIDAS */
     .klube-sidebar.collapsed ~ .klube-main-adjusted,
     body:has(.klube-sidebar.collapsed) .klube-main-adjusted {
-        margin-left: -100px !important;
+        margin-left: 95px !important;
     }
 }
 
 @media (max-width: 768px) {
     /* Mobile: sempre sem margem - SUAS ALTERAÇÕES MANTIDAS */
     .klube-main-adjusted {
-        
+        margin-left: 10px !important;
+        padding-left: 10px !important;
     }
 }
 
