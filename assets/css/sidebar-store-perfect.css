@@ -501,15 +501,14 @@ main {
     /* Para sidebar colapsada - SUAS ALTERAÇÕES MANTIDAS */
     .klube-sidebar.collapsed ~ .klube-main-adjusted,
     body:has(.klube-sidebar.collapsed) .klube-main-adjusted {
-        margin-left: 95px !important;
+        margin-left: 5px !important;
     }
 }
 
 @media (max-width: 768px) {
     /* Mobile: sempre sem margem - SUAS ALTERAÇÕES MANTIDAS */
     .klube-main-adjusted {
-        margin-left: 10px !important;
-        padding-left: 10px !important;
+        
     }
 }
 
