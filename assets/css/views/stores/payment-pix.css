@@ -124,12 +124,12 @@ body {
 
 /* Container Principal */
 .pix-container {
-    max-width: 1200px;
+    max-width: 1400px;
     margin: 0 auto;
     padding: 2rem;
     display: grid;
-    grid-template-columns: 1fr 2fr 1fr;
-    gap: 2rem;
+    grid-template-columns: 300px 1fr 320px;
+    gap: 2.5rem;
     align-items: start;
 }
 
@@ -338,29 +338,22 @@ body {
 }
 
 .qr-display {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2.5rem;
     margin-bottom: 2rem;
 }
 
-.qr-image-container {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--gray-50);
-    border-radius: var(--border-radius-lg);
-    padding: 2rem;
-    border: 2px dashed var(--gray-300);
-    min-height: 400px;
-}
 
 .qr-image-container img {
     width: 320px;
     height: 320px;
-    max-width: 100%;
+    object-fit: contain;
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: pixelated;
     border-radius: var(--border-radius);
-    box-shadow: var(--shadow-md);
+    background: white;
 }
 
 .qr-loading {
@@ -374,6 +367,9 @@ body {
 .qr-code-section {
     display: flex;
     flex-direction: column;
+    width: 100%;
+    max-width: 500px;
+    margin: 0 auto;
 }
 
 .code-label {
@@ -391,15 +387,17 @@ body {
 
 #pixCode {
     width: 100%;
-    height: 200px;
+    height: 140px;
     padding: 1rem;
-    border: 2px solid var(--gray-300);
+    border: 2px solid var(--primary-color);
     border-radius: var(--border-radius);
     font-family: 'Monaco', 'Menlo', monospace;
-    font-size: 0.875rem;
-    background: var(--gray-50);
+    font-size: 0.8rem;
+    background: var(--white);
     resize: none;
     transition: var(--transition);
+    word-break: break-all;
+    line-height: 1.4;
 }
 
 #pixCode:focus {
@@ -729,6 +727,23 @@ body {
 }
 
 /* Responsividade */
+@media (max-width: 1200px) {
+    .pix-container {
+        grid-template-columns: 280px 1fr 300px;
+        gap: 2rem;
+    }
+    
+    .qr-image-container {
+        width: 350px;
+        height: 350px;
+    }
+    
+    .qr-image-container img {
+        width: 280px;
+        height: 280px;
+    }
+}
+
 @media (max-width: 1024px) {
     .main-content {
         margin-left: 0;
@@ -738,6 +753,7 @@ body {
         grid-template-columns: 1fr;
         gap: 1.5rem;
         padding: 1.5rem;
+        max-width: 800px;
     }
     
     .steps-panel {
@@ -752,6 +768,17 @@ body {
     .info-panel {
         order: 1;
         position: static;
+    }
+    
+    .qr-image-container {
+        width: 320px;
+        height: 320px;
+        margin: 0 auto;
+    }
+    
+    .qr-image-container img {
+        width: 250px;
+        height: 250px;
     }
     
     .fixed-back-btn {
@@ -793,18 +820,18 @@ body {
     }
     
     .qr-display {
-        grid-template-columns: 1fr;
         gap: 1.5rem;
     }
     
     .qr-image-container {
-        min-height: 320px;
+        width: 300px;
+        height: 300px;
         padding: 1.5rem;
     }
     
     .qr-image-container img {
-        width: 280px;
-        height: 280px;
+        width: 220px;
+        height: 220px;
     }
     
     #pixCode {
@@ -878,6 +905,53 @@ body {
 
 .pix-action-btn {
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* QR Code específico - evitar distorção */
+.qr-image-container img[src*="qr"] {
+    image-rendering: -moz-crisp-edges;
+    image-rendering: -webkit-crisp-edges;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+}
+
+/* Animação suave para aparecer o QR */
+.qr-image-container img {
+    opacity: 0;
+    transform: scale(0.8);
+    transition: all 0.5s ease-out;
+}
+
+.qr-image-container img[style*="display: block"] {
+    opacity: 1;
+    transform: scale(1);
+}
+
+/* Melhor destaque do container do QR - sobrescrevendo definições anteriores */
+.qr-image-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #fff 0%, #f8f9fa 100%);
+    border-radius: var(--border-radius-lg);
+    padding: 2rem;
+    border: 3px solid var(--primary-color);
+    box-shadow: var(--shadow-lg);
+    width: 400px;
+    height: 400px;
+    position: relative;
+}
+
+.qr-image-container::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: linear-gradient(45deg, var(--primary-color), var(--primary-dark), var(--primary-color));
+    border-radius: var(--border-radius-lg);
+    z-index: -1;
 }
 
 /* Melhorias de acessibilidade */
