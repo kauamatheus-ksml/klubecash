@@ -2414,6 +2414,136 @@ ALTER TABLE `usuarios_endereco`
 --
 ALTER TABLE `verificacao_2fa`
   ADD CONSTRAINT `verificacao_2fa_ibfk_1` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`) ON DELETE CASCADE;
+
+-- --------------------------------------------------------
+
+--
+-- Estrutura para tabela `api_keys` (API Externa)
+--
+
+CREATE TABLE `api_keys` (
+  `id` int(11) NOT NULL,
+  `key_hash` varchar(255) NOT NULL,
+  `key_prefix` varchar(10) NOT NULL,
+  `partner_name` varchar(100) NOT NULL,
+  `partner_email` varchar(100) NOT NULL,
+  `permissions` TEXT NOT NULL,
+  `rate_limit_per_minute` int(11) DEFAULT 60,
+  `rate_limit_per_hour` int(11) DEFAULT 1000,
+  `is_active` tinyint(1) DEFAULT 1,
+  `last_used_at` timestamp NULL DEFAULT NULL,
+  `created_at` timestamp DEFAULT CURRENT_TIMESTAMP,
+  `expires_at` timestamp NULL DEFAULT NULL,
+  `webhook_url` varchar(255) NULL DEFAULT NULL,
+  `webhook_secret` varchar(255) NULL DEFAULT NULL,
+  `notes` text NULL DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Estrutura para tabela `api_rate_limits` (API Externa)
+--
+
+CREATE TABLE `api_rate_limits` (
+  `id` int(11) NOT NULL,
+  `api_key_id` int(11) NOT NULL,
+  `endpoint` varchar(255) NOT NULL,
+  `requests_count` int(11) DEFAULT 0,
+  `window_start` timestamp DEFAULT CURRENT_TIMESTAMP,
+  `window_type` enum('minute','hour','day') DEFAULT 'minute'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Estrutura para tabela `api_logs` (API Externa)
+--
+
+CREATE TABLE `api_logs` (
+  `id` int(11) NOT NULL,
+  `api_key_id` int(11) NULL DEFAULT NULL,
+  `endpoint` varchar(255) NOT NULL,
+  `method` varchar(10) NOT NULL,
+  `status_code` int(11) NOT NULL,
+  `response_time_ms` int(11) NULL DEFAULT NULL,
+  `ip_address` varchar(45) NOT NULL,
+  `user_agent` text NULL DEFAULT NULL,
+  `request_body` text NULL DEFAULT NULL,
+  `response_body` text NULL DEFAULT NULL,
+  `error_message` text NULL DEFAULT NULL,
+  `created_at` timestamp DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Despejando dados para a tabela `api_keys` (Chave de exemplo para testes)
+--
+
+INSERT INTO `api_keys` (
+  `key_hash`, 
+  `key_prefix`, 
+  `partner_name`, 
+  `partner_email`, 
+  `permissions`,
+  `notes`
+) VALUES (
+  SHA2(CONCAT('kc_test_key_12345678901234567890123456789012345678901234567890123456', UNIX_TIMESTAMP()), 256),
+  'kc_test',
+  'Partner de Teste',
+  'teste@example.com',
+  '["users.read", "users.create", "stores.read", "transactions.read", "transactions.create", "cashback.read", "cashback.calculate"]',
+  'API Key para testes de desenvolvimento'
+);
+
+--
+-- Índices para tabelas `api_keys`
+--
+ALTER TABLE `api_keys`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `key_hash` (`key_hash`),
+  ADD UNIQUE KEY `key_prefix` (`key_prefix`),
+  ADD KEY `partner_email` (`partner_email`),
+  ADD KEY `is_active` (`is_active`);
+
+--
+-- Índices para tabelas `api_rate_limits`
+--
+ALTER TABLE `api_rate_limits`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `api_key_id` (`api_key_id`),
+  ADD UNIQUE KEY `unique_rate_limit` (`api_key_id`, `endpoint`, `window_type`, `window_start`);
+
+--
+-- Índices para tabelas `api_logs`
+--
+ALTER TABLE `api_logs`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `api_key_id` (`api_key_id`),
+  ADD KEY `endpoint` (`endpoint`),
+  ADD KEY `created_at` (`created_at`),
+  ADD KEY `status_code` (`status_code`);
+
+--
+-- AUTO_INCREMENT para tabelas API Externa
+--
+ALTER TABLE `api_keys`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+ALTER TABLE `api_rate_limits`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+ALTER TABLE `api_logs`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- Restrições para tabelas API Externa
+--
+ALTER TABLE `api_rate_limits`
+  ADD CONSTRAINT `api_rate_limits_ibfk_1` FOREIGN KEY (`api_key_id`) REFERENCES `api_keys` (`id`) ON DELETE CASCADE;
+
+ALTER TABLE `api_logs`
+  ADD CONSTRAINT `api_logs_ibfk_1` FOREIGN KEY (`api_key_id`) REFERENCES `api_keys` (`id`) ON DELETE SET NULL;
+
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
