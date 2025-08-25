@@ -1,0 +1,105 @@
+{
+  "name": "@klubecash/javascript-sdk",
+  "version": "1.0.0",
+  "description": "Official JavaScript/Node.js SDK for KlubeCash External API",
+  "main": "klubecash-sdk.js",
+  "module": "klubecash-sdk.js",
+  "browser": "klubecash-sdk.js",
+  "types": "types/index.d.ts",
+  "files": [
+    "klubecash-sdk.js",
+    "types/",
+    "README.md"
+  ],
+  "keywords": [
+    "klubecash",
+    "cashback",
+    "api",
+    "sdk",
+    "javascript",
+    "nodejs",
+    "browser",
+    "typescript"
+  ],
+  "homepage": "https://klubecash.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/klubecash/javascript-sdk.git"
+  },
+  "bugs": {
+    "url": "https://github.com/klubecash/javascript-sdk/issues",
+    "email": "suporte@klubecash.com"
+  },
+  "author": {
+    "name": "KlubeCash Development Team",
+    "email": "dev@klubecash.com",
+    "url": "https://klubecash.com"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "browserslist": [
+    "> 1%",
+    "last 2 versions",
+    "not ie <= 11"
+  ],
+  "scripts": {
+    "test": "jest",
+    "test:coverage": "jest --coverage",
+    "test:watch": "jest --watch",
+    "lint": "eslint klubecash-sdk.js",
+    "lint:fix": "eslint klubecash-sdk.js --fix",
+    "build": "echo 'No build step required - using UMD format'",
+    "docs": "jsdoc klubecash-sdk.js -d docs/",
+    "example": "node examples/basic-usage.js",
+    "example:browser": "npx serve examples/ -p 3000"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.0.0",
+    "@types/node": "^18.0.0",
+    "eslint": "^8.0.0",
+    "jest": "^29.0.0",
+    "jest-environment-jsdom": "^29.0.0",
+    "jsdoc": "^4.0.0",
+    "serve": "^14.0.0"
+  },
+  "dependencies": {
+    "node-fetch": "^2.6.7"
+  },
+  "peerDependencies": {
+    "node-fetch": "^2.6.0 || ^3.0.0"
+  },
+  "peerDependenciesMeta": {
+    "node-fetch": {
+      "optional": true
+    }
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "coverageDirectory": "coverage",
+    "collectCoverageFrom": [
+      "klubecash-sdk.js"
+    ],
+    "testMatch": [
+      "**/test/**/*.test.js"
+    ]
+  },
+  "eslintConfig": {
+    "env": {
+      "browser": true,
+      "node": true,
+      "es2020": true,
+      "jest": true
+    },
+    "extends": "eslint:recommended",
+    "parserOptions": {
+      "ecmaVersion": 2020,
+      "sourceType": "module"
+    },
+    "rules": {
+      "no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
+      "no-console": "warn"
+    }
+  }
+}
