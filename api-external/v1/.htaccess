@@ -1,0 +1,39 @@
+RewriteEngine On
+
+# Redirecionar tudo para index.php
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ index.php [QSA,L]
+
+# Configurações de segurança
+Header always set X-Content-Type-Options nosniff
+Header always set X-Frame-Options DENY
+Header always set X-XSS-Protection "1; mode=block"
+Header always set Referrer-Policy "strict-origin-when-cross-origin"
+
+# Configurações CORS
+Header always set Access-Control-Allow-Origin "*"
+Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-API-Key"
+Header always set Access-Control-Max-Age "86400"
+
+# Configurações de cache
+<FilesMatch "\.(json|js|css)$">
+    Header set Cache-Control "max-age=300, public"
+</FilesMatch>
+
+# Limitar tamanho do request
+LimitRequestBody 2097152
+
+# Esconder informações do servidor
+ServerTokens Prod
+ServerSignature Off
+
+# Desabilitar listagem de diretórios
+Options -Indexes
+
+# Proteger arquivos sensíveis
+<FilesMatch "\.(md|log|txt|sql|env)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
