@@ -106,11 +106,24 @@ class Router {
     }
     
     private function getRequestPath() {
-        $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-        $basePath = API_BASE_URL;
+        // Para LiteSpeed, verificar diferentes fontes de path
+        $path = '';
         
-        if (strpos($path, $basePath) === 0) {
-            $path = substr($path, strlen($basePath));
+        // Tentar PATH_INFO primeiro (LiteSpeed)
+        if (isset($_SERVER['PATH_INFO']) && !empty($_SERVER['PATH_INFO'])) {
+            $path = $_SERVER['PATH_INFO'];
+        }
+        // Senão usar REQUEST_URI
+        else {
+            $path = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
+            $basePath = API_BASE_URL;
+            
+            if (strpos($path, $basePath) === 0) {
+                $path = substr($path, strlen($basePath));
+            }
+            
+            // Remover index.php se presente
+            $path = preg_replace('#^/?index\.php/?#', '/', $path);
         }
         
         return $path ?: '/';
