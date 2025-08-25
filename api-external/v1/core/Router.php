@@ -76,12 +76,15 @@ class Router {
         $method = $_SERVER['REQUEST_METHOD'];
         $path = $this->getRequestPath();
         
+        // Log para debug
+        error_log("API Request: $method $path");
+        
         foreach ($this->routes as $route) {
             if ($route['method'] === $method && preg_match($route['pattern'], $path, $matches)) {
                 
-                // Executar middleware global
-                foreach ($this->middleware as $middleware) {
-                    if (!isset($route['options']['skip_auth']) || !$route['options']['skip_auth']) {
+                // Executar middleware global apenas se não for rota pública
+                if (!isset($route['options']['skip_auth']) || !$route['options']['skip_auth']) {
+                    foreach ($this->middleware as $middleware) {
                         $middleware->handle();
                     }
                 }
@@ -102,6 +105,8 @@ class Router {
             }
         }
         
+        // Log da rota não encontrada para debug
+        error_log("Route not found: $method $path");
         Response::error('Route not found', 404);
     }
     
