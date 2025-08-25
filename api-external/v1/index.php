@@ -17,7 +17,7 @@ require_once '../../config/database.php';
 require_once 'config/api_config.php';
 require_once 'core/Response.php';
 require_once 'core/ApiException.php';
-require_once 'models/ApiKey.php';
+require_once 'models/SimpleApiKey.php';
 
 date_default_timezone_set('America/Sao_Paulo');
 
@@ -146,7 +146,7 @@ try {
     }
     
     // Validar API Key
-    $apiKeyModel = new ApiKey();
+    $apiKeyModel = new SimpleApiKey();
     $keyData = $apiKeyModel->validateApiKey($apiKey);
     
     if (!$keyData) {
