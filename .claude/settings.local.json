@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(cp:*)"
+      "Bash(cp:*)",
+      "Bash(php:*)",
+      "Bash(del test_mvp.php)"
     ],
     "deny": [],
     "ask": []
