@@ -1014,4 +1014,4 @@ style.textContent = `
         text-align: right;
     }
 `;
-document.head.appendChild(style);
+document.head.appendChild(style); 
