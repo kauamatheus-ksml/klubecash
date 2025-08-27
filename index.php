@@ -738,6 +738,25 @@ try {
             background: #f8f9fa;
         }
 
+        /* === HERO WELCOME === */
+        .hero-welcome {
+            margin-bottom: 40px;
+        }
+
+        .hero-welcome h1 {
+            font-size: 2.8rem;
+            font-weight: 700;
+            margin-bottom: 20px;
+            line-height: 1.2;
+        }
+
+        .hero-welcome p {
+            font-size: 1.1rem;
+            opacity: 0.95;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
 
         /* === ESTILOS PARA FUNCIONÁRIOS === */
         .employee-badge {
@@ -789,28 +808,33 @@ try {
                 <!-- Ações do Header -->
                 <div class="header-actions">
                     <?php if ($isLoggedIn): ?>
-                        <h1>Olá, <?php echo htmlspecialchars($userName); ?>! 👋</h1>
-                        
-                        <?php if ($userType === 'funcionario' && isset($_SESSION['employee_subtype'])): ?>
-                            <?php 
-                            $subtypeMap = ['gerente' => 'Gerente', 'financeiro' => 'Financeiro', 'vendedor' => 'Vendedor'];
-                            $subtypeDisplay = $subtypeMap[$_SESSION['employee_subtype']] ?? 'Funcionário';
-                            ?>
-                            <p><span style="display: inline-flex; align-items: center; gap: 8px; background: rgba(255, 215, 0, 0.15); color: #FF8C00; padding: 8px 16px; border-radius: 20px; font-weight: 600;">🎯 Acesso como: <?php echo $subtypeDisplay; ?></span></p>
-                            <p>Gerencie as operações da sua loja com eficiência.</p>
-                        <?php else: ?>
-                            <p>Continue economizando com inteligência. Explore suas oportunidades de cashback.</p>
-                        <?php endif; ?>
-                        
-                        <div class="hero-actions">
-                            <a href="<?php echo htmlspecialchars($dashboardURL); ?>" class="btn btn-primary">
-                                <?php echo ($userType === 'funcionario') ? 'Acessar Painel da Loja' : 'Acessar Minha Conta'; ?>
-                            </a>
-                            <a href="#parceiros" class="btn btn-ghost">Ver Lojas Parceiras</a>
+                        <div class="user-menu">
+                            <button class="user-button" id="userMenuBtn">
+                                <div class="user-avatar">
+                                    <?php echo strtoupper(substr($userName, 0, 1)); ?>
+                                </div>
+                                <span style="font-weight: 600; color: #333;">
+                                    <?php echo htmlspecialchars($userName); ?>
+                                </span>
+                            </button>
+                            <div class="user-dropdown" id="userDropdown">
+                                <a href="<?php echo htmlspecialchars($dashboardURL); ?>" class="dropdown-item">
+                                    <span>🏠</span>
+                                    <?php echo ($userType === 'funcionario') ? 'Painel da Loja' : 'Minha Conta'; ?>
+                                </a>
+                                <a href="#parceiros" class="dropdown-item">
+                                    <span>🏪</span>
+                                    Lojas Parceiras
+                                </a>
+                                <a href="logout.php" class="dropdown-item">
+                                    <span>🚪</span>
+                                    Sair
+                                </a>
+                            </div>
                         </div>
                     <?php else: ?>
                         <a href="<?php echo LOGIN_URL; ?>" class="btn btn-ghost">Entrar</a>
-                        
+                        <a href="<?php echo REGISTER_URL; ?>" class="btn btn-primary">Cadastrar</a>
                     <?php endif; ?>
                 </div>
                 
@@ -847,13 +871,28 @@ try {
         <section class="hero">
             <div class="container">
                 <?php if ($isLoggedIn): ?>
-                    <h1>Olá, <?php echo htmlspecialchars($userName); ?>! 👋</h1>
-                    <p>Continue economizando com inteligência. Explore suas oportunidades de cashback.</p>
+                    <div class="hero-welcome">
+                        <h1>Bem-vindo de volta, <?php echo htmlspecialchars($userName); ?>! 👋</h1>
+                        
+                        <?php if ($userType === 'funcionario' && isset($_SESSION['employee_subtype'])): ?>
+                            <?php 
+                            $subtypeMap = ['gerente' => 'Gerente', 'financeiro' => 'Financeiro', 'vendedor' => 'Vendedor'];
+                            $subtypeDisplay = $subtypeMap[$_SESSION['employee_subtype']] ?? 'Funcionário';
+                            ?>
+                            <div class="employee-badge">
+                                🎯 Acesso como: <?php echo $subtypeDisplay; ?>
+                            </div>
+                            <p>Gerencie as operações da sua loja com eficiência através do painel administrativo.</p>
+                        <?php else: ?>
+                            <p>Continue economizando com inteligência. Explore suas oportunidades de cashback e descubra novas formas de economizar.</p>
+                        <?php endif; ?>
+                    </div>
+                    
                     <div class="hero-actions">
                         <a href="<?php echo htmlspecialchars($dashboardURL); ?>" class="btn btn-primary">
-                            Acessar Minha Conta
+                            <?php echo ($userType === 'funcionario') ? 'Acessar Painel da Loja' : 'Acessar Minha Conta'; ?>
                         </a>
-                        <a href="#parceiros" class="btn btn-ghost">Ver Lojas Parceiras</a>
+                        <a href="#parceiros" class="btn btn-ghost">Explorar Parceiros</a>
                     </div>
                 <?php else: ?>
                     <h1>Transforme suas compras em dinheiro de volta</h1>
@@ -866,7 +905,20 @@ try {
                     </div>
                 <?php endif; ?>
                 
-                
+                <div class="hero-stats">
+                    <div class="stat-item">
+                        <span class="stat-number">10k+</span>
+                        <span class="stat-label">Membros Ativos</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number">R$ 2M</span>
+                        <span class="stat-label">Cashback Distribuído</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number">500+</span>
+                        <span class="stat-label">Lojas Parceiras</span>
+                    </div>
+                </div>
             </div>
         </section>
 
