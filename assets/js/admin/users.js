@@ -243,6 +243,9 @@ function handleUserTypeChange(type) {
     // Mostrar/ocultar campo MVP apenas para lojas
     if (mvpFieldGroup) {
         mvpFieldGroup.style.display = isStore ? 'block' : 'none';
+        console.log('Campo MVP definido como:', isStore ? 'visível' : 'oculto', 'para tipo:', type);
+    } else {
+        console.log('Elemento mvpFieldGroup não encontrado!');
     }
     
     if (isStore && !isEditMode) {
@@ -441,8 +444,7 @@ function editUser(userId) {
     if (passwordField) passwordField.required = false;
     if (passwordHelp) passwordHelp.textContent = 'Mínimo de 8 caracteres (deixe em branco para manter a senha atual)';
     
-    // Resetar campos de loja
-    resetStoreFields();
+    // NÃO resetar campos de loja ainda - será feito após carregar os dados
     
     // Mostrar modal
     modal.classList.add('show');
@@ -485,6 +487,11 @@ function editUser(userId) {
  * Preenche o formulário com dados do usuário
  */
 function fillUserForm(userData) {
+    // Debug: verificar se dados MVP estão chegando
+    console.log('Dados do usuário recebidos:', userData);
+    console.log('Tipo do usuário:', userData.tipo);
+    console.log('MVP do usuário:', userData.mvp);
+    
     document.getElementById('userId').value = userData.id;
     document.getElementById('userName').value = userData.nome;
     document.getElementById('userEmail').value = userData.email;
@@ -496,8 +503,10 @@ function fillUserForm(userData) {
     }
     
     // Campo MVP (apenas para lojas)
-    if (userData.tipo === 'loja' && userData.mvp) {
-        document.getElementById('userMvp').value = userData.mvp;
+    const mvpSelect = document.getElementById('userMvp');
+    if (mvpSelect && userData.tipo === 'loja') {
+        // Definir valor MVP (padrão 'nao' se não existir)
+        mvpSelect.value = userData.mvp || 'nao';
     }
     
     // Mostrar/ocultar campo MVP baseado no tipo

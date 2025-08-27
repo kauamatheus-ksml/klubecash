@@ -313,6 +313,8 @@ try {
                                         </td>
                                         <td>
                                             <?php if ($user['tipo'] === 'loja'): ?>
+                                                <!-- Debug: verificar valor MVP -->
+                                                <!-- MVP: <?php echo isset($user['mvp']) ? $user['mvp'] : 'não definido'; ?> -->
                                                 <?php if (isset($user['mvp']) && $user['mvp'] === 'sim'): ?>
                                                     <span class="badge badge-warning">
                                                         <i class="fas fa-star"></i> MVP
