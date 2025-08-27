@@ -1073,7 +1073,7 @@ try {
                     <h4>Legal</h4>
                     <ul>
                         <li><a href="termos-de-uso.php">Termos de Uso</a></li>
-                        <li><a href="#">Política de Privacidade</a></li>
+                        <li><a href="politica-de-privacidade.php">Política de Privacidade</a></li>
                         <li><a href="#">Política de Cookies</a></li>
                     </ul>
                 </div>
