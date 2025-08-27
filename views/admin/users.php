@@ -66,6 +66,14 @@ try {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gerenciar Usuários - Klube Cash</title>
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
+    
+    <!-- Font Awesome primeiro -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" integrity="sha512-Avb2QiuDEEvB4bZJYdft2mNjVShBftLdPG8FJ0V7irTLQ8Uo0qcPxh4Plq7G5tGm0rU+1SPhVotteLpBERwTkw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="stylesheet" href="../../assets/font-awesome/css/font-awesome.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" integrity="sha512-Avb2QiuDEEvB4bZJYdft2mNjVShBftLdPG8FJ0V7irTLQ8Uo0qcPxh4Plq7G5tGm0rU+1SPhVotteLpBERwTkw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <!-- Seu CSS depois -->
+    <link rel="stylesheet" href="../../assets/css/views/admin/users.css">
+    <link rel="stylesheet" href="../../assets/css/layout-fix.css">
 </head>
 <body>
     <?php include_once '../components/sidebar.php'; ?>
@@ -236,7 +244,6 @@ try {
                                 </th>
                                 <th>Usuário</th>
                                 <th>Tipo/Subtipo</th>
-                                <th>MVP</th>
                                 <th>Loja Vinculada</th>
                                 <th>Status</th>
                                 <th>Cadastro</th>
@@ -247,7 +254,7 @@ try {
                         <tbody>
                             <?php if (empty($users)): ?>
                                 <tr>
-                                    <td colspan="9" class="no-data">
+                                    <td colspan="8" class="no-data">
                                         <div class="no-data-content">
                                             <i class="fas fa-users"></i>
                                             <h4>Nenhum usuário encontrado</h4>
@@ -302,19 +309,6 @@ try {
                                                 }
                                                 ?>
                                             </span>
-                                        </td>
-                                        <td>
-                                            <?php if ($user['tipo'] === 'loja'): ?>
-                                                <?php if (isset($user['mvp']) && $user['mvp'] === 'sim'): ?>
-                                                    <span class="badge badge-warning">
-                                                        <i class="fas fa-star"></i> MVP
-                                                    </span>
-                                                <?php else: ?>
-                                                    <span class="text-muted">-</span>
-                                                <?php endif; ?>
-                                            <?php else: ?>
-                                                <span class="text-muted">-</span>
-                                            <?php endif; ?>
                                         </td>
                                         <td>
                                             <?php if ($user['tipo'] === 'funcionario' && !empty($user['nome_loja_vinculada'])): ?>
@@ -463,5 +457,162 @@ try {
             <?php endif; ?>
         </div>
     </div>
+    
+    <!-- Modal de Adicionar/Editar Usuário -->
+    <div class="modal" id="userModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" id="userModalTitle">
+                    <i class="fas fa-user-plus"></i> Adicionar Usuário
+                </h3>
+                <button class="modal-close" onclick="hideUserModal()" type="button">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="modal-body">
+                <form id="userForm" onsubmit="submitUserForm(event)">
+                    <input type="hidden" id="userId" name="id" value="">
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label required" for="userType">Tipo de Usuário</label>
+                            <select class="form-select" id="userType" name="tipo" required>
+                                <option value="">Selecione o tipo...</option>
+                                <option value="cliente">Cliente</option>
+                                <option value="loja">Loja</option>
+                                <option value="admin">Administrador</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label required" for="userStatus">Status</label>
+                            <select class="form-select" id="userStatus" name="status" required>
+                                <option value="ativo">Ativo</option>
+                                <option value="inativo">Inativo</option>
+                                <option value="bloqueado">Bloqueado</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label required" for="userName">Nome Completo</label>
+                        <input type="text" 
+                               class="form-control" 
+                               id="userName" 
+                               name="nome" 
+                               required 
+                               placeholder="Digite o nome completo">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label required" for="userEmail">E-mail</label>
+                        <div id="emailSelectContainer" style="display: none;">
+                            <select class="form-select" id="userEmailSelect" name="email_select">
+                                <option value="">Selecione uma loja...</option>
+                            </select>
+                        </div>
+                        <input type="email" 
+                               class="form-control" 
+                               id="userEmail" 
+                               name="email" 
+                               required 
+                               placeholder="Digite o e-mail">
+                    </div>
+                    
+                    <!-- Campos que serão preenchidos automaticamente quando for loja -->
+                    <div id="storeDataFields" style="display: none;">
+                        <div class="form-group">
+                            <label class="form-label" for="storeName">Nome da Loja</label>
+                            <input type="text" class="form-control" id="storeName" readonly>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label" for="storeDocument">CNPJ</label>
+                            <input type="text" class="form-control" id="storeDocument" readonly>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label" for="storeCategory">Categoria</label>
+                            <input type="text" class="form-control" id="storeCategory" readonly>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="userPhone">Telefone</label>
+                        <input type="tel" 
+                               class="form-control" 
+                               id="userPhone" 
+                               name="telefone" 
+                               placeholder="(00) 00000-0000">
+                    </div>
+                    
+                    <div class="form-group" id="passwordGroup">
+                        <label class="form-label required" for="userPassword">Senha</label>
+                        <div class="password-input">
+                            <input type="password" 
+                                   class="form-control" 
+                                   id="userPassword" 
+                                   name="senha"
+                                   placeholder="Digite a senha">
+                            <button type="button" class="password-toggle" onclick="togglePassword('userPassword')">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                        <small id="passwordHelp" class="form-text">
+                            Mínimo de 8 caracteres (deixe em branco para manter a senha atual ao editar)
+                        </small>
+                    </div>
+                </form>
+            </div>
+            
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="hideUserModal()">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+                <button type="submit" form="userForm" class="btn btn-primary" id="submitBtn">
+                    <i class="fas fa-save"></i> Salvar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Visualização de Usuário -->
+    <div class="modal" id="viewUserModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">
+                    <i class="fas fa-eye"></i> Detalhes do Usuário
+                </h3>
+                <button class="modal-close" onclick="hideViewUserModal()" type="button">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="modal-body">
+                <div id="userViewContent">
+                    <!-- Conteúdo será carregado dinamicamente -->
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="hideViewUserModal()">
+                    <i class="fas fa-times"></i> Fechar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+        <div class="loading-spinner">
+            <i class="fas fa-spinner fa-spin"></i>
+            <p>Carregando...</p>
+        </div>
+    </div>
+    
+    <!-- JavaScript -->
+    <script src="../../assets/js/admin/users.js"></script>
+    
 </body>
 </html>
