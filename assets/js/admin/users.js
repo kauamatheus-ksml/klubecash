@@ -30,6 +30,13 @@ function initializeUserManagement() {
     
     // Configurar máscaras de input
     setupInputMasks();
+    
+    // TESTE: Verificar se elemento MVP existe no DOM
+    const mvpField = document.getElementById('mvpFieldGroup');
+    console.log('TESTE INICIAL: Campo mvpFieldGroup existe?', mvpField ? 'SIM' : 'NÃO');
+    if (mvpField) {
+        console.log('Campo MVP encontrado:', mvpField);
+    }
 }
 
 /**
@@ -531,6 +538,47 @@ function fillUserForm(userData) {
     
     // Limpar campo de senha
     document.getElementById('userPassword').value = '';
+    
+    // CHAMADA FINAL: Força exibição do campo MVP para lojas
+    setTimeout(() => {
+        showMvpFieldForStore(userData);
+    }, 200);
+}
+
+/**
+ * Força exibição do campo MVP para lojas
+ */
+function showMvpFieldForStore(userData) {
+    console.log('=== showMvpFieldForStore chamada ===');
+    console.log('Tipo de usuário:', userData.tipo);
+    
+    if (userData.tipo !== 'loja') {
+        console.log('Não é loja, campo MVP não será exibido');
+        return;
+    }
+    
+    const mvpFieldGroup = document.getElementById('mvpFieldGroup');
+    const mvpSelect = document.getElementById('userMvp');
+    
+    console.log('Elemento mvpFieldGroup:', mvpFieldGroup);
+    console.log('Elemento mvpSelect:', mvpSelect);
+    
+    if (!mvpFieldGroup) {
+        console.error('ERRO CRÍTICO: Elemento mvpFieldGroup não encontrado!');
+        return;
+    }
+    
+    // Forçar exibição
+    mvpFieldGroup.style.display = 'block';
+    mvpFieldGroup.style.visibility = 'visible';
+    
+    // Definir valor
+    if (mvpSelect) {
+        mvpSelect.value = userData.mvp || 'nao';
+        console.log('Valor MVP definido:', userData.mvp || 'nao');
+    }
+    
+    console.log('Campo MVP FORÇADAMENTE exibido para loja');
 }
 
 /**
