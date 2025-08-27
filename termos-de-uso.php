@@ -300,21 +300,27 @@ $userName = $isLoggedIn ? ($_SESSION['user_name'] ?? '') : '';
                 </div>
 
                 <div class="legal-section">
-                    <h2>6. Pagamentos e Resgates</h2>
+                    <h2>6. Utilização do Cashback</h2>
                     
-                    <h3>6.1 Resgate de Cashback</h3>
+                    <h3>6.1 Como Usar Seu Saldo</h3>
+                    <p>O saldo de cashback acumulado:</p>
                     <ul>
-                        <li>Valor mínimo para resgate: R$ 10,00</li>
-                        <li>Processamento em até 3 dias úteis</li>
-                        <li>Disponível via PIX ou transferência bancária</li>
+                        <li>Pode ser utilizado apenas na loja onde foi gerado</li>
+                        <li>Funciona como crédito para futuras compras no mesmo estabelecimento</li>
+                        <li>Não pode ser transferido entre diferentes lojas parceiras</li>
+                        <li>Não há resgate em dinheiro ou transferência bancária</li>
                     </ul>
+
+                    <div class="highlight">
+                        <strong>Importante:</strong> Cada loja parceira mantém seu próprio saldo de cashback para você. O crédito gerado na Loja A só pode ser usado na Loja A.
+                    </div>
 
                     <h3>6.2 Taxas</h3>
                     <p>O Klube Cash não cobra taxas para:</p>
                     <ul>
                         <li>Cadastro na plataforma</li>
                         <li>Acúmulo de cashback</li>
-                        <li>Resgate via PIX</li>
+                        <li>Utilização do saldo nas compras</li>
                     </ul>
                 </div>
 
@@ -355,10 +361,10 @@ $userName = $isLoggedIn ? ($_SESSION['user_name'] ?? '') : '';
                     <h2>10. Encerramento da Conta</h2>
                     
                     <h3>10.1 Por Parte do Usuário</h3>
-                    <p>Você pode encerrar sua conta a qualquer momento através do suporte ao cliente. Cashbacks acumulados serão processados conforme os termos vigentes.</p>
+                    <p>Você pode encerrar sua conta a qualquer momento através do suporte ao cliente. Os saldos de cashback acumulados nas lojas parceiras permanecerão disponíveis para uso nas respectivas lojas, mesmo após o encerramento da conta na plataforma.</p>
 
                     <h3>10.2 Por Parte do Klube Cash</h3>
-                    <p>Podemos suspender ou encerrar contas que violem estes termos, com notificação prévia quando possível.</p>
+                    <p>Podemos suspender ou encerrar contas que violem estes termos, com notificação prévia quando possível. Saldos existentes poderão ser mantidos conforme análise do caso.</p>
                 </div>
 
                 <div class="legal-section">
