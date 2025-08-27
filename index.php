@@ -1,6 +1,29 @@
 <?php
 // index.php - Versão Corrigida e Simplificada
 
+// Inicialização da sessão
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Lógica de logout
+if (isset($_GET['action']) && $_GET['action'] === 'logout') {
+    // Limpar variáveis de sessão
+    $_SESSION = array();
+    
+    // Limpar cookies
+    if (isset($_COOKIE[session_name()])) {
+        setcookie(session_name(), '', time() - 3600, '/');
+    }
+    
+    // Destruir a sessão
+    session_destroy();
+    
+    // Redirecionar para a página inicial
+    header('Location: ./');
+    exit;
+}
+
 if (isset($_SESSION['user_type']) && $_SESSION['user_type'] === 'funcionario' && !isset($_SESSION['employee_subtype'])) {
     try {
         require_once './config/database.php';
@@ -100,10 +123,7 @@ function adjustBrightness($hex, $percent) {
     return sprintf("#%02x%02x%02x", $r, $g, $b);
 }
 
-// Inicialização da sessão (mantida igual)
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+// Sessão já foi inicializada no início do arquivo
 
 // Verificação do usuário logado (mantida igual)
 $isLoggedIn = isset($_SESSION['user_id']);
@@ -826,7 +846,7 @@ try {
                                     <span>🏪</span>
                                     Lojas Parceiras
                                 </a>
-                                <a href="logout.php" class="dropdown-item">
+                                <a href="?action=logout" class="dropdown-item">
                                     <span>🚪</span>
                                     Sair
                                 </a>
