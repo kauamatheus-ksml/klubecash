@@ -492,6 +492,7 @@ public static function getTransactionDetailsWithBalance($transactionId) {
                     u.ultimo_login,
                     u.subtipo_funcionario,
                     u.loja_vinculada_id,
+                    u.mvp,
                     l.nome_fantasia as nome_loja_vinculada
                 FROM usuarios u
                 LEFT JOIN lojas l ON u.loja_vinculada_id = l.id
@@ -580,7 +581,7 @@ public static function getUserDetails($userId) {
         
         // Obter dados do usuário
         $stmt = $db->prepare("
-            SELECT id, nome, email, telefone, tipo, status, data_criacao, ultimo_login
+            SELECT id, nome, email, telefone, tipo, status, data_criacao, ultimo_login, mvp
             FROM usuarios
             WHERE id = :user_id
         ");
@@ -934,6 +935,15 @@ public static function manageStoresWithBalance($filters = [], $page = 1) {
                 if (in_array($data['status'], $validStatus)) {
                     $updateFields[] = "status = :status";
                     $params[':status'] = $data['status'];
+                }
+            }
+            
+            // MVP (apenas para usuários tipo loja)
+            if (isset($data['mvp']) && !empty($data['mvp'])) {
+                $validMvp = ['sim', 'nao'];
+                if (in_array($data['mvp'], $validMvp)) {
+                    $updateFields[] = "mvp = :mvp";
+                    $params[':mvp'] = $data['mvp'];
                 }
             }
             
