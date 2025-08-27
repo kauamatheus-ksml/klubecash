@@ -244,6 +244,7 @@ try {
                                 </th>
                                 <th>Usuário</th>
                                 <th>Tipo/Subtipo</th>
+                                <th>MVP</th>
                                 <th>Loja Vinculada</th>
                                 <th>Status</th>
                                 <th>Cadastro</th>
@@ -254,7 +255,7 @@ try {
                         <tbody>
                             <?php if (empty($users)): ?>
                                 <tr>
-                                    <td colspan="8" class="no-data">
+                                    <td colspan="9" class="no-data">
                                         <div class="no-data-content">
                                             <i class="fas fa-users"></i>
                                             <h4>Nenhum usuário encontrado</h4>
@@ -309,6 +310,19 @@ try {
                                                 }
                                                 ?>
                                             </span>
+                                        </td>
+                                        <td>
+                                            <?php if ($user['tipo'] === 'loja'): ?>
+                                                <?php if (isset($user['mvp']) && $user['mvp'] === 'sim'): ?>
+                                                    <span class="badge badge-warning">
+                                                        <i class="fas fa-star"></i> MVP
+                                                    </span>
+                                                <?php else: ?>
+                                                    <span class="text-muted">-</span>
+                                                <?php endif; ?>
+                                            <?php else: ?>
+                                                <span class="text-muted">-</span>
+                                            <?php endif; ?>
                                         </td>
                                         <td>
                                             <?php if ($user['tipo'] === 'funcionario' && !empty($user['nome_loja_vinculada'])): ?>
@@ -492,6 +506,22 @@ try {
                                 <option value="inativo">Inativo</option>
                                 <option value="bloqueado">Bloqueado</option>
                             </select>
+                        </div>
+                    </div>
+
+                    <!-- Campo MVP - só aparece para usuários tipo Loja -->
+                    <div class="form-row" id="mvpFieldGroup" style="display: none;">
+                        <div class="form-group">
+                            <label class="form-label" for="userMvp">
+                                <i class="fas fa-star text-warning"></i> Status MVP
+                            </label>
+                            <select class="form-select" id="userMvp" name="mvp">
+                                <option value="nao">Não</option>
+                                <option value="sim">Sim</option>
+                            </select>
+                            <small class="form-text text-muted">
+                                Lojas MVP têm privilégios especiais na plataforma
+                            </small>
                         </div>
                     </div>
 

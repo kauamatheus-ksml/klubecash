@@ -238,6 +238,12 @@ function handleUserTypeChange(type) {
     const emailContainer = document.getElementById('emailSelectContainer');
     const emailInput = document.getElementById('userEmail');
     const storeFields = document.getElementById('storeDataFields');
+    const mvpFieldGroup = document.getElementById('mvpFieldGroup');
+    
+    // Mostrar/ocultar campo MVP apenas para lojas
+    if (mvpFieldGroup) {
+        mvpFieldGroup.style.display = isStore ? 'block' : 'none';
+    }
     
     if (isStore && !isEditMode) {
         // Mostrar seleção de loja
@@ -322,10 +328,12 @@ function clearStoreFields() {
     const storeNameInput = document.getElementById('storeName');
     const storeDocumentInput = document.getElementById('storeDocument');
     const storeCategoryInput = document.getElementById('storeCategory');
+    const mvpInput = document.getElementById('userMvp');
     
     if (emailInput) emailInput.value = '';
     if (nameInput) nameInput.value = '';
     if (phoneInput) phoneInput.value = '';
+    if (mvpInput) mvpInput.value = 'nao';
     if (storeNameInput) storeNameInput.value = '';
     if (storeDocumentInput) storeDocumentInput.value = '';
     if (storeCategoryInput) storeCategoryInput.value = '';
@@ -343,6 +351,7 @@ function resetStoreFields() {
     const emailContainer = document.getElementById('emailSelectContainer');
     const emailInput = document.getElementById('userEmail');
     const storeFields = document.getElementById('storeDataFields');
+    const mvpFieldGroup = document.getElementById('mvpFieldGroup');
     
     if (emailContainer) emailContainer.style.display = 'none';
     if (emailInput) {
@@ -351,6 +360,7 @@ function resetStoreFields() {
         emailInput.readOnly = false;
     }
     if (storeFields) storeFields.style.display = 'none';
+    if (mvpFieldGroup) mvpFieldGroup.style.display = 'none';
     
     clearStoreFields();
     isStoreUser = false;
@@ -484,6 +494,14 @@ function fillUserForm(userData) {
     if (userData.telefone) {
         document.getElementById('userPhone').value = userData.telefone;
     }
+    
+    // Campo MVP (apenas para lojas)
+    if (userData.tipo === 'loja' && userData.mvp) {
+        document.getElementById('userMvp').value = userData.mvp;
+    }
+    
+    // Mostrar/ocultar campo MVP baseado no tipo
+    handleUserTypeChange(userData.tipo);
     
     // Limpar campo de senha
     document.getElementById('userPassword').value = '';
