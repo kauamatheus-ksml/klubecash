@@ -905,20 +905,7 @@ try {
                     </div>
                 <?php endif; ?>
                 
-                <div class="hero-stats">
-                    <div class="stat-item">
-                        <span class="stat-number">10k+</span>
-                        <span class="stat-label">Membros Ativos</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-number">R$ 2M</span>
-                        <span class="stat-label">Cashback Distribuído</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-number">500+</span>
-                        <span class="stat-label">Lojas Parceiras</span>
-                    </div>
-                </div>
+                
             </div>
         </section>
 
