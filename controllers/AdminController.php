@@ -939,12 +939,23 @@ public static function manageStoresWithBalance($filters = [], $page = 1) {
             }
             
             // MVP (apenas para usuários tipo loja)
-            if (isset($data['mvp']) && !empty($data['mvp'])) {
+            // Debug: verificar se campo MVP está sendo recebido
+            error_log("DEBUG MVP - Campo mvp recebido: " . (isset($data['mvp']) ? $data['mvp'] : 'NÃO DEFINIDO'));
+            
+            if (isset($data['mvp'])) {
                 $validMvp = ['sim', 'nao'];
                 if (in_array($data['mvp'], $validMvp)) {
                     $updateFields[] = "mvp = :mvp";
                     $params[':mvp'] = $data['mvp'];
+                    error_log("DEBUG MVP - Campo MVP atualizado para: " . $data['mvp']);
+                } else {
+                    // Se valor inválido, definir como 'nao' (padrão)
+                    $updateFields[] = "mvp = :mvp";
+                    $params[':mvp'] = 'nao';
+                    error_log("DEBUG MVP - Valor inválido, definido como: nao");
                 }
+            } else {
+                error_log("DEBUG MVP - Campo MVP não foi enviado no formulário");
             }
             
             // Senha (opcional) - só incluir se foi fornecida e não está vazia

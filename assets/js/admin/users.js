@@ -737,7 +737,17 @@ function submitUserForm(event) {
     for (let [key, value] of formData.entries()) {
         if (key !== 'id') {
             data.append(key, value);
+            // Debug: verificar se campo MVP está sendo enviado
+            if (key === 'mvp') {
+                console.log('Campo MVP sendo enviado:', value);
+            }
         }
+    }
+    
+    // Debug: mostrar todos os dados que estão sendo enviados
+    console.log('Dados sendo enviados para o servidor:');
+    for (let [key, value] of data.entries()) {
+        console.log(key + ':', value);
     }
     
     const url = isEditing ? '/controllers/AdminController.php' : '/controllers/AuthController.php';
