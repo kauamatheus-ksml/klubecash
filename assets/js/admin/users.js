@@ -241,15 +241,17 @@ function handleUserTypeChange(type) {
     const mvpFieldGroup = document.getElementById('mvpFieldGroup');
     
     // Mostrar/ocultar campo MVP apenas para lojas
+    console.log('handleUserTypeChange - tipo:', type, 'isStore:', isStore, 'isEditMode:', isEditMode);
     if (mvpFieldGroup) {
         mvpFieldGroup.style.display = isStore ? 'block' : 'none';
-        console.log('Campo MVP definido como:', isStore ? 'visível' : 'oculto', 'para tipo:', type);
+        console.log('Campo MVP definido como:', isStore ? 'visível (block)' : 'oculto (none)', 'para tipo:', type);
+        console.log('Elemento mvpFieldGroup encontrado:', mvpFieldGroup);
     } else {
-        console.log('Elemento mvpFieldGroup não encontrado!');
+        console.log('ERRO: Elemento mvpFieldGroup não encontrado no DOM!');
     }
     
     if (isStore && !isEditMode) {
-        // Mostrar seleção de loja
+        // Mostrar seleção de loja (novo usuário)
         if (emailContainer) emailContainer.style.display = 'block';
         if (emailInput) emailInput.style.display = 'none';
         if (storeFields) storeFields.style.display = 'block';
@@ -259,8 +261,17 @@ function handleUserTypeChange(type) {
         if (availableStores.length === 0) {
             loadAvailableStores();
         }
+    } else if (isStore && isEditMode) {
+        // Para edição de loja, manter campos normais mas mostrar MVP
+        if (emailContainer) emailContainer.style.display = 'none';
+        if (emailInput) {
+            emailInput.style.display = 'block';
+            emailInput.required = true;
+            emailInput.readOnly = false;
+        }
+        if (storeFields) storeFields.style.display = 'none';
     } else {
-        // Mostrar input normal
+        // Mostrar input normal para outros tipos
         resetStoreFields();
     }
 }
@@ -423,8 +434,9 @@ function hideUserModal() {
 function editUser(userId) {
     if (!userId) return;
     
-    currentUserId = userId;
+    // IMPORTANTE: Definir isEditMode logo no início
     isEditMode = true;
+    currentUserId = userId;
     
     const modal = document.getElementById('userModal');
     const title = document.getElementById('userModalTitle');
@@ -488,9 +500,11 @@ function editUser(userId) {
  */
 function fillUserForm(userData) {
     // Debug: verificar se dados MVP estão chegando
+    console.log('=== fillUserForm chamada ===');
     console.log('Dados do usuário recebidos:', userData);
     console.log('Tipo do usuário:', userData.tipo);
     console.log('MVP do usuário:', userData.mvp);
+    console.log('isEditMode atual:', isEditMode);
     
     document.getElementById('userId').value = userData.id;
     document.getElementById('userName').value = userData.nome;
@@ -508,6 +522,9 @@ function fillUserForm(userData) {
         // Definir valor MVP (padrão 'nao' se não existir)
         mvpSelect.value = userData.mvp || 'nao';
     }
+    
+    // Importante: definir isEditMode antes de chamar handleUserTypeChange
+    isEditMode = true;
     
     // Mostrar/ocultar campo MVP baseado no tipo
     handleUserTypeChange(userData.tipo);
