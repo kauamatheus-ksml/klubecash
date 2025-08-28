@@ -3,7 +3,8 @@
     "allow": [
       "Bash(cp:*)",
       "Bash(php:*)",
-      "Bash(del test_mvp.php)"
+      "Bash(del test_mvp.php)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []

@@ -882,26 +882,52 @@ class TransactionController {
                 return ['status' => false, 'message' => 'Cliente não encontrado ou inativo.'];
             }
             
-            // Verificar se a loja existe e está aprovada, incluindo status MVP
-            $storeStmt = $db->prepare("
-                SELECT l.*, u.mvp as store_mvp 
-                FROM lojas l 
-                JOIN usuarios u ON l.usuario_id = u.id 
-                WHERE l.id = :loja_id AND l.status = :status
-            ");
-            $storeStmt->bindParam(':loja_id', $data['loja_id']);
-            $statusAprovado = STORE_APPROVED;
-            $storeStmt->bindParam(':status', $statusAprovado);
-            $storeStmt->execute();
-            $store = $storeStmt->fetch(PDO::FETCH_ASSOC);
+            // Verificar se a loja existe e está aprovada
+            $isStoreMvp = false; // Default para não-MVP
+            
+            try {
+                // Tentar query com campo MVP primeiro
+                $storeStmt = $db->prepare("
+                    SELECT l.*, 
+                           COALESCE(u.mvp, 'nao') as store_mvp 
+                    FROM lojas l 
+                    JOIN usuarios u ON l.usuario_id = u.id 
+                    WHERE l.id = :loja_id AND l.status = :status
+                ");
+                $storeStmt->bindParam(':loja_id', $data['loja_id']);
+                $statusAprovado = STORE_APPROVED;
+                $storeStmt->bindParam(':status', $statusAprovado);
+                $storeStmt->execute();
+                $store = $storeStmt->fetch(PDO::FETCH_ASSOC);
+                
+                if ($store) {
+                    $isStoreMvp = (isset($store['store_mvp']) && $store['store_mvp'] === 'sim');
+                }
+                
+            } catch (PDOException $e) {
+                // Se falhar (campo MVP não existe), usar query básica
+                error_log("MVP FIELD ERROR: " . $e->getMessage() . " - Usando query básica");
+                
+                $storeStmt = $db->prepare("
+                    SELECT l.*
+                    FROM lojas l 
+                    WHERE l.id = :loja_id AND l.status = :status
+                ");
+                $storeStmt->bindParam(':loja_id', $data['loja_id']);
+                $statusAprovado = STORE_APPROVED;
+                $storeStmt->bindParam(':status', $statusAprovado);
+                $storeStmt->execute();
+                $store = $storeStmt->fetch(PDO::FETCH_ASSOC);
+                
+                $isStoreMvp = false; // Campo MVP não existe, então não é MVP
+            }
             
             if (!$store) {
                 return ['status' => false, 'message' => 'Loja não encontrada ou não aprovada.'];
             }
             
-            // Verificar se a loja é MVP para aprovação automática
-            $isStoreMvp = ($store['store_mvp'] === 'sim');
-            error_log("MVP CHECK: Loja ID {$data['loja_id']} - MVP: " . ($isStoreMvp ? 'SIM' : 'NÃO'));
+            // Log de debug
+            error_log("MVP CHECK: Loja ID {$data['loja_id']} - MVP: " . ($isStoreMvp ? 'SIM' : 'NÃO') . " (store_mvp: " . ($store['store_mvp'] ?? 'NULL') . ")");
             
             // Verificar se o valor da transação é válido
             if (!is_numeric($data['valor_total']) || $data['valor_total'] <= 0) {

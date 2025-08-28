@@ -13,7 +13,8 @@ try {
     echo "<tr style='background: #f0f0f0;'><th>ID Loja</th><th>Nome da Loja</th><th>Email</th><th>Status MVP</th><th>Status Loja</th></tr>";
     
     $query = "
-        SELECT l.id, l.nome_fantasia, u.email, u.mvp, l.status
+        SELECT l.id, l.nome_fantasia, u.email, 
+               COALESCE(u.mvp, 'nao') as mvp, l.status
         FROM lojas l 
         JOIN usuarios u ON l.usuario_id = u.id 
         ORDER BY l.id ASC
@@ -28,12 +29,20 @@ try {
         $storeStatus = $store['status'] === 'aprovado' ? '✅ Aprovado' : '⏳ ' . ucfirst($store['status']);
         $rowColor = $store['mvp'] === 'sim' ? 'background: #fff3cd;' : '';
         
+        // Truncar texto longo para melhor visualização
+        $nomeExibir = strlen($store['nome_fantasia']) > 30 ? 
+                     substr($store['nome_fantasia'], 0, 30) . '...' : 
+                     $store['nome_fantasia'];
+        $emailExibir = strlen($store['email']) > 35 ? 
+                      substr($store['email'], 0, 35) . '...' : 
+                      $store['email'];
+        
         echo "<tr style='{$rowColor}'>";
-        echo "<td>{$store['id']}</td>";
-        echo "<td>{$store['nome_fantasia']}</td>";
-        echo "<td>{$store['email']}</td>";
-        echo "<td>{$mvpStatus}</td>";
-        echo "<td>{$storeStatus}</td>";
+        echo "<td style='text-align: center;'>{$store['id']}</td>";
+        echo "<td title='{$store['nome_fantasia']}'>{$nomeExibir}</td>";
+        echo "<td title='{$store['email']}'><small>{$emailExibir}</small></td>";
+        echo "<td style='text-align: center;'>{$mvpStatus}</td>";
+        echo "<td style='text-align: center;'>{$storeStatus}</td>";
         echo "</tr>";
     }
     echo "</table>";
