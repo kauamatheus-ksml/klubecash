@@ -190,8 +190,11 @@ class CashbackBalance {
             
             error_log("CASHBACK: Saldo atual: {$currentBalance}, Novo saldo: {$newBalance}");
             
-            // Iniciar transação do banco de dados
-            $this->db->beginTransaction();
+            // Verificar se já existe transação ativa para evitar transações aninhadas
+            $useOwnTransaction = !$this->db->inTransaction();
+            if ($useOwnTransaction) {
+                $this->db->beginTransaction();
+            }
             
             // 1. Atualizar/inserir saldo usando INSERT ON DUPLICATE KEY UPDATE
             // Esta técnica permite criar um novo registro ou atualizar um existente
@@ -208,7 +211,9 @@ class CashbackBalance {
             $balanceResult = $balanceStmt->execute([$userId, $storeId, $amount, $amount]);
             
             if (!$balanceResult) {
-                $this->db->rollBack();
+                if ($useOwnTransaction) {
+                    $this->db->rollBack();
+                }
                 error_log("CASHBACK: Erro ao atualizar saldo");
                 return false;
             }
@@ -235,19 +240,23 @@ class CashbackBalance {
             ]);
             
             if (!$movResult) {
-                $this->db->rollBack();
+                if ($useOwnTransaction) {
+                    $this->db->rollBack();
+                }
                 error_log("CASHBACK: Erro ao registrar movimentação");
                 return false;
             }
             
-            // Commit da transação
-            $this->db->commit();
+            // Commit da transação (apenas se for transação própria)
+            if ($useOwnTransaction) {
+                $this->db->commit();
+            }
             error_log("CASHBACK: Saldo creditado com sucesso - Novo saldo: {$newBalance}");
             return true;
             
         } catch (Exception $e) {
-            // Rollback em caso de erro
-            if ($this->db->inTransaction()) {
+            // Rollback em caso de erro (apenas se for transação própria)
+            if (isset($useOwnTransaction) && $useOwnTransaction && $this->db->inTransaction()) {
                 $this->db->rollBack();
             }
             error_log('CASHBACK: Erro ao adicionar saldo: ' . $e->getMessage());

@@ -848,6 +848,7 @@ class TransactionController {
     * @return array Resultado da operação
     */
     public static function registerTransaction($data) {
+        error_log("REGISTER_TRANSACTION: Início da função");
         try {
             // Validar dados obrigatórios
             $requiredFields = ['loja_id', 'usuario_id', 'valor_total', 'codigo_transacao'];
@@ -857,16 +858,22 @@ class TransactionController {
                 }
             }
             
+            error_log("REGISTER_TRANSACTION: Campos validados");
+            
             // Verificar se o usuário está autenticado e é loja ou admin
             if (!AuthController::isAuthenticated()) {
+                error_log("REGISTER_TRANSACTION: Usuário não autenticado");
                 return ['status' => false, 'message' => 'Usuário não autenticado.'];
             }
             
             if (!AuthController::isStore() && !AuthController::isAdmin()) {
+                error_log("REGISTER_TRANSACTION: Tipo de usuário não autorizado");
                 return ['status' => false, 'message' => 'Apenas lojas e administradores podem registrar transações.'];
             }
             
+            error_log("REGISTER_TRANSACTION: Autenticação OK, conectando ao banco");
             $db = Database::getConnection();
+            error_log("REGISTER_TRANSACTION: Conexão com banco estabelecida");
             
             // Verificar se o cliente existe
             $userStmt = $db->prepare("SELECT id, nome, email FROM usuarios WHERE id = :usuario_id AND tipo = :tipo AND status = :status");
@@ -1142,34 +1149,7 @@ class TransactionController {
                     error_log("[TRACE] TransactionController::registerTransaction() - Processo de notificação concluído para ID: {$transactionId}", 3, 'integration_trace.log');
                 }
                 
-                // 🎯 MVP: Processar cashback instantaneamente para lojas MVP
-                if ($isStoreMvp && $valorCashbackCliente > 0) {
-                    error_log("MVP CASHBACK: Processando cashback instantâneo para loja MVP - Valor: R$ {$valorCashbackCliente}");
-                    
-                    // Creditar cashback imediatamente
-                    $descricaoCashback = "Cashback MVP - Compra aprovada instantaneamente - Código: " . $data['codigo_transacao'];
-                    $creditResult = $balanceModel->addBalance(
-                        $data['usuario_id'], 
-                        $data['loja_id'], 
-                        $valorCashbackCliente, 
-                        $descricaoCashback, 
-                        $transactionId
-                    );
-                    
-                    if ($creditResult) {
-                        error_log("MVP CASHBACK: Cashback creditado com sucesso - R$ {$valorCashbackCliente} para usuário {$data['usuario_id']}");
-                        
-                        // Criar notificação especial para MVP
-                        self::createNotification(
-                            $data['usuario_id'],
-                            'Cashback MVP Creditado! 🎉',
-                            "Seu cashback de R$ " . number_format($valorCashbackCliente, 2, ',', '.') . " foi creditado instantaneamente! Loja MVP: " . $store['nome_fantasia'],
-                            'success'
-                        );
-                    } else {
-                        error_log("MVP CASHBACK: ERRO ao creditar cashback para usuário {$data['usuario_id']}");
-                    }
-                }
+                // MVP será processado APÓS o commit para evitar transações aninhadas
                 
                 // CORREÇÃO 5: Se usou saldo, debitar do saldo do cliente IMEDIATAMENTE
                 if ($usarSaldo && $valorSaldoUsado > 0) {
@@ -1181,7 +1161,9 @@ class TransactionController {
                     
                     if (!$debitResult) {
                         // Se falhou ao debitar saldo, reverter transação
-                        $db->rollBack();
+                        if ($db->inTransaction()) {
+                            $db->rollBack();
+                        }
                         error_log("REGISTRO: FALHA ao debitar saldo - revertendo transação");
                         return ['status' => false, 'message' => 'Erro ao debitar saldo do cliente. Transação cancelada.'];
                     }
@@ -1263,16 +1245,16 @@ class TransactionController {
                         
                         // Buscar o telefone do cliente que fez a compra
                         $userStmt = $db->prepare("SELECT telefone, nome FROM usuarios WHERE id = ?");
-                        $userStmt->execute([$userId]);
+                        $userStmt->execute([$data['usuario_id']]);
                         $userData = $userStmt->fetch(PDO::FETCH_ASSOC);
                         
                         // Verificar se o cliente tem WhatsApp cadastrado
                         if ($userData && !empty($userData['telefone'])) {
                             // Preparar as informações da transação para a mensagem WhatsApp
                             $whatsappData = [
-                                'valor_cashback' => $valor, // Valor do cashback desta transação
-                                'valor_usado' => $valorUsado ?? 0, // Valor usado do saldo (se aplicável)
-                                'nome_loja' => $nomeLoja // Nome da loja onde a compra foi realizada
+                                'valor_cashback' => $valorCashbackCliente, // Valor do cashback desta transação
+                                'valor_usado' => $valorSaldoUsado ?? 0, // Valor usado do saldo (se aplicável)
+                                'nome_loja' => $store['nome_fantasia'] // Nome da loja onde a compra foi realizada
                             ];
                             
                             // Enviar a notificação via WhatsApp usando nosso template específico
@@ -1317,6 +1299,35 @@ class TransactionController {
                 // Confirmar transação
                 $db->commit();
                 
+                // 🎯 MVP: Processar cashback instantaneamente APÓS commit para evitar transações aninhadas
+                if ($isStoreMvp && $valorCashbackCliente > 0) {
+                    error_log("MVP CASHBACK: Processando cashback instantâneo para loja MVP - Valor: R$ {$valorCashbackCliente}");
+                    
+                    // Creditar cashback imediatamente
+                    $descricaoCashback = "Cashback MVP - Compra aprovada instantaneamente - Código: " . $data['codigo_transacao'];
+                    $creditResult = $balanceModel->addBalance(
+                        $data['usuario_id'], 
+                        $data['loja_id'], 
+                        $valorCashbackCliente, 
+                        $descricaoCashback, 
+                        $transactionId
+                    );
+                    
+                    if ($creditResult) {
+                        error_log("MVP CASHBACK: Cashback creditado com sucesso - R$ {$valorCashbackCliente} para usuário {$data['usuario_id']}");
+                        
+                        // Criar notificação especial para MVP
+                        self::createNotification(
+                            $data['usuario_id'],
+                            'Cashback MVP Creditado! 🎉',
+                            "Seu cashback de R$ " . number_format($valorCashbackCliente, 2, ',', '.') . " foi creditado instantaneamente! Loja MVP: " . $store['nome_fantasia'],
+                            'success'
+                        );
+                    } else {
+                        error_log("MVP CASHBACK: ERRO ao creditar cashback para usuário {$data['usuario_id']}");
+                    }
+                }
+                
                 return [
                     'status' => true, 
                     'message' => $successMessage,
@@ -1347,8 +1358,9 @@ class TransactionController {
                 $db->rollBack();
             }
             
-            error_log('Erro ao registrar transação: ' . $e->getMessage());
-            return ['status' => false, 'message' => 'Erro ao registrar transação. Tente novamente.'];
+            error_log('Erro PDO ao registrar transação: ' . $e->getMessage() . ' - Arquivo: ' . $e->getFile() . ' - Linha: ' . $e->getLine());
+            error_log('Stack trace: ' . $e->getTraceAsString());
+            return ['status' => false, 'message' => 'Erro PDO: ' . $e->getMessage()];
         }
     }
     
