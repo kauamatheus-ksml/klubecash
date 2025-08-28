@@ -117,8 +117,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     error_log("[TRACE] register-transaction.php - Dados enviados: " . json_encode($transactionData), 3, '../../integration_trace.log');
                 }
                 
-                // Registrar transação
-                $result = TransactionController::registerTransaction($transactionData);
+                // Registrar transação usando versão corrigida
+                $result = TransactionController::registerTransactionFixed($transactionData);
                 
                 // === TRACE: RESULTADO DA CHAMADA ===
                 if (file_exists('../../trace-integration.php')) {

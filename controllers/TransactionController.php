@@ -1227,8 +1227,8 @@ class TransactionController {
                     //     'info'
                     // );
                 }
-                // INTEGRAÇÃO WHATSAPP: Temporariamente desabilitada para debug
-                if (false && defined('WHATSAPP_ENABLED') && WHATSAPP_ENABLED) {
+                // INTEGRAÇÃO WHATSAPP: Com tratamento de erro aprimorado
+                if (defined('WHATSAPP_ENABLED') && WHATSAPP_ENABLED) {
                     try {
                         // Carregar as classes necessárias para WhatsApp
                         if (!class_exists('WhatsAppBot')) {
@@ -1258,10 +1258,11 @@ class TransactionController {
                             // O resultado será automaticamente registrado em nosso sistema de logs
                             // Você poderá acompanhar o sucesso ou falha na interface de monitoramento
                         }
-                    } catch (Exception $e) {
-                        // Qualquer erro será registrado sem interromper o processamento da transação
-                        // Isso garante que o sistema principal continue funcionando mesmo se houver problema com WhatsApp
-                        error_log("WhatsApp Nova Transação - Erro: " . $e->getMessage());
+                    } catch (Throwable $e) {
+                        // Capturar TODOS os tipos de erro (Exception, Error, etc.) sem interromper a transação
+                        // Isso garante que o sistema principal continue funcionando mesmo se houver problema crítico com WhatsApp
+                        error_log("WhatsApp Nova Transação - Erro crítico: " . $e->getMessage() . " em " . $e->getFile() . ":" . $e->getLine());
+                        // Não relançar a exceção para não afetar o fluxo principal
                     }
                 }
                 // Enviar email para o cliente (opcional, pode remover se não quiser)
@@ -1350,9 +1351,179 @@ class TransactionController {
                 $db->rollBack();
             }
             
-            error_log('Erro GERAL ao registrar transação: ' . $e->getMessage() . ' - Arquivo: ' . $e->getFile() . ' - Linha: ' . $e->getLine());
-            error_log('Stack trace: ' . $e->getTraceAsString());
+            error_log('ERRO CAPTURADO na registerTransaction: ' . $e->getMessage());
+            error_log('Arquivo: ' . $e->getFile() . ' - Linha: ' . $e->getLine());
+            error_log('Stack trace completo: ' . $e->getTraceAsString());
+            
+            // Se for o erro específico de transação, vamos dar mais detalhes
+            if (strpos($e->getMessage(), 'There is no active transaction') !== false) {
+                error_log('PROBLEMA DE TRANSAÇÃO DETECTADO - Investigando origem...');
+                error_log('Estado atual do DB: inTransaction = ' . ($db->inTransaction() ? 'SIM' : 'NÃO'));
+            }
+            
             return ['status' => false, 'message' => 'Erro: ' . $e->getMessage()];
+        }
+    }
+    
+    /**
+     * Versão limpa e funcional do registro de transações com funcionalidade MVP
+     */
+    public static function registerTransactionFixed($data) {
+        try {
+            // Validar dados obrigatórios
+            $requiredFields = ['loja_id', 'usuario_id', 'valor_total', 'codigo_transacao'];
+            foreach ($requiredFields as $field) {
+                if (!isset($data[$field]) || empty($data[$field])) {
+                    return ['status' => false, 'message' => 'Dados da transação incompletos. Campo faltante: ' . $field];
+                }
+            }
+            
+            // Verificar autenticação
+            if (!AuthController::isAuthenticated()) {
+                return ['status' => false, 'message' => 'Usuário não autenticado.'];
+            }
+            
+            if (!AuthController::isStore() && !AuthController::isAdmin()) {
+                return ['status' => false, 'message' => 'Apenas lojas e administradores podem registrar transações.'];
+            }
+            
+            $db = Database::getConnection();
+            
+            // Verificar cliente
+            $userStmt = $db->prepare("SELECT id, nome, email FROM usuarios WHERE id = ? AND tipo = ? AND status = ?");
+            $userStmt->execute([$data['usuario_id'], USER_TYPE_CLIENT, USER_ACTIVE]);
+            $user = $userStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$user) {
+                return ['status' => false, 'message' => 'Cliente não encontrado ou inativo.'];
+            }
+            
+            // Verificar loja e MVP
+            $storeStmt = $db->prepare("
+                SELECT l.*, COALESCE(u.mvp, 'nao') as store_mvp 
+                FROM lojas l 
+                JOIN usuarios u ON l.usuario_id = u.id 
+                WHERE l.id = ? AND l.status = ?
+            ");
+            $storeStmt->execute([$data['loja_id'], STORE_APPROVED]);
+            $store = $storeStmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$store) {
+                return ['status' => false, 'message' => 'Loja não encontrada ou não aprovada.'];
+            }
+            
+            $isStoreMvp = ($store['store_mvp'] === 'sim');
+            
+            // Validar valor
+            if (!is_numeric($data['valor_total']) || $data['valor_total'] <= 0) {
+                return ['status' => false, 'message' => 'Valor da transação inválido.'];
+            }
+            
+            if ($data['valor_total'] < MIN_TRANSACTION_VALUE) {
+                return ['status' => false, 'message' => 'Valor mínimo para transação é R$ ' . number_format(MIN_TRANSACTION_VALUE, 2, ',', '.')];
+            }
+            
+            // Verificar código duplicado
+            $checkStmt = $db->prepare("SELECT id FROM transacoes_cashback WHERE codigo_transacao = ? AND loja_id = ?");
+            $checkStmt->execute([$data['codigo_transacao'], $data['loja_id']]);
+            
+            if ($checkStmt->rowCount() > 0) {
+                return ['status' => false, 'message' => 'Já existe uma transação com este código.'];
+            }
+            
+            // Calcular cashback
+            $valorCashbackTotal = ($data['valor_total'] * DEFAULT_CASHBACK_TOTAL) / 100;
+            $valorCashbackCliente = ($data['valor_total'] * DEFAULT_CASHBACK_CLIENT) / 100;
+            $valorCashbackAdmin = ($data['valor_total'] * DEFAULT_CASHBACK_ADMIN) / 100;
+            $valorLoja = 0.00;
+            
+            // Definir status - MVP é aprovado automaticamente
+            $transactionStatus = $isStoreMvp ? TRANSACTION_APPROVED : TRANSACTION_PENDING;
+            
+            // Preparar dados
+            $descricao = isset($data['descricao']) ? $data['descricao'] : 'Compra na ' . $store['nome_fantasia'];
+            $dataTransacao = isset($data['data_transacao']) ? $data['data_transacao'] : date('Y-m-d H:i:s');
+            
+            // Inserir transação
+            $db->beginTransaction();
+            
+            $insertStmt = $db->prepare("
+                INSERT INTO transacoes_cashback (
+                    usuario_id, loja_id, valor_total, valor_cashback,
+                    valor_cliente, valor_admin, valor_loja, codigo_transacao,
+                    data_transacao, status, descricao
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ");
+            
+            $result = $insertStmt->execute([
+                $data['usuario_id'],
+                $data['loja_id'],
+                $data['valor_total'],
+                $valorCashbackTotal,
+                $valorCashbackCliente,
+                $valorCashbackAdmin,
+                $valorLoja,
+                $data['codigo_transacao'],
+                $dataTransacao,
+                $transactionStatus,
+                $descricao
+            ]);
+            
+            if (!$result) {
+                if ($db->inTransaction()) {
+                    $db->rollBack();
+                }
+                return ['status' => false, 'message' => 'Falha ao inserir transação no banco.'];
+            }
+            
+            $transactionId = $db->lastInsertId();
+            
+            // Commit
+            $db->commit();
+            
+            // Mensagem de sucesso
+            $successMessage = $isStoreMvp ? 
+                '🎉 Transação MVP aprovada instantaneamente! Cashback creditado automaticamente.' :
+                'Transação registrada com sucesso!';
+            
+            // Se MVP, creditar cashback
+            $cashbackCreditado = false;
+            if ($isStoreMvp && $valorCashbackCliente > 0) {
+                require_once __DIR__ . '/../models/CashbackBalance.php';
+                $balanceModel = new CashbackBalance();
+                $descricaoCashback = "Cashback MVP instantâneo - Código: " . $data['codigo_transacao'];
+                
+                $creditResult = $balanceModel->addBalance(
+                    $data['usuario_id'],
+                    $data['loja_id'],
+                    $valorCashbackCliente,
+                    $descricaoCashback,
+                    $transactionId
+                );
+                
+                $cashbackCreditado = $creditResult;
+            }
+            
+            return [
+                'status' => true,
+                'message' => $successMessage,
+                'data' => [
+                    'transaction_id' => $transactionId,
+                    'valor_original' => $data['valor_total'],
+                    'valor_cashback' => $valorCashbackCliente,
+                    'is_mvp' => $isStoreMvp,
+                    'status_transacao' => $transactionStatus,
+                    'cashback_creditado' => $cashbackCreditado
+                ]
+            ];
+            
+        } catch (Exception $e) {
+            if (isset($db) && $db->inTransaction()) {
+                $db->rollBack();
+            }
+            
+            error_log('Erro em registerTransactionFixed: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro ao registrar transação. Tente novamente.'];
         }
     }
     
@@ -1616,7 +1787,9 @@ class TransactionController {
                     ]
                 ];
             } else {
-                $db->rollBack();
+                if ($db->inTransaction()) {
+                    $db->rollBack();
+                }
                 return [
                     'status' => false,
                     'message' => "Processamento concluído com erros. Nenhuma transação foi registrada.",
@@ -2167,7 +2340,9 @@ class TransactionController {
             $payment = $stmt->fetch(PDO::FETCH_ASSOC);
             
             if (!$payment) {
-                $db->rollBack();
+                if ($db->inTransaction()) {
+                    $db->rollBack();
+                }
                 return ['status' => false, 'message' => 'Pagamento não encontrado ou já processado'];
             }
             
@@ -2188,7 +2363,9 @@ class TransactionController {
             $transactions = $transactionsStmt->fetchAll(PDO::FETCH_ASSOC);
             
             if (empty($transactions)) {
-                $db->rollBack();
+                if ($db->inTransaction()) {
+                    $db->rollBack();
+                }
                 return ['status' => false, 'message' => 'Nenhuma transação encontrada para este pagamento'];
             }
             
@@ -2303,7 +2480,7 @@ class TransactionController {
             ];
             
         } catch (Exception $e) {
-            if (isset($db)) {
+            if (isset($db) && $db->inTransaction()) {
                 $db->rollBack();
             }
             error_log("Erro ao aprovar pagamento automaticamente: " . $e->getMessage());
