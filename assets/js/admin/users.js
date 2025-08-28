@@ -1,5 +1,4 @@
-// assets/js/admin/users.js - Sistema Profissional de Gerenciamento de Usuários
-// Compatível com a nova interface users_new.php
+// assets/js/admin/users.js
 
 // Variáveis globais
 let currentUserId = null;
@@ -7,18 +6,10 @@ let selectedUsers = [];
 let availableStores = [];
 let isStoreUser = false;
 let isEditMode = false;
-let currentPage = 1;
-let totalPages = 1;
-let currentFilters = {};
-let visibleColumns = new Set(['select', 'id', 'nome', 'email', 'tipo', 'status', 'data_criacao', 'acoes']);
-
-// Toast notification system
-let toastContainer = null;
 
 // Inicialização quando o DOM estiver carregado
 document.addEventListener('DOMContentLoaded', function() {
     initializeUserManagement();
-    createToastContainer();
 });
 
 /**
@@ -34,77 +25,36 @@ function initializeUserManagement() {
     // Event listeners para modais
     setupModalListeners();
     
-    // Event listeners para tabela
-    setupTableListeners();
-    
-    // Event listeners para paginação
-    setupPaginationListeners();
-    
-    // Event listeners para ações em massa
-    setupBulkActionListeners();
-    
-    // Configurar controles de coluna
-    setupColumnControls();
-    
     // Carregar lojas disponíveis
     loadAvailableStores();
     
     // Configurar máscaras de input
     setupInputMasks();
-    
-    // Configurar validação de senha
-    setupPasswordValidation();
-    
-    // Carregar estatísticas
-    loadStatistics();
-    
-    // Configurar filtros avançados
-    setupAdvancedFilters();
 }
 
 /**
  * Configura os event listeners para filtros
  */
 function setupFilterListeners() {
-    const basicSearch = document.getElementById('basicSearch');
-    const tipoFilter = document.getElementById('filterTipo');
-    const statusFilter = document.getElementById('filterStatus');
-    const advancedToggle = document.getElementById('toggleAdvanced');
+    const tipoFilter = document.getElementById('tipoFilter');
+    const statusFilter = document.getElementById('statusFilter');
+    const searchInput = document.getElementById('searchInput');
     
-    // Busca básica
-    if (basicSearch) {
-        let searchTimeout;
-        basicSearch.addEventListener('input', function() {
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => {
-                currentFilters.search = this.value.trim();
-                applyFilters();
-            }, 500);
-        });
-    }
-    
-    // Filtros básicos
     if (tipoFilter) {
-        tipoFilter.addEventListener('change', function() {
-            currentFilters.tipo = this.value;
-            applyFilters();
-        });
+        tipoFilter.addEventListener('change', applyFilters);
     }
     
     if (statusFilter) {
-        statusFilter.addEventListener('change', function() {
-            currentFilters.status = this.value;
-            applyFilters();
+        statusFilter.addEventListener('change', applyFilters);
+    }
+    
+    if (searchInput) {
+        let searchTimeout;
+        searchInput.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(applyFilters, 500);
         });
     }
-    
-    // Toggle filtros avançados
-    if (advancedToggle) {
-        advancedToggle.addEventListener('click', toggleAdvancedFilters);
-    }
-    
-    // Filtros avançados
-    setupAdvancedFilterListeners();
 }
 
 /**
@@ -288,20 +238,9 @@ function handleUserTypeChange(type) {
     const emailContainer = document.getElementById('emailSelectContainer');
     const emailInput = document.getElementById('userEmail');
     const storeFields = document.getElementById('storeDataFields');
-    const mvpFieldGroup = document.getElementById('mvpFieldGroup');
-    
-    // Mostrar/ocultar campo MVP apenas para lojas
-    console.log('handleUserTypeChange - tipo:', type, 'isStore:', isStore, 'isEditMode:', isEditMode);
-    if (mvpFieldGroup) {
-        mvpFieldGroup.style.display = isStore ? 'block' : 'none';
-        console.log('Campo MVP definido como:', isStore ? 'visível (block)' : 'oculto (none)', 'para tipo:', type);
-        console.log('Elemento mvpFieldGroup encontrado:', mvpFieldGroup);
-    } else {
-        console.log('ERRO: Elemento mvpFieldGroup não encontrado no DOM!');
-    }
     
     if (isStore && !isEditMode) {
-        // Mostrar seleção de loja (novo usuário)
+        // Mostrar seleção de loja
         if (emailContainer) emailContainer.style.display = 'block';
         if (emailInput) emailInput.style.display = 'none';
         if (storeFields) storeFields.style.display = 'block';
@@ -311,17 +250,8 @@ function handleUserTypeChange(type) {
         if (availableStores.length === 0) {
             loadAvailableStores();
         }
-    } else if (isStore && isEditMode) {
-        // Para edição de loja, manter campos normais mas mostrar MVP
-        if (emailContainer) emailContainer.style.display = 'none';
-        if (emailInput) {
-            emailInput.style.display = 'block';
-            emailInput.required = true;
-            emailInput.readOnly = false;
-        }
-        if (storeFields) storeFields.style.display = 'none';
     } else {
-        // Mostrar input normal para outros tipos
+        // Mostrar input normal
         resetStoreFields();
     }
 }
@@ -392,12 +322,10 @@ function clearStoreFields() {
     const storeNameInput = document.getElementById('storeName');
     const storeDocumentInput = document.getElementById('storeDocument');
     const storeCategoryInput = document.getElementById('storeCategory');
-    const mvpInput = document.getElementById('userMvp');
     
     if (emailInput) emailInput.value = '';
     if (nameInput) nameInput.value = '';
     if (phoneInput) phoneInput.value = '';
-    if (mvpInput) mvpInput.value = 'nao';
     if (storeNameInput) storeNameInput.value = '';
     if (storeDocumentInput) storeDocumentInput.value = '';
     if (storeCategoryInput) storeCategoryInput.value = '';
@@ -415,7 +343,6 @@ function resetStoreFields() {
     const emailContainer = document.getElementById('emailSelectContainer');
     const emailInput = document.getElementById('userEmail');
     const storeFields = document.getElementById('storeDataFields');
-    const mvpFieldGroup = document.getElementById('mvpFieldGroup');
     
     if (emailContainer) emailContainer.style.display = 'none';
     if (emailInput) {
@@ -424,7 +351,6 @@ function resetStoreFields() {
         emailInput.readOnly = false;
     }
     if (storeFields) storeFields.style.display = 'none';
-    if (mvpFieldGroup) mvpFieldGroup.style.display = 'none';
     
     clearStoreFields();
     isStoreUser = false;
@@ -484,9 +410,8 @@ function hideUserModal() {
 function editUser(userId) {
     if (!userId) return;
     
-    // IMPORTANTE: Definir isEditMode logo no início
-    isEditMode = true;
     currentUserId = userId;
+    isEditMode = true;
     
     const modal = document.getElementById('userModal');
     const title = document.getElementById('userModalTitle');
@@ -506,7 +431,8 @@ function editUser(userId) {
     if (passwordField) passwordField.required = false;
     if (passwordHelp) passwordHelp.textContent = 'Mínimo de 8 caracteres (deixe em branco para manter a senha atual)';
     
-    // NÃO resetar campos de loja ainda - será feito após carregar os dados
+    // Resetar campos de loja
+    resetStoreFields();
     
     // Mostrar modal
     modal.classList.add('show');
@@ -549,13 +475,6 @@ function editUser(userId) {
  * Preenche o formulário com dados do usuário
  */
 function fillUserForm(userData) {
-    // Debug: verificar se dados MVP estão chegando
-    console.log('=== fillUserForm chamada ===');
-    console.log('Dados do usuário recebidos:', userData);
-    console.log('Tipo do usuário:', userData.tipo);
-    console.log('MVP do usuário:', userData.mvp);
-    console.log('isEditMode atual:', isEditMode);
-    
     document.getElementById('userId').value = userData.id;
     document.getElementById('userName').value = userData.nome;
     document.getElementById('userEmail').value = userData.email;
@@ -566,62 +485,8 @@ function fillUserForm(userData) {
         document.getElementById('userPhone').value = userData.telefone;
     }
     
-    // Campo MVP (apenas para lojas)
-    const mvpSelect = document.getElementById('userMvp');
-    if (mvpSelect && userData.tipo === 'loja') {
-        // Definir valor MVP (padrão 'nao' se não existir)
-        mvpSelect.value = userData.mvp || 'nao';
-    }
-    
-    // Importante: definir isEditMode antes de chamar handleUserTypeChange
-    isEditMode = true;
-    
-    // Mostrar/ocultar campo MVP baseado no tipo
-    handleUserTypeChange(userData.tipo);
-    
     // Limpar campo de senha
     document.getElementById('userPassword').value = '';
-    
-    // CHAMADA FINAL: Força exibição do campo MVP para lojas
-    setTimeout(() => {
-        showMvpFieldForStore(userData);
-    }, 200);
-}
-
-/**
- * Força exibição do campo MVP para lojas
- */
-function showMvpFieldForStore(userData) {
-    console.log('=== showMvpFieldForStore chamada ===');
-    console.log('Tipo de usuário:', userData.tipo);
-    
-    if (userData.tipo !== 'loja') {
-        console.log('Não é loja, campo MVP não será exibido');
-        return;
-    }
-    
-    const mvpFieldGroup = document.getElementById('mvpFieldGroup');
-    const mvpSelect = document.getElementById('userMvp');
-    
-    console.log('Elemento mvpFieldGroup:', mvpFieldGroup);
-    console.log('Elemento mvpSelect:', mvpSelect);
-    
-    if (!mvpFieldGroup) {
-        console.error('ERRO CRÍTICO: Elemento mvpFieldGroup não encontrado!');
-        return;
-    }
-    
-    // Forçar exibição
-    mvpFieldGroup.style.display = 'block';
-    mvpFieldGroup.style.visibility = 'visible';
-    
-    // Definir valor
-    if (mvpSelect) {
-        mvpSelect.value = userData.mvp || 'nao';
-        console.log('Valor MVP definido:', userData.mvp || 'nao');
-    }
-    
-    console.log('Campo MVP FORÇADAMENTE exibido para loja');
 }
 
 /**
@@ -845,17 +710,7 @@ function submitUserForm(event) {
     for (let [key, value] of formData.entries()) {
         if (key !== 'id') {
             data.append(key, value);
-            // Debug: verificar se campo MVP está sendo enviado
-            if (key === 'mvp') {
-                console.log('Campo MVP sendo enviado:', value);
-            }
         }
-    }
-    
-    // Debug: mostrar todos os dados que estão sendo enviados
-    console.log('Dados sendo enviados para o servidor:');
-    for (let [key, value] of data.entries()) {
-        console.log(key + ':', value);
     }
     
     const url = isEditing ? '/controllers/AdminController.php' : '/controllers/AuthController.php';
