@@ -19,6 +19,21 @@ StoreHelper::requireStoreAccess();
 $storeId = StoreHelper::getCurrentStoreId();
 $store = AuthController::getStoreData();
 
+// Verificar se a loja é MVP para exibir feedback diferenciado
+$isStoreMvp = false;
+if ($storeId) {
+    try {
+        $db = Database::getConnection();
+        $mvpStmt = $db->prepare("SELECT u.mvp FROM lojas l JOIN usuarios u ON l.usuario_id = u.id WHERE l.id = :loja_id");
+        $mvpStmt->bindParam(':loja_id', $storeId);
+        $mvpStmt->execute();
+        $mvpResult = $mvpStmt->fetch(PDO::FETCH_ASSOC);
+        $isStoreMvp = ($mvpResult && $mvpResult['mvp'] === 'sim');
+    } catch (Exception $e) {
+        error_log("Erro ao verificar status MVP: " . $e->getMessage());
+    }
+}
+
 // Esta verificação não deveria ser necessária, mas vamos manter como fallback
 if (!$storeId || !$store) {
     // Se chegou aqui, há problema na sessão - vamos limpar e tentar novamente
@@ -31,6 +46,8 @@ if (!$storeId || !$store) {
 $success = false;
 $error = '';
 $transactionData = [];
+$isMvpTransaction = false;
+$transactionResult = null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Debug: Log dos dados recebidos
@@ -115,6 +132,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 if ($result['status']) {
                     $success = true;
+                    $transactionResult = $result;
+                    $isMvpTransaction = isset($result['data']['is_mvp']) && $result['data']['is_mvp'];
                     
                     // === INTEGRAÇÃO WHATSAPP DIRETA ===
                     try {
@@ -1349,22 +1368,43 @@ $activeMenu = 'register-transaction';
         <div class="main-content" id="mainContent">
             <!-- Header da Página -->
             <div class="page-header">
-                <h1 class="page-title">✨ Registrar Nova Venda</h1>
-                <p class="page-subtitle">Cadastre sua venda em 4 passos simples e ofereça cashback aos seus clientes</p>
+                <h1 class="page-title">
+                    ✨ Registrar Nova Venda
+                    <?php if ($isStoreMvp): ?>
+                        <span style="background: linear-gradient(45deg, #FFD700, #FFA500); color: #8B4513; padding: 0.3rem 0.8rem; border-radius: 20px; font-size: 0.7rem; font-weight: bold; margin-left: 1rem; box-shadow: 0 2px 8px rgba(255, 215, 0, 0.3);">🏆 LOJA MVP</span>
+                    <?php endif; ?>
+                </h1>
+                <p class="page-subtitle">
+                    <?php if ($isStoreMvp): ?>
+                        🎯 Como loja MVP, suas transações são aprovadas instantaneamente com cashback imediato!
+                    <?php else: ?>
+                        Cadastre sua venda em 4 passos simples e ofereça cashback aos seus clientes
+                    <?php endif; ?>
+                </p>
             </div>
             
             <!-- Alertas de Sucesso/Erro -->
             <?php if ($success): ?>
-            <div class="alert success">
+            <div class="alert success" <?php echo $isMvpTransaction ? 'style="background: linear-gradient(135deg, #FFD700 0%, #FFF8DC 100%); border-color: #FFD700;"' : ''; ?>>
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
                     <polyline points="22 4 12 14.01 9 11.01"></polyline>
                 </svg>
                 <div>
-                    <h4>🎉 Transação registrada com sucesso!</h4>
-                    <p>O cashback será liberado para o cliente assim que o pagamento da comissão for realizado e aprovado.</p>
+                    <?php if ($isMvpTransaction): ?>
+                        <h4>🏆 Transação MVP Aprovada Instantaneamente!</h4>
+                        <p><strong>Parabéns!</strong> Como loja MVP, sua transação foi aprovada automaticamente e o cashback de <strong>R$ <?php echo number_format($transactionResult['data']['valor_cashback'], 2, ',', '.'); ?></strong> já foi creditado na conta do cliente.</p>
+                        <p>✅ <strong>Status:</strong> Aprovada e processada instantaneamente<br>
+                           💰 <strong>Cashback:</strong> Creditado automaticamente<br>
+                           🎯 <strong>Privilégio MVP:</strong> Sem necessidade de pagamento de comissão</p>
+                    <?php else: ?>
+                        <h4>🎉 Transação registrada com sucesso!</h4>
+                        <p>O cashback será liberado para o cliente assim que o pagamento da comissão for realizado e aprovado.</p>
+                    <?php endif; ?>
                 </div>
-                <a href="<?php echo STORE_REGISTER_TRANSACTION_URL; ?>" class="nav-btn nav-btn-primary">Registrar Nova</a>
+                <a href="<?php echo STORE_REGISTER_TRANSACTION_URL; ?>" class="nav-btn nav-btn-primary">
+                    <?php echo $isMvpTransaction ? 'Registrar Nova MVP' : 'Registrar Nova'; ?>
+                </a>
             </div>
             <?php endif; ?>
             

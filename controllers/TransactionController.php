@@ -882,8 +882,13 @@ class TransactionController {
                 return ['status' => false, 'message' => 'Cliente não encontrado ou inativo.'];
             }
             
-            // Verificar se a loja existe e está aprovada
-            $storeStmt = $db->prepare("SELECT * FROM lojas WHERE id = :loja_id AND status = :status");
+            // Verificar se a loja existe e está aprovada, incluindo status MVP
+            $storeStmt = $db->prepare("
+                SELECT l.*, u.mvp as store_mvp 
+                FROM lojas l 
+                JOIN usuarios u ON l.usuario_id = u.id 
+                WHERE l.id = :loja_id AND l.status = :status
+            ");
             $storeStmt->bindParam(':loja_id', $data['loja_id']);
             $statusAprovado = STORE_APPROVED;
             $storeStmt->bindParam(':status', $statusAprovado);
@@ -893,6 +898,10 @@ class TransactionController {
             if (!$store) {
                 return ['status' => false, 'message' => 'Loja não encontrada ou não aprovada.'];
             }
+            
+            // Verificar se a loja é MVP para aprovação automática
+            $isStoreMvp = ($store['store_mvp'] === 'sim');
+            error_log("MVP CHECK: Loja ID {$data['loja_id']} - MVP: " . ($isStoreMvp ? 'SIM' : 'NÃO'));
             
             // Verificar se o valor da transação é válido
             if (!is_numeric($data['valor_total']) || $data['valor_total'] <= 0) {
@@ -995,8 +1004,14 @@ class TransactionController {
             $db->beginTransaction();
             
             try {
-                // Definir o status da transação (pendente por padrão)
-                $transactionStatus = isset($data['status']) ? $data['status'] : TRANSACTION_PENDING;
+                // Definir o status da transação
+                // 🎯 MVP: Aprovar automaticamente transações de lojas MVP
+                if ($isStoreMvp) {
+                    $transactionStatus = TRANSACTION_APPROVED;
+                    error_log("MVP AUTO-APPROVAL: Transação automaticamente aprovada para loja MVP ID {$data['loja_id']}");
+                } else {
+                    $transactionStatus = isset($data['status']) ? $data['status'] : TRANSACTION_PENDING;
+                }
                 
                 // Preparar descrição da transação
                 $descricao = isset($data['descricao']) ? $data['descricao'] : 'Compra na ' . $store['nome_fantasia'];
@@ -1101,6 +1116,35 @@ class TransactionController {
                     error_log("[TRACE] TransactionController::registerTransaction() - Processo de notificação concluído para ID: {$transactionId}", 3, 'integration_trace.log');
                 }
                 
+                // 🎯 MVP: Processar cashback instantaneamente para lojas MVP
+                if ($isStoreMvp && $valorCashbackCliente > 0) {
+                    error_log("MVP CASHBACK: Processando cashback instantâneo para loja MVP - Valor: R$ {$valorCashbackCliente}");
+                    
+                    // Creditar cashback imediatamente
+                    $descricaoCashback = "Cashback MVP - Compra aprovada instantaneamente - Código: " . $data['codigo_transacao'];
+                    $creditResult = $balanceModel->addBalance(
+                        $data['usuario_id'], 
+                        $data['loja_id'], 
+                        $valorCashbackCliente, 
+                        $descricaoCashback, 
+                        $transactionId
+                    );
+                    
+                    if ($creditResult) {
+                        error_log("MVP CASHBACK: Cashback creditado com sucesso - R$ {$valorCashbackCliente} para usuário {$data['usuario_id']}");
+                        
+                        // Criar notificação especial para MVP
+                        self::createNotification(
+                            $data['usuario_id'],
+                            'Cashback MVP Creditado! 🎉',
+                            "Seu cashback de R$ " . number_format($valorCashbackCliente, 2, ',', '.') . " foi creditado instantaneamente! Loja MVP: " . $store['nome_fantasia'],
+                            'success'
+                        );
+                    } else {
+                        error_log("MVP CASHBACK: ERRO ao creditar cashback para usuário {$data['usuario_id']}");
+                    }
+                }
+                
                 // CORREÇÃO 5: Se usou saldo, debitar do saldo do cliente IMEDIATAMENTE
                 if ($usarSaldo && $valorSaldoUsado > 0) {
                     $descricaoUso = "Uso do saldo na compra - Código: " . $data['codigo_transacao'] . " - Transação #" . $transactionId;
@@ -1158,23 +1202,30 @@ class TransactionController {
                 }
                 
                 // Preparar mensagem de sucesso
-                $successMessage = 'Transação registrada com sucesso!';
+                if ($isStoreMvp) {
+                    $successMessage = '🎉 Transação MVP aprovada instantaneamente! Cashback creditado automaticamente.';
+                } else {
+                    $successMessage = 'Transação registrada com sucesso!';
+                }
+                
                 if ($usarSaldo && $valorSaldoUsado > 0) {
                     $successMessage .= ' Saldo de R$ ' . number_format($valorSaldoUsado, 2, ',', '.') . ' foi usado na compra.';
                 }
                 
-                // Criar notificação para o cliente
-                $notificationMessage = 'Você tem um novo cashback de R$ ' . number_format($valorCashbackCliente, 2, ',', '.') . ' pendente da loja ' . $store['nome_fantasia'];
-                if ($usarSaldo && $valorSaldoUsado > 0) {
-                    $notificationMessage .= '. Você usou R$ ' . number_format($valorSaldoUsado, 2, ',', '.') . ' do seu saldo nesta compra.';
+                // Criar notificação para o cliente (apenas se não for MVP, pois MVP já criou notificação especial)
+                if (!$isStoreMvp) {
+                    $notificationMessage = 'Você tem um novo cashback de R$ ' . number_format($valorCashbackCliente, 2, ',', '.') . ' pendente da loja ' . $store['nome_fantasia'];
+                    if ($usarSaldo && $valorSaldoUsado > 0) {
+                        $notificationMessage .= '. Você usou R$ ' . number_format($valorSaldoUsado, 2, ',', '.') . ' do seu saldo nesta compra.';
+                    }
+                    
+                    self::createNotification(
+                        $data['usuario_id'],
+                        'Nova transação registrada',
+                        $notificationMessage,
+                        'info'
+                    );
                 }
-                
-                self::createNotification(
-                    $data['usuario_id'],
-                    'Nova transação registrada',
-                    $notificationMessage,
-                    'info'
-                );
                 // INTEGRAÇÃO WHATSAPP: Notificação automática de nova transação
                 // Este código é executado sempre que uma loja registra uma nova venda
                 if (defined('WHATSAPP_ENABLED') && WHATSAPP_ENABLED) {
@@ -1249,7 +1300,10 @@ class TransactionController {
                         'valor_efetivamente_pago' => $valorEfetivamentePago,
                         'valor_saldo_usado' => $valorSaldoUsado,
                         'valor_cashback' => $valorCashbackCliente,
-                        'valor_comissao' => $valorCashbackTotal
+                        'valor_comissao' => $valorCashbackTotal,
+                        'is_mvp' => $isStoreMvp,
+                        'status_transacao' => $transactionStatus,
+                        'cashback_creditado' => $isStoreMvp
                     ]
                 ];
                 
