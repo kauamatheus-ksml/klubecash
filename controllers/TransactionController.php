@@ -848,7 +848,6 @@ class TransactionController {
     * @return array Resultado da operação
     */
     public static function registerTransaction($data) {
-        error_log("REGISTER_TRANSACTION: Início da função");
         try {
             // Validar dados obrigatórios
             $requiredFields = ['loja_id', 'usuario_id', 'valor_total', 'codigo_transacao'];
@@ -858,22 +857,16 @@ class TransactionController {
                 }
             }
             
-            error_log("REGISTER_TRANSACTION: Campos validados");
-            
             // Verificar se o usuário está autenticado e é loja ou admin
             if (!AuthController::isAuthenticated()) {
-                error_log("REGISTER_TRANSACTION: Usuário não autenticado");
                 return ['status' => false, 'message' => 'Usuário não autenticado.'];
             }
             
             if (!AuthController::isStore() && !AuthController::isAdmin()) {
-                error_log("REGISTER_TRANSACTION: Tipo de usuário não autorizado");
                 return ['status' => false, 'message' => 'Apenas lojas e administradores podem registrar transações.'];
             }
             
-            error_log("REGISTER_TRANSACTION: Autenticação OK, conectando ao banco");
             $db = Database::getConnection();
-            error_log("REGISTER_TRANSACTION: Conexão com banco estabelecida");
             
             // Verificar se o cliente existe
             $userStmt = $db->prepare("SELECT id, nome, email FROM usuarios WHERE id = :usuario_id AND tipo = :tipo AND status = :status");
@@ -1227,16 +1220,15 @@ class TransactionController {
                         $notificationMessage .= '. Você usou R$ ' . number_format($valorSaldoUsado, 2, ',', '.') . ' do seu saldo nesta compra.';
                     }
                     
-                    self::createNotification(
-                        $data['usuario_id'],
-                        'Nova transação registrada',
-                        $notificationMessage,
-                        'info'
-                    );
+                    // self::createNotification(
+                    //     $data['usuario_id'],
+                    //     'Nova transação registrada',
+                    //     $notificationMessage,
+                    //     'info'
+                    // );
                 }
-                // INTEGRAÇÃO WHATSAPP: Notificação automática de nova transação
-                // Este código é executado sempre que uma loja registra uma nova venda
-                if (defined('WHATSAPP_ENABLED') && WHATSAPP_ENABLED) {
+                // INTEGRAÇÃO WHATSAPP: Temporariamente desabilitada para debug
+                if (false && defined('WHATSAPP_ENABLED') && WHATSAPP_ENABLED) {
                     try {
                         // Carregar as classes necessárias para WhatsApp
                         if (!class_exists('WhatsAppBot')) {
@@ -1316,13 +1308,13 @@ class TransactionController {
                     if ($creditResult) {
                         error_log("MVP CASHBACK: Cashback creditado com sucesso - R$ {$valorCashbackCliente} para usuário {$data['usuario_id']}");
                         
-                        // Criar notificação especial para MVP
-                        self::createNotification(
-                            $data['usuario_id'],
-                            'Cashback MVP Creditado! 🎉',
-                            "Seu cashback de R$ " . number_format($valorCashbackCliente, 2, ',', '.') . " foi creditado instantaneamente! Loja MVP: " . $store['nome_fantasia'],
-                            'success'
-                        );
+                        // Criar notificação especial para MVP (temporariamente comentado)
+                        // self::createNotification(
+                        //     $data['usuario_id'],
+                        //     'Cashback MVP Creditado! 🎉',
+                        //     "Seu cashback de R$ " . number_format($valorCashbackCliente, 2, ',', '.') . " foi creditado instantaneamente! Loja MVP: " . $store['nome_fantasia'],
+                        //     'success'
+                        // );
                     } else {
                         error_log("MVP CASHBACK: ERRO ao creditar cashback para usuário {$data['usuario_id']}");
                     }
@@ -1352,15 +1344,15 @@ class TransactionController {
                 throw $e;
             }
             
-        } catch (PDOException $e) {
+        } catch (Exception $e) {
             // Reverter transação em caso de erro
             if (isset($db) && $db->inTransaction()) {
                 $db->rollBack();
             }
             
-            error_log('Erro PDO ao registrar transação: ' . $e->getMessage() . ' - Arquivo: ' . $e->getFile() . ' - Linha: ' . $e->getLine());
+            error_log('Erro GERAL ao registrar transação: ' . $e->getMessage() . ' - Arquivo: ' . $e->getFile() . ' - Linha: ' . $e->getLine());
             error_log('Stack trace: ' . $e->getTraceAsString());
-            return ['status' => false, 'message' => 'Erro PDO: ' . $e->getMessage()];
+            return ['status' => false, 'message' => 'Erro: ' . $e->getMessage()];
         }
     }
     
