@@ -1,4 +1,5 @@
-// assets/js/admin/users.js
+// assets/js/admin/users_new.js - Sistema Profissional de Gerenciamento de Usuários
+// Compatível com a nova interface users_new.php
 
 // Variáveis globais
 let currentUserId = null;
@@ -6,10 +7,18 @@ let selectedUsers = [];
 let availableStores = [];
 let isStoreUser = false;
 let isEditMode = false;
+let currentPage = 1;
+let totalPages = 1;
+let currentFilters = {};
+let visibleColumns = new Set(['select', 'id', 'nome', 'email', 'tipo', 'status', 'data_criacao', 'acoes']);
+
+// Toast notification system
+let toastContainer = null;
 
 // Inicialização quando o DOM estiver carregado
 document.addEventListener('DOMContentLoaded', function() {
     initializeUserManagement();
+    createToastContainer();
 });
 
 /**
@@ -25,35 +34,108 @@ function initializeUserManagement() {
     // Event listeners para modais
     setupModalListeners();
     
+    // Event listeners para tabela
+    setupTableListeners();
+    
+    // Event listeners para paginação
+    setupPaginationListeners();
+    
+    // Event listeners para ações em massa
+    setupBulkActionListeners();
+    
+    // Configurar controles de coluna
+    setupColumnControls();
+    
     // Carregar lojas disponíveis
     loadAvailableStores();
     
     // Configurar máscaras de input
     setupInputMasks();
+    
+    // Configurar validação de senha
+    setupPasswordValidation();
+    
+    // Carregar estatísticas
+    loadStatistics();
+    
+    // Configurar filtros avançados
+    setupAdvancedFilters();
 }
 
 /**
  * Configura os event listeners para filtros
  */
 function setupFilterListeners() {
-    const tipoFilter = document.getElementById('tipoFilter');
-    const statusFilter = document.getElementById('statusFilter');
-    const searchInput = document.getElementById('searchInput');
+    const basicSearch = document.getElementById('basicSearch');
+    const tipoFilter = document.getElementById('filterTipo');
+    const statusFilter = document.getElementById('filterStatus');
+    const advancedToggle = document.getElementById('toggleAdvanced');
     
+    // Busca básica
+    if (basicSearch) {
+        let searchTimeout;
+        basicSearch.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                currentFilters.search = this.value.trim();
+                applyFilters();
+            }, 500);
+        });
+    }
+    
+    // Filtros básicos
     if (tipoFilter) {
-        tipoFilter.addEventListener('change', applyFilters);
+        tipoFilter.addEventListener('change', function() {
+            currentFilters.tipo = this.value;
+            applyFilters();
+        });
     }
     
     if (statusFilter) {
-        statusFilter.addEventListener('change', applyFilters);
+        statusFilter.addEventListener('change', function() {
+            currentFilters.status = this.value;
+            applyFilters();
+        });
     }
     
-    if (searchInput) {
-        let searchTimeout;
-        searchInput.addEventListener('input', function() {
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(applyFilters, 500);
-        });
+    // Toggle filtros avançados
+    if (advancedToggle) {
+        advancedToggle.addEventListener('click', toggleAdvancedFilters);
+    }
+    
+    // Filtros avançados
+    setupAdvancedFilterListeners();
+}
+
+/**
+ * Configura event listeners avançados para filtros
+ */
+function setupAdvancedFilterListeners() {
+    const dataInicioInput = document.getElementById('filterDataInicio');
+    const dataFimInput = document.getElementById('filterDataFim');
+    const emailInput = document.getElementById('filterEmail');
+    const telefoneInput = document.getElementById('filterTelefone');
+    const mvpFilter = document.getElementById('filterMvp');
+    const clearFiltersBtn = document.getElementById('clearFilters');
+    
+    [dataInicioInput, dataFimInput, emailInput, telefoneInput, mvpFilter].forEach(input => {
+        if (input) {
+            input.addEventListener('change', function() {
+                const filterName = this.id.replace('filter', '').toLowerCase();
+                if (filterName === 'datainicio') {
+                    currentFilters.data_inicio = this.value;
+                } else if (filterName === 'datafim') {
+                    currentFilters.data_fim = this.value;
+                } else {
+                    currentFilters[filterName] = this.value;
+                }
+                applyFilters();
+            });
+        }
+    });
+    
+    if (clearFiltersBtn) {
+        clearFiltersBtn.addEventListener('click', clearAllFilters);
     }
 }
 
@@ -63,6 +145,7 @@ function setupFilterListeners() {
 function setupFormListeners() {
     const userTypeSelect = document.getElementById('userType');
     const emailSelect = document.getElementById('userEmailSelect');
+    const userForm = document.getElementById('userForm');
     
     if (userTypeSelect) {
         userTypeSelect.addEventListener('change', function() {
@@ -75,6 +158,89 @@ function setupFormListeners() {
             handleStoreEmailChange(this.value);
         });
     }
+    
+    if (userForm) {
+        userForm.addEventListener('submit', submitUserForm);
+    }
+}
+
+/**
+ * Configura os event listeners para tabela
+ */
+function setupTableListeners() {
+    const selectAllCheckbox = document.getElementById('selectAll');
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', toggleSelectAll);
+    }
+    
+    // Event delegation para checkboxes de usuários
+    document.addEventListener('change', function(event) {
+        if (event.target.classList.contains('user-checkbox')) {
+            const userId = parseInt(event.target.value);
+            toggleUserSelection(event.target, userId);
+        }
+    });
+}
+
+/**
+ * Configura os event listeners para paginação
+ */
+function setupPaginationListeners() {
+    const itemsPerPageSelect = document.getElementById('itemsPerPage');
+    if (itemsPerPageSelect) {
+        itemsPerPageSelect.addEventListener('change', function() {
+            currentPage = 1; // Reset para primeira página
+            loadUsers();
+        });
+    }
+    
+    const pageJumpInput = document.getElementById('pageJump');
+    if (pageJumpInput) {
+        pageJumpInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                jumpToPage();
+            }
+        });
+    }
+}
+
+/**
+ * Configura os event listeners para ações em massa
+ */
+function setupBulkActionListeners() {
+    const bulkActivateBtn = document.getElementById('bulkActivate');
+    const bulkDeactivateBtn = document.getElementById('bulkDeactivate');
+    const bulkBlockBtn = document.getElementById('bulkBlock');
+    const cancelBulkBtn = document.getElementById('cancelBulk');
+    
+    if (bulkActivateBtn) {
+        bulkActivateBtn.addEventListener('click', () => bulkAction('ativo'));
+    }
+    
+    if (bulkDeactivateBtn) {
+        bulkDeactivateBtn.addEventListener('click', () => bulkAction('inativo'));
+    }
+    
+    if (bulkBlockBtn) {
+        bulkBlockBtn.addEventListener('click', () => bulkAction('bloqueado'));
+    }
+    
+    if (cancelBulkBtn) {
+        cancelBulkBtn.addEventListener('click', clearSelection);
+    }
+}
+
+/**
+ * Configura controles de visibilidade de colunas
+ */
+function setupColumnControls() {
+    const columnToggles = document.querySelectorAll('.column-toggle');
+    columnToggles.forEach(toggle => {
+        toggle.addEventListener('change', function() {
+            const columnName = this.dataset.column;
+            toggleColumnVisibility(columnName, this.checked);
+        });
+    });
 }
 
 /**
@@ -96,6 +262,14 @@ function setupModalListeners() {
             hideViewUserModal();
         }
     });
+    
+    // Event listeners para abas do modal
+    const tabButtons = document.querySelectorAll('.tab-button');
+    tabButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            switchTab(this.dataset.tab);
+        });
+    });
 }
 
 /**
@@ -103,13 +277,162 @@ function setupModalListeners() {
  */
 function setupInputMasks() {
     const phoneInput = document.getElementById('userPhone');
+    const cpfInput = document.getElementById('userCpf');
+    
     if (phoneInput) {
         phoneInput.addEventListener('input', function(e) {
             let value = e.target.value.replace(/\D/g, '');
-            value = value.replace(/(\d{2})(\d)/, '($1) $2');
-            value = value.replace(/(\d{5})(\d)/, '$1-$2');
+            if (value.length <= 10) {
+                value = value.replace(/(\d{2})(\d)/, '($1) $2');
+                value = value.replace(/(\d{4})(\d)/, '$1-$2');
+            } else {
+                value = value.replace(/(\d{2})(\d)/, '($1) $2');
+                value = value.replace(/(\d{5})(\d)/, '$1-$2');
+            }
             e.target.value = value;
         });
+    }
+    
+    if (cpfInput) {
+        cpfInput.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            value = value.replace(/(\d{3})(\d)/, '$1.$2');
+            value = value.replace(/(\d{3})(\d)/, '$1.$2');
+            value = value.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+            e.target.value = value;
+        });
+    }
+}
+
+/**
+ * Configura validação de senha
+ */
+function setupPasswordValidation() {
+    const passwordInput = document.getElementById('userPassword');
+    const strengthIndicator = document.getElementById('passwordStrength');
+    
+    if (passwordInput && strengthIndicator) {
+        passwordInput.addEventListener('input', function() {
+            updatePasswordStrength(this.value, strengthIndicator);
+        });
+    }
+}
+
+/**
+ * Atualiza indicador de força da senha
+ */
+function updatePasswordStrength(password, indicator) {
+    let strength = 0;
+    let feedback = [];
+    
+    if (password.length >= 8) {
+        strength += 1;
+    } else {
+        feedback.push('Mínimo 8 caracteres');
+    }
+    
+    if (/[A-Z]/.test(password)) {
+        strength += 1;
+    } else {
+        feedback.push('Uma letra maiúscula');
+    }
+    
+    if (/[a-z]/.test(password)) {
+        strength += 1;
+    } else {
+        feedback.push('Uma letra minúscula');
+    }
+    
+    if (/\d/.test(password)) {
+        strength += 1;
+    } else {
+        feedback.push('Um número');
+    }
+    
+    if (/[^\w\s]/.test(password)) {
+        strength += 1;
+    } else {
+        feedback.push('Um caractere especial');
+    }
+    
+    const strengthClasses = ['weak', 'fair', 'good', 'strong', 'very-strong'];
+    const strengthTexts = ['Muito fraca', 'Fraca', 'Regular', 'Forte', 'Muito forte'];
+    
+    indicator.className = 'password-strength ' + strengthClasses[strength - 1];
+    indicator.textContent = password ? strengthTexts[strength - 1] : '';
+    
+    if (feedback.length > 0 && password) {
+        indicator.title = 'Faltam: ' + feedback.join(', ');
+    } else {
+        indicator.title = '';
+    }
+}
+
+/**
+ * Carrega estatísticas do dashboard
+ */
+function loadStatistics() {
+    fetch('/controllers/AdminController.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'action=getUserStatistics'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status && data.data) {
+            updateStatistics(data.data);
+        }
+    })
+    .catch(error => {
+        console.error('Erro ao carregar estatísticas:', error);
+    });
+}
+
+/**
+ * Atualiza os cards de estatísticas
+ */
+function updateStatistics(stats) {
+    const elements = {
+        totalUsers: document.getElementById('totalUsers'),
+        activeUsers: document.getElementById('activeUsers'),
+        storeUsers: document.getElementById('storeUsers'),
+        newUsers: document.getElementById('newUsers'),
+        mvpStores: document.getElementById('mvpStores'),
+        blockedUsers: document.getElementById('blockedUsers')
+    };
+    
+    Object.keys(elements).forEach(key => {
+        if (elements[key] && stats[key] !== undefined) {
+            elements[key].textContent = stats[key];
+        }
+    });
+}
+
+/**
+ * Configura filtros avançados
+ */
+function setupAdvancedFilters() {
+    const advancedSection = document.getElementById('advancedFilters');
+    if (advancedSection) {
+        advancedSection.style.display = 'none';
+    }
+}
+
+/**
+ * Alterna exibição dos filtros avançados
+ */
+function toggleAdvancedFilters() {
+    const advancedSection = document.getElementById('advancedFilters');
+    const toggleBtn = document.getElementById('toggleAdvanced');
+    
+    if (advancedSection && toggleBtn) {
+        const isVisible = advancedSection.style.display !== 'none';
+        advancedSection.style.display = isVisible ? 'none' : 'block';
+        toggleBtn.innerHTML = isVisible ? 
+            '<i class="fas fa-chevron-down"></i> Mostrar Filtros Avançados' :
+            '<i class="fas fa-chevron-up"></i> Ocultar Filtros Avançados';
     }
 }
 
@@ -117,66 +440,378 @@ function setupInputMasks() {
  * Aplica filtros à listagem
  */
 function applyFilters() {
-    const form = document.getElementById('filtersForm');
-    if (form) {
-        form.submit();
-    }
+    currentPage = 1; // Reset para primeira página
+    loadUsers();
 }
 
 /**
  * Limpa todos os filtros
  */
-function clearFilters() {
-    const url = new URL(window.location);
-    url.searchParams.delete('busca');
-    url.searchParams.delete('tipo');
-    url.searchParams.delete('status');
-    url.searchParams.delete('page');
-    window.location.href = url.toString();
+function clearAllFilters() {
+    currentFilters = {};
+    
+    // Limpar inputs
+    const inputs = [
+        'basicSearch', 'filterTipo', 'filterStatus', 'filterDataInicio',
+        'filterDataFim', 'filterEmail', 'filterTelefone', 'filterMvp'
+    ];
+    
+    inputs.forEach(id => {
+        const element = document.getElementById(id);
+        if (element) {
+            element.value = '';
+        }
+    });
+    
+    // Recarregar dados
+    applyFilters();
+    showToast('Filtros limpos com sucesso!', 'success');
 }
 
 /**
- * Exibe mensagem para o usuário
+ * Carrega lista de usuários com filtros e paginação
  */
-function showMessage(message, type = 'success') {
-    const messageContainer = document.getElementById('messageContainer');
-    if (!messageContainer) return;
+function loadUsers() {
+    showLoadingOverlay();
     
-    const alertClass = `alert-${type}`;
-    const iconClass = type === 'success' ? 'fa-check-circle' : 
-                     type === 'error' ? 'fa-exclamation-triangle' : 
-                     type === 'warning' ? 'fa-exclamation-triangle' : 'fa-info-circle';
+    const params = new URLSearchParams({
+        action: 'getUsers',
+        page: currentPage,
+        limit: document.getElementById('itemsPerPage')?.value || 25,
+        ...currentFilters
+    });
     
-    messageContainer.innerHTML = `
-        <div class="alert ${alertClass}">
-            <i class="fas ${iconClass}"></i>
-            ${message}
-        </div>
+    fetch('/controllers/AdminController.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: params
+    })
+    .then(response => response.json())
+    .then(data => {
+        hideLoadingOverlay();
+        
+        if (data.status) {
+            updateUsersTable(data.data.users);
+            updatePagination(data.data.pagination);
+        } else {
+            showToast(data.message || 'Erro ao carregar usuários', 'error');
+        }
+    })
+    .catch(error => {
+        hideLoadingOverlay();
+        console.error('Erro:', error);
+        showToast('Erro ao carregar usuários: ' + error.message, 'error');
+    });
+}
+
+/**
+ * Atualiza tabela de usuários
+ */
+function updateUsersTable(users) {
+    const tbody = document.getElementById('usersTableBody');
+    if (!tbody) return;
+    
+    if (users.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="8" class="text-center py-4">
+                    <i class="fas fa-users text-muted mb-2" style="font-size: 2rem;"></i><br>
+                    <span class="text-muted">Nenhum usuário encontrado com os filtros aplicados</span>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    tbody.innerHTML = users.map(user => createUserRow(user)).join('');
+}
+
+/**
+ * Cria linha da tabela para um usuário
+ */
+function createUserRow(user) {
+    const statusClass = {
+        'ativo': 'success',
+        'inativo': 'warning',
+        'bloqueado': 'danger'
+    };
+    
+    const typeClass = {
+        'admin': 'primary',
+        'loja': 'info',
+        'cliente': 'secondary',
+        'funcionario': 'dark'
+    };
+    
+    return `
+        <tr data-user-id="${user.id}">
+            <td class="column-select">
+                <input type="checkbox" class="user-checkbox" value="${user.id}">
+            </td>
+            <td class="column-id">#${user.id}</td>
+            <td class="column-nome">
+                <div class="user-info">
+                    <div class="user-avatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div>
+                        <strong>${user.nome}</strong>
+                        ${user.tipo === 'loja' && user.mvp === 'sim' ? '<span class="badge badge-gold ms-1">MVP</span>' : ''}
+                    </div>
+                </div>
+            </td>
+            <td class="column-email">${user.email}</td>
+            <td class="column-tipo">
+                <span class="badge badge-${typeClass[user.tipo] || 'secondary'}">
+                    ${user.tipo.charAt(0).toUpperCase() + user.tipo.slice(1)}
+                </span>
+            </td>
+            <td class="column-status">
+                <span class="badge badge-${statusClass[user.status] || 'secondary'}">
+                    ${user.status.charAt(0).toUpperCase() + user.status.slice(1)}
+                </span>
+            </td>
+            <td class="column-data_criacao">
+                ${new Date(user.data_criacao).toLocaleDateString('pt-BR')}
+            </td>
+            <td class="column-acoes">
+                <div class="action-buttons">
+                    <button class="btn btn-sm btn-outline-primary" onclick="viewUser(${user.id})" title="Visualizar">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="editUser(${user.id})" title="Editar">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <div class="dropdown d-inline-block">
+                        <button class="btn btn-sm btn-outline-info dropdown-toggle" data-bs-toggle="dropdown" title="Status">
+                            <i class="fas fa-cog"></i>
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><button class="dropdown-item" onclick="changeUserStatus(${user.id}, 'ativo', '${user.nome}')">
+                                <i class="fas fa-check-circle text-success me-2"></i>Ativar
+                            </button></li>
+                            <li><button class="dropdown-item" onclick="changeUserStatus(${user.id}, 'inativo', '${user.nome}')">
+                                <i class="fas fa-pause-circle text-warning me-2"></i>Desativar
+                            </button></li>
+                            <li><button class="dropdown-item" onclick="changeUserStatus(${user.id}, 'bloqueado', '${user.nome}')">
+                                <i class="fas fa-ban text-danger me-2"></i>Bloquear
+                            </button></li>
+                        </ul>
+                    </div>
+                </div>
+            </td>
+        </tr>
+    `;
+}
+
+/**
+ * Atualiza controles de paginação
+ */
+function updatePagination(pagination) {
+    totalPages = pagination.total_pages;
+    currentPage = pagination.current_page;
+    
+    const paginationContainer = document.getElementById('paginationContainer');
+    const pageInfo = document.getElementById('pageInfo');
+    const pageJumpInput = document.getElementById('pageJump');
+    
+    if (pageInfo) {
+        pageInfo.textContent = `Página ${currentPage} de ${totalPages} (${pagination.total_records} registros)`;
+    }
+    
+    if (pageJumpInput) {
+        pageJumpInput.max = totalPages;
+        pageJumpInput.value = currentPage;
+    }
+    
+    if (paginationContainer) {
+        paginationContainer.innerHTML = createPaginationHTML(pagination);
+    }
+}
+
+/**
+ * Cria HTML da paginação
+ */
+function createPaginationHTML(pagination) {
+    const { current_page, total_pages, has_prev, has_next } = pagination;
+    let html = '';
+    
+    // Botão anterior
+    html += `
+        <button class="btn btn-outline-primary" ${!has_prev ? 'disabled' : ''} 
+                onclick="changePage(${current_page - 1})">
+            <i class="fas fa-chevron-left"></i> Anterior
+        </button>
     `;
     
-    // Rolar para a mensagem
-    messageContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    // Números das páginas
+    const start = Math.max(1, current_page - 2);
+    const end = Math.min(total_pages, current_page + 2);
     
-    // Remover mensagem após 5 segundos
+    if (start > 1) {
+        html += `<button class="btn btn-outline-primary" onclick="changePage(1)">1</button>`;
+        if (start > 2) {
+            html += `<span class="pagination-ellipsis">...</span>`;
+        }
+    }
+    
+    for (let i = start; i <= end; i++) {
+        const isActive = i === current_page;
+        html += `
+            <button class="btn ${isActive ? 'btn-primary' : 'btn-outline-primary'}" 
+                    onclick="changePage(${i})" ${isActive ? 'disabled' : ''}>
+                ${i}
+            </button>
+        `;
+    }
+    
+    if (end < total_pages) {
+        if (end < total_pages - 1) {
+            html += `<span class="pagination-ellipsis">...</span>`;
+        }
+        html += `<button class="btn btn-outline-primary" onclick="changePage(${total_pages})">${total_pages}</button>`;
+    }
+    
+    // Botão próximo
+    html += `
+        <button class="btn btn-outline-primary" ${!has_next ? 'disabled' : ''} 
+                onclick="changePage(${current_page + 1})">
+            Próximo <i class="fas fa-chevron-right"></i>
+        </button>
+    `;
+    
+    return html;
+}
+
+/**
+ * Muda para uma página específica
+ */
+function changePage(page) {
+    if (page >= 1 && page <= totalPages && page !== currentPage) {
+        currentPage = page;
+        loadUsers();
+    }
+}
+
+/**
+ * Pula para página digitada
+ */
+function jumpToPage() {
+    const input = document.getElementById('pageJump');
+    if (input) {
+        const page = parseInt(input.value);
+        if (page >= 1 && page <= totalPages) {
+            changePage(page);
+        } else {
+            input.value = currentPage;
+            showToast('Página inválida', 'error');
+        }
+    }
+}
+
+/**
+ * Sistema de Toast Notifications
+ */
+function createToastContainer() {
+    if (!toastContainer) {
+        toastContainer = document.createElement('div');
+        toastContainer.className = 'toast-container';
+        toastContainer.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            max-width: 350px;
+        `;
+        document.body.appendChild(toastContainer);
+    }
+}
+
+/**
+ * Exibe toast notification
+ */
+function showToast(message, type = 'success', duration = 5000) {
+    const toast = document.createElement('div');
+    const iconMap = {
+        success: 'fa-check-circle',
+        error: 'fa-exclamation-triangle',
+        warning: 'fa-exclamation-triangle',
+        info: 'fa-info-circle'
+    };
+    
+    toast.className = `toast toast-${type} show`;
+    toast.innerHTML = `
+        <div class="toast-header">
+            <i class="fas ${iconMap[type]} me-2"></i>
+            <strong class="me-auto">
+                ${type === 'success' ? 'Sucesso' : 
+                  type === 'error' ? 'Erro' : 
+                  type === 'warning' ? 'Atenção' : 'Informação'}
+            </strong>
+            <button type="button" class="btn-close" onclick="this.parentElement.parentElement.remove()"></button>
+        </div>
+        <div class="toast-body">${message}</div>
+    `;
+    
+    toastContainer.appendChild(toast);
+    
+    // Auto remove
     setTimeout(() => {
-        messageContainer.innerHTML = '';
-    }, 5000);
+        if (toast.parentNode) {
+            toast.remove();
+        }
+    }, duration);
+}
+
+/**
+ * Exibe mensagem para o usuário (mantido para compatibilidade)
+ */
+function showMessage(message, type = 'success') {
+    showToast(message, type);
 }
 
 /**
  * Exibe loading overlay
  */
 function showLoading() {
-    const overlay = document.getElementById('loadingOverlay');
-    if (overlay) {
-        overlay.style.display = 'flex';
-    }
+    showLoadingOverlay();
 }
 
 /**
  * Esconde loading overlay
  */
 function hideLoading() {
+    hideLoadingOverlay();
+}
+
+/**
+ * Exibe loading overlay (nova implementação)
+ */
+function showLoadingOverlay() {
+    let overlay = document.getElementById('loadingOverlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'loadingOverlay';
+        overlay.className = 'loading-overlay';
+        overlay.innerHTML = `
+            <div class="loading-spinner">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Carregando...</span>
+                </div>
+                <div class="mt-2">Carregando...</div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+    }
+    overlay.style.display = 'flex';
+}
+
+/**
+ * Esconde loading overlay (nova implementação)
+ */
+function hideLoadingOverlay() {
     const overlay = document.getElementById('loadingOverlay');
     if (overlay) {
         overlay.style.display = 'none';
@@ -238,9 +873,15 @@ function handleUserTypeChange(type) {
     const emailContainer = document.getElementById('emailSelectContainer');
     const emailInput = document.getElementById('userEmail');
     const storeFields = document.getElementById('storeDataFields');
+    const mvpFieldGroup = document.getElementById('mvpFieldGroup');
+    
+    // Mostrar/ocultar campo MVP apenas para lojas
+    if (mvpFieldGroup) {
+        mvpFieldGroup.style.display = isStore ? 'block' : 'none';
+    }
     
     if (isStore && !isEditMode) {
-        // Mostrar seleção de loja
+        // Mostrar seleção de loja (novo usuário)
         if (emailContainer) emailContainer.style.display = 'block';
         if (emailInput) emailInput.style.display = 'none';
         if (storeFields) storeFields.style.display = 'block';
@@ -250,8 +891,17 @@ function handleUserTypeChange(type) {
         if (availableStores.length === 0) {
             loadAvailableStores();
         }
+    } else if (isStore && isEditMode) {
+        // Para edição de loja, manter campos normais mas mostrar MVP
+        if (emailContainer) emailContainer.style.display = 'none';
+        if (emailInput) {
+            emailInput.style.display = 'block';
+            emailInput.required = true;
+            emailInput.readOnly = false;
+        }
+        if (storeFields) storeFields.style.display = 'none';
     } else {
-        // Mostrar input normal
+        // Mostrar input normal para outros tipos
         resetStoreFields();
     }
 }
@@ -322,10 +972,12 @@ function clearStoreFields() {
     const storeNameInput = document.getElementById('storeName');
     const storeDocumentInput = document.getElementById('storeDocument');
     const storeCategoryInput = document.getElementById('storeCategory');
+    const mvpInput = document.getElementById('userMvp');
     
     if (emailInput) emailInput.value = '';
     if (nameInput) nameInput.value = '';
     if (phoneInput) phoneInput.value = '';
+    if (mvpInput) mvpInput.value = 'nao';
     if (storeNameInput) storeNameInput.value = '';
     if (storeDocumentInput) storeDocumentInput.value = '';
     if (storeCategoryInput) storeCategoryInput.value = '';
@@ -343,6 +995,7 @@ function resetStoreFields() {
     const emailContainer = document.getElementById('emailSelectContainer');
     const emailInput = document.getElementById('userEmail');
     const storeFields = document.getElementById('storeDataFields');
+    const mvpFieldGroup = document.getElementById('mvpFieldGroup');
     
     if (emailContainer) emailContainer.style.display = 'none';
     if (emailInput) {
@@ -351,6 +1004,7 @@ function resetStoreFields() {
         emailInput.readOnly = false;
     }
     if (storeFields) storeFields.style.display = 'none';
+    if (mvpFieldGroup) mvpFieldGroup.style.display = 'none';
     
     clearStoreFields();
     isStoreUser = false;
@@ -410,8 +1064,9 @@ function hideUserModal() {
 function editUser(userId) {
     if (!userId) return;
     
-    currentUserId = userId;
+    // IMPORTANTE: Definir isEditMode logo no início
     isEditMode = true;
+    currentUserId = userId;
     
     const modal = document.getElementById('userModal');
     const title = document.getElementById('userModalTitle');
@@ -430,9 +1085,6 @@ function editUser(userId) {
     if (passwordGroup) passwordGroup.style.display = 'block';
     if (passwordField) passwordField.required = false;
     if (passwordHelp) passwordHelp.textContent = 'Mínimo de 8 caracteres (deixe em branco para manter a senha atual)';
-    
-    // Resetar campos de loja
-    resetStoreFields();
     
     // Mostrar modal
     modal.classList.add('show');
@@ -484,6 +1136,18 @@ function fillUserForm(userData) {
     if (userData.telefone) {
         document.getElementById('userPhone').value = userData.telefone;
     }
+    
+    // Campo MVP (apenas para lojas)
+    const mvpSelect = document.getElementById('userMvp');
+    if (mvpSelect && userData.tipo === 'loja') {
+        mvpSelect.value = userData.mvp || 'nao';
+    }
+    
+    // Importante: definir isEditMode antes de chamar handleUserTypeChange
+    isEditMode = true;
+    
+    // Mostrar/ocultar campo MVP baseado no tipo
+    handleUserTypeChange(userData.tipo);
     
     // Limpar campo de senha
     document.getElementById('userPassword').value = '';
@@ -933,18 +1597,349 @@ function bulkAction(status) {
 }
 
 /**
- * Exporta usuários
+ * Alterna visibilidade de colunas
  */
-function exportUsers() {
-    showMessage('Função de exportação será implementada em breve', 'info');
+function toggleColumnVisibility(columnName, visible) {
+    const columns = document.querySelectorAll(`.column-${columnName}`);
+    columns.forEach(column => {
+        column.style.display = visible ? '' : 'none';
+    });
+    
+    if (visible) {
+        visibleColumns.add(columnName);
+    } else {
+        visibleColumns.delete(columnName);
+    }
+    
+    // Salvar preferências no localStorage
+    localStorage.setItem('userTableColumns', JSON.stringify(Array.from(visibleColumns)));
 }
 
+/**
+ * Carrega preferências de colunas
+ */
+function loadColumnPreferences() {
+    const saved = localStorage.getItem('userTableColumns');
+    if (saved) {
+        visibleColumns = new Set(JSON.parse(saved));
+        
+        // Aplicar preferências
+        const allColumns = ['select', 'id', 'nome', 'email', 'tipo', 'status', 'data_criacao', 'acoes'];
+        allColumns.forEach(column => {
+            const toggle = document.querySelector(`[data-column="${column}"]`);
+            if (toggle) {
+                toggle.checked = visibleColumns.has(column);
+                toggleColumnVisibility(column, visibleColumns.has(column));
+            }
+        });
+    }
+}
+
+/**
+ * Troca de aba no modal
+ */
+function switchTab(tabName) {
+    // Remover classe ativa de todas as abas
+    const tabButtons = document.querySelectorAll('.tab-button');
+    const tabPanes = document.querySelectorAll('.tab-pane');
+    
+    tabButtons.forEach(btn => btn.classList.remove('active'));
+    tabPanes.forEach(pane => pane.classList.remove('active'));
+    
+    // Ativar aba selecionada
+    const activeButton = document.querySelector(`[data-tab="${tabName}"]`);
+    const activePane = document.getElementById(tabName);
+    
+    if (activeButton) activeButton.classList.add('active');
+    if (activePane) activePane.classList.add('active');
+}
+
+/**
+ * Limpa seleção de usuários
+ */
+function clearSelection() {
+    selectedUsers = [];
+    const checkboxes = document.querySelectorAll('.user-checkbox');
+    const selectAll = document.getElementById('selectAll');
+    
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    
+    if (selectAll) {
+        selectAll.checked = false;
+    }
+    
+    updateBulkActionBar();
+}
+
+/**
+ * Exporta usuários para CSV
+ */
+function exportUsersToCSV() {
+    showLoadingOverlay();
+    
+    const params = new URLSearchParams({
+        action: 'exportUsers',
+        format: 'csv',
+        ...currentFilters
+    });
+    
+    fetch('/controllers/AdminController.php', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: params
+    })
+    .then(response => response.blob())
+    .then(blob => {
+        hideLoadingOverlay();
+        
+        // Criar link para download
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `usuarios_${new Date().toISOString().slice(0, 10)}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        
+        showToast('Usuários exportados com sucesso!', 'success');
+    })
+    .catch(error => {
+        hideLoadingOverlay();
+        console.error('Erro:', error);
+        showToast('Erro ao exportar usuários: ' + error.message, 'error');
+    });
+}
+
+/**
+ * Exporta usuários (mantido para compatibilidade)
+ */
+function exportUsers() {
+    exportUsersToCSV();
+}
+
+// Event listeners adicionais para inicialização tardia
+document.addEventListener('DOMContentLoaded', function() {
+    // Carregar preferências de colunas
+    loadColumnPreferences();
+    
+    // Carregar dados iniciais
+    if (typeof loadUsers === 'function') {
+        loadUsers();
+    }
+    
+    // Configurar atualização automática das estatísticas
+    setInterval(loadStatistics, 300000); // A cada 5 minutos
+});
+
+// Adicionar estilos CSS avançados
+const advancedStyles = document.createElement('style');
+advancedStyles.textContent = `
+    /* Estilos para Toast Notifications */
+    .toast-container {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 9999;
+        max-width: 350px;
+    }
+    
+    .toast {
+        min-width: 300px;
+        margin-bottom: 10px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        border: none;
+    }
+    
+    .toast-success {
+        background: #d4edda;
+        border-left: 4px solid #28a745;
+    }
+    
+    .toast-error {
+        background: #f8d7da;
+        border-left: 4px solid #dc3545;
+    }
+    
+    .toast-warning {
+        background: #fff3cd;
+        border-left: 4px solid #ffc107;
+    }
+    
+    .toast-info {
+        background: #d1ecf1;
+        border-left: 4px solid #17a2b8;
+    }
+    
+    /* Loading Overlay */
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(255, 255, 255, 0.9);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 9998;
+        backdrop-filter: blur(2px);
+    }
+    
+    .loading-spinner {
+        text-align: center;
+        color: var(--primary-color);
+    }
+    
+    /* Password Strength Indicator */
+    .password-strength {
+        height: 4px;
+        border-radius: 2px;
+        margin-top: 5px;
+        transition: all 0.3s ease;
+    }
+    
+    .password-strength.weak {
+        background: #dc3545;
+        width: 20%;
+    }
+    
+    .password-strength.fair {
+        background: #fd7e14;
+        width: 40%;
+    }
+    
+    .password-strength.good {
+        background: #ffc107;
+        width: 60%;
+    }
+    
+    .password-strength.strong {
+        background: #198754;
+        width: 80%;
+    }
+    
+    .password-strength.very-strong {
+        background: #0d6efd;
+        width: 100%;
+    }
+    
+    /* User Info in Table */
+    .user-info {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .user-avatar {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: var(--primary-light, #e3f2fd);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--primary-color, #1976d2);
+        font-size: 14px;
+    }
+    
+    /* Badge MVP */
+    .badge-gold {
+        background: linear-gradient(45deg, #ffd700, #ffed4e);
+        color: #8b4513;
+        font-weight: bold;
+        text-shadow: 0 1px 1px rgba(0,0,0,0.2);
+    }
+    
+    /* Action Buttons */
+    .action-buttons {
+        display: flex;
+        gap: 5px;
+        align-items: center;
+    }
+    
+    .action-buttons .btn {
+        padding: 4px 8px;
+        font-size: 12px;
+    }
+    
+    /* Pagination */
+    .pagination-ellipsis {
+        padding: 6px 12px;
+        color: #6c757d;
+    }
+    
+    /* Advanced Filters */
+    #advancedFilters {
+        border-top: 1px solid #dee2e6;
+        padding-top: 1rem;
+        margin-top: 1rem;
+    }
+    
+    /* Bulk Action Bar */
+    .bulk-action-bar {
+        position: sticky;
+        top: 0;
+        background: #f8f9fa;
+        border-bottom: 1px solid #dee2e6;
+        padding: 10px 15px;
+        z-index: 100;
+        display: none;
+        align-items: center;
+        gap: 15px;
+    }
+    
+    .bulk-info {
+        font-weight: 500;
+        color: #495057;
+    }
+    
+    /* Column Visibility Controls */
+    .column-controls {
+        background: #f8f9fa;
+        border-radius: 6px;
+        padding: 10px;
+        margin-bottom: 15px;
+    }
+    
+    .column-toggle {
+        margin-right: 15px;
+    }
+    
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .action-buttons {
+            flex-direction: column;
+            gap: 2px;
+        }
+        
+        .user-info {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 5px;
+        }
+        
+        .toast-container {
+            left: 10px;
+            right: 10px;
+            top: 10px;
+            max-width: none;
+        }
+    }
+`;
+document.head.appendChild(advancedStyles);
+
 // Adicionar estilos CSS para campos com erro
-const style = document.createElement('style');
-style.textContent = `
+const errorStyles = document.createElement('style');
+errorStyles.textContent = `
     .form-control.error,
     .form-select.error {
-        border-color: var(--danger-color) !important;
+        border-color: var(--danger-color, #dc3545) !important;
         box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.1) !important;
     }
     
@@ -965,24 +1960,24 @@ style.textContent = `
         width: 60px;
         height: 60px;
         border-radius: 50%;
-        background: var(--primary-light);
+        background: var(--primary-light, #e3f2fd);
         display: flex;
         align-items: center;
         justify-content: center;
-        color: var(--primary-color);
+        color: var(--primary-color, #1976d2);
         font-size: 1.5rem;
     }
     
     .user-basic-info h4 {
         margin: 0 0 0.25rem 0;
-        color: var(--dark-gray);
+        color: var(--dark-gray, #343a40);
         font-size: 1.25rem;
         font-weight: 600;
     }
     
     .user-basic-info p {
         margin: 0;
-        color: var(--medium-gray);
+        color: var(--medium-gray, #6c757d);
         font-size: 0.875rem;
     }
     
@@ -1005,13 +2000,13 @@ style.textContent = `
     
     .detail-item label {
         font-weight: 600;
-        color: var(--dark-gray);
+        color: var(--dark-gray, #343a40);
         margin: 0;
     }
     
     .detail-item span {
-        color: var(--medium-gray);
+        color: var(--medium-gray, #6c757d);
         text-align: right;
     }
 `;
-document.head.appendChild(style); 
+document.head.appendChild(errorStyles);
