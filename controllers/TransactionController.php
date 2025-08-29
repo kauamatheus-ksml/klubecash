@@ -727,12 +727,11 @@ class TransactionController {
             $storeMvpResult = $storeMvpStmt->fetch(PDO::FETCH_ASSOC);
             $isStoreMvp = ($storeMvpResult && $storeMvpResult['mvp'] === 'sim');
             
-            // Se for loja MVP, só mostrar transações que realmente deveriam estar pendentes
-            // (ou seja, transações com algum problema que impediu a aprovação automática)
+            // Se for loja MVP, OCULTAR transações pendentes pois elas deveriam estar aprovadas
             if ($isStoreMvp) {
-                error_log("PENDENTES DEBUG: Loja {$storeId} é MVP - Filtrando transações pendentes que deveriam estar aprovadas");
-                // Para MVP, normalmente não deveria haver transações pendentes
-                // Se há, é porque houve algum erro no processo de aprovação automática
+                error_log("PENDENTES DEBUG: Loja {$storeId} é MVP - OCULTANDO todas as transações pendentes desta tela");
+                // Para lojas MVP, forçar query que não retorna nada
+                $whereConditions[] = "1 = 0"; // Condição que nunca é verdadeira = não mostra nada
             } else {
                 error_log("PENDENTES DEBUG: Loja {$storeId} não é MVP - Mostrando todas as pendentes normalmente");
             }
