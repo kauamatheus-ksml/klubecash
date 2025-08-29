@@ -213,62 +213,134 @@ class TransactionController {
             $limit = ITEMS_PER_PAGE;
             $offset = ($page - 1) * $limit;
             
-            // Construir condições WHERE
-            $whereConditions = ["pc.loja_id = :loja_id"];
-            $params = [':loja_id' => $storeId];
+            // CORREÇÃO MVP: Verificar se a loja é MVP para incluir transações aprovadas automaticamente
+            $storeMvpQuery = "SELECT u.mvp FROM lojas l JOIN usuarios u ON l.usuario_id = u.id WHERE l.id = :store_id";
+            $storeMvpStmt = $db->prepare($storeMvpQuery);
+            $storeMvpStmt->bindParam(':store_id', $storeId);
+            $storeMvpStmt->execute();
+            $storeMvpResult = $storeMvpStmt->fetch(PDO::FETCH_ASSOC);
+            $isStoreMvp = ($storeMvpResult && $storeMvpResult['mvp'] === 'sim');
             
-            // Aplicar filtros
-            if (!empty($filters['status'])) {
-                $whereConditions[] = "pc.status = :status";
-                $params[':status'] = $filters['status'];
+            error_log("PAYMENT HISTORY DEBUG: Loja {$storeId} - MVP: " . ($isStoreMvp ? 'SIM' : 'NÃO'));
+            
+            if ($isStoreMvp) {
+                // LOJA MVP: Mostrar transações aprovadas como "pagamentos" virtuais sem cobrança
+                error_log("PAYMENT HISTORY DEBUG: Usando query MVP para transações aprovadas");
+                
+                // Para MVP, construir condições baseadas nas transações aprovadas
+                $whereConditions = ["t.loja_id = :loja_id", "t.status = 'aprovado'"];
+                $params = [':loja_id' => $storeId];
+                
+                // Aplicar filtros nas transações
+                if (!empty($filters['data_inicio'])) {
+                    $whereConditions[] = "DATE(t.data_transacao) >= :data_inicio";
+                    $params[':data_inicio'] = $filters['data_inicio'];
+                }
+                
+                if (!empty($filters['data_fim'])) {
+                    $whereConditions[] = "DATE(t.data_transacao) <= :data_fim";
+                    $params[':data_fim'] = $filters['data_fim'];
+                }
+                
+                // Para MVP, não há status de pagamento real, então ignorar esse filtro ou mapear para aprovado
+                if (!empty($filters['status']) && $filters['status'] !== 'aprovado') {
+                    // Se filtrar por pendente ou rejeitado, não mostrar nada para MVP
+                    $whereConditions[] = "1 = 0"; // Condição impossível
+                }
+                
+                $whereClause = "WHERE " . implode(" AND ", $whereConditions);
+                
+                // Query para transações MVP aprovadas (simular como pagamentos virtuais)
+                $paymentsQuery = "
+                    SELECT 
+                        t.id as id,
+                        'mvp_aprovado' as metodo_pagamento,
+                        0.00 as valor_total,
+                        t.data_transacao as data_registro,
+                        t.data_transacao as data_aprovacao,
+                        'aprovado' as status,
+                        'Transação MVP - Aprovada automaticamente (sem cobrança de comissão)' as observacao,
+                        1 as qtd_transacoes,
+                        t.valor_total as valor_vendas_originais,
+                        COALESCE((SELECT SUM(cm.valor) 
+                                FROM cashback_movimentacoes cm 
+                                WHERE cm.usuario_id = t.usuario_id 
+                                AND cm.loja_id = t.loja_id 
+                                AND cm.tipo_operacao = 'uso'
+                                AND cm.transacao_uso_id = t.id), 0) as total_saldo_usado,
+                        CASE WHEN EXISTS(
+                            SELECT 1 FROM cashback_movimentacoes cm2 
+                            WHERE cm2.usuario_id = t.usuario_id 
+                            AND cm2.loja_id = t.loja_id 
+                            AND cm2.tipo_operacao = 'uso'
+                            AND cm2.transacao_uso_id = t.id
+                        ) THEN 1 ELSE 0 END as qtd_com_saldo
+                    FROM transacoes_cashback t
+                    JOIN usuarios u ON t.usuario_id = u.id
+                    $whereClause
+                    ORDER BY t.data_transacao DESC
+                    LIMIT :limit OFFSET :offset
+                ";
+            } else {
+                // LOJA NORMAL: Query original com pagamentos de comissão reais
+                error_log("PAYMENT HISTORY DEBUG: Usando query normal para pagamentos de comissão");
+                
+                $whereConditions = ["pc.loja_id = :loja_id"];
+                $params = [':loja_id' => $storeId];
+                
+                // Aplicar filtros
+                if (!empty($filters['status'])) {
+                    $whereConditions[] = "pc.status = :status";
+                    $params[':status'] = $filters['status'];
+                }
+                
+                if (!empty($filters['data_inicio'])) {
+                    $whereConditions[] = "DATE(pc.data_registro) >= :data_inicio";
+                    $params[':data_inicio'] = $filters['data_inicio'];
+                }
+                
+                if (!empty($filters['data_fim'])) {
+                    $whereConditions[] = "DATE(pc.data_registro) <= :data_fim";
+                    $params[':data_fim'] = $filters['data_fim'];
+                }
+                
+                if (!empty($filters['metodo_pagamento'])) {
+                    $whereConditions[] = "pc.metodo_pagamento = :metodo_pagamento";
+                    $params[':metodo_pagamento'] = $filters['metodo_pagamento'];
+                }
+                
+                $whereClause = "WHERE " . implode(" AND ", $whereConditions);
+                
+                // Query original para pagamentos com informações agregadas de saldo
+                $paymentsQuery = "
+                    SELECT 
+                        pc.*,
+                        COUNT(pt.transacao_id) as qtd_transacoes,
+                        SUM(t.valor_total) as valor_vendas_originais,
+                        COALESCE(SUM(
+                            (SELECT SUM(cm.valor) 
+                            FROM cashback_movimentacoes cm 
+                            WHERE cm.usuario_id = t.usuario_id 
+                            AND cm.loja_id = t.loja_id 
+                            AND cm.tipo_operacao = 'uso'
+                            AND cm.transacao_uso_id = t.id)
+                        ), 0) as total_saldo_usado,
+                        SUM(CASE WHEN EXISTS(
+                            SELECT 1 FROM cashback_movimentacoes cm2 
+                            WHERE cm2.usuario_id = t.usuario_id 
+                            AND cm2.loja_id = t.loja_id 
+                            AND cm2.tipo_operacao = 'uso'
+                            AND cm2.transacao_uso_id = t.id
+                        ) THEN 1 ELSE 0 END) as qtd_com_saldo
+                    FROM pagamentos_comissao pc
+                    LEFT JOIN pagamentos_transacoes pt ON pc.id = pt.pagamento_id
+                    LEFT JOIN transacoes_cashback t ON pt.transacao_id = t.id
+                    $whereClause
+                    GROUP BY pc.id
+                    ORDER BY pc.data_registro DESC
+                    LIMIT :limit OFFSET :offset
+                ";
             }
-            
-            if (!empty($filters['data_inicio'])) {
-                $whereConditions[] = "DATE(pc.data_registro) >= :data_inicio";
-                $params[':data_inicio'] = $filters['data_inicio'];
-            }
-            
-            if (!empty($filters['data_fim'])) {
-                $whereConditions[] = "DATE(pc.data_registro) <= :data_fim";
-                $params[':data_fim'] = $filters['data_fim'];
-            }
-            
-            if (!empty($filters['metodo_pagamento'])) {
-                $whereConditions[] = "pc.metodo_pagamento = :metodo_pagamento";
-                $params[':metodo_pagamento'] = $filters['metodo_pagamento'];
-            }
-            
-            $whereClause = "WHERE " . implode(" AND ", $whereConditions);
-            
-            // Query para obter pagamentos com informações agregadas de saldo
-            $paymentsQuery = "
-                SELECT 
-                    pc.*,
-                    COUNT(pt.transacao_id) as qtd_transacoes,
-                    SUM(t.valor_total) as valor_vendas_originais,
-                    COALESCE(SUM(
-                        (SELECT SUM(cm.valor) 
-                        FROM cashback_movimentacoes cm 
-                        WHERE cm.usuario_id = t.usuario_id 
-                        AND cm.loja_id = t.loja_id 
-                        AND cm.tipo_operacao = 'uso'
-                        AND cm.transacao_uso_id = t.id)
-                    ), 0) as total_saldo_usado,
-                    SUM(CASE WHEN EXISTS(
-                        SELECT 1 FROM cashback_movimentacoes cm2 
-                        WHERE cm2.usuario_id = t.usuario_id 
-                        AND cm2.loja_id = t.loja_id 
-                        AND cm2.tipo_operacao = 'uso'
-                        AND cm2.transacao_uso_id = t.id
-                    ) THEN 1 ELSE 0 END) as qtd_com_saldo
-                FROM pagamentos_comissao pc
-                LEFT JOIN pagamentos_transacoes pt ON pc.id = pt.pagamento_id
-                LEFT JOIN transacoes_cashback t ON pt.transacao_id = t.id
-                $whereClause
-                GROUP BY pc.id
-                ORDER BY pc.data_registro DESC
-                LIMIT :limit OFFSET :offset
-            ";
             
             $stmt = $db->prepare($paymentsQuery);
             foreach ($params as $key => $value) {
@@ -280,14 +352,25 @@ class TransactionController {
             
             $payments = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
-            // Query para contar total de pagamentos
-            $countQuery = "
-                SELECT COUNT(DISTINCT pc.id) as total
-                FROM pagamentos_comissao pc
-                LEFT JOIN pagamentos_transacoes pt ON pc.id = pt.pagamento_id
-                LEFT JOIN transacoes_cashback t ON pt.transacao_id = t.id
-                $whereClause
-            ";
+            // Query para contar total - DIFERENTES PARA MVP E NORMAL
+            if ($isStoreMvp) {
+                // Para MVP, contar transações aprovadas
+                $countQuery = "
+                    SELECT COUNT(*) as total
+                    FROM transacoes_cashback t
+                    JOIN usuarios u ON t.usuario_id = u.id
+                    $whereClause
+                ";
+            } else {
+                // Para loja normal, contar pagamentos de comissão
+                $countQuery = "
+                    SELECT COUNT(DISTINCT pc.id) as total
+                    FROM pagamentos_comissao pc
+                    LEFT JOIN pagamentos_transacoes pt ON pc.id = pt.pagamento_id
+                    LEFT JOIN transacoes_cashback t ON pt.transacao_id = t.id
+                    $whereClause
+                ";
+            }
             
             $countStmt = $db->prepare($countQuery);
             foreach ($params as $key => $value) {
