@@ -61,18 +61,73 @@ try {
     $movStmt->execute();
     $movimentacoes = $movStmt->fetchAll(PDO::FETCH_ASSOC);
     
-    // 3. CORRIGIDO: Obter estatísticas de comissões
+    // 3. CORRIGIDO: Obter estatísticas incluindo transações MVP
     $statsStmt = $db->prepare("
         SELECT 
-            COUNT(DISTINCT tcom.id) as total_transacoes,
-            COALESCE(SUM(CASE WHEN tc.status = 'aprovado' THEN tcom.valor_comissao ELSE 0 END), 0) as comissoes_aprovadas,
-            COUNT(CASE WHEN tc.status = 'pendente' THEN 1 END) as transacoes_pendentes,
-            COALESCE(SUM(CASE WHEN tc.status = 'pendente' THEN tcom.valor_comissao ELSE 0 END), 0) as comissoes_pendentes,
-            COUNT(CASE WHEN tc.status = 'aprovado' THEN 1 END) as transacoes_aprovadas,
-            COALESCE(SUM(tcom.valor_comissao), 0) as total_comissoes_recebidas
-        FROM transacoes_comissao tcom
-        JOIN transacoes_cashback tc ON tcom.transacao_id = tc.id
-        WHERE tcom.tipo_usuario = 'admin'
+            (
+                -- Transações com comissão (lojas normais)
+                SELECT COUNT(DISTINCT tcom.id)
+                FROM transacoes_comissao tcom
+                JOIN transacoes_cashback tc ON tcom.transacao_id = tc.id
+                WHERE tcom.tipo_usuario = 'admin'
+            ) + (
+                -- Transações MVP aprovadas (sem comissão)
+                SELECT COUNT(*)
+                FROM transacoes_cashback tc
+                JOIN lojas l ON tc.loja_id = l.id
+                JOIN usuarios u ON l.usuario_id = u.id
+                WHERE tc.status = 'aprovado' 
+                AND u.mvp = 'sim'
+                AND tc.id NOT IN (
+                    SELECT transacao_id FROM transacoes_comissao WHERE tipo_usuario = 'admin'
+                )
+            ) as total_transacoes,
+            
+            COALESCE((
+                SELECT SUM(CASE WHEN tc.status = 'aprovado' THEN tcom.valor_comissao ELSE 0 END)
+                FROM transacoes_comissao tcom
+                JOIN transacoes_cashback tc ON tcom.transacao_id = tc.id
+                WHERE tcom.tipo_usuario = 'admin'
+            ), 0) as comissoes_aprovadas,
+            
+            (
+                SELECT COUNT(CASE WHEN tc.status = 'pendente' THEN 1 END)
+                FROM transacoes_comissao tcom
+                JOIN transacoes_cashback tc ON tcom.transacao_id = tc.id
+                WHERE tcom.tipo_usuario = 'admin'
+            ) as transacoes_pendentes,
+            
+            COALESCE((
+                SELECT SUM(CASE WHEN tc.status = 'pendente' THEN tcom.valor_comissao ELSE 0 END)
+                FROM transacoes_comissao tcom
+                JOIN transacoes_cashback tc ON tcom.transacao_id = tc.id
+                WHERE tcom.tipo_usuario = 'admin'
+            ), 0) as comissoes_pendentes,
+            
+            (
+                -- Transações aprovadas com comissão
+                SELECT COUNT(CASE WHEN tc.status = 'aprovado' THEN 1 END)
+                FROM transacoes_comissao tcom
+                JOIN transacoes_cashback tc ON tcom.transacao_id = tc.id
+                WHERE tcom.tipo_usuario = 'admin'
+            ) + (
+                -- Transações MVP aprovadas (contam como aprovadas)
+                SELECT COUNT(*)
+                FROM transacoes_cashback tc
+                JOIN lojas l ON tc.loja_id = l.id
+                JOIN usuarios u ON l.usuario_id = u.id
+                WHERE tc.status = 'aprovado' 
+                AND u.mvp = 'sim'
+                AND tc.id NOT IN (
+                    SELECT transacao_id FROM transacoes_comissao WHERE tipo_usuario = 'admin'
+                )
+            ) as transacoes_aprovadas,
+            
+            COALESCE((
+                SELECT SUM(tcom.valor_comissao)
+                FROM transacoes_comissao tcom
+                WHERE tcom.tipo_usuario = 'admin'
+            ), 0) as total_comissoes_recebidas
     ");
     $statsStmt->execute();
     $estatisticas = $statsStmt->fetch(PDO::FETCH_ASSOC);
@@ -138,21 +193,58 @@ try {
 
     $mensal = $mesesCompletos;
     
-    // 5. CORRIGIDO: Obter top lojas por comissões geradas
+    // 5. CORRIGIDO: Obter top lojas incluindo MVP (por volume de transações)
     $topLojasStmt = $db->prepare("
         SELECT 
             l.id,
             l.nome_fantasia,
-            COUNT(DISTINCT tcom.id) as quantidade_transacoes,
-            COALESCE(SUM(tcom.valor_comissao), 0) as total_comissoes
+            u.mvp,
+            (
+                -- Transações com comissão
+                SELECT COUNT(DISTINCT tcom.id)
+                FROM transacoes_comissao tcom
+                JOIN transacoes_cashback tc2 ON tcom.transacao_id = tc2.id
+                WHERE tcom.tipo_usuario = 'admin' AND tc2.loja_id = l.id
+                AND tc2.status IN ('aprovado', 'pendente')
+            ) + (
+                -- Transações MVP aprovadas (sem comissão)
+                SELECT COUNT(*)
+                FROM transacoes_cashback tc3
+                WHERE tc3.loja_id = l.id 
+                AND tc3.status = 'aprovado'
+                AND u.mvp = 'sim'
+                AND tc3.id NOT IN (
+                    SELECT transacao_id FROM transacoes_comissao WHERE tipo_usuario = 'admin'
+                )
+            ) as quantidade_transacoes,
+            
+            COALESCE((
+                SELECT SUM(tcom.valor_comissao)
+                FROM transacoes_comissao tcom
+                JOIN transacoes_cashback tc2 ON tcom.transacao_id = tc2.id
+                WHERE tcom.tipo_usuario = 'admin' AND tc2.loja_id = l.id
+                AND tc2.status IN ('aprovado', 'pendente')
+            ), 0) as total_comissoes,
+            
+            -- Volume total de vendas (incluindo MVP)
+            COALESCE((
+                SELECT SUM(tc4.valor_total)
+                FROM transacoes_cashback tc4
+                WHERE tc4.loja_id = l.id 
+                AND tc4.status IN ('aprovado', 'pendente')
+            ), 0) as volume_vendas
+            
         FROM lojas l
-        JOIN transacoes_cashback tc ON l.id = tc.loja_id
-        JOIN transacoes_comissao tcom ON tc.id = tcom.transacao_id
-        WHERE tcom.tipo_usuario = 'admin'
-        AND tc.status IN ('aprovado', 'pendente')
-        GROUP BY l.id, l.nome_fantasia
-        HAVING total_comissoes > 0
-        ORDER BY total_comissoes DESC
+        JOIN usuarios u ON l.usuario_id = u.id
+        WHERE EXISTS (
+            -- Tem transações com comissão OU é MVP com transações
+            SELECT 1 FROM transacoes_cashback tc 
+            WHERE tc.loja_id = l.id 
+            AND tc.status IN ('aprovado', 'pendente')
+        )
+        GROUP BY l.id, l.nome_fantasia, u.mvp
+        HAVING quantidade_transacoes > 0
+        ORDER BY volume_vendas DESC, quantidade_transacoes DESC
         LIMIT 10
     ");
     $topLojasStmt->execute();
