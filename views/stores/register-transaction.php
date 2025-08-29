@@ -197,7 +197,7 @@ $activeMenu = 'register-transaction';
             <!-- Header da Página -->
             <div class="page-header">
                 <h1 class="page-title">
-                    ✨ Registrar Nova Venda
+                    ✨ Registrar Nova 1 Venda
                     <?php if ($isStoreMvp): ?>
                         <span style="background: linear-gradient(45deg, #FFD700, #FFA500); color: #8B4513; padding: 0.3rem 0.8rem; border-radius: 20px; font-size: 0.7rem; font-weight: bold; margin-left: 1rem; box-shadow: 0 2px 8px rgba(255, 215, 0, 0.3);">🏆 LOJA MVP</span>
                     <?php endif; ?>
