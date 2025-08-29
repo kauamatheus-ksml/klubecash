@@ -1481,27 +1481,43 @@ class TransactionController {
             // Commit
             $db->commit();
             
-            // Mensagem de sucesso
+            // Mensagem de sucesso (será atualizada após tentativa de crédito de cashback)
             $successMessage = $isStoreMvp ? 
-                '🎉 Transação MVP aprovada instantaneamente! Cashback creditado automaticamente.' :
+                '🎉 Transação MVP aprovada instantaneamente!' :
                 'Transação registrada com sucesso!';
             
             // Se MVP, creditar cashback
             $cashbackCreditado = false;
             if ($isStoreMvp && $valorCashbackCliente > 0) {
-                require_once __DIR__ . '/../models/CashbackBalance.php';
-                $balanceModel = new CashbackBalance();
-                $descricaoCashback = "Cashback MVP instantâneo - Código: " . $data['codigo_transacao'];
-                
-                $creditResult = $balanceModel->addBalance(
-                    $data['usuario_id'],
-                    $data['loja_id'],
-                    $valorCashbackCliente,
-                    $descricaoCashback,
-                    $transactionId
-                );
-                
-                $cashbackCreditado = $creditResult;
+                try {
+                    require_once __DIR__ . '/../models/CashbackBalance.php';
+                    $balanceModel = new CashbackBalance();
+                    $descricaoCashback = "Cashback MVP instantâneo - Código: " . $data['codigo_transacao'];
+                    
+                    $creditResult = $balanceModel->addBalance(
+                        $data['usuario_id'],
+                        $data['loja_id'],
+                        $valorCashbackCliente,
+                        $descricaoCashback,
+                        $transactionId
+                    );
+                    
+                    $cashbackCreditado = $creditResult;
+                    
+                    if ($creditResult) {
+                        error_log("MVP CASHBACK: Creditado com sucesso - R$ {$valorCashbackCliente} para usuário {$data['usuario_id']} na loja {$data['loja_id']}");
+                        $successMessage = '🎉 Transação MVP aprovada instantaneamente! Cashback creditado automaticamente.';
+                    } else {
+                        error_log("MVP CASHBACK: FALHA no crédito - Transação criada mas cashback não creditado para transação {$transactionId}");
+                        $successMessage = '⚠️ Transação MVP aprovada, mas houve problema no crédito automático de cashback. Entre em contato com o suporte.';
+                        // Não falhar a transação por causa do problema de cashback
+                    }
+                } catch (Exception $e) {
+                    error_log("MVP CASHBACK: ERRO no crédito - " . $e->getMessage() . " para transação {$transactionId}");
+                    $successMessage = '⚠️ Transação MVP aprovada, mas houve erro no crédito automático de cashback. Entre em contato com o suporte.';
+                    // Não falhar a transação por causa do problema de cashback
+                    $cashbackCreditado = false;
+                }
             }
             
             return [

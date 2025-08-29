@@ -43,6 +43,15 @@ class NotificationTrigger {
                 ];
             }
             
+            // CORREÇÃO TEMPORÁRIA: Desabilitar notificações devido a erro HTTP 400
+            // TODO: Investigar e corrigir o problema de configuração do WhatsApp
+            error_log("NotificationTrigger: Notificações temporariamente desabilitadas devido a erro HTTP 400");
+            return [
+                'success' => false,
+                'message' => 'Notificações temporariamente desabilitadas para resolução de problemas',
+                'skipped' => true
+            ];
+            
             // Definir se deve ser assíncrono (padrão: sim)
             $async = $options['async'] ?? true;
             $debug = $options['debug'] ?? false;
