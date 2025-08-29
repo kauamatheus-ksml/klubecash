@@ -184,7 +184,7 @@ $activeMenu = 'register-transaction';
     <title>Registrar Venda - Klube Cash</title>
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="stylesheet" href="../../assets/css/views/stores/register-transaction.css">
+    
     <!-- CSS Customizado para a nova interface -->
     
 </head>
