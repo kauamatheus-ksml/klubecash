@@ -305,12 +305,27 @@ try {
                 <div class="card">
                     <div class="card-header">
                         <h2 class="card-title">Configurações de Cashback</h2>
+                        <div class="card-header-actions">
+                            <a href="/admin/cashback-config" class="btn btn-secondary btn-sm">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 5px;">
+                                    <path d="M12 1v6m0 0l4-4m-4 4L8 3"></path>
+                                    <path d="M12 23v-6m0 0l4 4m-4-4l-4 4"></path>
+                                    <path d="M20 12h-2.5"></path>
+                                    <path d="M7 12H4"></path>
+                                    <path d="M14.5 8h-5v8h5V8z"></path>
+                                </svg>
+                                Configuração por Loja
+                            </a>
+                        </div>
                     </div>
                     <div class="card-body">
                         <!-- REMOVIDO: Campo porcentagem total - sempre será 10% -->
                         <div class="info-box">
                             <div class="info-icon">ℹ️</div>
                             <div class="info-content">
+                                <strong>Configurações Globais:</strong> Estas são as configurações padrão do sistema. 
+                                Para configurar percentuais específicos por loja, use o botão "Configuração por Loja" acima.
+                                <br><br>
                                 <strong>Informação importante:</strong> A comissão total é sempre 10% sobre cada venda. 
                                 Esta porcentagem é distribuída entre cliente e plataforma. A loja não recebe cashback.
                             </div>
