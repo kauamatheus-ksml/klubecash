@@ -754,24 +754,132 @@ function buildQueryString($exclude = []) {
         </div>
     </div>
 
+    <!-- Loading Indicator -->
+    <div id="loadingIndicator" style="display: none;">
+        <div class="loading-spinner"></div>
+    </div>
+
     <!-- Modal de Detalhes da Transação -->
     <div id="transactionModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3 id="modalTitle">Detalhes da Transação</h3>
-                <button class="modal-close" onclick="closeModal()">
-                    <i class="fas fa-times"></i>
-                </button>
+                <h2 class="modal-title" id="modalTitle">Detalhes da Transação</h2>
+                <button class="modal-close">&times;</button>
             </div>
             <div class="modal-body" id="modalContent">
-                <div class="loading-spinner">
+                <div class="loading-content">
                     <i class="fas fa-spinner fa-spin"></i>
-                    Carregando...
+                    Carregando detalhes...
                 </div>
             </div>
         </div>
     </div>
 
-    <script src="../../assets/js/transactions.js"></script>
+    <!-- Include the modern JavaScript -->
+    <script src="../../assets/js/views/admin/transactions.js"></script>
+    
+    <!-- Legacy compatibility scripts -->
+    <script>
+    // Legacy functions for backward compatibility with existing onclick handlers
+    function viewTransaction(id) {
+        if (window.transactionManager) {
+            window.transactionManager.viewTransaction(id);
+        }
+    }
+    
+    function approveTransaction(id) {
+        if (window.transactionManager) {
+            window.transactionManager.approveTransaction(id);
+        }
+    }
+    
+    function cancelTransaction(id) {
+        if (window.transactionManager) {
+            window.transactionManager.cancelTransaction(id);
+        }
+    }
+    
+    function exportTransaction(id) {
+        if (window.transactionManager) {
+            window.transactionManager.exportTransactions([id]);
+        }
+    }
+    
+    function toggleSelectAll() {
+        const checkbox = document.getElementById('selectAll');
+        if (window.transactionManager && checkbox) {
+            window.transactionManager.toggleSelectAll(checkbox.checked);
+        }
+    }
+    
+    function clearSelection() {
+        if (window.transactionManager) {
+            window.transactionManager.selectedTransactions.clear();
+            window.transactionManager.updateBulkActions();
+            document.querySelectorAll('.transaction-checkbox').forEach(cb => cb.checked = false);
+            document.getElementById('selectAll').checked = false;
+        }
+    }
+    
+    function clearFilters() {
+        // Reset all filter inputs
+        document.querySelectorAll('.form-input, .form-select').forEach(input => {
+            if (input.type === 'checkbox') {
+                input.checked = false;
+            } else {
+                input.value = '';
+            }
+        });
+        
+        if (window.transactionManager) {
+            window.transactionManager.currentFilters = {};
+            window.transactionManager.loadTransactions();
+        }
+    }
+    
+    function sortTable(column) {
+        if (window.transactionManager) {
+            window.transactionManager.handleSort(column);
+        }
+    }
+    
+    function changeItemsPerPage(value) {
+        if (window.transactionManager) {
+            window.transactionManager.itemsPerPage = parseInt(value);
+            window.transactionManager.currentPage = 1;
+            window.transactionManager.loadTransactions();
+        }
+    }
+    
+    function closeModal() {
+        if (window.transactionManager) {
+            window.transactionManager.closeModal();
+        }
+    }
+    
+    function toggleDropdown(button) {
+        const dropdown = button.parentNode;
+        const dropdownContent = dropdown.querySelector('.dropdown-content');
+        
+        // Close all other dropdowns
+        document.querySelectorAll('.dropdown-content').forEach(content => {
+            if (content !== dropdownContent) {
+                content.style.display = 'none';
+            }
+        });
+        
+        // Toggle current dropdown
+        dropdownContent.style.display = dropdownContent.style.display === 'block' ? 'none' : 'block';
+    }
+    
+    // Close dropdowns when clicking outside
+    document.addEventListener('click', function(event) {
+        if (!event.target.matches('.btn-action-small')) {
+            document.querySelectorAll('.dropdown-content').forEach(content => {
+                content.style.display = 'none';
+            });
+        }
+    });
+    </script>
 </body>
 </html>

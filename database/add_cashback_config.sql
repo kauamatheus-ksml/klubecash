@@ -30,4 +30,4 @@ WHERE id > 0;
 CREATE INDEX idx_lojas_cashback_config ON lojas (cashback_ativo, porcentagem_cliente, porcentagem_admin);
 
 -- Comentários sobre o campo antigo (manter por compatibilidade)
-ALTER TABLE lojas MODIFY COLUMN porcentagem_cashback DECIMAL(5,2) COMMENT 'Campo legado - usar porcentagem_cliente + porcentagem_admin';
+ALTER TABLE lojas MODIFY COLUMN porcentagem_cashback DECIMAL(5,2) COMMENT 'Campo legado - usar porcentagem_cliente + porcentagem_admin';-
