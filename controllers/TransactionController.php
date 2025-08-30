@@ -1536,11 +1536,44 @@ class TransactionController {
                 return ['status' => false, 'message' => 'Já existe uma transação com este código.'];
             }
             
-            // Calcular cashback
-            $valorCashbackTotal = ($data['valor_total'] * DEFAULT_CASHBACK_TOTAL) / 100;
-            $valorCashbackCliente = ($data['valor_total'] * DEFAULT_CASHBACK_CLIENT) / 100;
-            $valorCashbackAdmin = ($data['valor_total'] * DEFAULT_CASHBACK_ADMIN) / 100;
+            // NOVO: Obter configurações de cashback da loja
+            $storeConfigQuery = $db->prepare("
+                SELECT l.*, u.mvp,
+                       COALESCE(l.porcentagem_cliente, 5.00) as porcentagem_cliente,
+                       COALESCE(l.porcentagem_admin, 5.00) as porcentagem_admin,
+                       COALESCE(l.cashback_ativo, 1) as cashback_ativo
+                FROM lojas l 
+                JOIN usuarios u ON l.usuario_id = u.id 
+                WHERE l.id = :loja_id
+            ");
+            $storeConfigQuery->bindParam(':loja_id', $data['loja_id']);
+            $storeConfigQuery->execute();
+            $storeConfig = $storeConfigQuery->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$storeConfig) {
+                return ['status' => false, 'message' => 'Loja não encontrada.'];
+            }
+            
+            // Verificar se cashback está ativo para esta loja
+            if ($storeConfig['cashback_ativo'] != 1) {
+                return ['status' => false, 'message' => 'Esta loja não oferece cashback no momento.'];
+            }
+            
+            // Verificar se é loja MVP
+            $isStoreMvp = ($storeConfig['mvp'] === 'sim');
+            
+            // Calcular cashback usando configurações específicas da loja
+            $porcentagemCliente = (float) $storeConfig['porcentagem_cliente'];
+            $porcentagemAdmin = (float) $storeConfig['porcentagem_admin'];
+            $porcentagemTotal = $porcentagemCliente + $porcentagemAdmin;
+            
+            $valorCashbackCliente = ($data['valor_total'] * $porcentagemCliente) / 100;
+            $valorCashbackAdmin = ($data['valor_total'] * $porcentagemAdmin) / 100;
+            $valorCashbackTotal = $valorCashbackCliente + $valorCashbackAdmin;
             $valorLoja = 0.00;
+            
+            // Log para debug das configurações
+            error_log("CASHBACK CONFIG: Loja {$data['loja_id']} - Cliente: {$porcentagemCliente}%, Admin: {$porcentagemAdmin}%, MVP: " . ($isStoreMvp ? 'SIM' : 'NÃO'));
             
             // Definir status - MVP é aprovado automaticamente
             $transactionStatus = $isStoreMvp ? TRANSACTION_APPROVED : TRANSACTION_PENDING;

@@ -311,6 +311,7 @@ RewriteRule ^admin/configuracoes/?$ views/admin/settings.php [L]
 RewriteRule ^admin/saldo/?$ views/admin/balance.php [L]
 RewriteRule ^admin/comissoes/?$ views/admin/commissions.php [L]
 RewriteRule ^admin/pagamentos/?$ views/admin/payments.php [L]
+RewriteRule ^admin/cashback-config/?$ views/admin/cashback-config.php [L]
 RewriteRule ^admin/relatorios/?$ views/admin/reports.php [L]
 
 # === ROTAS DE AUDITORIA (SISTEMA SIMPLIFICADO) ===
