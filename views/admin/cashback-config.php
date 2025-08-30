@@ -40,12 +40,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 throw new Exception('Soma dos percentuais não pode exceder 100%');
             }
             
+            // Atualizar a tabela lojas
             $updateStmt = $db->prepare("
                 UPDATE lojas 
                 SET porcentagem_cliente = :porcentagem_cliente,
                     porcentagem_admin = :porcentagem_admin,
                     cashback_ativo = :cashback_ativo,
-                    data_config_cashback = NOW()
+                    data_config_cashback = NOW(),
+                    porcentagem_cashback = :porcentagem_cliente
                 WHERE id = :loja_id
             ");
             
@@ -55,6 +57,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $updateStmt->bindParam(':cashback_ativo', $cashbackAtivo);
             
             if ($updateStmt->execute()) {
+                // Atualizar também a tabela configuracoes_cashback global se necessário
+                $configStmt = $db->prepare("
+                    UPDATE configuracoes_cashback 
+                    SET porcentagem_cliente = :porcentagem_cliente,
+                        porcentagem_admin = :porcentagem_admin,
+                        data_atualizacao = NOW()
+                    WHERE id = 1
+                ");
+                $configStmt->bindParam(':porcentagem_cliente', $porcentagemCliente);
+                $configStmt->bindParam(':porcentagem_admin', $porcentagemAdmin);
+                $configStmt->execute();
+                
                 $success = 'Configurações de cashback atualizadas com sucesso!';
             } else {
                 throw new Exception('Erro ao atualizar configurações');
@@ -89,7 +103,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 JOIN usuarios u ON l.usuario_id = u.id
                 SET l.porcentagem_cliente = :porcentagem_cliente,
                     l.porcentagem_admin = :porcentagem_admin,
-                    l.data_config_cashback = NOW()
+                    l.data_config_cashback = NOW(),
+                    l.porcentagem_cashback = :porcentagem_cliente
                 WHERE l.status = 'aprovado' {$whereClause}
             ");
             
@@ -98,6 +113,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             
             if ($bulkUpdateStmt->execute()) {
                 $affected = $bulkUpdateStmt->rowCount();
+                
+                // Atualizar também a tabela configuracoes_cashback global
+                $configStmt = $db->prepare("
+                    UPDATE configuracoes_cashback 
+                    SET porcentagem_cliente = :porcentagem_cliente,
+                        porcentagem_admin = :porcentagem_admin,
+                        data_atualizacao = NOW()
+                    WHERE id = 1
+                ");
+                $configStmt->bindParam(':porcentagem_cliente', $porcentagemCliente);
+                $configStmt->bindParam(':porcentagem_admin', $porcentagemAdmin);
+                $configStmt->execute();
+                
                 $success = "Configurações aplicadas a {$affected} loja(s) com sucesso!";
             } else {
                 throw new Exception('Erro ao aplicar configurações em lote');
