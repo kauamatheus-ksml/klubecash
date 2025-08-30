@@ -47,7 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     porcentagem_admin = :porcentagem_admin,
                     cashback_ativo = :cashback_ativo,
                     data_config_cashback = NOW(),
-                    porcentagem_cashback = :porcentagem_cliente
+                    porcentagem_cashback = :porcentagem_cashback
                 WHERE id = :loja_id
             ");
             
@@ -55,6 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $updateStmt->bindParam(':porcentagem_cliente', $porcentagemCliente);
             $updateStmt->bindParam(':porcentagem_admin', $porcentagemAdmin);
             $updateStmt->bindParam(':cashback_ativo', $cashbackAtivo);
+            $updateStmt->bindParam(':porcentagem_cashback', $porcentagemCliente);
             
             if ($updateStmt->execute()) {
                 // Atualizar também a tabela configuracoes_cashback global se necessário
@@ -104,12 +105,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                 SET l.porcentagem_cliente = :porcentagem_cliente,
                     l.porcentagem_admin = :porcentagem_admin,
                     l.data_config_cashback = NOW(),
-                    l.porcentagem_cashback = :porcentagem_cliente
+                    l.porcentagem_cashback = :porcentagem_cashback_bulk
                 WHERE l.status = 'aprovado' {$whereClause}
             ");
             
             $bulkUpdateStmt->bindParam(':porcentagem_cliente', $porcentagemCliente);
             $bulkUpdateStmt->bindParam(':porcentagem_admin', $porcentagemAdmin);
+            $bulkUpdateStmt->bindParam(':porcentagem_cashback_bulk', $porcentagemCliente);
             
             if ($bulkUpdateStmt->execute()) {
                 $affected = $bulkUpdateStmt->rowCount();
