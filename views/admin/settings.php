@@ -306,49 +306,26 @@ try {
                     <div class="card-header">
                         <h2 class="card-title">Configurações de Cashback</h2>
                         <div class="card-header-actions">
-                            <a href="/admin/cashback-config" class="btn btn-secondary btn-sm">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 5px;">
+                            <a href="/admin/cashback-config" class="btn btn-primary btn-sm" style="background: linear-gradient(135deg, #FF7A00, #FF9500); border: none; font-weight: 600; padding: 10px 20px; box-shadow: 0 4px 12px rgba(255, 122, 0, 0.3); transition: all 0.3s ease;" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 16px rgba(255, 122, 0, 0.4)'" onmouseout="this.style.transform='translateY(0px)'; this.style.boxShadow='0 4px 12px rgba(255, 122, 0, 0.3)'">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px;">
+                                    <path d="M12 2v6m0 0l4-4m-4 4L8 4"></path>
+                                    <path d="M12 22v-6m0 0l4 4m-4-4l-4 4"></path>
+                                    <circle cx="12" cy="12" r="3"></circle>
                                     <path d="M12 1v6m0 0l4-4m-4 4L8 3"></path>
                                     <path d="M12 23v-6m0 0l4 4m-4-4l-4 4"></path>
-                                    <path d="M20 12h-2.5"></path>
-                                    <path d="M7 12H4"></path>
-                                    <path d="M14.5 8h-5v8h5V8z"></path>
                                 </svg>
-                                Configuração por Loja
+                                🏪 Configuração Personalizada por Loja
                             </a>
                         </div>
                     </div>
                     <div class="card-body">
-                        <!-- REMOVIDO: Campo porcentagem total - sempre será 10% -->
                         <div class="info-box">
-                            <div class="info-icon">ℹ️</div>
+                            <div class="info-icon">⚙️</div>
                             <div class="info-content">
-                                <strong>Configurações Globais:</strong> Estas são as configurações padrão do sistema. 
-                                Para configurar percentuais específicos por loja, use o botão "Configuração por Loja" acima.
-                                <br><br>
-                                <strong>Informação importante:</strong> A comissão total é sempre 10% sobre cada venda. 
-                                Esta porcentagem é distribuída entre cliente e plataforma. A loja não recebe cashback.
+                                <strong>Configurações por Loja:</strong> Use o botão abaixo para configurar percentuais específicos para cada loja.
+                                Cada loja pode ter suas próprias configurações de cashback personalizadas.
                             </div>
                         </div>
-                        
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label class="form-label" for="porcentagemCliente">Porcentagem para o Cliente (%)</label>
-                                <input type="number" step="0.01" min="0" max="10" class="form-control" id="porcentagemCliente" name="porcentagem_cliente" value="<?php echo $settings['porcentagem_cliente']; ?>" required>
-                                <small class="form-text">Parte do cashback que vai para o cliente</small>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label class="form-label" for="porcentagemAdmin">Porcentagem para a Plataforma (%)</label>
-                                <input type="number" step="0.01" min="0" max="10" class="form-control" id="porcentagemAdmin" name="porcentagem_admin" value="<?php echo $settings['porcentagem_admin']; ?>" required>
-                                <small class="form-text">Parte da comissão que fica para a plataforma</small>
-                            </div>
-                        </div>
-                        
-                        <p class="form-text" id="somaInfo">
-                            A soma deve ser exatamente <strong>10%</strong> (cliente + plataforma).
-                            <strong>Soma atual: <span id="somaAtual">0.00</span>%</strong>
-                        </p>
                         
                         <div class="btn-group">
                             <button type="submit" class="btn btn-primary">Salvar Configurações de Cashback</button>
