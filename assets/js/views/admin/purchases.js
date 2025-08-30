@@ -19,11 +19,14 @@ class PurchaseManager {
         this.bindEvents();
         this.initializeFilters();
         
-        // Load data immediately on page load
+        // Load data immediately and also set up fallback
+        this.updateKPIs();
+        this.loadPurchases();
+        
+        // Backup: Try to load data after a short delay
         setTimeout(() => {
-            this.updateKPIs();
-            this.loadPurchases();
-        }, 100);
+            this.calculateKPIsFromDOM();
+        }, 500);
     }
 
     bindEvents() {
