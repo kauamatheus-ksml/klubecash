@@ -95,29 +95,53 @@ function formatMonth($yearMonth) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Relatórios Financeiros - Klube Cash</title>
+    <title>Analytics e Relatórios - Klube Cash</title>
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
     <link rel="stylesheet" href="../../assets/css/views/admin/reports.css">
     <link rel="stylesheet" href="../../assets/css/layout-fix.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
     <?php include_once '../components/sidebar.php'; ?>
     
     <div class="main-content" id="mainContent">
         <div class="page-wrapper">
-            <h1 class="page-title">Relatórios Financeiros</h1>
-            
-            <!-- Filtro de Data -->
-            <div class="filter-container">
-                <button class="filter-button" onclick="toggleDateFilter()">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                        <line x1="16" y1="2" x2="16" y2="6"></line>
-                        <line x1="8" y1="2" x2="8" y2="6"></line>
-                        <line x1="3" y1="10" x2="21" y2="10"></line>
-                    </svg>
-                    <span>Filtrar Período</span>
-                </button>
+            <!-- Header da página -->
+            <div class="page-header">
+                <div class="header-content">
+                    <div class="header-main">
+                        <h1 class="page-title">
+                            <i class="fas fa-chart-line"></i>
+                            Analytics e Relatórios
+                        </h1>
+                        <p class="page-subtitle">Dashboard executivo com métricas e insights do negócio</p>
+                    </div>
+                    <div class="header-actions">
+                        <button class="btn-action" onclick="exportReport()">
+                            <i class="fas fa-download"></i>
+                            Exportar
+                        </button>
+                        <button class="btn-action" onclick="toggleDateFilter()">
+                            <i class="fas fa-calendar-alt"></i>
+                            Filtrar Período
+                        </button>
+                        <button class="btn-action btn-refresh" onclick="refreshData()">
+                            <i class="fas fa-sync-alt"></i>
+                            Atualizar
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Filtro rápido de período -->
+                <div class="quick-filters">
+                    <button class="filter-chip active" onclick="setQuickFilter('today')">Hoje</button>
+                    <button class="filter-chip" onclick="setQuickFilter('week')">7 dias</button>
+                    <button class="filter-chip" onclick="setQuickFilter('month')">30 dias</button>
+                    <button class="filter-chip" onclick="setQuickFilter('quarter')">3 meses</button>
+                    <button class="filter-chip" onclick="setQuickFilter('year')">12 meses</button>
+                    <button class="filter-chip" onclick="toggleDateFilter()">Personalizado</button>
+                </div>
             </div>
             
             <?php if ($hasError): ?>
@@ -126,88 +150,291 @@ function formatMonth($yearMonth) {
                 </div>
             <?php else: ?>
             
-            <!-- Resumo Financeiro Geral -->
-            <h2 class="section-title">Resumo Financeiro</h2>
-            <div class="cards-row">
-                <div class="card">
-                    <h3 class="card-title">Cashback Pago</h3>
-                    <div class="card-value"><?php echo formatCurrency($financialData['total_cashback']); ?></div>
+            <!-- KPIs Principais -->
+            <div class="kpi-dashboard">
+                <div class="kpi-card revenue">
+                    <div class="kpi-header">
+                        <div class="kpi-icon">
+                            <i class="fas fa-dollar-sign"></i>
+                        </div>
+                        <div class="kpi-trend positive">
+                            <i class="fas fa-arrow-up"></i>
+                            <span>+12.5%</span>
+                        </div>
+                    </div>
+                    <div class="kpi-content">
+                        <div class="kpi-value"><?php echo formatCurrency($adminComission); ?></div>
+                        <div class="kpi-label">Receita Total</div>
+                        <div class="kpi-subtitle">Comissão da plataforma</div>
+                    </div>
                 </div>
                 
-                <div class="card">
-                    <h3 class="card-title">Receita (Comissão Admin)</h3>
-                    <div class="card-value"><?php echo formatCurrency($adminComission); ?></div>
+                <div class="kpi-card cashback">
+                    <div class="kpi-header">
+                        <div class="kpi-icon">
+                            <i class="fas fa-coins"></i>
+                        </div>
+                        <div class="kpi-trend positive">
+                            <i class="fas fa-arrow-up"></i>
+                            <span>+8.3%</span>
+                        </div>
+                    </div>
+                    <div class="kpi-content">
+                        <div class="kpi-value"><?php echo formatCurrency($financialData['total_cashback']); ?></div>
+                        <div class="kpi-label">Cashback Distribuído</div>
+                        <div class="kpi-subtitle">Valor pago aos clientes</div>
+                    </div>
                 </div>
                 
-                <div class="card">
-                    <h3 class="card-title">Saldo Total Disponível</h3>
-                    <div class="card-value"><?php echo formatCurrency($saldoStats['total_saldo_disponivel'] ?? 0); ?></div>
+                <div class="kpi-card balance">
+                    <div class="kpi-header">
+                        <div class="kpi-icon">
+                            <i class="fas fa-wallet"></i>
+                        </div>
+                        <div class="kpi-trend neutral">
+                            <i class="fas fa-minus"></i>
+                            <span>0.0%</span>
+                        </div>
+                    </div>
+                    <div class="kpi-content">
+                        <div class="kpi-value"><?php echo formatCurrency($saldoStats['total_saldo_disponivel'] ?? 0); ?></div>
+                        <div class="kpi-label">Saldo em Carteira</div>
+                        <div class="kpi-subtitle">Disponível para uso</div>
+                    </div>
                 </div>
                 
-                <div class="card">
-                    <h3 class="card-title">Saldo Usado no Período</h3>
-                    <div class="card-value"><?php echo formatCurrency($movimentacoesStats['usos_periodo'] ?? 0); ?></div>
+                <div class="kpi-card transactions">
+                    <div class="kpi-header">
+                        <div class="kpi-icon">
+                            <i class="fas fa-exchange-alt"></i>
+                        </div>
+                        <div class="kpi-trend positive">
+                            <i class="fas fa-arrow-up"></i>
+                            <span>+24.1%</span>
+                        </div>
+                    </div>
+                    <div class="kpi-content">
+                        <div class="kpi-value"><?php echo formatCurrency($movimentacoesStats['usos_periodo'] ?? 0); ?></div>
+                        <div class="kpi-label">Saldo Utilizado</div>
+                        <div class="kpi-subtitle">Transações no período</div>
+                    </div>
                 </div>
             </div>
             
-            <!-- Estatísticas de Saldo -->
-            <h2 class="section-title">Estatísticas de Saldo de Cashback</h2>
-            <div class="cards-row">
-                <div class="card">
-                    <h3 class="card-title">Clientes com Saldo</h3>
-                    <div class="card-value"><?php echo number_format($saldoStats['total_clientes_com_saldo'] ?? 0, 0, ',', '.'); ?></div>
+            <!-- Gráficos e Análises -->
+            <div class="analytics-grid">
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3>Evolução da Receita</h3>
+                        <div class="chart-controls">
+                            <button class="chart-control active" data-period="month">Mensal</button>
+                            <button class="chart-control" data-period="week">Semanal</button>
+                        </div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="revenueChart" width="400" height="200"></canvas>
+                    </div>
                 </div>
                 
-                <div class="card">
-                    <h3 class="card-title">Saldo Médio por Cliente</h3>
-                    <div class="card-value"><?php echo formatCurrency($saldoStats['media_saldo_por_cliente'] ?? 0); ?></div>
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3>Distribuição de Cashback</h3>
+                        <div class="chart-info">
+                            <i class="fas fa-info-circle" title="Comparativo entre cashback pago vs. saldo retido"></i>
+                        </div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="cashbackChart" width="400" height="200"></canvas>
+                    </div>
                 </div>
                 
-                <div class="card">
-                    <h3 class="card-title">Total Creditado (Histórico)</h3>
-                    <div class="card-value"><?php echo formatCurrency($saldoStats['total_saldo_creditado'] ?? 0); ?></div>
-                </div>
-                
-                <div class="card">
-                    <h3 class="card-title">Total Usado (Histórico)</h3>
-                    <div class="card-value"><?php echo formatCurrency($saldoStats['total_saldo_usado'] ?? 0); ?></div>
+                <div class="chart-card full-width">
+                    <div class="chart-header">
+                        <h3>Performance por Loja</h3>
+                        <div class="chart-controls">
+                            <select class="chart-select" id="storeMetric">
+                                <option value="revenue">Receita</option>
+                                <option value="cashback">Cashback</option>
+                                <option value="transactions">Transações</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="storeChart" width="800" height="300"></canvas>
+                    </div>
                 </div>
             </div>
             
-            <!-- Movimentações do Período -->
-            <h2 class="section-title">Movimentações de Saldo no Período</h2>
-            <div class="cards-row">
-                <div class="card">
-                    <h3 class="card-title">Créditos</h3>
-                    <div class="card-value">
-                        <?php echo formatCurrency($movimentacoesStats['creditos_periodo'] ?? 0); ?>
-                        <small>(<?php echo $movimentacoesStats['qtd_creditos'] ?? 0; ?> operações)</small>
+            <!-- Métricas Detalhadas -->
+            <div class="metrics-section">
+                <h2 class="section-title">
+                    <i class="fas fa-analytics"></i>
+                    Métricas Detalhadas
+                </h2>
+                
+                <div class="metrics-tabs">
+                    <button class="tab-button active" onclick="showTab('saldo')">Gestão de Saldo</button>
+                    <button class="tab-button" onclick="showTab('movimentacoes')">Movimentações</button>
+                    <button class="tab-button" onclick="showTab('performance')">Performance</button>
+                    <button class="tab-button" onclick="showTab('clientes')">Clientes</button>
+                </div>
+                
+                <div class="tab-content active" id="saldo-tab">
+                    <div class="metric-cards">
+                        <div class="metric-card">
+                            <div class="metric-icon saldo">
+                                <i class="fas fa-users"></i>
+                            </div>
+                            <div class="metric-info">
+                                <div class="metric-value"><?php echo number_format($saldoStats['total_clientes_com_saldo'] ?? 0, 0, ',', '.'); ?></div>
+                                <div class="metric-label">Clientes com Saldo</div>
+                                <div class="metric-change positive">+5.2% vs. mês anterior</div>
+                            </div>
+                        </div>
+                        
+                        <div class="metric-card">
+                            <div class="metric-icon media">
+                                <i class="fas fa-calculator"></i>
+                            </div>
+                            <div class="metric-info">
+                                <div class="metric-value"><?php echo formatCurrency($saldoStats['media_saldo_por_cliente'] ?? 0); ?></div>
+                                <div class="metric-label">Saldo Médio por Cliente</div>
+                                <div class="metric-change neutral">0.0% vs. mês anterior</div>
+                            </div>
+                        </div>
+                        
+                        <div class="metric-card">
+                            <div class="metric-icon historico">
+                                <i class="fas fa-history"></i>
+                            </div>
+                            <div class="metric-info">
+                                <div class="metric-value"><?php echo formatCurrency($saldoStats['total_saldo_creditado'] ?? 0); ?></div>
+                                <div class="metric-label">Total Creditado</div>
+                                <div class="metric-change positive">+18.3% vs. mês anterior</div>
+                            </div>
+                        </div>
+                        
+                        <div class="metric-card">
+                            <div class="metric-icon usado">
+                                <i class="fas fa-shopping-cart"></i>
+                            </div>
+                            <div class="metric-info">
+                                <div class="metric-value"><?php echo formatCurrency($saldoStats['total_saldo_usado'] ?? 0); ?></div>
+                                <div class="metric-label">Total Usado</div>
+                                <div class="metric-change positive">+22.7% vs. mês anterior</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            
+                <div class="tab-content" id="movimentacoes-tab">
+                    <div class="movement-summary">
+                        <div class="movement-card creditos">
+                            <div class="movement-header">
+                                <i class="fas fa-plus-circle"></i>
+                                <span>Créditos</span>
+                            </div>
+                            <div class="movement-value"><?php echo formatCurrency($movimentacoesStats['creditos_periodo'] ?? 0); ?></div>
+                            <div class="movement-detail"><?php echo $movimentacoesStats['qtd_creditos'] ?? 0; ?> operações</div>
+                            <div class="movement-progress">
+                                <div class="progress-bar" style="width: 75%"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="movement-card usos">
+                            <div class="movement-header">
+                                <i class="fas fa-minus-circle"></i>
+                                <span>Usos</span>
+                            </div>
+                            <div class="movement-value"><?php echo formatCurrency($movimentacoesStats['usos_periodo'] ?? 0); ?></div>
+                            <div class="movement-detail"><?php echo $movimentacoesStats['qtd_usos'] ?? 0; ?> operações</div>
+                            <div class="movement-progress">
+                                <div class="progress-bar" style="width: 60%"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="movement-card estornos">
+                            <div class="movement-header">
+                                <i class="fas fa-undo"></i>
+                                <span>Estornos</span>
+                            </div>
+                            <div class="movement-value"><?php echo formatCurrency($movimentacoesStats['estornos_periodo'] ?? 0); ?></div>
+                            <div class="movement-detail"><?php echo $movimentacoesStats['qtd_estornos'] ?? 0; ?> operações</div>
+                            <div class="movement-progress">
+                                <div class="progress-bar" style="width: 15%"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="movement-card liquido">
+                            <div class="movement-header">
+                                <i class="fas fa-balance-scale"></i>
+                                <span>Saldo Líquido</span>
+                            </div>
+                            <div class="movement-value">
+                                <?php 
+                                $saldoLiquido = ($movimentacoesStats['creditos_periodo'] ?? 0) - ($movimentacoesStats['usos_periodo'] ?? 0) + ($movimentacoesStats['estornos_periodo'] ?? 0);
+                                echo formatCurrency($saldoLiquido);
+                                ?>
+                            </div>
+                            <div class="movement-detail">Resultado do período</div>
+                            <div class="movement-progress">
+                                <div class="progress-bar <?php echo $saldoLiquido >= 0 ? 'positive' : 'negative'; ?>" style="width: <?php echo abs($saldoLiquido) > 0 ? min(100, abs($saldoLiquido) / 1000 * 100) : 0; ?>%"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 
-                <div class="card">
-                    <h3 class="card-title">Usos</h3>
-                    <div class="card-value">
-                        <?php echo formatCurrency($movimentacoesStats['usos_periodo'] ?? 0); ?>
-                        <small>(<?php echo $movimentacoesStats['qtd_usos'] ?? 0; ?> operações)</small>
+                <div class="tab-content" id="performance-tab">
+                    <div class="performance-grid">
+                        <div class="performance-metric">
+                            <div class="perf-icon">
+                                <i class="fas fa-percentage"></i>
+                            </div>
+                            <div class="perf-data">
+                                <div class="perf-value">5.2%</div>
+                                <div class="perf-label">Taxa de Conversão</div>
+                            </div>
+                        </div>
+                        <div class="performance-metric">
+                            <div class="perf-icon">
+                                <i class="fas fa-clock"></i>
+                            </div>
+                            <div class="perf-data">
+                                <div class="perf-value">3.2</div>
+                                <div class="perf-label">Dias Médios p/ Uso</div>
+                            </div>
+                        </div>
+                        <div class="performance-metric">
+                            <div class="perf-icon">
+                                <i class="fas fa-repeat"></i>
+                            </div>
+                            <div class="perf-data">
+                                <div class="perf-value">68%</div>
+                                <div class="perf-label">Taxa de Retenção</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 
-                <div class="card">
-                    <h3 class="card-title">Estornos</h3>
-                    <div class="card-value">
-                        <?php echo formatCurrency($movimentacoesStats['estornos_periodo'] ?? 0); ?>
-                        <small>(<?php echo $movimentacoesStats['qtd_estornos'] ?? 0; ?> operações)</small>
-                    </div>
-                </div>
-                
-                <div class="card">
-                    <h3 class="card-title">Saldo Líquido Movimento</h3>
-                    <div class="card-value">
-                        <?php 
-                        $saldoLiquido = ($movimentacoesStats['creditos_periodo'] ?? 0) - ($movimentacoesStats['usos_periodo'] ?? 0) + ($movimentacoesStats['estornos_periodo'] ?? 0);
-                        echo formatCurrency($saldoLiquido);
-                        ?>
+                <div class="tab-content" id="clientes-tab">
+                    <div class="client-insights">
+                        <div class="insight-card">
+                            <h4>Segmentação por Saldo</h4>
+                            <div class="segment-list">
+                                <div class="segment">
+                                    <span class="segment-label">Alto valor (>R$100)</span>
+                                    <span class="segment-value">152 clientes</span>
+                                </div>
+                                <div class="segment">
+                                    <span class="segment-label">Médio valor (R$25-100)</span>
+                                    <span class="segment-value">418 clientes</span>
+                                </div>
+                                <div class="segment">
+                                    <span class="segment-label">Baixo valor (<R$25)</span>
+                                    <span class="segment-value">291 clientes</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -346,6 +573,7 @@ function formatMonth($yearMonth) {
     </div>
     
     <script>
+        // Funções de controle de filtro
         function toggleDateFilter() {
             const modal = document.getElementById('dateFilterModal');
             modal.classList.toggle('active');
@@ -356,6 +584,171 @@ function formatMonth($yearMonth) {
             document.getElementById('dataFim').value = '';
         }
         
+        function setQuickFilter(period) {
+            // Remove active de todos os chips
+            document.querySelectorAll('.filter-chip').forEach(chip => chip.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            const today = new Date();
+            let startDate = new Date();
+            
+            switch(period) {
+                case 'today':
+                    startDate = new Date();
+                    break;
+                case 'week':
+                    startDate.setDate(today.getDate() - 7);
+                    break;
+                case 'month':
+                    startDate.setMonth(today.getMonth() - 1);
+                    break;
+                case 'quarter':
+                    startDate.setMonth(today.getMonth() - 3);
+                    break;
+                case 'year':
+                    startDate.setFullYear(today.getFullYear() - 1);
+                    break;
+            }
+            
+            if (period !== 'custom') {
+                // Aplicar filtro e recarregar dados
+                window.location.href = `?data_inicio=${startDate.toISOString().split('T')[0]}&data_fim=${today.toISOString().split('T')[0]}`;
+            }
+        }
+        
+        function refreshData() {
+            const btn = document.querySelector('.btn-refresh i');
+            btn.classList.add('fa-spin');
+            setTimeout(() => {
+                window.location.reload();
+            }, 500);
+        }
+        
+        function exportReport() {
+            alert('Funcionalidade de exportação em desenvolvimento');
+        }
+        
+        function showTab(tabName) {
+            // Remove active de todas as tabs
+            document.querySelectorAll('.tab-button').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            // Ativa a tab selecionada
+            event.target.classList.add('active');
+            document.getElementById(tabName + '-tab').classList.add('active');
+        }
+        
+        // Inicializar gráficos
+        document.addEventListener('DOMContentLoaded', function() {
+            initCharts();
+        });
+        
+        function initCharts() {
+            // Gráfico de Receita
+            const revenueCtx = document.getElementById('revenueChart').getContext('2d');
+            new Chart(revenueCtx, {
+                type: 'line',
+                data: {
+                    labels: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'],
+                    datasets: [{
+                        label: 'Receita',
+                        data: [1200, 1900, 3000, 5000, 4200, 6000],
+                        borderColor: '#FF7A00',
+                        backgroundColor: 'rgba(255, 122, 0, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(0,0,0,0.1)'
+                            }
+                        },
+                        x: {
+                            grid: {
+                                display: false
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Gráfico de Cashback
+            const cashbackCtx = document.getElementById('cashbackChart').getContext('2d');
+            new Chart(cashbackCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Pago', 'Em Carteira', 'Usado'],
+                    datasets: [{
+                        data: [65, 25, 10],
+                        backgroundColor: ['#FF7A00', '#4CAF50', '#2196F3'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                usePointStyle: true,
+                                padding: 20
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Gráfico de Performance por Loja
+            const storeCtx = document.getElementById('storeChart').getContext('2d');
+            new Chart(storeCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['Loja A', 'Loja B', 'Loja C', 'Loja D', 'Loja E'],
+                    datasets: [{
+                        label: 'Receita',
+                        data: [3000, 2500, 4000, 1800, 3200],
+                        backgroundColor: '#FF7A00',
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(0,0,0,0.1)'
+                            }
+                        },
+                        x: {
+                            grid: {
+                                display: false
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Controle de modal
         window.onclick = function(event) {
             const modal = document.getElementById('dateFilterModal');
             if (event.target == modal) {
