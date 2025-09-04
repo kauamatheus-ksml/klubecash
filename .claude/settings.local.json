@@ -5,7 +5,9 @@
       "Bash(php:*)",
       "Bash(del test_mvp.php)",
       "Bash(find:*)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(setx:*)",
+      "Bash(dir:*)"
     ],
     "deny": [],
     "ask": []

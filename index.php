@@ -854,7 +854,7 @@ try {
                         </div>
                     <?php else: ?>
                         <a href="<?php echo LOGIN_URL; ?>" class="btn btn-ghost">Entrar</a>
-                        <a href="<?php echo REGISTER_URL; ?>" class="btn btn-primary">Cadastrar</a>
+                        
                     <?php endif; ?>
                 </div>
                 
