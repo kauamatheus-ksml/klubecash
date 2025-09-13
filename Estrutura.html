@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Estrutura Completa do Projeto Flutter - Klube Cash (App Cliente)</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f2f5; /* Light gray background */
+        }
+        .section-header {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem;
+            background-color: #1a202c; /* Dark blue-gray for headers */
+            color: #ffffff;
+            border-radius: 0.5rem;
+            margin-bottom: 0.5rem;
+            transition: background-color 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .section-header:hover {
+            background-color: #2d3748; /* Slightly lighter on hover */
+        }
+        .section-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.5s ease-out, padding 0.5s ease-out;
+            background-color: #ffffff; /* White background for content */
+            border-radius: 0.5rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            margin-bottom: 1rem;
+        }
+        .section-content.expanded {
+            max-height: 2000px; /* Arbitrary large value to allow content to expand */
+            padding: 1rem;
+            transition: max-height 0.7s ease-in, padding 0.7s ease-in;
+        }
+        .subsection-header {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem;
+            background-color: #e2e8f0; /* Light gray for sub-headers */
+            color: #2d3748; /* Darker text for contrast */
+            border-radius: 0.375rem;
+            margin-top: 0.5rem;
+            margin-bottom: 0.25rem;
+            transition: background-color 0.3s ease;
+        }
+        .subsection-header:hover {
+            background-color: #cbd5e0; /* Even lighter on hover */
+        }
+        .subsection-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.4s ease-out, padding 0.4s ease-out;
+            background-color: #f7fafc; /* Even lighter for sub-content */
+            border-radius: 0.375rem;
+        }
+        .subsection-content.expanded {
+            max-height: 1500px; /* Arbitrary large value */
+            padding: 0.75rem;
+            transition: max-height 0.6s ease-in, padding 0.6s ease-in;
+        }
+        .file-item {
+            padding: 0.25rem 0;
+            color: #4a5568; /* Gray text for file items */
+        }
+        .folder-structure pre {
+            background-color: #edf2f7; /* Light background for code block */
+            padding: 1rem;
+            border-radius: 0.375rem;
+            overflow-x: auto;
+            white-space: pre-wrap; /* Wrap long lines */
+            word-break: break-all; /* Break words to prevent overflow */
+            color: #2d3748; /* Dark text for code */
+            font-size: 0.9em;
+        }
+        .arrow {
+            transition: transform 0.3s ease;
+        }
+        .arrow.rotated {
+            transform: rotate(90deg);
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div class="max-w-4xl mx-auto bg-white p-6 md:p-8 rounded-lg shadow-xl">
+        <h1 class="text-3xl md:text-4xl font-bold text-center text-gray-800 mb-6">Estrutura Completa do Projeto Flutter - Klube Cash (App Cliente)</h1>
+
+        <p class="text-gray-600 mb-8 text-center">
+            Este site interativo permite visualizar a arquitetura e estrutura de pastas do projeto Flutter Klube Cash.
+            Clique nos cabeçalhos para expandir ou recolher as seções.
+        </p>
+
+        <!-- Visão Geral da Arquitetura -->
+        <div class="mb-6">
+            <div class="section-header" onclick="toggleSection('overview')">
+                <h2 class="text-xl md:text-2xl font-semibold">Visão Geral da Arquitetura</h2>
+                <span class="arrow text-2xl" id="overview-arrow">&#9658;</span>
+            </div>
+            <div id="overview-content" class="section-content">
+                <p class="text-gray-700">
+                    O projeto seguirá o padrão <strong class="font-medium text-blue-600">Clean Architecture</strong> com separação clara entre camadas de apresentação, domínio e dados. Utilizará <strong class="font-medium text-blue-600">Riverpod</strong> para gerenciamento de estado e <strong class="font-medium text-blue-600">Go Router</strong> para navegação.
+                </p>
+            </div>
+        </div>
+
+        <!-- Estrutura de Pastas -->
+        <div class="mb-6">
+            <div class="section-header" onclick="toggleSection('folderStructure')">
+                <h2 class="text-xl md:text-2xl font-semibold">Estrutura de Pastas</h2>
+                <span class="arrow text-2xl" id="folderStructure-arrow">&#9658;</span>
+            </div>
+            <div id="folderStructure-content" class="section-content folder-structure">
+                <pre><code>
+klube_cash_client/
+├── android/
+├── ios/
+├── lib/
+│   ├── core/
+│   │   ├── constants/
+│   │   │   ├── api_constants.dart
+│   │   │   ├── app_colors.dart
+│   │   │   ├── app_images.dart
+│   │   │   ├── app_strings.dart
+│   │   │   └── app_dimensions.dart
+│   │   ├── errors/
+│   │   │   ├── exceptions.dart
+│   │   │   └── failures.dart
+│   │   ├── network/
+│   │   │   ├── api_client.dart
+│   │   │   ├── network_info.dart
+│   │   │   └── api_interceptors.dart
+│   │   ├── routes/
+│   │   │   ├── app_router.dart
+│   │   │   └── route_guards.dart
+│   │   ├── theme/
+│   │   │   ├── app_theme.dart
+│   │   │   ├── text_styles.dart
+│   │   │   └── theme_provider.dart
+│   │   ├── utils/
+│   │   │   ├── validators.dart
+│   │   │   ├── formatters.dart
+│   │   │   ├── date_utils.dart
+│   │   │   └── currency_utils.dart
+│   │   └── widgets/
+│   │       ├── custom_button.dart
+│   │       ├── custom_text_field.dart
+│   │       ├── loading_indicator.dart
+│   │       ├── error_widget.dart
+│   │       ├── empty_state_widget.dart
+│   │       └── custom_app_bar.dart
+│   ├── features/
+│   │   ├── auth/
+│   │   │   ├── data/
+│   │   │   │   ├── datasources/
+│   │   │   │   │   └── auth_remote_datasource.dart
+│   │   │   │   ├── models/
+│   │   │   │   │   ├── user_model.dart
+│   │   │   │   │   └── auth_response_model.dart
+│   │   │   │   └── repositories/
+│   │   │   │       └── auth_repository_impl.dart
+│   │   │   ├── domain/
+│   │   │   │   ├── entities/
+│   │   │   │   │   └── user.dart
+│   │   │   │   ├── repositories/
+│   │   │   │   │   └── auth_repository.dart
+│   │   │   │   └── usecases/
+│   │   │   │       ├── login_usecase.dart
+│   │   │   │       ├── register_usecase.dart
+│   │   │   │       ├── logout_usecase.dart
+│   │   │   │       └── recover_password_usecase.dart
+│   │   │   └── presentation/
+│   │   │       ├── providers/
+│   │   │       │   └── auth_provider.dart
+│   │   │       ├── screens/
+│   │   │       │   ├── login_screen.dart
+│   │   │       │   ├── register_screen.dart
+│   │   │       │   ├── recover_password_screen.dart
+│   │   │       │   └── splash_screen.dart
+│   │   │       └── widgets/
+│   │   │           ├── login_form.dart
+│   │   │           ├── register_form.dart
+│   │   │           ├── social_login_buttons.dart
+│   │   │           └── auth_header.dart
+│   │   ├── dashboard/
+│   │   │   ├── data/
+│   │   │   │   ├── datasources/
+│   │   │   │   │   └── dashboard_remote_datasource.dart
+│   │   │   │   ├── models/
+│   │   │   │   │   ├── cashback_summary_model.dart
+│   │   │   │   │   └── transaction_summary_model.dart
+│   │   │   │   └── repositories/
+│   │   │   │       └── dashboard_repository_impl.dart
+│   │   │   ├── domain/
+│   │   │   │   ├── entities/
+│   │   │   │   │   ├── cashback_summary.dart
+│   │   │   │   │   └── transaction_summary.dart
+│   │   │   │   ├── repositories/
+│   │   │   │   │   └── dashboard_repository.dart
+│   │   │   │   └── usecases/
+│   │   │   │       ├── get_cashback_summary_usecase.dart
+│   │   │   │       └── get_recent_transactions_usecase.dart
+│   │   │   └── presentation/
+│   │   │       ├── providers/
+│   │   │       │   └── dashboard_provider.dart
+│   │   │       ├── screens/
+│   │   │       │   └── dashboard_screen.dart
+│   │   │       └── widgets/
+│   │   │           ├── cashback_card.dart
+│   │   │           ├── cashback_chart.dart
+│   │   │           ├── recent_transactions_list.dart
+│   │   │           ├── balance_summary_card.dart
+│   │   │           └── quick_actions_grid.dart
+│   │   ├── cashback/
+│   │   │   ├── data/
+│   │   │   │   ├── datasources/
+│   │   │   │   │   └── cashback_remote_datasource.dart
+│   │   │   │   ├── models/
+│   │   │   │   │   ├── cashback_transaction_model.dart
+│   │   │   │   │   └── cashback_filter_model.dart
+│   │   │   │   └── repositories/
+│   │   │   │       └── cashback_repository_impl.dart
+│   │   │   ├── domain/
+│   │   │   │   ├── entities/
+│   │   │   │   │   ├── cashback_transaction.dart
+│   │   │   │   │   └── cashback_filter.dart
+│   │   │   │   ├── repositories/
+│   │   │   │   │   └── cashback_repository.dart
+│   │   │   │   └── usecases/
+│   │   │   │       ├── get_cashback_history_usecase.dart
+│   │   │   │       └── filter_cashback_usecase.dart
+│   │   │   └── presentation/
+│   │   │       ├── providers/
+│   │   │       │   └── cashback_provider.dart
+│   │   │       ├── screens/
+│   │   │       │   ├── cashback_history_screen.dart
+│   │   │       │   └── cashback_details_screen.dart
+│   │   │       └── widgets/
+│   │   │           ├── cashback_list_item.dart
+│   │   │           ├── cashback_filter_sheet.dart
+│   │   │           ├── cashback_status_chip.dart
+│   │   │           └── cashback_statistics_card.dart
+│   │   ├── stores/
+│   │   │   ├── data/
+│   │   │   │   ├── datasources/
+│   │   │   │   │   └── stores_remote_datasource.dart
+│   │   │   │   ├── models/
+│   │   │   │   │   ├── store_model.dart
+│   │   │   │   │   └── store_category_model.dart
+│   │   │   │   └── repositories/
+│   │   │   │       └── stores_repository_impl.dart
+│   │   │   ├── domain/
+│   │   │   │   ├── entities/
+│   │   │   │   │   ├── store.dart
+│   │   │   │   │   └── store_category.dart
+│   │   │   │   ├── repositories/
+│   │   │   │   │   └── stores_repository.dart
+│   │   │   │   └── usecases/
+│   │   │   │       ├── get_partner_stores_usecase.dart
+│   │   │   │       ├── search_stores_usecase.dart
+│   │   │   │       └── get_store_details_usecase.dart
+│   │   │   └── presentation/
+│   │   │       ├── providers/
+│   │   │       │   └── stores_provider.dart
+│   │   │       ├── screens/
+│   │   │       │   ├── partner_stores_screen.dart
+│   │   │       │   └── store_details_screen.dart
+│   │   │       └── widgets/
+│   │   │           ├── store_card.dart
+│   │   │           ├── store_search_bar.dart
+│   │   │           ├── store_categories_chips.dart
+│   │   │           └── store_info_section.dart
+│   │   ├── profile/
+│   │   │   ├── data/
+│   │   │   │   ├── datasources/
+│   │   │   │   │   └── profile_remote_datasource.dart
+│   │   │   │   ├── models/
+│   │   │   │   │   └── profile_model.dart
+│   │   │   │   └── repositories/
+│   │   │   │       └── profile_repository_impl.dart
+│   │   │   ├── domain/
+│   │   │   │   ├── entities/
+│   │   │   │   │   └── profile.dart
+│   │   │   │   ├── repositories/
+│   │   │   │   │   └── profile_repository.dart
+│   │   │   │   └── usecases/
+│   │   │   │       ├── get_profile_usecase.dart
+│   │   │   │       ├── update_profile_usecase.dart
+│   │   │   │       └── change_password_usecase.dart
+│   │   │   └── presentation/
+│   │   │       ├── providers/
+│   │   │       │   └── profile_provider.dart
+│   │   │       ├── screens/
+│   │   │       │   ├── profile_screen.dart
+│   │   │       │   ├── edit_profile_screen.dart
+│   │   │       │   └── change_password_screen.dart
+│   │   │       └── widgets/
+│   │   │           ├── profile_header.dart
+│   │   │           ├── profile_menu_item.dart
+│   │   │           ├── profile_form.dart
+│   │   │           └── logout_dialog.dart
+│   │   └── notifications/
+│   │       ├── data/
+│   │       │   ├── datasources/
+│   │       │   │   └── notifications_remote_datasource.dart
+│   │       │   ├── models/
+│   │       │   │   └── notification_model.dart
+│   │       │   └── repositories/
+│   │       │       └── notifications_repository_impl.dart
+│   │       ├── domain/
+│   │       │   ├── entities/
+│   │       │   │   └── notification.dart
+│   │   │       │   ├── repositories/
+│   │       │   │   │   └── notifications_repository.dart
+│   │       │   │   └── usecases/
+│   │       │   │       ├── get_notifications_usecase.dart
+│   │       │   │       └── mark_as_read_usecase.dart
+│   │       └── presentation/
+│   │           ├── providers/
+│   │           │   └── notifications_provider.dart
+│   │           ├── screens/
+│   │           │   └── notifications_screen.dart
+│   │           └── widgets/
+│   │               ├── notification_tile.dart
+│   │               └── notification_badge.dart
+│   ├── main.dart
+│   └── app.dart
+├── test/
+├── assets/
+│   ├── images/
+│   │   ├── logo.png
+│   │   ├── splash_background.png
+│   │   ├── empty_cashback.png
+│   │   ├── empty_stores.png
+│   │   └── icons/
+│   └── fonts/
+├── pubspec.yaml
+└── README.md
+                </code></pre>
+            </div>
+        </div>
+
+        <!-- Detalhamento dos Arquivos -->
+        <div class="mb-6">
+            <div class="section-header" onclick="toggleSection('fileDetails')">
+                <h2 class="text-xl md:text-2xl font-semibold">Detalhamento dos Arquivos</h2>
+                <span class="arrow text-2xl" id="fileDetails-arrow">&#9658;</span>
+            </div>
+            <div id="fileDetails-content" class="section-content">
+                <!-- Core Section -->
+                <div class="mb-4">
+                    <div class="subsection-header" onclick="toggleSubsection('core')">
+                        <h3 class="text-lg md:text-xl font-medium">Core</h3>
+                        <span class="arrow text-xl" id="core-arrow">&#9658;</span>
+                    </div>
+                    <div id="core-content" class="subsection-content">
+                        <h4 class="font-semibold text-gray-800 mt-2">Constants:</h4>
+                        <ul class="list-disc ml-5 text-gray-700">
+                            <li class="file-item"><strong>api_constants.dart:</strong> URLs base da API, endpoints, timeouts</li>
+                            <li class="file-item"><strong>app_colors.dart:</strong> Paleta de cores (primária, secundária, success, error, etc)</li>
+                            <li class="file-item"><strong>app_images.dart:</strong> Caminhos das imagens e ícones</li>
+                            <li class="file-item"><strong>app_strings.dart:</strong> Todos os textos da aplicação (internacionalização)</li>
+                            <li class="file-item"><strong>app_dimensions.dart:</strong> Espaçamentos, tamanhos, bordas padrão</li>
+                        </ul>
+                        <h4 class="font-semibold text-gray-800 mt-2">Errors:</h4>
+                        <ul class="list-disc ml-5 text-gray-700">
+                            <li class="file-item"><strong>exceptions.dart:</strong> Exceções customizadas (ServerException, CacheException)</li>
+                            <li class="file-item"><strong>failures.dart:</strong> Classes de falha para tratamento de erros</li>
+                        </ul>
+                        <h4 class="font-semibold text-gray-800 mt-2">Network:</h4>
+                        <ul class="list-disc ml-5 text-gray-700">
+                            <li class="file-item"><strong>api_client.dart:</strong> Cliente HTTP configurado com Dio</li>
+                            <li class="file-item"><strong>network_info.dart:</strong> Verificação de conectividade</li>
+                            <li class="file-item"><strong>api_interceptors.dart:</strong> Interceptadores para auth, logs, retry</li>
+                        </ul>
+                        <h4 class="font-semibold text-gray-800 mt-2">Routes:</h4>
+                        <ul class="list-disc ml-5 text-gray-700">
+                            <li class="file-item"><strong>app_router.dart:</strong> Configuração do Go Router com todas as rotas</li>
+                            <li class="file-item"><strong>route_guards.dart:</strong> Guards para verificar autenticação</li>
+                        </ul>
+                        <h4 class="font-semibold text-gray-800 mt-2">Theme:</h4>
+                        <ul class="list-disc ml-5 text-gray-700">
+                            <li class="file-item"><strong>app_theme.dart:</strong> Tema light/dark completo</li>
+                            <li class="file-item"><strong>text_styles.dart:</strong> Estilos de texto padronizados</li>
+                            <li class="file-item"><strong>theme_provider.dart:</strong> Provider para alternar temas</li>
+                        </ul>
+                        <h4 class="font-semibold text-gray-800 mt-2">Utils:</h4>
+                        <ul class="list-disc ml-5 text-gray-700">
+                            <li class="file-item"><strong>validators.dart:</strong> Validações de CPF, email, senha</li>
+                            <li class="file-item"><strong>formatters.dart:</strong> Formatação de moeda, data, CPF</li>
+                            <li class="file-item"><strong>date_utils.dart:</strong> Manipulação de datas</li>
+                            <li class="file-item"><strong>currency_utils.dart:</strong> Conversões e formatações monetárias</li>
+                        </ul>
+                        <h4 class="font-semibold text-gray-800 mt-2">Widgets Globais:</h4>
+                        <ul class="list-disc ml-5 text-gray-700">
+                            <li class="file-item"><strong>custom_button.dart:</strong> Botão padrão com variações (primary, secondary, outline)</li>
+                            <li class="file-item"><strong>custom_text_field.dart:</strong> Campo de texto customizado com validação</li>
+                            <li class="file-item"><strong>loading_indicator.dart:</strong> Indicador de carregamento padrão</li>
+                            <li class="file-item"><strong>error_widget.dart:</strong> Widget para exibir erros</li>
+                            <li class="file-item"><strong>empty_state_widget.dart:</strong> Estado vazio customizável</li>
+                            <li class="file-item"><strong>custom_app_bar.dart:</strong> AppBar padrão do app</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Features Section -->
+                <div class="mb-4">
+                    <div class="subsection-header" onclick="toggleSubsection('features')">
+                        <h3 class="text-lg md:text-xl font-medium">Features</h3>
+                        <span class="arrow text-xl" id="features-arrow">&#9658;</span>
+                    </div>
+                    <div id="features-content" class="subsection-content">
+                        <h4 class="font-semibold text-gray-800 mt-2">Auth (Autenticação)</h4>
+                        <h5 class="font-medium text-gray-700 ml-4">Screens:</h5>
+                        <ul class="list-disc ml-8 text-gray-600">
+                            <li class="file-item"><strong>splash_screen.dart:</strong> Logo animado do Klube Cash, Verificação de token salvo, Redirecionamento automático</li>
+                            <li class="file-item"><strong>login_screen.dart:</strong> Logo do Klube Cash no topo, Campo de email/CPF, Campo de senha com toggle de visibilidade, Checkbox "Lembrar-me", Botão "Entrar", Link "Esqueceu sua senha?", Divisor "ou", Botões de login social (Google, Facebook), Link "Não tem conta? Cadastre-se"</li>
+                            <li class="file-item"><strong>register_screen.dart:</strong> Header com voltar, Título "Criar Conta", Campo nome completo, Campo CPF com máscara, Campo email, Campo telefone com máscara, Campo senha com indicador de força, Campo confirmar senha, Checkbox de termos de uso, Botão "Cadastrar", Link "Já tem conta? Faça login"</li>
+                            <li class="file-item"><strong>recover_password_screen.dart:</strong> Header com voltar, Título "Recuperar Senha", Instrução explicativa, Campo email/CPF, Botão "Enviar", Mensagem de sucesso após envio</li>
+                        </ul>
+                        <h4 class="font-semibold text-gray-800 mt-2">Dashboard</h4>
+                        <h5 class="font-medium text-gray-700 ml-4">Screen:</h5>
+                        <ul class="list-disc ml-8 text-gray-600">
+                            <li class="file-item"><strong>dashboard_screen.dart:</strong> Header (Saudação personalizada, Foto do usuário, Ícone de notificações com badge), Card de Saldo Principal (Título "Seu Cashback", Saldo disponível em destaque, Saldo pendente menor abaixo, Toggle para ocultar valores, Botão "Ver extrato"), Gráfico de Evolução (Gráfico de linha dos últimos 30 dias, Seletor de período), Ações Rápidas (Grid 2x2: Ver lojas parceiras, Histórico completo, Indique amigos, Ajuda), Últimas Transações (Lista das 5 últimas, Logo da loja, Nome da loja, Data, Valor do cashback, Status, Link "Ver todas")</li>
+                        </ul>
+                        <h4 class="font-semibold text-gray-800 mt-2">Cashback</h4>
+                        <h5 class="font-medium text-gray-700 ml-4">Screens:</h5>
+                        <ul class="list-disc ml-8 text-gray-600">
+                            <li class="file-item"><strong>cashback_history_screen.dart:</strong> Header (Título "Histórico de Cashback", Botão de filtro), Card de Resumo (Total acumulado, Total disponível, Total pendente), Filtros (Bottom Sheet: Período, Status, Lojas específicas, Ordenação), Lista de Transações (Agrupadas por mês, Item: logo loja, nome, data, valor, status, Pull to refresh, Paginação infinita)</li>
+                            <li class="file-item"><strong>cashback_details_screen.dart:</strong> Logo e nome da loja, Status da transação, Valor da compra, Percentual de cashback, Valor do cashback, Data da compra, Previsão de liberação, Código da transação, Botão "Reportar problema"</li>
+                        </ul>
+                        <h4 class="font-semibold text-gray-800 mt-2">Stores (Lojas Parceiras)</h4>
+                        <h5 class="font-medium text-gray-700 ml-4">Screens:</h5>
+                        <ul class="list-disc ml-8 text-gray-600">
+                            <li class="file-item"><strong>partner_stores_screen.dart:</strong> Barra de Busca (Campo de pesquisa, Ícone de busca, Filtro por categoria), Chips de Categorias (Todas, Alimentação, Moda, Serviços, Outros), Lista/Grid de Lojas (Toggle lista/grid, Card: logo, nome, cashback%, categoria, Indicador de "Nova parceira"), Filtros Avançados (Por percentual de cashback, Por distância, Por avaliação)</li>
+                            <li class="file-item"><strong>store_details_screen.dart:</strong> Header com imagem (Foto de capa, Logo sobreposto, Botão voltar, Botão favoritar), Informações Principais (Nome da loja, Categoria, Percentual de cashback em destaque, Avaliação e reviews), Seções em tabs (Sobre, Localização, Avaliações), Botão Flutuante ("Ir às compras")</li>
+                        </ul>
+                        <h4 class="font-semibold text-gray-800 mt-2">Profile</h4>
+                        <h5 class="font-medium text-gray-700 ml-4">Screens:</h5>
+                        <ul class="list-disc ml-8 text-gray-600">
+                            <li class="file-item"><strong>profile_screen.dart:</strong> Header do Perfil (Foto, Nome, CPF parcial, Email, Membro desde), Menu de Opções (Meus dados, Alterar senha, Notificações, Termos de uso, Política de privacidade, Central de ajuda, Sobre o app, Sair), Card de Indicação ("Indique e ganha", Código de indicação, Botão compartilhar)</li>
+                            <li class="file-item"><strong>edit_profile_screen.dart:</strong> Foto editável, Campos: nome, email, telefone, Botão salvar, Validações em tempo real</li>
+                            <li class="file-item"><strong>change_password_screen.dart:</strong> Campo senha atual, Campo nova senha, Campo confirmar senha, Indicador de força, Botão salvar</li>
+                        </ul>
+                        <h4 class="font-semibold text-gray-800 mt-2">Notifications</h4>
+                        <h5 class="font-medium text-gray-700 ml-4">Screen:</h5>
+                        <ul class="list-disc ml-8 text-gray-600">
+                            <li class="file-item"><strong>notifications_screen.dart:</strong> Header (Título "Notificações", Botão "Marcar todas como lidas"), Lista de Notificações (Agrupadas por data, Ícone por tipo, Título e descrição, Horário, Indicador de não lida, Swipe para deletar)</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Providers (Gerenciamento de Estado) -->
+                <div class="mb-4">
+                    <div class="subsection-header" onclick="toggleSubsection('providers')">
+                        <h3 class="text-lg md:text-xl font-medium">Providers (Gerenciamento de Estado)</h3>
+                        <span class="arrow text-xl" id="providers-arrow">&#9658;</span>
+                    </div>
+                    <div id="providers-content" class="subsection-content">
+                        <ul class="list-disc ml-5 text-gray-700">
+                            <li class="file-item"><strong>auth_provider.dart:</strong> Estado de autenticação (loading, authenticated, unauthenticated), Dados do usuário logado, Métodos: login, logout, register, checkAuth</li>
+                            <li class="file-item"><strong>dashboard_provider.dart:</strong> Saldo de cashback (disponível/pendente), Transações recentes, Dados do gráfico, Método refresh</li>
+                            <li class="file-item"><strong>cashback_provider.dart:</strong> Lista de transações de cashback, Filtros ativos, Paginação, Métodos: loadMore, filter, refresh</li>
+                            <li class="file-item"><strong>stores_provider.dart:</strong> Lista de lojas parceiras, Categorias, Filtros e busca, Lojas favoritas</li>
+                            <li class="file-item"><strong>profile_provider.dart:</strong> Dados do perfil, Estado de edição, Upload de foto</li>
+                            <li class="file-item"><strong>notifications_provider.dart:</strong> Lista de notificações, Contador de não lidas, Configurações de notificação</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Modelos de Dados -->
+                <div class="mb-4">
+                    <div class="subsection-header" onclick="toggleSubsection('dataModels')">
+                        <h3 class="text-lg md:text-xl font-medium">Modelos de Dados</h3>
+                        <span class="arrow text-xl" id="dataModels-arrow">&#9658;</span>
+                    </div>
+                    <div id="dataModels-content" class="subsection-content">
+                        <h4 class="font-semibold text-gray-800 mt-2">User:</h4>
+                        <ul class="list-disc ml-5 text-gray-700">
+                            <li class="file-item"><code>- id: String</code></li>
+                            <li class="file-item"><code>- name: String</code></li>
+                            <li class="file-item"><code>- email: String</code></li>
+                            <li class="file-item"><code>- cpf: String</code></li>
+                            <li class="file-item"><code>- phone: String</code></li>
+                            <li class="file-item"><code>- profileImage: String?</code></li>
+                            <li class="file-item"><code>- createdAt: DateTime</code></li>
+                            <li class="file-item"><code>- memberSince: DateTime</code></li>
+                        </ul>
+                        <h4 class="font-semibold text-gray-800 mt-2">CashbackTransaction:</h4>
+                        <ul class="list-disc ml-5 text-gray-700">
+                            <li class="file-item"><code>- id: String</code></li>
+                            <li class="file-item"><code>- storeId: String</code></li>
+                            <li class="file-item"><code>- storeName: String</code></li>
+                            <li class="file-item"><code>- storeLogo: String</code></li>
+                            <li class="file-item"><code>- purchaseAmount: double</code></li>
+                            <li class="file-item"><code>- cashbackPercentage: double</code></li>
+                            <li class="file-item"><code>- cashbackAmount: double</code></li>
+                            <li class="file-item"><code>- status: CashbackStatus (pending, available, expired)</code></li>
+                            <li class="file-item"><code>- transactionDate: DateTime</code></li>
+                            <li class="file-item"><code>- releaseDate: DateTime?</code></li>
+                            <li class="file-item"><code>- transactionCode: String</code></li>
+                        </ul>
+                        <h4 class="font-semibold text-gray-800 mt-2">Store:</h4>
+                        <ul class="list-disc ml-5 text-gray-700">
+                            <li class="file-item"><code>- id: String</code></li>
+                            <li class="file-item"><code>- name: String</code></li>
+                            <li class="file-item"><code>- logo: String</code></li>
+                            <li class="file-item"><code>- coverImage: String?</code></li>
+                            <li class="file-item"><code>- category: StoreCategory</code></li>
+                            <li class="file-item"><code>- cashbackPercentage: double</code></li>
+                            <li class="file-item"><code>- description: String</code></li>
+                            <li class="file-item"><code>- rating: double</code></li>
+                            <li class="file-item"><code>- reviewsCount: int</code></li>
+                            <li class="file-item"><code>- address: Address?</code></li>
+                            <li class="file-item"><code>- isNew: bool</code></li>
+                            <li class="file-item"><code>- isFavorite: bool</code></li>
+                        </ul>
+                        <h4 class="font-semibold text-gray-800 mt-2">CashbackSummary:</h4>
+                        <ul class="list-disc ml-5 text-gray-700">
+                            <li class="file-item"><code>- totalBalance: double</code></li>
+                            <li class="file-item"><code>- availableBalance: double</code></li>
+                            <li class="file-item"><code>- pendingBalance: double</code></li>
+                            <li class="file-item"><code>- lastUpdate: DateTime</code></li>
+                            <li class="file-item"><code>- chartData: List&lt;ChartPoint&gt;</code></li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Configurações Importantes -->
+                <div class="mb-4">
+                    <div class="subsection-header" onclick="toggleSubsection('configs')">
+                        <h3 class="text-lg md:text-xl font-medium">Configurações Importantes</h3>
+                        <span class="arrow text-xl" id="configs-arrow">&#9658;</span>
+                    </div>
+                    <div id="configs-content" class="subsection-content">
+                        <h4 class="font-semibold text-gray-800 mt-2">pubspec.yaml - Dependências principais:</h4>
+                        <pre><code>
+dependencies:
+  # State Management
+  flutter_riverpod: ^2.4.0
+  
+  # Navigation
+  go_router: ^12.0.0
+  
+  # Network
+  dio: ^5.3.0
+  connectivity_plus: ^5.0.0
+  
+  # Local Storage
+  shared_preferences: ^2.2.0
+  flutter_secure_storage: ^9.0.0
+  
+  # UI
+  flutter_svg: ^2.0.0
+  cached_network_image: ^3.3.0
+  shimmer: ^3.0.0
+  lottie: ^2.7.0
+  
+  # Utils
+  intl: ^0.18.0
+  mask_text_input_formatter: ^2.5.0
+  
+  # Charts
+  fl_chart: ^0.65.0
+                        </code></pre>
+                    </div>
+                </div>
+
+                <!-- Fluxos Principais -->
+                <div class="mb-4">
+                    <div class="subsection-header" onclick="toggleSubsection('mainFlows')">
+                        <h3 class="text-lg md:text-xl font-medium">Fluxos Principais</h3>
+                        <span class="arrow text-xl" id="mainFlows-arrow">&#9658;</span>
+                    </div>
+                    <div id="mainFlows-content" class="subsection-content">
+                        <h4 class="font-semibold text-gray-800 mt-2">Fluxo de Login:</h4>
+                        <ul class="list-disc ml-5 text-gray-700">
+                            <li class="file-item">Splash → Verifica token</li>
+                            <li class="file-item">Se não autenticado → Login</li>
+                            <li class="file-item">Validação de campos</li>
+                            <li class="file-item">Chamada API</li>
+                            <li class="file-item">Salva token</li>
+                            <li class="file-item">Navega para Dashboard</li>
+                        </ul>
+                        <h4 class="font-semibold text-gray-800 mt-2">Fluxo de Cashback:</h4>
+                        <ul class="list-disc ml-5 text-gray-700">
+                            <li class="file-item">Dashboard mostra resumo</li>
+                            <li class="file-item">Cliente acessa histórico</li>
+                            <li class="file-item">Filtra por período/status</li>
+                            <li class="file-item">Visualiza detalhes</li>
+                            <li class="file-item">Acompanha liberação</li>
+                        </ul>
+                        <h4 class="font-semibold text-gray-800 mt-2">Fluxo de Navegação Principal:</h4>
+                        <ul class="list-disc ml-5 text-gray-700">
+                            <li class="file-item">Bottom Navigation com 4 abas: Home (Dashboard), Histórico, Lojas, Perfil</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Considerações de UX/UI -->
+                <div class="mb-4">
+                    <div class="subsection-header" onclick="toggleSubsection('uxUi')">
+                        <h3 class="text-lg md:text-xl font-medium">Considerações de UX/UI</h3>
+                        <span class="arrow text-xl" id="uxUi-arrow">&#9658;</span>
+                    </div>
+                    <div id="uxUi-content" class="subsection-content">
+                        <h4 class="font-semibold text-gray-800 mt-2">Cores principais:</h4>
+                        <ul class="list-disc ml-5 text-gray-700">
+                            <li class="file-item">Primária: Verde (cashback/dinheiro)</li>
+                            <li class="file-item">Secundária: Azul escuro</li>
+                            <li class="file-item">Success: Verde claro</li>
+                            <li class="file-item">Warning: Amarelo</li>
+                            <li class="file-item">Error: Vermelho</li>
+                        </ul>
+                        <h4 class="font-semibold text-gray-800 mt-2">Animações:</h4>
+                        <ul class="list-disc ml-5 text-gray-700">
+                            <li class="file-item">Transições suaves entre telas</li>
+                            <li class="file-item">Shimmer durante carregamento</li>
+                            <li class="file-item">Pull to refresh animado</li>
+                            <li class="file-item">Animações de entrada de cards</li>
+                        </ul>
+                        <h4 class="font-semibold text-gray-800 mt-2">Feedback visual:</h4>
+                        <ul class="list-disc ml-5 text-gray-700">
+                            <li class="file-item">Loading states</li>
+                            <li class="file-item">Empty states ilustrados</li>
+                            <li class="file-item">Mensagens de erro claras</li>
+                            <li class="file-item">Toasts para ações</li>
+                        </ul>
+                        <h4 class="font-semibold text-gray-800 mt-2">Acessibilidade:</h4>
+                        <ul class="list-disc ml-5 text-gray-700">
+                            <li class="file-item">Textos com contraste adequado</li>
+                            <li class="file-item">Áreas de toque mínimas de 48px</li>
+                            <li class="file-item">Suporte a screen readers</li>
+                            <li class="file-item">Fontes escaláveis</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <p class="text-gray-700 mt-8 text-center text-sm">
+                    Esta estrutura proporciona uma base sólida e escalável para o desenvolvimento do app cliente do Klube Cash, seguindo as melhores práticas do Flutter e garantindo uma experiência consistente e intuitiva para o usuário.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Function to toggle the expansion of a section
+        function toggleSection(id) {
+            const content = document.getElementById(id + '-content'); // Get the content div
+            const arrow = document.getElementById(id + '-arrow'); // Get the arrow icon
+
+            // Toggle the 'expanded' class
+            content.classList.toggle('expanded');
+            // Toggle the 'rotated' class for the arrow
+            arrow.classList.toggle('rotated');
+        }
+
+        // Function to toggle the expansion of a subsection
+        function toggleSubsection(id) {
+            const content = document.getElementById(id + '-content'); // Get the content div
+            const arrow = document.getElementById(id + '-arrow'); // Get the arrow icon
+
+            // Toggle the 'expanded' class
+            content.classList.toggle('expanded');
+            // Toggle the 'rotated' class for the arrow
+            arrow.classList.toggle('rotated');
+        }
+    </script>
+</body>
+</html>

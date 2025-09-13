@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KlubeCash External API - Documentação</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f8f9fa;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .nav-tabs {
+            display: flex;
+            background: white;
+            border-radius: 10px 10px 0 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .nav-tab {
+            flex: 1;
+            padding: 1rem 2rem;
+            background: white;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            color: #666;
+            transition: all 0.3s;
+        }
+
+        .nav-tab.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .nav-tab:hover:not(.active) {
+            background: #f0f0f0;
+        }
+
+        .content {
+            background: white;
+            border-radius: 0 0 10px 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 2rem;
+            min-height: 600px;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .endpoint {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            margin: 1rem 0;
+            border-radius: 5px;
+        }
+
+        .endpoint-header {
+            padding: 1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .method {
+            padding: 0.3rem 0.8rem;
+            border-radius: 5px;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+
+        .method.get { background: #28a745; color: white; }
+        .method.post { background: #007bff; color: white; }
+        .method.put { background: #ffc107; color: black; }
+        .method.delete { background: #dc3545; color: white; }
+
+        .endpoint-path {
+            font-family: 'Monaco', 'Consolas', monospace;
+            font-weight: 500;
+        }
+
+        .endpoint-details {
+            display: none;
+            padding: 0 1rem 1rem;
+        }
+
+        .endpoint.expanded .endpoint-details {
+            display: block;
+        }
+
+        .try-it-form {
+            background: #f0f0f0;
+            padding: 1rem;
+            border-radius: 5px;
+            margin: 1rem 0;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 0.3rem;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-family: 'Monaco', 'Consolas', monospace;
+        }
+
+        .btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 0.7rem 1.5rem;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .btn:hover {
+            background: #5a6fd8;
+            transform: translateY(-1px);
+        }
+
+        .response-area {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 5px;
+            min-height: 150px;
+            font-family: 'Monaco', 'Consolas', monospace;
+            white-space: pre-wrap;
+            border: 1px solid #ddd;
+        }
+
+        .code-block {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 1rem;
+            border-radius: 5px;
+            font-family: 'Monaco', 'Consolas', monospace;
+            overflow-x: auto;
+            margin: 1rem 0;
+        }
+
+        .auth-info {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 1rem;
+            border-radius: 5px;
+            margin-bottom: 2rem;
+        }
+
+        .auth-info h3 {
+            color: #856404;
+            margin-bottom: 0.5rem;
+        }
+
+        .sdk-card {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .sdk-card h3 {
+            color: #667eea;
+            margin-bottom: 1rem;
+        }
+
+        .copy-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 0.3rem 0.8rem;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            margin-left: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>KlubeCash External API</h1>
+            <p class="subtitle">Integração completa com cashback e gestão de lojas</p>
+        </header>
+
+        <div class="nav-tabs">
+            <button class="nav-tab active" onclick="showTab('intro')">Introdução</button>
+            <button class="nav-tab" onclick="showTab('auth')">Autenticação</button>
+            <button class="nav-tab" onclick="showTab('endpoints')">Endpoints</button>
+            <button class="nav-tab" onclick="showTab('examples')">Exemplos</button>
+            <button class="nav-tab" onclick="showTab('sdks')">SDKs</button>
+        </div>
+
+        <div class="content">
+            <!-- Introdução -->
+            <div class="tab-content active" id="intro">
+                <h2>Bem-vindo à KlubeCash API</h2>
+                <p>A KlubeCash External API permite que sistemas externos integrem com nossa plataforma de cashback, oferecendo acesso a usuários, lojas e cálculos de cashback.</p>
+                
+                <h3>Características principais:</h3>
+                <ul style="margin: 1rem 0; padding-left: 2rem;">
+                    <li>✅ Autenticação segura via API Keys</li>
+                    <li>✅ Rate limiting (1000 requests/hora)</li>
+                    <li>✅ Respostas padronizadas em JSON</li>
+                    <li>✅ Documentação interativa</li>
+                    <li>✅ SDKs disponíveis</li>
+                </ul>
+
+                <h3>URL Base:</h3>
+                <div class="code-block">https://klubecash.com/api-external/v1</div>
+
+                <h3>Informações da API:</h3>
+                <button class="btn" onclick="testInfoEndpoint()">Testar GET /auth/info</button>
+                <div class="response-area" id="info-response">Clique no botão acima para testar o endpoint de informações</div>
+            </div>
+
+            <!-- Autenticação -->
+            <div class="tab-content" id="auth">
+                <h2>Autenticação</h2>
+                <div class="auth-info">
+                    <h3>🔑 API Key Required</h3>
+                    <p>Todos os endpoints protegidos requerem uma API Key válida no header <strong>X-API-Key</strong>.</p>
+                </div>
+
+                <h3>Como obter uma API Key:</h3>
+                <ol style="padding-left: 2rem; margin: 1rem 0;">
+                    <li>Entre em contato com nossa equipe</li>
+                    <li>Forneça informações sobre seu projeto</li>
+                    <li>Receba sua API Key personalizada</li>
+                    <li>Configure os headers de suas requisições</li>
+                </ol>
+
+                <h3>Configuração do Header:</h3>
+                <div class="code-block">X-API-Key: sua_api_key_aqui</div>
+
+                <h3>Teste sua API Key:</h3>
+                <div class="try-it-form">
+                    <div class="form-group">
+                        <label>API Key:</label>
+                        <input type="password" id="apiKeyInput" placeholder="kc_live_...">
+                    </div>
+                    <button class="btn" onclick="testApiKey()">Testar API Key</button>
+                    <div class="response-area" id="apikey-response" style="margin-top: 1rem;">Digite sua API Key e clique em testar</div>
+                </div>
+            </div>
+
+            <!-- Endpoints -->
+            <div class="tab-content" id="endpoints">
+                <h2>Endpoints Disponíveis</h2>
+
+                <!-- Endpoint: Users -->
+                <div class="endpoint">
+                    <div class="endpoint-header" onclick="toggleEndpoint(this)">
+                        <span class="method get">GET</span>
+                        <span class="endpoint-path">/users</span>
+                        <span style="flex-grow: 1;"></span>
+                        <span>Listar usuários</span>
+                    </div>
+                    <div class="endpoint-details">
+                        <p><strong>Descrição:</strong> Retorna uma lista dos últimos 10 usuários cadastrados.</p>
+                        <p><strong>Autenticação:</strong> Requerida</p>
+                        
+                        <h4>Resposta de sucesso:</h4>
+                        <div class="code-block">{
+  "success": true,
+  "message": "Users retrieved successfully",
+  "data": [
+    {
+      "id": 123,
+      "name": "João Silva",
+      "email": "joao@email.com",
+      "type": "cliente",
+      "status": "ativo",
+      "created_at": "2024-01-15 10:30:00"
+    }
+  ]
+}</div>
+                        
+                        <div class="try-it-form">
+                            <button class="btn" onclick="testEndpoint('/users', 'GET')">Testar Endpoint</button>
+                            <div class="response-area" id="users-response">Resposta aparecerá aqui</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Endpoint: Stores -->
+                <div class="endpoint">
+                    <div class="endpoint-header" onclick="toggleEndpoint(this)">
+                        <span class="method get">GET</span>
+                        <span class="endpoint-path">/stores</span>
+                        <span style="flex-grow: 1;"></span>
+                        <span>Listar lojas</span>
+                    </div>
+                    <div class="endpoint-details">
+                        <p><strong>Descrição:</strong> Retorna uma lista das últimas 10 lojas cadastradas.</p>
+                        <p><strong>Autenticação:</strong> Requerida</p>
+                        
+                        <h4>Resposta de sucesso:</h4>
+                        <div class="code-block">{
+  "success": true,
+  "message": "Stores retrieved successfully",
+  "data": [
+    {
+      "id": 59,
+      "trade_name": "Loja Exemplo",
+      "legal_name": "Empresa Exemplo LTDA",
+      "cnpj": "12.345.678/0001-90",
+      "email": "contato@loja.com",
+      "status": "aprovado",
+      "created_at": "2024-01-10 14:20:00"
+    }
+  ]
+}</div>
+                        
+                        <div class="try-it-form">
+                            <button class="btn" onclick="testEndpoint('/stores', 'GET')">Testar Endpoint</button>
+                            <div class="response-area" id="stores-response">Resposta aparecerá aqui</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Endpoint: Cashback Calculate -->
+                <div class="endpoint">
+                    <div class="endpoint-header" onclick="toggleEndpoint(this)">
+                        <span class="method post">POST</span>
+                        <span class="endpoint-path">/cashback/calculate</span>
+                        <span style="flex-grow: 1;"></span>
+                        <span>Calcular cashback</span>
+                    </div>
+                    <div class="endpoint-details">
+                        <p><strong>Descrição:</strong> Calcula o valor de cashback para uma compra.</p>
+                        <p><strong>Autenticação:</strong> Requerida</p>
+                        
+                        <h4>Parâmetros (JSON):</h4>
+                        <div class="code-block">{
+  "store_id": 59,
+  "amount": 100.00
+}</div>
+                        
+                        <h4>Resposta de sucesso:</h4>
+                        <div class="code-block">{
+  "success": true,
+  "message": "Success",
+  "data": {
+    "store_id": 59,
+    "purchase_amount": 100,
+    "store_cashback_percentage": 10,
+    "cashback_calculation": {
+      "total_cashback": 10,
+      "client_receives": 0.5,
+      "admin_receives": 0.5,
+      "store_receives": 0
+    }
+  }
+}</div>
+                        
+                        <div class="try-it-form">
+                            <div class="form-group">
+                                <label>Store ID:</label>
+                                <input type="number" id="storeId" value="59" min="1">
+                            </div>
+                            <div class="form-group">
+                                <label>Amount:</label>
+                                <input type="number" id="amount" value="100" min="0.01" step="0.01">
+                            </div>
+                            <button class="btn" onclick="testCashbackEndpoint()">Calcular Cashback</button>
+                            <div class="response-area" id="cashback-response">Resposta aparecerá aqui</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Exemplos -->
+            <div class="tab-content" id="examples">
+                <h2>Exemplos de Integração</h2>
+                
+                <h3>cURL</h3>
+                <div class="code-block"># Listar usuários
+curl -X GET "https://klubecash.com/api-external/v1/users" \
+  -H "X-API-Key: sua_api_key_aqui" \
+  -H "Content-Type: application/json"
+
+# Calcular cashback
+curl -X POST "https://klubecash.com/api-external/v1/cashback/calculate" \
+  -H "X-API-Key: sua_api_key_aqui" \
+  -H "Content-Type: application/json" \
+  -d '{"store_id": 59, "amount": 100}'</div>
+                
+                <h3>PHP</h3>
+                <div class="code-block">$apiKey = 'sua_api_key_aqui';
+$baseUrl = 'https://klubecash.com/api-external/v1';
+
+// Configurar headers
+$headers = [
+    'X-API-Key: ' . $apiKey,
+    'Content-Type: application/json'
+];
+
+// Listar usuários
+$ch = curl_init();
+curl_setopt($ch, CURLOPT_URL, $baseUrl . '/users');
+curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+$response = curl_exec($ch);
+curl_close($ch);
+
+$users = json_decode($response, true);</div>
+                
+                <h3>JavaScript (Fetch)</h3>
+                <div class="code-block">const apiKey = 'sua_api_key_aqui';
+const baseUrl = 'https://klubecash.com/api-external/v1';
+
+// Listar usuários
+fetch(`${baseUrl}/users`, {
+  headers: {
+    'X-API-Key': apiKey,
+    'Content-Type': 'application/json'
+  }
+})
+.then(response => response.json())
+.then(data => console.log(data))
+.catch(error => console.error('Error:', error));
+
+// Calcular cashback
+fetch(`${baseUrl}/cashback/calculate`, {
+  method: 'POST',
+  headers: {
+    'X-API-Key': apiKey,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    store_id: 59,
+    amount: 100
+  })
+})
+.then(response => response.json())
+.then(data => console.log(data));</div>
+            </div>
+
+            <!-- SDKs -->
+            <div class="tab-content" id="sdks">
+                <h2>SDKs Disponíveis</h2>
+                
+                <div class="sdk-card">
+                    <h3>🔄 Em Desenvolvimento</h3>
+                    <p>Os SDKs oficiais estão sendo desenvolvidos para facilitar a integração com a KlubeCash API.</p>
+                    
+                    <h4>SDKs planejados:</h4>
+                    <ul style="margin: 1rem 0; padding-left: 2rem;">
+                        <li>✨ PHP SDK (em breve)</li>
+                        <li>✨ JavaScript/Node.js SDK (em breve)</li>
+                        <li>✨ Python SDK (planejado)</li>
+                        <li>✨ Java SDK (planejado)</li>
+                    </ul>
+                    
+                    <p>Por enquanto, você pode usar os exemplos de código fornecidos na aba "Exemplos" para integrar diretamente com a API REST.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showTab(tabId) {
+            // Esconder todas as abas
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Remover classe active de todos os botões
+            document.querySelectorAll('.nav-tab').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Mostrar aba selecionada
+            document.getElementById(tabId).classList.add('active');
+            
+            // Ativar botão correspondente
+            event.target.classList.add('active');
+        }
+
+        function toggleEndpoint(element) {
+            const endpoint = element.closest('.endpoint');
+            endpoint.classList.toggle('expanded');
+        }
+
+        async function testInfoEndpoint() {
+            const responseArea = document.getElementById('info-response');
+            responseArea.textContent = 'Fazendo requisição...';
+            
+            try {
+                const response = await fetch('https://klubecash.com/api-external/v1/auth/info');
+                const data = await response.json();
+                responseArea.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                responseArea.textContent = `Erro: ${error.message}`;
+            }
+        }
+
+        async function testApiKey() {
+            const apiKey = document.getElementById('apiKeyInput').value;
+            const responseArea = document.getElementById('apikey-response');
+            
+            if (!apiKey) {
+                responseArea.textContent = 'Por favor, digite sua API Key';
+                return;
+            }
+            
+            responseArea.textContent = 'Testando API Key...';
+            
+            try {
+                const response = await fetch('https://klubecash.com/api-external/v1/users', {
+                    headers: {
+                        'X-API-Key': apiKey
+                    }
+                });
+                const data = await response.json();
+                responseArea.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                responseArea.textContent = `Erro: ${error.message}`;
+            }
+        }
+
+        async function testEndpoint(endpoint, method = 'GET') {
+            const apiKey = document.getElementById('apiKeyInput').value || 'sua_api_key_aqui';
+            const responseAreaId = endpoint.replace('/', '') + '-response';
+            const responseArea = document.getElementById(responseAreaId);
+            
+            responseArea.textContent = 'Fazendo requisição...';
+            
+            try {
+                const response = await fetch(`https://klubecash.com/api-external/v1${endpoint}`, {
+                    method: method,
+                    headers: {
+                        'X-API-Key': apiKey,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                const data = await response.json();
+                responseArea.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                responseArea.textContent = `Erro: ${error.message}`;
+            }
+        }
+
+        async function testCashbackEndpoint() {
+            const apiKey = document.getElementById('apiKeyInput').value || 'sua_api_key_aqui';
+            const storeId = document.getElementById('storeId').value;
+            const amount = document.getElementById('amount').value;
+            const responseArea = document.getElementById('cashback-response');
+            
+            responseArea.textContent = 'Calculando cashback...';
+            
+            try {
+                const response = await fetch('https://klubecash.com/api-external/v1/cashback/calculate', {
+                    method: 'POST',
+                    headers: {
+                        'X-API-Key': apiKey,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        store_id: parseInt(storeId),
+                        amount: parseFloat(amount)
+                    })
+                });
+                const data = await response.json();
+                responseArea.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                responseArea.textContent = `Erro: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>

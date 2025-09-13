@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cp:*)",
+      "Bash(php:*)",
+      "Bash(del test_mvp.php)",
+      "Bash(find:*)",
+      "Bash(mkdir:*)",
+      "Bash(setx:*)",
+      "Bash(dir:*)",
+      "Bash(git config:*)",
+      "Bash(git push:*)",
+      "Bash(git commit:*)",
+      "Bash(git filter-branch:*)",
+      "Bash(git add:*)",
+      "Read(//c/Users/Kaua/Documents/GitHub/**)",
+      "Bash(git checkout:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
