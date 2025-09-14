@@ -813,13 +813,7 @@ class TransactionController {
             error_log("PENDENTES DEBUG: Loja {$storeId} - MVP: " . ($isStoreMvp ? 'SIM' : 'NÃO') . " - Mostrando todas as transações");
             
             
-            // COMENTAR/REMOVER esta seção que causava o problema:
-            /*
-            if ($isStoreMvp) {
-                error_log("PENDENTES DEBUG: Loja {$storeId} é MVP - OCULTANDO todas as transações pendentes desta tela");
-                $whereConditions[] = "1 = 0"; // ESTA LINHA CAUSAVA O PROBLEMA!
-            }
-            */
+            
             // Verificar se a loja é MVP apenas para informação
             $storeMvpQuery = "SELECT u.mvp FROM lojas l JOIN usuarios u ON l.usuario_id = u.id WHERE l.id = :store_id";
             $storeMvpStmt = $db->prepare($storeMvpQuery);
