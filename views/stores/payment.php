@@ -21,6 +21,7 @@ $userId = $_SESSION['user_id'];
 
 // Obter dados da loja associada ao usuário
 $db = Database::getConnection();
+$activeMenu = 'pagamentos';
 $storeQuery = $db->prepare("SELECT id, nome_fantasia FROM lojas WHERE usuario_id = :usuario_id");
 $storeQuery->bindParam(':usuario_id', $userId);
 $storeQuery->execute();
@@ -203,9 +204,10 @@ $activeMenu = 'payment';
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
     <title>Realizar Pagamento - Klube Cash</title>
     <link rel="stylesheet" href="../../assets/css/views/stores/payment.css">
+    <link rel="stylesheet" href="/assets/css/sidebar-lojista.css">
 </head>
 <body>
-    <?php include_once '../components/sidebar-store.php'; ?>
+    <?php include '../../views/components/sidebar-lojista-responsiva.php'; ?>
     
     <div class="main-content" id="mainContent">
         <div class="dashboard-header">
@@ -507,6 +509,6 @@ $activeMenu = 'payment';
         });
     </script>
     
-    
+    <script src="/assets/js/sidebar-lojista.js"></script>
 </body>
 </html>
