@@ -543,7 +543,7 @@
 
 /* O conteúdo principal deve ser ajustado automaticamente pelo JavaScript */
 .conteudo-principal-ajustado {
-    margin-left: 20px;
+    margin-left: var(--largura-sidebar-expandida);
     transition: var(--transicao-padrao);
 }
 
