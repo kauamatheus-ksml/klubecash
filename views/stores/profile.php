@@ -8,6 +8,7 @@ require_once '../../utils/Security.php';
 
 // Iniciar sessão
 session_start();
+$activeMenu = 'perfil';
 
 // Verificar se o usuário está logado e é uma loja
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION['user_type'] !== 'loja') {
@@ -312,11 +313,12 @@ $activeMenu = 'profile';
     <title>Perfil da Loja - Klube Cash</title>
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
     <link rel="stylesheet" href="../../assets/css/views/stores/profile.css">
-    
+    <link rel="stylesheet" href="/assets/css/sidebar-lojista.css">
+
 </head>
 <body>
     <!-- Incluir sidebar da loja -->
-    <?php include_once '../components/sidebar-store.php'; ?>
+    <?php include '../../views/components/sidebar-lojista-responsiva.php'; ?>
     
     <div class="main-content" id="mainContent">
         <!-- Cabeçalho da página -->
@@ -700,5 +702,6 @@ $activeMenu = 'profile';
         });
     });
     </script>
+    <script src="/assets/js/sidebar-lojista.js"></script>
 </body>
 </html>
