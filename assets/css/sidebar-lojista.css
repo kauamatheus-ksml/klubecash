@@ -76,7 +76,7 @@
 .container-logo-sidebar {
     display: flex;
     align-items: center;
-    gap: 2px;
+    gap: 12px;
     flex: 1;
     min-width: 0;
 }

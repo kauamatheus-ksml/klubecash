@@ -1592,6 +1592,6 @@ $statusLabels = [
             }
         });
     </script>
-    
+    <script src="/assets/js/sidebar-lojista.js"></script>
 </body>
 </html>

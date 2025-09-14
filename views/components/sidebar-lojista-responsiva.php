@@ -80,7 +80,7 @@ $itens_menu_principal = [
     <!-- Cabeçalho da Sidebar -->
     <div class="cabecalho-sidebar-lojista">
         <div class="container-logo-sidebar">
-            <img src="/assets/images/KlubeCashLOGO (1).png" alt="Klube Cash" class="logo-sidebar-lojista">
+            <img src="/assets/images/logo.png" alt="Klube Cash" class="logo-sidebar-lojista">
             <span class="texto-logo-sidebar">KlubeCash</span>
         </div>
         

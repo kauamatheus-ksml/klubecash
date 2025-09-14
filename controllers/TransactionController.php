@@ -790,16 +790,36 @@ class TransactionController {
             $limit = ITEMS_PER_PAGE;
             $offset = ($page - 1) * $limit;
             
-            // Construir condições WHERE BÁSICAS
+            // Construir condições WHERE - EXCLUIR TRANSAÇÕES MVP APROVADAS
+            // Para lojas MVP, transações pendentes indicam problema no sistema
+            // Transações de lojas MVP deveriam estar automaticamente aprovadas
             $whereConditions = [
-                "t.loja_id = :loja_id",
+                "t.loja_id = :loja_id", 
                 "t.status = :status"
             ];
             $params = [
                 ':loja_id' => $storeId,
                 ':status' => TRANSACTION_PENDING
             ];
-            // Aplicar filtros normalmente
+            
+            // CORREÇÃO: Verificar se a loja é MVP e ajustar a consulta
+            $storeMvpQuery = "SELECT u.mvp FROM lojas l JOIN usuarios u ON l.usuario_id = u.id WHERE l.id = :store_id";
+            $storeMvpStmt = $db->prepare($storeMvpQuery);
+            $storeMvpStmt->bindParam(':store_id', $storeId);
+            $storeMvpStmt->execute();
+            $storeMvpResult = $storeMvpStmt->fetch(PDO::FETCH_ASSOC);
+            $isStoreMvp = ($storeMvpResult && $storeMvpResult['mvp'] === 'sim');
+            
+            // Se for loja MVP, OCULTAR transações pendentes pois elas deveriam estar aprovadas
+            if ($isStoreMvp) {
+                error_log("PENDENTES DEBUG: Loja {$storeId} é MVP - OCULTANDO todas as transações pendentes desta tela");
+                // Para lojas MVP, forçar query que não retorna nada
+                $whereConditions[] = "1 = 0"; // Condição que nunca é verdadeira = não mostra nada
+            } else {
+                error_log("PENDENTES DEBUG: Loja {$storeId} não é MVP - Mostrando todas as pendentes normalmente");
+            }
+            
+            // Aplicar filtros
             if (!empty($filters['data_inicio'])) {
                 $whereConditions[] = "DATE(t.data_transacao) >= :data_inicio";
                 $params[':data_inicio'] = $filters['data_inicio'];
@@ -820,51 +840,45 @@ class TransactionController {
                 $params[':valor_max'] = $filters['valor_max'];
             }
             
-            $whereClause = "WHERE " . implode(' AND ', $whereConditions);
+            $whereClause = "WHERE " . implode(" AND ", $whereConditions);
             
-            // Consulta principal com informações de saldo
-            $query = "
+            // Query para obter transações com informações de saldo usado
+            $transactionsQuery = "
                 SELECT 
                     t.*,
                     u.nome as cliente_nome,
                     u.email as cliente_email,
-                    u.cpf as cliente_cpf,
-                    -- Calcular saldo usado efetivamente
-                    GREATEST(0, LEAST(
-                        COALESCE(t.saldo_usado, 0),
-                        COALESCE(s.saldo, 0)
-                    )) as saldo_usado_efetivo,
-                    -- Valor efetivo da venda (valor_total - saldo_usado)
-                    (t.valor_total - GREATEST(0, LEAST(
-                        COALESCE(t.saldo_usado, 0),
-                        COALESCE(s.saldo, 0)
-                    ))) as valor_venda_efetivo,
-                    -- Calcular comissão real (10% do valor efetivo)
-                    ROUND((t.valor_total - GREATEST(0, LEAST(
-                        COALESCE(t.saldo_usado, 0),
-                        COALESCE(s.saldo, 0)
-                    ))) * 0.10, 2) as comissao_real
+                    COALESCE(
+                        (SELECT SUM(cm.valor) 
+                        FROM cashback_movimentacoes cm 
+                        WHERE cm.usuario_id = t.usuario_id 
+                        AND cm.loja_id = t.loja_id 
+                        AND cm.tipo_operacao = 'uso'
+                        AND cm.transacao_uso_id = t.id), 0
+                    ) as saldo_usado
                 FROM transacoes_cashback t
                 JOIN usuarios u ON t.usuario_id = u.id
-                LEFT JOIN saldos_usuarios s ON (s.usuario_id = u.id AND s.loja_id = t.loja_id)
-                {$whereClause}
+                $whereClause
                 ORDER BY t.data_transacao DESC
-                LIMIT {$limit} OFFSET {$offset}
+                LIMIT :limit OFFSET :offset
             ";
             
-            $stmt = $db->prepare($query);
+            $stmt = $db->prepare($transactionsQuery);
             foreach ($params as $key => $value) {
                 $stmt->bindValue($key, $value);
             }
+            $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+            $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
             $stmt->execute();
+            
             $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
-            // Consulta para contar total de registros
+            // Query para contar total de transações
             $countQuery = "
                 SELECT COUNT(*) as total
                 FROM transacoes_cashback t
                 JOIN usuarios u ON t.usuario_id = u.id
-                {$whereClause}
+                $whereClause
             ";
             
             $countStmt = $db->prepare($countQuery);
@@ -874,27 +888,33 @@ class TransactionController {
             $countStmt->execute();
             $totalCount = $countStmt->fetch(PDO::FETCH_ASSOC)['total'];
             
-            // Calcular totais
+            // Query para totais - COMPLETAMENTE CORRIGIDA
             $totalsQuery = "
                 SELECT 
                     COUNT(*) as total_transacoes,
                     SUM(t.valor_total) as total_valor_vendas_originais,
-                    SUM(GREATEST(0, LEAST(
-                        COALESCE(t.saldo_usado, 0),
-                        COALESCE(s.saldo, 0)
-                    ))) as total_saldo_usado,
-                    SUM(t.valor_total - GREATEST(0, LEAST(
-                        COALESCE(t.saldo_usado, 0),
-                        COALESCE(s.saldo, 0)
-                    ))) as total_valor_efetivo,
-                    SUM(ROUND((t.valor_total - GREATEST(0, LEAST(
-                        COALESCE(t.saldo_usado, 0),
-                        COALESCE(s.saldo, 0)
-                    ))) * 0.10, 2)) as total_comissao_real
+                    COALESCE(SUM(
+                        (SELECT SUM(cm.valor) 
+                        FROM cashback_movimentacoes cm 
+                        WHERE cm.usuario_id = t.usuario_id 
+                        AND cm.loja_id = t.loja_id 
+                        AND cm.tipo_operacao = 'uso'
+                        AND cm.transacao_uso_id = t.id)
+                    ), 0) as total_saldo_usado,
+                    -- CORREÇÃO: Calcular comissão total como 10% do valor efetivamente cobrado
+                    SUM(
+                        (t.valor_total - COALESCE(
+                            (SELECT SUM(cm.valor) 
+                            FROM cashback_movimentacoes cm 
+                            WHERE cm.usuario_id = t.usuario_id 
+                            AND cm.loja_id = t.loja_id 
+                            AND cm.tipo_operacao = 'uso'
+                            AND cm.transacao_uso_id = t.id), 0
+                        )) * 0.10
+                    ) as total_valor_comissoes
                 FROM transacoes_cashback t
                 JOIN usuarios u ON t.usuario_id = u.id
-                LEFT JOIN saldos_usuarios s ON (s.usuario_id = u.id AND s.loja_id = t.loja_id)
-                {$whereClause}
+                $whereClause
             ";
             
             $totalsStmt = $db->prepare($totalsQuery);
@@ -904,7 +924,7 @@ class TransactionController {
             $totalsStmt->execute();
             $totals = $totalsStmt->fetch(PDO::FETCH_ASSOC);
             
-            // Informações de paginação
+            // Calcular paginação
             $totalPages = ceil($totalCount / $limit);
             
             return [
@@ -915,19 +935,15 @@ class TransactionController {
                     'paginacao' => [
                         'pagina_atual' => $page,
                         'total_paginas' => $totalPages,
-                        'total_registros' => $totalCount,
-                        'registros_por_pagina' => $limit
+                        'total_itens' => $totalCount,
+                        'itens_por_pagina' => $limit
                     ]
                 ]
             ];
             
-        } catch (Exception $e) {
-            error_log("ERRO getPendingTransactionsWithBalance: " . $e->getMessage());
-            return [
-                'status' => false, 
-                'message' => 'Erro ao carregar transações pendentes. Tente novamente.',
-                'debug' => $e->getMessage()
-            ];
+        } catch (PDOException $e) {
+            error_log('Erro ao buscar transações pendentes com saldo: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro ao buscar transações pendentes.'];
         }
     }
     /**

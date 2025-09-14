@@ -344,9 +344,6 @@ RewriteRule ^api/employees$ api/employees.php [L,QSA]
 RewriteRule ^store/funcionarios/?$ views/stores/employees.php [L,QSA]
 RewriteRule ^api/employees/?$ api/employees.php [L,QSA]
 
-# === DEBUG API ===
-RewriteRule ^api/debug-store/?$ api/debug-store.php [L,QSA]
-
 # NOVA ROTA OPENPIX
 RewriteRule ^api/openpix/?$ api/openpix.php [L]
 # NOVO WEBHOOK OPENPIX
