@@ -80,7 +80,7 @@ if ($result['status'] && isset($result['data']['totais'])) {
 <body>
     <?php include '../../views/components/sidebar-lojista-responsiva.php'; ?>
     
-    <div class="main-content" id="mainContent">
+    <div class="container main-content">
         <div class="dashboard-wrapper">
             <div class="dashboard-header">
                 <h1>Comissões Pendentes</h1>
