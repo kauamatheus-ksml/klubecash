@@ -341,7 +341,7 @@ RewriteRule ^store/perfil/?$ views/stores/profile.php [L,QSA]
 RewriteRule ^api/employees$ api/employees.php [L,QSA]
 
 # Funcionários
-RewriteRule ^store/funcionarios/?$ views/stores/employees.php [L,QSA]
+RewriteRule ^store/funcionarios/?$ views/stores/funcionarios.php [L,QSA]
 RewriteRule ^api/employees/?$ api/employees.php [L,QSA]
 
 # NOVA ROTA OPENPIX
