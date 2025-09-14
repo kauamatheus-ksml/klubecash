@@ -790,31 +790,7 @@ class TransactionController {
             $limit = ITEMS_PER_PAGE;
             $offset = ($page - 1) * $limit;
             
-            // Construir condições WHERE BÁSICAS
-            $whereConditions = [
-                "t.loja_id = :loja_id", 
-                "t.status = :status"
-            ];
-            $params = [
-                ':loja_id' => $storeId,
-                ':status' => TRANSACTION_PENDING
-            ];
-            
-            // CORREÇÃO: REMOVER a lógica que ocultava transações MVP
-            // Verificar se a loja é MVP apenas para informação
-            $storeMvpQuery = "SELECT u.mvp FROM lojas l JOIN usuarios u ON l.usuario_id = u.id WHERE l.id = :store_id";
-            $storeMvpStmt = $db->prepare($storeMvpQuery);
-            $storeMvpStmt->bindParam(':store_id', $storeId);
-            $storeMvpStmt->execute();
-            $storeMvpResult = $storeMvpStmt->fetch(PDO::FETCH_ASSOC);
-            $isStoreMvp = ($storeMvpResult && $storeMvpResult['mvp'] === 'sim');
-            
-            // LOG para debug, mas NÃO ocultar mais nada
-            error_log("PENDENTES DEBUG: Loja {$storeId} - MVP: " . ($isStoreMvp ? 'SIM' : 'NÃO') . " - Mostrando todas as transações");
-            
-            
-            
-            // Verificar se a loja é MVP apenas para informação
+            // Verificar se a loja é MVP primeiro
             $storeMvpQuery = "SELECT u.mvp FROM lojas l JOIN usuarios u ON l.usuario_id = u.id WHERE l.id = :store_id";
             $storeMvpStmt = $db->prepare($storeMvpQuery);
             $storeMvpStmt->bindParam(':store_id', $storeId);
@@ -822,8 +798,26 @@ class TransactionController {
             $storeMvpResult = $storeMvpStmt->fetch(PDO::FETCH_ASSOC);
             $isStoreMvp = ($storeMvpResult && $storeMvpResult['mvp'] === 'sim');
 
-            // LOG para debug, mas NÃO ocultar mais nada
-            error_log("PENDENTES DEBUG: Loja {$storeId} - MVP: " . ($isStoreMvp ? 'SIM' : 'NÃO') . " - Mostrando todas as transações");
+            // Construir condições WHERE baseadas no tipo da loja
+            $whereConditions = ["t.loja_id = :loja_id"];
+            $params = [':loja_id' => $storeId];
+
+            if ($isStoreMvp) {
+                // Para lojas MVP: buscar transações aprovadas que ainda não foram pagas
+                // Verificar se não existe pagamento para essa transação
+                $whereConditions[] = "t.status = :status";
+                $whereConditions[] = "NOT EXISTS (
+                    SELECT 1 FROM pagamentos_transacoes pt
+                    JOIN pagamentos_comissao pc ON pt.pagamento_id = pc.id
+                    WHERE pt.transacao_id = t.id AND pc.status = 'aprovado'
+                )";
+                $params[':status'] = TRANSACTION_APPROVED;
+            } else {
+                // Para lojas normais: buscar transações pendentes
+                $whereConditions[] = "t.status = :status";
+                $params[':status'] = TRANSACTION_PENDING;
+            }
+            error_log("PENDENTES DEBUG: Loja {$storeId} - MVP: " . ($isStoreMvp ? 'SIM' : 'NÃO') . " - Status buscado: " . ($isStoreMvp ? 'APROVADO' : 'PENDENTE'));
             // Aplicar filtros normalmente
             if (!empty($filters['data_inicio'])) {
                 $whereConditions[] = "DATE(t.data_transacao) >= :data_inicio";
