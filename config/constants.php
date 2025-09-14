@@ -239,6 +239,7 @@ define('STORE_DASHBOARD_URL', SITE_URL . '/store/dashboard');
 define('STORE_TRANSACTIONS_URL', SITE_URL . '/store/transacoes');
 define('STORE_PENDING_TRANSACTIONS_URL', SITE_URL . '/store/transacoes-pendentes');
 define('STORE_REGISTER_TRANSACTION_URL', SITE_URL . '/store/registrar-transacao');
+define('STORE_EMPLOYEES_URL', SITE_URL . '/store/funcionarios');
 define('STORE_BATCH_UPLOAD_URL', SITE_URL . '/store/upload-lote');
 define('STORE_PAYMENT_URL', SITE_URL . '/store/pagamento');
 define('STORE_PAYMENT_HISTORY_URL', SITE_URL . '/store/historico-pagamentos');
@@ -247,7 +248,17 @@ define('STORE_PAYMENT_PIX_URL', SITE_URL . '/store/pagamento-pix');
 define('STORE_SALDOS_URL', SITE_URL . '/store/saldos');
 define('STORE_BALANCE_REPASSES_URL', SITE_URL . '/store/repasses-saldo');
 // Adicionar esta linha se não existir
-define('STORE_EMPLOYEES_URL', SITE_URL . '/store/funcionarios');
+
+// === DEBUGGING TRANSAÇÕES ===
+define('DEBUG_TRANSACTIONS', true);
+define('DEBUG_MVP_LOGIC', true);
+
+// Função para debug de transações
+function debugTransaction($message, $data = []) {
+    if (defined('DEBUG_TRANSACTIONS') && DEBUG_TRANSACTIONS) {
+        error_log("TRANSACTION DEBUG: $message - Data: " . json_encode($data));
+    }
+}
 
 
 // === CONFIGURAÇÕES DE ASSETS ===
