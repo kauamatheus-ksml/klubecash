@@ -137,7 +137,7 @@ $activeMenu = 'dashboard';
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-    <div class="container main-content">
+    <div class="dashboard-container">
         <!-- Incluir o componente sidebar -->
         <?php include '../../views/components/sidebar-lojista-responsiva.php'; ?>
         
