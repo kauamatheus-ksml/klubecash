@@ -810,7 +810,8 @@ class TransactionController {
             $isStoreMvp = ($storeMvpResult && $storeMvpResult['mvp'] === 'sim');
             
             // LOG para debug, mas NÃO ocultar mais nada
-            error_log("PENDENTES DEBUG: Loja {$storeId} - MVP: " . ($isStoreMvp ? 'SIM' : 'NÃO') . " - MOSTRANDO todas as transações pendentes");
+            error_log("PENDENTES DEBUG: Loja {$storeId} - MVP: " . ($isStoreMvp ? 'SIM' : 'NÃO') . " - Mostrando todas as transações");
+            
             
             // COMENTAR/REMOVER esta seção que causava o problema:
             /*
@@ -819,7 +820,16 @@ class TransactionController {
                 $whereConditions[] = "1 = 0"; // ESTA LINHA CAUSAVA O PROBLEMA!
             }
             */
-            
+            // Verificar se a loja é MVP apenas para informação
+            $storeMvpQuery = "SELECT u.mvp FROM lojas l JOIN usuarios u ON l.usuario_id = u.id WHERE l.id = :store_id";
+            $storeMvpStmt = $db->prepare($storeMvpQuery);
+            $storeMvpStmt->bindParam(':store_id', $storeId);
+            $storeMvpStmt->execute();
+            $storeMvpResult = $storeMvpStmt->fetch(PDO::FETCH_ASSOC);
+            $isStoreMvp = ($storeMvpResult && $storeMvpResult['mvp'] === 'sim');
+
+            // LOG para debug, mas NÃO ocultar mais nada
+            error_log("PENDENTES DEBUG: Loja {$storeId} - MVP: " . ($isStoreMvp ? 'SIM' : 'NÃO') . " - Mostrando todas as transações");
             // Aplicar filtros normalmente
             if (!empty($filters['data_inicio'])) {
                 $whereConditions[] = "DATE(t.data_transacao) >= :data_inicio";

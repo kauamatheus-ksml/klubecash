@@ -1,7 +1,7 @@
 <?php
 // views/stores/payment-history.php
 // Definir o menu ativo na sidebar
-$activeMenu = 'pagamentos';
+$activeMenu = 'payment-history';
 
 // Incluir arquivos necessários
 require_once '../../config/database.php';
@@ -154,7 +154,6 @@ $statusLabels = [
     <title>Histórico de Pagamentos - Klube Cash</title>
     <link rel="stylesheet" href="../../assets/css/main.css">
     <link rel="stylesheet" href="../../assets/css/views/stores/payment-history.css">
-    <link rel="stylesheet" href="/assets/css/sidebar-lojista.css">
     <style>
         /* Estilos para as abas */
         .tabs-container {
@@ -502,7 +501,7 @@ $statusLabels = [
     </style>
 </head>
 <body>
-    <?php include '../../views/components/sidebar-lojista-responsiva.php'; ?>
+    <?php include_once '../components/sidebar-store.php'; ?>
     
     <div class="main-content" id="mainContent">
         <div class="dashboard-wrapper">
@@ -1592,6 +1591,5 @@ $statusLabels = [
             }
         });
     </script>
-    <script src="/assets/js/sidebar-lojista.js"></script>
 </body>
 </html>
