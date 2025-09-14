@@ -333,7 +333,7 @@ $activeMenu = 'register-transaction';
     <?php include '../../views/components/sidebar-lojista-responsiva.php'; ?>
     <div class="dashboard-container">
         <!-- Incluir sidebar/menu lateral -->
-        <?php include_once '../components/sidebar-store.php'; ?>
+        
         
         <div class="main-content" id="mainContent">
             <!-- Header da Página -->
