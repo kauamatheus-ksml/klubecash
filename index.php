@@ -1102,7 +1102,7 @@ try {
                     <h4>Contato</h4>
                     <ul>
                         <li><a href="mailto:contato@klubecash.com">contato@klubecash.com</a></li>
-                        <li><a href="tel:+553430301314">(34) 3030-1314</a></li>
+                        <li><a href="tel:+55343030-1344">(34) 3030-1314</a></li>
                         <li>Patos de Minas, MG</li>
                     </ul>
                 </div>
