@@ -246,8 +246,8 @@ define('STORE_PROFILE_URL', SITE_URL . '/store/perfil');
 define('STORE_PAYMENT_PIX_URL', SITE_URL . '/store/pagamento-pix');
 define('STORE_SALDOS_URL', SITE_URL . '/store/saldos');
 define('STORE_BALANCE_REPASSES_URL', SITE_URL . '/store/repasses-saldo');
-define('STORE_EMPLOYEES_URL', SITE_URL . '/
-');
+// Adicionar esta linha se não existir
+define('STORE_EMPLOYEES_URL', SITE_URL . '/store/funcionarios');
 
 
 // === CONFIGURAÇÕES DE ASSETS ===
