@@ -1,6 +1,6 @@
 <?php
 // views/stores/pending-commissions.php
-$activeMenu = 'pending-commissions';
+$activeMenu = 'pendentes-pagamento';
 
 require_once '../../config/database.php';
 require_once '../../config/constants.php';
@@ -74,9 +74,11 @@ if ($result['status'] && isset($result['data']['totais'])) {
     
     <link rel="stylesheet" href="../../assets/css/views/stores/pending-commissions.css">
     <link rel="stylesheet" href="../../assets/css/openpix-styles.css">
+
+    <link rel="stylesheet" href="/assets/css/sidebar-lojista.css">
 </head>
 <body>
-    <?php include_once '../components/sidebar-store.php'; ?>
+    <?php include '../../views/components/sidebar-lojista-responsiva.php'; ?>
     
     <div class="main-content" id="mainContent">
         <div class="dashboard-wrapper">
@@ -870,5 +872,6 @@ function testSession() {
 // Criar botão após DOM carregado
 
 </script>
+<script src="/assets/js/sidebar-lojista.js"></script>
 </body>
 </html>
