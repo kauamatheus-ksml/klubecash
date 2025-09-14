@@ -10,6 +10,10 @@ if (!defined('ROOT_PATH')) {
 
 
 
+// URLs dos assets da sidebar (caso precise de CDN futuro)
+define('SIDEBAR_LOJISTA_CSS_URL', CSS_URL . '/sidebar-lojista.css');
+define('SIDEBAR_LOJISTA_JS_URL', JS_URL . '/sidebar-lojista.js');
+
 // === TIPOS DE CLIENTE ===
 define('CLIENT_TYPE_COMPLETE', 'completo');      // Cliente com cadastro completo
 define('CLIENT_TYPE_VISITOR', 'visitante');      // Cliente visitante (sem senha)
