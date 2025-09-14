@@ -790,32 +790,15 @@ class TransactionController {
             $limit = ITEMS_PER_PAGE;
             $offset = ($page - 1) * $limit;
             
-            // Verificar se a loja é MVP primeiro
-            $storeMvpQuery = "SELECT u.mvp FROM lojas l JOIN usuarios u ON l.usuario_id = u.id WHERE l.id = :store_id";
-            $storeMvpStmt = $db->prepare($storeMvpQuery);
-            $storeMvpStmt->bindParam(':store_id', $storeId);
-            $storeMvpStmt->execute();
-            $storeMvpResult = $storeMvpStmt->fetch(PDO::FETCH_ASSOC);
-            $isStoreMvp = ($storeMvpResult && $storeMvpResult['mvp'] === 'sim');
-
-            // Construir condições WHERE baseadas no tipo da loja
-            $whereConditions = ["t.loja_id = :loja_id"];
-            $params = [':loja_id' => $storeId];
-
-            if ($isStoreMvp) {
-                // Para lojas MVP: mostrar transações aprovadas como "pendentes de pagamento"
-                $whereConditions[] = "t.status = :status";
-                $params[':status'] = TRANSACTION_APPROVED;
-                error_log("DEBUG MVP: Buscando transações APROVADAS para loja MVP {$storeId}");
-            } else {
-                // Para lojas normais: buscar transações pendentes
-                $whereConditions[] = "t.status = :status";
-                $params[':status'] = TRANSACTION_PENDING;
-                error_log("DEBUG NORMAL: Buscando transações PENDENTES para loja normal {$storeId}");
-            }
-            
-            error_log("PENDENTES DEBUG: Loja {$storeId} - MVP: " . ($isStoreMvp ? 'SIM' : 'NÃO') . " - Status: " . ($isStoreMvp ? 'APROVADO' : 'PENDENTE'));
-            error_log("PENDENTES DEBUG: Condições WHERE: " . implode(' AND ', $whereConditions));
+            // Construir condições WHERE BÁSICAS
+            $whereConditions = [
+                "t.loja_id = :loja_id",
+                "t.status = :status"
+            ];
+            $params = [
+                ':loja_id' => $storeId,
+                ':status' => TRANSACTION_PENDING
+            ];
             // Aplicar filtros normalmente
             if (!empty($filters['data_inicio'])) {
                 $whereConditions[] = "DATE(t.data_transacao) >= :data_inicio";
