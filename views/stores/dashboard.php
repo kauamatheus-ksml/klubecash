@@ -29,7 +29,6 @@ if (!$storeId || !$store) {
 
 // Obter conexão com banco para as queries
 $db = Database::getConnection();
-$activeMenu = 'dashboard';
 
 // Obter estatísticas da loja
 // 1. Total de vendas registradas
@@ -133,13 +132,12 @@ $activeMenu = 'dashboard';
     <title>Dashboard da Loja - Klube Cash</title>
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
     <link rel="stylesheet" href="../../assets/css/views/stores/dashboard.css">
-    <link rel="stylesheet" href="/assets/css/sidebar-lojista.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <div class="dashboard-container">
         <!-- Incluir o componente sidebar -->
-        <?php include '../../views/components/sidebar-lojista-responsiva.php'; ?>
+        <?php include_once '../components/sidebar-store.php'; ?>
         
         <div class="main-content" id="mainContent">
             <div class="dashboard-header">
@@ -388,6 +386,5 @@ $activeMenu = 'dashboard';
     </div>
     
     <script src="../../assets/js/views/stores/dashboard.js"></script>
-    <script src="/assets/js/sidebar-lojista.js"></script>
 </body>
 </html>
