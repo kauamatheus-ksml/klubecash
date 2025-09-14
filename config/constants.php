@@ -16,7 +16,7 @@ define('SIDEBAR_LOJISTA_CACHE_TIME', 30 * 24 * 60 * 60); // 30 dias
 define('SIDEBAR_LOJISTA_CSS_URL', CSS_URL . '/sidebar-lojista.css');
 define('SIDEBAR_LOJISTA_JS_URL', JS_URL . '/sidebar-lojista.js');
 
-// === TIPOS DE CLIENTE ===
+
 define('CLIENT_TYPE_COMPLETE', 'completo');      // Cliente com cadastro completo
 define('CLIENT_TYPE_VISITOR', 'visitante');      // Cliente visitante (sem senha)
 
