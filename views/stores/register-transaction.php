@@ -341,14 +341,12 @@ $activeMenu = 'register-transaction';
                 <h1 class="page-title">
                     ✨ Registrar Nova Venda
                     <?php if ($isStoreMvp): ?>
-                        <span style="background: linear-gradient(45deg, #FFD700, #FFA500); color: #8B4513; padding: 0.3rem 0.8rem; border-radius: 20px; font-size: 0.7rem; font-weight: bold; margin-left: 1rem; box-shadow: 0 2px 8px rgba(255, 215, 0, 0.3);">🏆 LOJA MVP</span>
+                        <span style="background: linear-gradient(45deg, #FFD700, #FFA500); color: #8B4513; padding: 0.3rem 0.8rem; border-radius: 20px; font-size: 0.7rem; font-weight: bold; margin-left: 1rem; box-shadow: 0 2px 8px rgba(255, 215, 0, 0.3);">LOJA MVP</span>
                     <?php endif; ?>
                 </h1>
                 <p class="page-subtitle">
                     <?php if (!$cashbackAtivo): ?>
                         ⚠️ <strong>Atenção:</strong> O cashback está temporariamente desabilitado para sua loja
-                    <?php elseif ($isStoreMvp): ?>
-                        🎯 Como loja MVP, suas transações são aprovadas instantaneamente com <?php echo number_format($porcentagemCliente, 1); ?>% de cashback imediato!
                     <?php else: ?>
                         Cadastre sua venda em 4 passos simples e ofereça <?php echo number_format($porcentagemCliente, 1); ?>% de cashback aos seus clientes
                     <?php endif; ?>
@@ -357,25 +355,23 @@ $activeMenu = 'register-transaction';
             
             <!-- Alertas de Sucesso/Erro -->
             <?php if ($success): ?>
-            <div class="alert success" <?php echo $isMvpTransaction ? 'style="background: linear-gradient(135deg, #FFD700 0%, #FFF8DC 100%); border-color: #FFD700;"' : ''; ?>>
+            <div class="alert success">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
                     <polyline points="22 4 12 14.01 9 11.01"></polyline>
                 </svg>
                 <div>
-                    <?php if ($isMvpTransaction): ?>
-                        <h4>🏆 Transação MVP Aprovada Instantaneamente!</h4>
-                        <p><strong>Parabéns!</strong> Como loja MVP, sua transação foi aprovada automaticamente e o cashback de <strong>R$ <?php echo number_format($transactionResult['data']['valor_cashback'], 2, ',', '.'); ?></strong> já foi creditado na conta do cliente.</p>
-                        <p>✅ <strong>Status:</strong> Aprovada e processada instantaneamente<br>
-                           💰 <strong>Cashback:</strong> Creditado automaticamente<br>
-                           🎯 <strong>Privilégio MVP:</strong> Sem necessidade de pagamento de comissão</p>
-                    <?php else: ?>
-                        <h4>🎉 Transação registrada com sucesso!</h4>
-                        <p>O cashback será liberado para o cliente assim que o pagamento da comissão for realizado e aprovado.</p>
-                    <?php endif; ?>
+                    <h4>🎉 Transação registrada com sucesso!</h4>
+                    <p>
+                        <?php if ($isMvpTransaction): ?>
+                            Transação aprovada automaticamente. Cashback de <strong>R$ <?php echo number_format($transactionResult['data']['valor_cashback'], 2, ',', '.'); ?></strong> creditado ao cliente.
+                        <?php else: ?>
+                            O cashback será liberado para o cliente assim que o pagamento da comissão for realizado e aprovado.
+                        <?php endif; ?>
+                    </p>
                 </div>
                 <a href="<?php echo STORE_REGISTER_TRANSACTION_URL; ?>" class="nav-btn nav-btn-primary">
-                    <?php echo $isMvpTransaction ? 'Registrar Nova MVP' : 'Registrar Nova'; ?>
+                    Registrar Nova Venda
                 </a>
             </div>
             <?php endif; ?>
@@ -394,43 +390,6 @@ $activeMenu = 'register-transaction';
             </div>
             <?php endif; ?>
             
-            <!-- Configurações Atuais da Loja -->
-            <?php if (!$success): ?>
-            <div class="store-config-info" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border: 1px solid #dee2e6; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
-                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #6c757d;">
-                        <circle cx="12" cy="12" r="3"></circle>
-                        <path d="M12 1v6m0 10v6m11-7h-6m-10 0H1"></path>
-                    </svg>
-                    <strong style="color: #495057;">Configurações de Cashback da Loja</strong>
-                </div>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; font-size: 14px;">
-                    <div>
-                        <span style="color: #6c757d;">Cashback do Cliente:</span>
-                        <strong style="color: #28a745;"><?php echo number_format($porcentagemCliente, 1); ?>%</strong>
-                    </div>
-                    <div>
-                        <span style="color: #6c757d;">Comissão Plataforma:</span>
-                        <strong style="color: <?php echo $isStoreMvp && $porcentagemAdmin == 0 ? '#ffc107' : '#007bff'; ?>;">
-                            <?php echo number_format($porcentagemAdmin, 1); ?>%
-                            <?php if ($isStoreMvp && $porcentagemAdmin == 0): ?>(MVP - Isento)<?php endif; ?>
-                        </strong>
-                    </div>
-                    <div>
-                        <span style="color: #6c757d;">Status:</span>
-                        <strong style="color: <?php echo $cashbackAtivo ? '#28a745' : '#dc3545'; ?>;">
-                            <?php echo $cashbackAtivo ? 'Ativo' : 'Desabilitado'; ?>
-                        </strong>
-                    </div>
-                    <div>
-                        <span style="color: #6c757d;">Tipo de Loja:</span>
-                        <strong style="color: <?php echo $isStoreMvp ? '#ffc107' : '#6c757d'; ?>;">
-                            <?php echo $isStoreMvp ? '🏆 MVP' : 'Normal'; ?>
-                        </strong>
-                    </div>
-                </div>
-            </div>
-            <?php endif; ?>
             
             <!-- Indicador de Progresso -->
             <div class="progress-container">
@@ -771,29 +730,11 @@ $activeMenu = 'register-transaction';
                                     <span class="simulator-value" id="resumoCashbackCliente">R$ 0,00</span>
                                 </div>
                                 <div class="simulator-item">
-                                    <span class="simulator-label">
-                                        <?php if ($isStoreMvp): ?>
-                                            Comissão Plataforma (<?php echo number_format($porcentagemAdmin, 1); ?>%) - MVP:
-                                        <?php else: ?>
-                                            Receita Klube Cash (<?php echo number_format($porcentagemAdmin, 1); ?>%):
-                                        <?php endif; ?>
-                                    </span>
-                                    <span class="simulator-value" id="resumoReceitaAdmin">
-                                        <?php if ($isStoreMvp && $porcentagemAdmin == 0): ?>
-                                            R$ 0,00 (MVP)
-                                        <?php else: ?>
-                                            R$ 0,00
-                                        <?php endif; ?>
-                                    </span>
+                                    <span class="simulator-label">Receita Klube Cash (<?php echo number_format($porcentagemAdmin, 1); ?>%):</span>
+                                    <span class="simulator-value" id="resumoReceitaAdmin">R$ 0,00</span>
                                 </div>
                                 <div class="simulator-item total">
-                                    <span class="simulator-label">
-                                        <?php if ($isStoreMvp): ?>
-                                            Total (<?php echo number_format($porcentagemTotal, 1); ?>%) - MVP:
-                                        <?php else: ?>
-                                            Comissão Total a Pagar (<?php echo number_format($porcentagemTotal, 1); ?>%):
-                                        <?php endif; ?>
-                                    </span>
+                                    <span class="simulator-label">Comissão Total a Pagar (<?php echo number_format($porcentagemTotal, 1); ?>%):</span>
                                     <span class="simulator-value" id="resumoComissaoTotal">R$ 0,00</span>
                                 </div>
                             </div>
