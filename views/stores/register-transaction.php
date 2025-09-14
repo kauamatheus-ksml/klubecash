@@ -11,6 +11,7 @@ require_once '../../utils/StoreHelper.php';
 
 // Iniciar sessão
 session_start();
+$activeMenu = 'nova-venda';
 
 // Verificação simplificada
 StoreHelper::requireStoreAccess();
@@ -203,6 +204,7 @@ $activeMenu = 'register-transaction';
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="../../assets/css/views/stores/profile.css">
     <!-- CSS Customizado para a nova interface -->
+    <link rel="stylesheet" href="/assets/css/sidebar-lojista.css">
     <link rel="stylesheet" href="../../assets/css/views/stores/register-transaction.css">
     <style>
 /* Estilos específicos para cliente visitante nesta página */
@@ -328,6 +330,7 @@ $activeMenu = 'register-transaction';
 </style>
 </head>
 <body>
+    <?php include '../../views/components/sidebar-lojista-responsiva.php'; ?>
     <div class="dashboard-container">
         <!-- Incluir sidebar/menu lateral -->
         <?php include_once '../components/sidebar-store.php'; ?>
@@ -1629,5 +1632,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
         
     </script>
+
+    <script src="/assets/js/sidebar-lojista.js"></script>
 </body>
 </html>
