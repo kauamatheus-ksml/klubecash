@@ -662,17 +662,7 @@ ErrorDocument 500 /views/errors/500.php
 </Files>
 
 
-# === RECURSOS DA SIDEBAR LOJISTA ===
-# Permitir acesso aos assets da sidebar
-RewriteRule ^assets/css/sidebar-lojista\.css$ assets/css/sidebar-lojista.css [L]
-RewriteRule ^assets/js/sidebar-lojista\.js$ assets/js/sidebar-lojista.js [L]
 
-# Cache otimizado para assets da sidebar
-<FilesMatch "(sidebar-lojista\.(css|js))$">
-    ExpiresActive on
-    ExpiresDefault "access plus 30 days"
-    Header append Vary User-Agent
-</FilesMatch>
 
 # === CONFIGURAÇÕES ESPECÍFICAS PARA DEBUG ===
 RewriteRule ^debug-register/?$ views/auth/debug-register.php [L]
