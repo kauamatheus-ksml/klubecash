@@ -811,7 +811,7 @@ class TransactionController {
             
             // LOG para debug, mas NÃO ocultar mais nada
             error_log("PENDENTES DEBUG: Loja {$storeId} - MVP: " . ($isStoreMvp ? 'SIM' : 'NÃO') . " - Mostrando todas as transações");
-            error_log("PENDENTES DEBUG: Loja {$storeId} - MVP: " . ($isStoreMvp ? 'SIM' : 'NÃO') . " - MOSTRANDO todas as transações pendentes");
+            
             
             // COMENTAR/REMOVER esta seção que causava o problema:
             /*
