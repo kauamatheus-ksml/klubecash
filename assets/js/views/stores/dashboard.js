@@ -107,4 +107,122 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
+    // Value visibility toggle functionality
+    loadValueVisibilityState();
 });
+
+// Function to toggle value visibility
+function toggleValueVisibility(targetId) {
+    const hiddenValues = getHiddenValues();
+    const valueElement = document.querySelector(`[data-id="${targetId}"]`);
+    const button = document.querySelector(`[data-target="${targetId}"]`);
+
+    if (!valueElement || !button) return;
+
+    const isHidden = hiddenValues.includes(targetId);
+
+    if (isHidden) {
+        // Show value
+        valueElement.textContent = valueElement.dataset.original;
+        button.querySelector('.eye-open').style.display = '';
+        button.querySelector('.eye-closed').style.display = 'none';
+        removeFromHiddenValues(targetId);
+    } else {
+        // Hide value
+        valueElement.textContent = '••••••';
+        button.querySelector('.eye-open').style.display = 'none';
+        button.querySelector('.eye-closed').style.display = '';
+        addToHiddenValues(targetId);
+    }
+}
+
+// Function to toggle table column visibility
+function toggleTableColumnVisibility(targetId) {
+    const hiddenValues = getHiddenValues();
+    const columns = document.querySelectorAll(`[data-column="${targetId}"]`);
+    const button = document.querySelector(`[data-target="${targetId}"]`);
+
+    if (!button) return;
+
+    const isHidden = hiddenValues.includes(targetId);
+
+    if (isHidden) {
+        // Show values
+        columns.forEach(column => {
+            const valueElement = column.querySelector('.hideable-value');
+            if (valueElement) {
+                valueElement.textContent = valueElement.dataset.original;
+            }
+        });
+        button.querySelector('.eye-open').style.display = '';
+        button.querySelector('.eye-closed').style.display = 'none';
+        removeFromHiddenValues(targetId);
+    } else {
+        // Hide values
+        columns.forEach(column => {
+            const valueElement = column.querySelector('.hideable-value');
+            if (valueElement) {
+                valueElement.textContent = '••••••';
+            }
+        });
+        button.querySelector('.eye-open').style.display = 'none';
+        button.querySelector('.eye-closed').style.display = '';
+        addToHiddenValues(targetId);
+    }
+}
+
+// LocalStorage management functions
+function getHiddenValues() {
+    const stored = localStorage.getItem('klubecash_hidden_values');
+    return stored ? JSON.parse(stored) : [];
+}
+
+function addToHiddenValues(valueId) {
+    const hiddenValues = getHiddenValues();
+    if (!hiddenValues.includes(valueId)) {
+        hiddenValues.push(valueId);
+        localStorage.setItem('klubecash_hidden_values', JSON.stringify(hiddenValues));
+    }
+}
+
+function removeFromHiddenValues(valueId) {
+    const hiddenValues = getHiddenValues();
+    const filteredValues = hiddenValues.filter(id => id !== valueId);
+    localStorage.setItem('klubecash_hidden_values', JSON.stringify(filteredValues));
+}
+
+// Load initial visibility state from localStorage
+function loadValueVisibilityState() {
+    const hiddenValues = getHiddenValues();
+
+    hiddenValues.forEach(valueId => {
+        if (valueId.startsWith('table-')) {
+            // Handle table columns
+            const columns = document.querySelectorAll(`[data-column="${valueId}"]`);
+            const button = document.querySelector(`[data-target="${valueId}"]`);
+
+            if (button) {
+                button.querySelector('.eye-open').style.display = 'none';
+                button.querySelector('.eye-closed').style.display = '';
+
+                columns.forEach(column => {
+                    const valueElement = column.querySelector('.hideable-value');
+                    if (valueElement) {
+                        valueElement.textContent = '••••••';
+                    }
+                });
+            }
+        } else {
+            // Handle individual values
+            const valueElement = document.querySelector(`[data-id="${valueId}"]`);
+            const button = document.querySelector(`[data-target="${valueId}"]`);
+
+            if (valueElement && button) {
+                valueElement.textContent = '••••••';
+                button.querySelector('.eye-open').style.display = 'none';
+                button.querySelector('.eye-closed').style.display = '';
+            }
+        }
+    });
+}

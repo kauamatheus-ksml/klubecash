@@ -508,6 +508,96 @@
     font-size: 0.9rem;
   }
 
+  /* Value toggle button styles */
+  .value-toggle-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    margin-left: 8px;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition);
+    opacity: 0.6;
+    vertical-align: middle;
+  }
+
+  .value-toggle-btn:hover {
+    opacity: 1;
+    background-color: rgba(0, 0, 0, 0.05);
+    transform: scale(1.1);
+  }
+
+  .value-toggle-btn svg {
+    transition: var(--transition);
+    color: var(--medium-gray);
+  }
+
+  .value-toggle-btn:hover svg {
+    color: var(--primary-color);
+  }
+
+  /* Table header toggle button styles */
+  .table-header-toggle {
+    margin-left: 6px;
+    opacity: 0.5;
+  }
+
+  .table-header-toggle:hover {
+    opacity: 0.9;
+  }
+
+  /* Hidden value styles */
+  .hideable-value {
+    font-family: 'Courier New', monospace;
+    transition: var(--transition);
+  }
+
+  /* Card content with toggle button */
+  .card-content h3 {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  /* Table header with toggle */
+  .data-table th {
+    position: relative;
+  }
+
+  .data-table th .value-toggle-btn {
+    position: absolute;
+    top: 50%;
+    right: 8px;
+    transform: translateY(-50%);
+    opacity: 0.4;
+  }
+
+  .data-table th:hover .value-toggle-btn {
+    opacity: 0.8;
+  }
+
+  /* Responsive adjustments for toggle buttons */
+  @media (max-width: 767.98px) {
+    .value-toggle-btn {
+      padding: 6px;
+      margin-left: 4px;
+    }
+
+    .table-header-toggle {
+      position: static;
+      margin-left: 4px;
+      transform: none;
+    }
+
+    .data-table th {
+      padding-right: 30px;
+    }
+  }
+
 
 
   
