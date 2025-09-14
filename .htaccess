@@ -661,8 +661,5 @@ ErrorDocument 500 /views/errors/500.php
     php_value error_log /home/u383946504/domains/klubecash.com/public_html/logs/register_errors.log
 </Files>
 
-
-
-
 # === CONFIGURAÇÕES ESPECÍFICAS PARA DEBUG ===
 RewriteRule ^debug-register/?$ views/auth/debug-register.php [L]

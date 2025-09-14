@@ -8,7 +8,6 @@ if (!defined('ROOT_PATH')) {
 }
 
 
-
 // === TIPOS DE CLIENTE ===
 define('CLIENT_TYPE_COMPLETE', 'completo');      // Cliente com cadastro completo
 define('CLIENT_TYPE_VISITOR', 'visitante');      // Cliente visitante (sem senha)
