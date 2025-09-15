@@ -725,95 +725,117 @@
         }
 
         /* ========================================
-           SIMULAÇÃO DE CASHBACK
+           RESUMO DA TRANSAÇÃO - DESIGN CLEAN
         ======================================== */
         .cashback-simulator {
-            background: linear-gradient(135deg, var(--primary-light) 0%, var(--white) 100%);
-            border-radius: var(--border-radius);
-            padding: 2rem;
+            background: var(--white);
+            border-radius: var(--border-radius-sm);
+            padding: 1.5rem;
             margin: 2rem 0;
-            border: 2px solid var(--primary-color);
+            border: 1px solid #E1E7F0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
         }
 
         .simulator-header {
             display: flex;
             align-items: center;
-            gap: 1rem;
-            margin-bottom: 1.5rem;
+            gap: 0.75rem;
+            margin-bottom: 1.25rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #F1F5F9;
         }
 
         .simulator-icon {
-            width: 60px;
-            height: 60px;
-            background: var(--primary-color);
-            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            background: #F8FAFC;
+            border: 2px solid #E2E8F0;
+            border-radius: 8px;
             display: flex;
             align-items: center;
             justify-content: center;
-            color: var(--white);
-            font-size: 1.5rem;
+            color: var(--secondary-color);
+            font-size: 1.2rem;
         }
 
         .simulator-title {
-            font-size: 1.3rem;
-            font-weight: 700;
-            color: var(--primary-color);
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--secondary-color);
+            margin: 0;
         }
 
         .simulator-details {
-            background: var(--white);
-            border-radius: var(--border-radius-sm);
-            overflow: hidden;
-            box-shadow: var(--shadow-md);
-            border: 1px solid rgba(0,0,0,0.05);
+            background: transparent;
+            border: none;
+            box-shadow: none;
+            border-radius: 0;
         }
 
         .simulator-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 1.25rem 1.5rem;
-            border-bottom: 1px solid rgba(0,0,0,0.05);
-            transition: var(--transition);
+            padding: 0.75rem 0;
+            border-bottom: 1px solid #F1F5F9;
+            transition: none;
         }
 
         .simulator-item:hover {
-            background: var(--light-gray);
+            background: transparent;
         }
 
         .simulator-item:last-child {
             border-bottom: none;
+            padding-bottom: 0;
         }
 
         .simulator-item.total {
-            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
-            color: var(--white);
-            font-weight: 700;
-            font-size: 1.1rem;
+            background: #F8FAFC;
+            border: 1px solid #E2E8F0;
+            border-radius: 6px;
+            padding: 1rem;
+            margin-top: 0.75rem;
+            color: var(--secondary-color);
+            font-weight: 600;
+            font-size: 1rem;
         }
 
         .simulator-item.balance-used {
-            background: linear-gradient(135deg, var(--success-light) 0%, var(--white) 100%);
-            border-left: 4px solid var(--success-color);
+            background: #F0FDF4;
+            border: 1px solid #BBF7D0;
+            border-radius: 6px;
+            padding: 0.75rem;
+            margin: 0.5rem 0;
         }
 
         .simulator-label {
-            color: var(--secondary-color);
+            color: var(--medium-gray);
             font-weight: 500;
+            font-size: 0.95rem;
         }
 
         .simulator-item.total .simulator-label {
-            color: var(--white);
+            color: var(--secondary-color);
+        }
+
+        .simulator-item.balance-used .simulator-label {
+            color: #166534;
         }
 
         .simulator-value {
-            font-weight: 700;
-            font-size: 1.1rem;
-            color: var(--primary-color);
+            font-weight: 600;
+            font-size: 1rem;
+            color: var(--dark-gray);
         }
 
         .simulator-item.total .simulator-value {
-            color: var(--white);
+            color: var(--secondary-color);
+            font-weight: 700;
+        }
+
+        .simulator-item.balance-used .simulator-value {
+            color: #166534;
         }
 
         /* ========================================
