@@ -361,6 +361,10 @@ $activeMenu = 'register-transaction';
 </head>
 <body>
     <?php include '../../views/components/sidebar-lojista-responsiva.php'; ?>
+
+    <!-- Container de Toasts -->
+    <div id="toast-container" class="toast-container"></div>
+
     <div class="dashboard-container">
         <!-- Incluir sidebar/menu lateral -->
         
@@ -939,7 +943,7 @@ $activeMenu = 'register-transaction';
             switch (currentStep) {
                 case 1:
                     if (!clientData) {
-                        showNotification('Por favor, busque e selecione um cliente primeiro', 'warning');
+                        toast.warning('Cliente Obrigatório', 'Busque e selecione um cliente primeiro.');
                         return false;
                     }
                     return true;
@@ -949,13 +953,13 @@ $activeMenu = 'register-transaction';
                     const codigoTransacao = document.getElementById('codigo_transacao').value.trim();
 
                     if (valorTotal <= 0) {
-                        showNotification('Por favor, informe o valor total da venda', 'warning');
+                        toast.warning('Valor Obrigatório', 'Informe o valor total da venda.');
                         document.getElementById('valor_total').focus();
                         return false;
                     }
 
                     if (!codigoTransacao) {
-                        showNotification('Por favor, informe o código da transação', 'warning');
+                        toast.warning('Código Obrigatório', 'Informe o código da transação.');
                         document.getElementById('codigo_transacao').focus();
                         return false;
                     }
@@ -1013,7 +1017,7 @@ $activeMenu = 'register-transaction';
             const clientInfoCard = document.getElementById('clientInfoCard');
 
             if (!searchTerm) {
-                showNotification('Por favor, digite um email, CPF ou telefone válido', 'warning');
+                toast.warning('Campo Vazio', 'Digite um email, CPF ou telefone para buscar o cliente.');
                 return;
             }
 
@@ -1021,6 +1025,9 @@ $activeMenu = 'register-transaction';
             searchBtn.disabled = true;
             searchBtn.querySelector('.btn-text').textContent = 'Buscando...';
             searchBtn.querySelector('.loading-spinner').style.display = 'inline-block';
+
+            // Toast de loading
+            const loadingToastId = toast.loading('Buscando Cliente', 'Procurando cliente no sistema...');
 
             try {
                 const response = await fetch('../../api/store-client-search.php', {
@@ -1035,28 +1042,37 @@ $activeMenu = 'register-transaction';
 
                 const data = await response.json();
 
+                // Remover toast de loading
+                toast.remove(loadingToastId);
+
                 if (data.status) {
                     clientData = data.data;
                     clientBalance = data.data.saldo || 0;
                     mostrarInfoCliente(data.data);
                     hideVisitorSection(); // Esconder seção de visitante
                     document.getElementById('nextToStep2').disabled = false;
+                    toast.success('Cliente Encontrado!', `${data.data.nome} carregado com sucesso.`);
                 } else {
                     mostrarErroCliente(data.message);
-                    
+
                     // Mostrar opção de criar visitante se disponível
                     if (data.can_create_visitor) {
                         currentSearchTerm = data.search_term;
                         currentSearchType = data.search_type;
                         showVisitorOption();
+                        toast.info('Cliente não encontrado', 'Você pode criar um cliente visitante para prosseguir.');
+                    } else {
+                        toast.warning('Cliente não encontrado', data.message);
                     }
-                    
+
                     document.getElementById('nextToStep2').disabled = true;
                 }
             } catch (error) {
                 console.error('Erro ao buscar cliente:', error);
+                toast.remove(loadingToastId);
                 mostrarErroCliente('Erro ao buscar cliente. Tente novamente.');
                 document.getElementById('nextToStep2').disabled = true;
+                toast.error('Erro de Conexão', 'Não foi possível buscar o cliente. Verifique sua conexão.');
             } finally {
                 searchBtn.disabled = false;
                 searchBtn.querySelector('.btn-text').textContent = 'Buscar Cliente';
@@ -1131,7 +1147,6 @@ $activeMenu = 'register-transaction';
             `;
 
             document.getElementById('cliente_id_hidden').value = client.id;
-            showNotification('Cliente encontrado!', 'success');
         }
 
         function mostrarErroCliente(message) {
@@ -1225,7 +1240,7 @@ $activeMenu = 'register-transaction';
                 generateBtn.disabled = false;
                 generateBtn.querySelector('.btn-text').textContent = 'Gerar';
 
-                showNotification('Código gerado com sucesso!', 'success');
+                toast.success('Código Gerado!', `Código ${codigo} criado automaticamente.`);
             }, 800);
         }
 
@@ -1296,42 +1311,179 @@ $activeMenu = 'register-transaction';
         }
 
         // ========================================
-        // SISTEMA DE TOAST
+        // SISTEMA DE TOAST UNIFICADO
         // ========================================
 
-        function showSuccessToast(isMvp, cashbackValue) {
-            const toast = document.createElement('div');
-            toast.className = 'toast';
-
-            let message;
-            if (isMvp) {
-                message = `Transação aprovada! Cashback de R$ ${cashbackValue} creditado.`;
-            } else {
-                message = 'Transação registrada! Cashback será liberado após aprovação.';
+        class ToastSystem {
+            constructor() {
+                this.container = document.getElementById('toast-container');
+                this.toasts = new Map();
+                this.toastId = 0;
             }
 
-            toast.innerHTML = `
-                <svg class="toast-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
-                </svg>
-                <div class="toast-content">
-                    <div class="toast-title">Sucesso!</div>
-                    <div class="toast-message">${message}</div>
-                </div>
-            `;
+            show(type, title, message, options = {}) {
+                const {
+                    duration = this.getDefaultDuration(type),
+                    closable = true,
+                    showProgress = true
+                } = options;
 
-            document.body.appendChild(toast);
+                const id = ++this.toastId;
+                const toast = this.createToast(type, title, message, closable, showProgress);
 
-            // Remover toast após 4 segundos
-            setTimeout(() => {
+                this.container.appendChild(toast);
+                this.toasts.set(id, toast);
+
+                // Auto-remover após duração especificada
+                if (duration > 0) {
+                    this.scheduleRemoval(id, duration, showProgress);
+                }
+
+                return id;
+            }
+
+            createToast(type, title, message, closable, showProgress) {
+                const toast = document.createElement('div');
+                toast.className = `toast ${type}`;
+
+                const icon = this.getIcon(type);
+
+                toast.innerHTML = `
+                    ${icon}
+                    <div class="toast-content">
+                        <div class="toast-title">${title}</div>
+                        <div class="toast-message">${message}</div>
+                    </div>
+                    ${closable ? '<button class="toast-close" onclick="toast.remove(this.parentElement)">&times;</button>' : ''}
+                    ${showProgress ? '<div class="toast-progress"></div>' : ''}
+                `;
+
+                return toast;
+            }
+
+            getIcon(type) {
+                const icons = {
+                    success: `<svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                    </svg>`,
+                    error: `<svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="15" y1="9" x2="9" y2="15"></line>
+                        <line x1="9" y1="9" x2="15" y2="15"></line>
+                    </svg>`,
+                    warning: `<svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                        <line x1="12" y1="9" x2="12" y2="13"></line>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>`,
+                    info: `<svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="16" x2="12" y2="12"></line>
+                        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                    </svg>`,
+                    loading: `<svg class="toast-icon loading" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+                    </svg>`
+                };
+                return icons[type] || icons.info;
+            }
+
+            getDefaultDuration(type) {
+                const durations = {
+                    success: 4000,
+                    error: 6000,
+                    warning: 5000,
+                    info: 4000,
+                    loading: 0 // Loading não remove automaticamente
+                };
+                return durations[type] || 4000;
+            }
+
+            scheduleRemoval(id, duration, showProgress) {
+                const toast = this.toasts.get(id);
+                if (!toast) return;
+
+                const progressBar = toast.querySelector('.toast-progress');
+
+                if (showProgress && progressBar) {
+                    progressBar.style.width = '100%';
+                    progressBar.style.transition = `width ${duration}ms linear`;
+                    setTimeout(() => {
+                        progressBar.style.width = '0%';
+                    }, 50);
+                }
+
+                setTimeout(() => this.remove(id), duration);
+            }
+
+            remove(toastOrId) {
+                let toast, id;
+
+                if (typeof toastOrId === 'number') {
+                    id = toastOrId;
+                    toast = this.toasts.get(id);
+                } else {
+                    toast = toastOrId;
+                    // Encontrar ID pelo elemento
+                    for (const [key, value] of this.toasts.entries()) {
+                        if (value === toast) {
+                            id = key;
+                            break;
+                        }
+                    }
+                }
+
+                if (!toast) return;
+
                 toast.style.animation = 'slideOutRight 0.3s ease-in forwards';
                 setTimeout(() => {
                     if (toast.parentNode) {
                         toast.parentNode.removeChild(toast);
                     }
+                    if (id) this.toasts.delete(id);
                 }, 300);
-            }, 4000);
+            }
+
+            // Métodos de conveniência
+            success(title, message, options) {
+                return this.show('success', title, message, options);
+            }
+
+            error(title, message, options) {
+                return this.show('error', title, message, options);
+            }
+
+            warning(title, message, options) {
+                return this.show('warning', title, message, options);
+            }
+
+            info(title, message, options) {
+                return this.show('info', title, message, options);
+            }
+
+            loading(title, message, options) {
+                return this.show('loading', title, message, { duration: 0, closable: false, ...options });
+            }
+
+            clear() {
+                this.toasts.forEach(toast => this.remove(toast));
+            }
+        }
+
+        // Instância global do sistema de toast
+        const toast = new ToastSystem();
+
+        // Função para compatibilidade com código existente
+        function showSuccessToast(isMvp, cashbackValue) {
+            let message;
+            if (isMvp) {
+                message = `Cashback de R$ ${cashbackValue} creditado automaticamente.`;
+            } else {
+                message = 'Cashback será liberado após aprovação da comissão.';
+            }
+
+            toast.success('Transação Registrada!', message);
         }
 
         // ========================================
@@ -1345,54 +1497,16 @@ $activeMenu = 'register-transaction';
             });
         }
 
+        // Função de compatibilidade para showNotification
         function showNotification(message, type = 'info') {
-            const notification = document.createElement('div');
-            notification.className = `notification ${type}`;
-            
-            const icons = {
-                success: '✅',
-                warning: '⚠️',
-                error: '❌',
-                info: 'ℹ️'
+            const titleMap = {
+                success: 'Sucesso!',
+                warning: 'Atenção!',
+                error: 'Erro!',
+                info: 'Informação'
             };
 
-            notification.innerHTML = `
-                <span style="font-size: 1.2rem; margin-right: 0.5rem;">${icons[type] || icons.info}</span>
-                <span>${message}</span>
-            `;
-
-            const colors = {
-                success: '#28A745',
-                warning: '#FFC107',
-                error: '#DC3545',
-                info: '#17A2B8'
-            };
-
-            notification.style.cssText = `
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                background: ${colors[type] || colors.info};
-                color: white;
-                padding: 1rem 1.5rem;
-                border-radius: 8px;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-                z-index: 10000;
-                font-weight: 600;
-                max-width: 350px;
-                animation: slideInRight 0.3s ease-out;
-            `;
-
-            document.body.appendChild(notification);
-
-            setTimeout(() => {
-                notification.style.animation = 'slideOutRight 0.3s ease-in forwards';
-                setTimeout(() => {
-                    if (notification.parentNode) {
-                        notification.parentNode.removeChild(notification);
-                    }
-                }, 300);
-            }, 4000);
+            toast[type](titleMap[type], message);
         }
 
         let formSubmitting = false; // Flag para prevenir envio duplo
@@ -1413,7 +1527,7 @@ $activeMenu = 'register-transaction';
             if (currentStep !== 4) {
                 console.log('❌ Não está no step final, impedindo submissão');
                 e.preventDefault();
-                showNotification('Complete todos os passos antes de registrar a venda', 'warning');
+                toast.warning('Passos Incompletos', 'Complete todos os passos antes de registrar a venda.');
                 return false;
             }
             
@@ -1421,7 +1535,7 @@ $activeMenu = 'register-transaction';
             if (!clientData) {
                 e.preventDefault();
                 console.log('❌ Cliente não selecionado');
-                showNotification('Por favor, selecione um cliente primeiro', 'error');
+                toast.error('Cliente Obrigatório', 'Selecione um cliente antes de prosseguir.');
                 goToStep(1);
                 return false;
             }
@@ -1433,7 +1547,7 @@ $activeMenu = 'register-transaction';
             if (valorTotal <= 0) {
                 e.preventDefault();
                 console.log('❌ Valor inválido:', valorTotal);
-                showNotification('Por favor, informe o valor total da venda', 'error');
+                toast.error('Valor Inválido', 'Informe o valor total da venda.');
                 goToStep(2);
                 // Focar no campo após mostrar o step
                 setTimeout(() => {
@@ -1442,11 +1556,11 @@ $activeMenu = 'register-transaction';
                 }, 300);
                 return false;
             }
-            
+
             if (valorTotal < 5) {
                 e.preventDefault();
                 console.log('❌ Valor menor que mínimo:', valorTotal);
-                showNotification('Valor mínimo da venda é R$ 5,00', 'error');
+                toast.error('Valor Muito Baixo', 'O valor mínimo da venda é R$ 5,00.');
                 goToStep(2);
                 setTimeout(() => {
                     valorTotalField.focus();
@@ -1462,7 +1576,7 @@ $activeMenu = 'register-transaction';
             if (!codigoTransacao) {
                 e.preventDefault();
                 console.log('❌ Código não informado');
-                showNotification('Por favor, informe o código da transação', 'error');
+                toast.error('Código Obrigatório', 'Informe o código da transação.');
                 goToStep(2);
                 setTimeout(() => {
                     codigoTransacaoField.focus();
@@ -1482,23 +1596,11 @@ $activeMenu = 'register-transaction';
                 submitBtn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v6m11-7h-6m-6 0H1"/></svg> Processando...';
             }
 
-            showNotification('Registrando venda...', 'info');
+            toast.info('Processando', 'Registrando venda no sistema...');
             return true;
         }
 
-        // Adicionar estilos de animação
-        const animationStyles = document.createElement('style');
-        animationStyles.textContent = `
-            @keyframes slideInRight {
-                from { transform: translateX(100%); opacity: 0; }
-                to { transform: translateX(0); opacity: 1; }
-            }
-            @keyframes slideOutRight {
-                from { transform: translateX(0); opacity: 1; }
-                to { transform: translateX(100%); opacity: 0; }
-            }
-        `;
-        document.head.appendChild(animationStyles);
+        // Sistema de toast carregado e pronto para uso
 
 
         // === FUNÇÕES PARA CLIENTE VISITANTE ===
@@ -1540,13 +1642,13 @@ $activeMenu = 'register-transaction';
 
             // Validações
             if (!nome || nome.length < 2) {
-                showNotification('Nome é obrigatório e deve ter pelo menos 2 caracteres.', 'warning');
+                toast.warning('Nome Inválido', 'O nome deve ter pelo menos 2 caracteres.');
                 return;
             }
 
             const phoneClean = telefone.replace(/[^0-9]/g, '');
             if (!phoneClean || phoneClean.length < 10) {
-                showNotification('Telefone é obrigatório e deve ter pelo menos 10 dígitos.', 'warning');
+                toast.warning('Telefone Inválido', 'O telefone deve ter pelo menos 10 dígitos.');
                 return;
             }
 
@@ -1566,21 +1668,21 @@ $activeMenu = 'register-transaction';
 
                 if (data.status) {
                     // Cliente visitante criado com sucesso
-                    showNotification('Cliente visitante criado com sucesso!', 'success');
+                    toast.success('Cliente Criado!', `${data.data.nome} foi cadastrado como cliente visitante.`);
                     clientData = data.data;
                     clientBalance = 0;
                     mostrarInfoCliente(data.data);
                     hideVisitorSection();
                     document.getElementById('nextToStep2').disabled = false;
-                    
+
                     // Atualizar campo de busca
                     document.getElementById('search_term').value = telefone;
                 } else {
-                    showNotification(data.message, 'error');
+                    toast.error('Erro ao Criar Cliente', data.message);
                 }
             } catch (error) {
                 console.error('Erro:', error);
-                showNotification('Erro ao criar cliente visitante. Tente novamente.', 'error');
+                toast.error('Erro de Conexão', 'Não foi possível criar o cliente visitante. Tente novamente.');
             }
         }
 
