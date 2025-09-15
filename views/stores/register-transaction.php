@@ -353,29 +353,7 @@ $activeMenu = 'register-transaction';
                 </p>
             </div>
             
-            <!-- Alertas de Sucesso/Erro -->
-            <?php if ($success): ?>
-            <div class="alert success">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
-                </svg>
-                <div>
-                    <h4>🎉 Transação registrada com sucesso!</h4>
-                    <p>
-                        <?php if ($isMvpTransaction): ?>
-                            Transação aprovada automaticamente. Cashback de <strong>R$ <?php echo number_format($transactionResult['data']['valor_cashback'], 2, ',', '.'); ?></strong> creditado ao cliente.
-                        <?php else: ?>
-                            O cashback será liberado para o cliente assim que o pagamento da comissão for realizado e aprovado.
-                        <?php endif; ?>
-                    </p>
-                </div>
-                <a href="<?php echo STORE_REGISTER_TRANSACTION_URL; ?>" class="nav-btn nav-btn-primary">
-                    Registrar Nova Venda
-                </a>
-            </div>
-            <?php endif; ?>
-            
+            <!-- Sistema de Toast para notificações -->
             <?php if (!empty($error)): ?>
             <div class="alert error">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -852,6 +830,14 @@ $activeMenu = 'register-transaction';
         document.addEventListener('DOMContentLoaded', function() {
             initializeEventListeners();
             updateProgressBar();
+
+            // Verificar se há sucesso para mostrar toast
+            <?php if ($success): ?>
+            showSuccessToast(
+                <?php echo json_encode($isMvpTransaction); ?>,
+                <?php echo json_encode(number_format($transactionResult['data']['valor_cashback'] ?? 0, 2, ',', '.')); ?>
+            );
+            <?php endif; ?>
         });
 
         function initializeEventListeners() {
@@ -1277,6 +1263,47 @@ $activeMenu = 'register-transaction';
             } else {
                 resumoSaldoRow.style.display = 'none';
             }
+        }
+
+        // ========================================
+        // SISTEMA DE TOAST
+        // ========================================
+
+        function showSuccessToast(isMvp, cashbackValue) {
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+
+            let message;
+            if (isMvp) {
+                message = `Transação aprovada! Cashback de R$ ${cashbackValue} creditado.`;
+            } else {
+                message = 'Transação registrada! Cashback será liberado após aprovação.';
+            }
+
+            toast.innerHTML = `
+                <svg class="toast-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
+                <div class="toast-content">
+                    <div class="toast-title">Sucesso!</div>
+                    <div class="toast-message">${message}</div>
+                </div>
+            `;
+
+            document.body.appendChild(toast);
+
+            // Remover toast e resetar página após 3 segundos
+            setTimeout(() => {
+                toast.style.animation = 'slideOutRight 0.3s ease-in forwards';
+                setTimeout(() => {
+                    if (toast.parentNode) {
+                        toast.parentNode.removeChild(toast);
+                    }
+                    // Resetar página - redirecionar para URL limpa
+                    window.location.href = window.location.href.split('?')[0];
+                }, 300);
+            }, 3000);
         }
 
         // ========================================
