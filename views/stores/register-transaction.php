@@ -67,14 +67,37 @@ if (!$storeId || !$store) {
     exit;
 }
 
-// Verificar se o formulário foi enviado
+// Verificar se há dados de sucesso na sessão (padrão PRG)
 $success = false;
 $error = '';
 $transactionData = [];
 $isMvpTransaction = false;
 $transactionResult = null;
 
+// Verificar se há transação de sucesso na sessão
+if (isset($_SESSION['transaction_success'])) {
+    $success = true;
+    $sessionData = $_SESSION['transaction_success'];
+    $isMvpTransaction = $sessionData['is_mvp'];
+    $transactionResult = [
+        'data' => [
+            'valor_cashback' => $sessionData['valor_cashback'],
+            'transaction_id' => $sessionData['transaction_id']
+        ]
+    ];
+
+    // Limpar dados da sessão após uso
+    unset($_SESSION['transaction_success']);
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Verificar se já há uma transação de sucesso na sessão para evitar duplo envio
+    if (isset($_SESSION['transaction_success'])) {
+        // Redirecionar para evitar processamento duplo
+        header('Location: ' . $_SERVER['REQUEST_URI']);
+        exit;
+    }
+
     // Debug: Log dos dados recebidos
     error_log("FORM DEBUG: Dados POST recebidos: " . print_r($_POST, true));
     
@@ -156,10 +179,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 
                 if ($result['status']) {
-                    $success = true;
-                    $transactionResult = $result;
-                    $isMvpTransaction = isset($result['data']['is_mvp']) && $result['data']['is_mvp'];
-                    
                     // === INTEGRAÇÃO WHATSAPP DIRETA ===
                     try {
                         require_once '../../utils/NotificationTrigger.php';
@@ -168,7 +187,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } catch (Exception $e) {
                         error_log("[TRACE] register-transaction.php - ERRO na notificação: " . $e->getMessage(), 3, '../../integration_trace.log');
                     }
-                    
+
                     // ✅ AUDITORIA: Registrar quem criou a transação
                     StoreHelper::logUserAction($_SESSION['user_id'], 'criou_transacao', [
                         'loja_id' => $storeId,
@@ -178,9 +197,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'codigo_transacao' => $codigoTransacao,
                         'valor_saldo_usado' => $valorSaldoUsado
                     ]);
-                    
-                    $transactionData = [];
+
                     error_log("FORM DEBUG: Transação registrada com sucesso - ID: " . $result['data']['transaction_id']);
+
+                    // IMPLEMENTAR PADRÃO PRG (Post-Redirect-Get)
+                    // Salvar dados de sucesso na sessão e redirecionar
+                    $_SESSION['transaction_success'] = [
+                        'is_mvp' => isset($result['data']['is_mvp']) && $result['data']['is_mvp'],
+                        'valor_cashback' => $result['data']['valor_cashback'] ?? 0,
+                        'transaction_id' => $result['data']['transaction_id']
+                    ];
+
+                    // Redirecionar para evitar reenvio do formulário
+                    header('Location: ' . $_SERVER['REQUEST_URI']);
+                    exit;
                 } else {
                     $error = $result['message'];
                     error_log("FORM DEBUG: Erro ao registrar - " . $result['message']);
@@ -1293,17 +1323,15 @@ $activeMenu = 'register-transaction';
 
             document.body.appendChild(toast);
 
-            // Remover toast e resetar página após 3 segundos
+            // Remover toast após 4 segundos
             setTimeout(() => {
                 toast.style.animation = 'slideOutRight 0.3s ease-in forwards';
                 setTimeout(() => {
                     if (toast.parentNode) {
                         toast.parentNode.removeChild(toast);
                     }
-                    // Resetar página - redirecionar para URL limpa
-                    window.location.href = window.location.href.split('?')[0];
                 }, 300);
-            }, 3000);
+            }, 4000);
         }
 
         // ========================================
@@ -1367,11 +1395,20 @@ $activeMenu = 'register-transaction';
             }, 4000);
         }
 
+        let formSubmitting = false; // Flag para prevenir envio duplo
+
         function validateForm(e) {
             console.log('🔍 VALIDAÇÃO INICIADA');
             console.log('Step atual:', currentStep);
             console.log('Cliente atual:', clientData);
-            
+
+            // Prevenir envio duplo
+            if (formSubmitting) {
+                console.log('❌ Formulário já está sendo enviado');
+                e.preventDefault();
+                return false;
+            }
+
             // Só validar se estamos no último step (4)
             if (currentStep !== 4) {
                 console.log('❌ Não está no step final, impedindo submissão');
@@ -1434,6 +1471,17 @@ $activeMenu = 'register-transaction';
             }
 
             console.log('✅ VALIDAÇÃO PASSOU - Enviando formulário');
+
+            // Marcar como enviando para prevenir duplo envio
+            formSubmitting = true;
+
+            // Desabilitar botão de envio
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v6m11-7h-6m-6 0H1"/></svg> Processando...';
+            }
+
             showNotification('Registrando venda...', 'info');
             return true;
         }
