@@ -189,7 +189,7 @@ if (!empty($selectedTransactions)) {
         $saldoUsado = $transaction['saldo_usado'] ?? 0;
         $totalOriginalValue += $transaction['valor_total'];
         $totalBalanceUsed += $saldoUsado;
-        $totalValue += $transaction['valor_admin'];
+        $totalValue += $transaction['valor_cashback'];
     }
 }
 
