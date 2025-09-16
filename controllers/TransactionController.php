@@ -1966,7 +1966,7 @@ class TransactionController {
                 return ['status' => false, 'message' => 'Dados obrigatórios faltando'];
             }
             
-            // Verificar se o usuário está autenticado e é loja ou admin
+            // Verificar autenticação
             if (!AuthController::isAuthenticated()) {
                 return ['status' => false, 'message' => 'Usuário não autenticado.'];
             }
@@ -1987,12 +1987,14 @@ class TransactionController {
             
             error_log("registerPayment - IDs: " . implode(',', $transactionIds));
             
-            // CORREÇÃO: Validar se todas as transações existem e calcular valor total correto
+            // CORREÇÃO PRINCIPAL: Calcular valor total correto (comissão + cashback)
             $placeholders = implode(',', array_fill(0, count($transactionIds), '?'));
             $validateStmt = $db->prepare("
                 SELECT 
                     id,
+                    (valor_cliente + valor_admin) as valor_total_comissao,
                     valor_admin as comissao_loja,
+                    valor_cliente as cashback_cliente,
                     status,
                     loja_id
                 FROM transacoes_cashback 
@@ -2011,10 +2013,10 @@ class TransactionController {
                 ];
             }
 
-            // CORREÇÃO: Calcular valor total correto (apenas comissão da loja)
+            // CORREÇÃO: Calcular valor total correto (comissão + cashback)
             $totalCalculated = 0;
             foreach ($transactions as $transaction) {
-                $totalCalculated += $transaction['comissao_loja'];
+                $totalCalculated += $transaction['valor_total_comissao']; // Soma comissão + cashback
             }
             
             // Validar se o valor informado bate com o calculado
@@ -2033,6 +2035,7 @@ class TransactionController {
                 return ['status' => false, 'message' => 'Valor total deve ser maior que zero'];
             }
             
+            // Resto da função continua igual...
             // Iniciar transação no banco de dados
             $db->beginTransaction();
             
@@ -2084,42 +2087,31 @@ class TransactionController {
                 self::createNotification(
                     1, // Admin padrão
                     'Novo pagamento registrado',
-                    'Nova solicitação de pagamento de comissão de R$ ' . number_format($totalCalculated, 2, ',', '.') . ' aguardando aprovação.',
+                    'Nova solicitação de pagamento de comissão de R$ ' . number_format($totalCalculated, 2, ',', '.'),
                     'info'
                 );
                 
-                // 5. Log de sucesso
-                error_log("registerPayment - Pagamento registrado com sucesso: ID=$paymentId, Valor=$totalCalculated, Transações=" . implode(',', $transactionIds));
-                
-                // Commit da transação
                 $db->commit();
-                error_log("registerPayment - Sucesso total!");
                 
                 return [
                     'status' => true,
-                    'message' => 'Pagamento registrado com sucesso! Aguardando aprovação da administração.',
+                    'message' => 'Pagamento registrado com sucesso.',
                     'data' => [
                         'payment_id' => $paymentId,
                         'valor_total' => $totalCalculated,
-                        'total_transacoes' => count($transactionIds)
+                        'transacoes_count' => count($transactionIds)
                     ]
                 ];
                 
             } catch (Exception $e) {
-                // Rollback em caso de erro
-                if ($db->inTransaction()) {
-                    $db->rollBack();
-                }
-                error_log("registerPayment - Erro durante transação: " . $e->getMessage());
-                throw $e;
+                $db->rollBack();
+                error_log('Erro na transação de pagamento: ' . $e->getMessage());
+                return ['status' => false, 'message' => 'Erro ao processar pagamento: ' . $e->getMessage()];
             }
             
         } catch (Exception $e) {
-            error_log("registerPayment - ERRO: " . $e->getMessage());
-            return [
-                'status' => false, 
-                'message' => 'Erro ao registrar pagamento: ' . $e->getMessage()
-            ];
+            error_log('Erro ao registrar pagamento: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro interno. Tente novamente.'];
         }
     }
     

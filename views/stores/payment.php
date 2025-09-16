@@ -40,6 +40,8 @@ $storeName = $store['nome_fantasia'];
 // Verificar se viemos da página de comissões pendentes
 $selectedTransactions = [];
 $totalValue = 0;
+$totalTaxaPlataforma = 0;  // CORREÇÃO: Adicionar variável para taxa da plataforma
+$totalCashbackClientes = 0; // CORREÇÃO: Adicionar variável para cashback dos clientes
 $totalOriginalValue = 0;
 $totalBalanceUsed = 0;
 $error = '';
@@ -75,6 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt->execute($params);
                 $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 
+                // CORREÇÃO: Calcular valores separadamente
                 foreach ($transactions as $transaction) {
                     $saldoUsado = $transaction['saldo_usado'] ?? 0;
                     $valorOriginal = $transaction['valor_total'];
@@ -82,8 +85,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     
                     $totalOriginalValue += $valorOriginal;
                     $totalBalanceUsed += $saldoUsado;
-                    $totalValue += $transaction['valor_admin']; // Comissão a ser paga
+                    $totalTaxaPlataforma += floatval($transaction['valor_admin']);   // Taxa para Klube Cash
+                    $totalCashbackClientes += floatval($transaction['valor_cliente']); // Cashback para clientes
                 }
+                
+                // CORREÇÃO: Valor total do PIX = taxa + cashback
+                $totalValue = $totalTaxaPlataforma + $totalCashbackClientes;
             }
         } else {
             $error = 'Nenhuma transação selecionada.';
@@ -140,6 +147,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     // Limpar dados da sessão
                     $selectedTransactions = [];
                     $totalValue = 0;
+                    $totalTaxaPlataforma = 0;
+                    $totalCashbackClientes = 0;
                     $totalOriginalValue = 0;
                     $totalBalanceUsed = 0;
                 } else {
@@ -181,16 +190,23 @@ if (!empty($selectedTransactions)) {
     $stmt->execute($params);
     $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    // Recalcular totais
+    // CORREÇÃO: Recalcular totais separadamente
     $totalValue = 0;
+    $totalTaxaPlataforma = 0;
+    $totalCashbackClientes = 0;
     $totalOriginalValue = 0;
     $totalBalanceUsed = 0;
+    
     foreach ($transactions as $transaction) {
         $saldoUsado = $transaction['saldo_usado'] ?? 0;
         $totalOriginalValue += $transaction['valor_total'];
         $totalBalanceUsed += $saldoUsado;
-        $totalValue += $transaction['valor_admin'];
+        $totalTaxaPlataforma += floatval($transaction['valor_admin']);   // Taxa para Klube Cash
+        $totalCashbackClientes += floatval($transaction['valor_cliente']); // Cashback para clientes
     }
+    
+    // CORREÇÃO: Valor total do PIX = taxa + cashback
+    $totalValue = $totalTaxaPlataforma + $totalCashbackClientes;
 }
 
 $activeMenu = 'payment';
