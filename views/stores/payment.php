@@ -82,7 +82,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     
                     $totalOriginalValue += $valorOriginal;
                     $totalBalanceUsed += $saldoUsado;
-                    $totalValue += $transaction['valor_admin']; // Comissão a ser paga
+                    $totalValue += $transaction['valor_cashback']; // Comissão a ser paga
                 }
             }
         } else {
