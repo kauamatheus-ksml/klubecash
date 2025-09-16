@@ -224,8 +224,8 @@ if ($result['status'] && isset($result['data']['totais'])) {
                                             $saldoUsado = floatval($transaction['saldo_usado'] ?? 0);
                                             $valorCobrado = $valorOriginal - $saldoUsado;
                                             
-                                            $comissaoTotal = $valorCobrado * 0.10;
-                                            $cashbackCliente = $valorCobrado * 0.05;
+                                            $comissaoLoja = $valorCobrado * ($porcentagemAdmin / 100);     // Só o que a loja paga
+                                            $cashbackCliente = $valorCobrado * ($porcentagemCliente / 100); // Para referência
                                             ?>
                                             <tr>
                                                 <td>

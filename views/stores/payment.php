@@ -82,7 +82,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     
                     $totalOriginalValue += $valorOriginal;
                     $totalBalanceUsed += $saldoUsado;
-                    $totalValue += $transaction['valor_cashback']; // Comissão a ser paga
+                    $totalValue += $transaction['valor_admin']; // Comissão a ser paga
                 }
             }
         } else {
@@ -189,7 +189,7 @@ if (!empty($selectedTransactions)) {
         $saldoUsado = $transaction['saldo_usado'] ?? 0;
         $totalOriginalValue += $transaction['valor_total'];
         $totalBalanceUsed += $saldoUsado;
-        $totalValue += $transaction['valor_cashback'];
+        $totalValue += $transaction['valor_admin'];
     }
 }
 

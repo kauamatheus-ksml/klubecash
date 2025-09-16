@@ -6,7 +6,61 @@
 if (!defined('ROOT_PATH')) {
     define('ROOT_PATH', '/home/u383946504/domains/klubecash.com/public_html/'); // SEU CAMINHO ABSOLUTO
 }
+// === FUNÇÕES AUXILIARES PARA COMISSÃO ===
+/**
+ * NOVA FUNÇÃO: Obtém os percentuais de comissão para uma loja específica
+ * 
+ * @param int $storeId ID da loja
+ * @return array Percentuais personalizados ou padrão
+ */
+function getStoreCommissionRates($storeId) {
+    try {
+        $db = Database::getConnection();
+        $stmt = $db->prepare("
+            SELECT 
+                COALESCE(porcentagem_cliente, ?) as porcentagem_cliente,
+                COALESCE(porcentagem_admin, ?) as porcentagem_admin
+            FROM lojas WHERE id = ?
+        ");
+        $stmt->execute([DEFAULT_CLIENT_PERCENTAGE, DEFAULT_ADMIN_PERCENTAGE, $storeId]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($result) {
+            return [
+                'client' => (float) $result['porcentagem_cliente'],
+                'admin' => (float) $result['porcentagem_admin'],
+                'total' => (float) $result['porcentagem_cliente'] + (float) $result['porcentagem_admin']
+            ];
+        }
+    } catch (Exception $e) {
+        error_log("Erro ao obter percentuais da loja {$storeId}: " . $e->getMessage());
+    }
+    
+    // Retorna valores padrão em caso de erro
+    return [
+        'client' => DEFAULT_CLIENT_PERCENTAGE,
+        'admin' => DEFAULT_ADMIN_PERCENTAGE,
+        'total' => DEFAULT_TOTAL_PERCENTAGE
+    ];
+}
 
+/**
+ * NOVA FUNÇÃO: Calcula valores de comissão baseado no valor efetivamente cobrado
+ * 
+ * @param float $valorCobrado Valor que a loja efetivamente recebeu
+ * @param int $storeId ID da loja
+ * @return array Valores calculados
+ */
+function calculateCommissionValues($valorCobrado, $storeId) {
+    $rates = getStoreCommissionRates($storeId);
+    
+    return [
+        'valor_cobrado' => $valorCobrado,
+        'comissao_loja' => $valorCobrado * ($rates['admin'] / 100), // O que a loja deve pagar
+        'cashback_cliente' => $valorCobrado * ($rates['client'] / 100), // O que o cliente receberá
+        'percentuais' => $rates
+    ];
+}
 
 // === TIPOS DE CLIENTE ===
 define('CLIENT_TYPE_COMPLETE', 'completo');      // Cliente com cadastro completo
