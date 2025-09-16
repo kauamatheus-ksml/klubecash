@@ -137,9 +137,9 @@ if ($result['status'] && isset($result['data']['totais'])) {
                 </div>
                 
                 <div class="stat-card">
-                    <div class="stat-card-title">Valor Total de Comissões</div>
-                    <div class="stat-card-value">R$ <?php echo number_format($totalValorComissoes, 2, ',', '.'); ?></div>
-                    <div class="stat-card-subtitle">Valor a pagar ao Klube Cash (10%)</div>
+                    <div class="stat-card-title">Sua Comissão Devida</div>
+                    <div class="stat-card-value">R$ <?php echo number_format($totalComissaoLoja, 2, ',', '.'); ?></div>
+                    <div class="stat-card-subtitle">Valor a pagar ao Klube Cash (<?php echo number_format($porcentagemAdmin, 1); ?>%)</div>
                 </div>
             </div>
             
