@@ -47,24 +47,23 @@ if (isset($_GET['valor_max']) && !empty($_GET['valor_max'])) {
     $filters['valor_max'] = floatval($_GET['valor_max']);
 }
 
-// NOVO: Obter configurações de cashback da loja
-$porcentagemCliente = 5.00;
-$porcentagemAdmin = 5.00;
-$porcentagemTotal = 10.00;
+// CORREÇÃO: Obter configurações personalizadas de cashback da loja
+$porcentagemCliente = DEFAULT_CLIENT_PERCENTAGE;
+$porcentagemAdmin = DEFAULT_ADMIN_PERCENTAGE;
+$porcentagemTotal = DEFAULT_TOTAL_PERCENTAGE;
 
 try {
     $db = Database::getConnection();
     $configStmt = $db->prepare("
         SELECT u.mvp,
-               COALESCE(l.porcentagem_cliente, 5.00) as porcentagem_cliente,
-               COALESCE(l.porcentagem_admin, 5.00) as porcentagem_admin,
+               COALESCE(l.porcentagem_cliente, ?) as porcentagem_cliente,
+               COALESCE(l.porcentagem_admin, ?) as porcentagem_admin,
                COALESCE(l.cashback_ativo, 1) as cashback_ativo
         FROM lojas l
         JOIN usuarios u ON l.usuario_id = u.id
-        WHERE l.id = :loja_id
+        WHERE l.id = ?
     ");
-    $configStmt->bindParam(':loja_id', $storeId);
-    $configStmt->execute();
+    $configStmt->execute([DEFAULT_CLIENT_PERCENTAGE, DEFAULT_ADMIN_PERCENTAGE, $storeId]);
     $configResult = $configStmt->fetch(PDO::FETCH_ASSOC);
 
     if ($configResult) {
@@ -82,7 +81,7 @@ $totalTransacoes = 0;
 $totalValorVendas = 0;
 $totalValorComissoes = 0;
 $totalSaldoUsado = 0;
-$totalComissaoLoja = 0;  // NOVO: Valor que a loja deve pagar
+$totalComissaoLoja = 0;  // CORREÇÃO: Valor que a loja deve pagar (só parte da plataforma)
 
 if ($result['status'] && isset($result['data']['totais'])) {
     $totalTransacoes = $result['data']['totais']['total_transacoes'];
