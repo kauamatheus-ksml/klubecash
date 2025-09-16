@@ -1992,13 +1992,13 @@ class TransactionController {
             $validateStmt = $db->prepare("
                 SELECT 
                     id,
-                    (valor_cliente + valor_admin) as comissao_total,
+                    valor_admin as comissao_loja,
                     status,
                     loja_id
                 FROM transacoes_cashback 
                 WHERE id IN ($placeholders) AND loja_id = ? AND status = ?
             ");
-            
+
             $validateParams = array_merge($transactionIds, [$data['loja_id'], TRANSACTION_PENDING]);
             $validateStmt->execute($validateParams);
             $transactions = $validateStmt->fetchAll(PDO::FETCH_ASSOC);
@@ -2010,11 +2010,11 @@ class TransactionController {
                     'message' => 'Algumas transações não foram encontradas ou não estão pendentes. Esperado: ' . count($transactionIds) . ', Encontrado: ' . count($transactions)
                 ];
             }
-            
-            // CORREÇÃO: Calcular valor total correto (soma das comissões totais)
+
+            // CORREÇÃO: Calcular valor total correto (apenas comissão da loja)
             $totalCalculated = 0;
             foreach ($transactions as $transaction) {
-                $totalCalculated += $transaction['comissao_total'];
+                $totalCalculated += $transaction['comissao_loja'];
             }
             
             // Validar se o valor informado bate com o calculado
