@@ -47,20 +47,51 @@ if (isset($_GET['valor_max']) && !empty($_GET['valor_max'])) {
     $filters['valor_max'] = floatval($_GET['valor_max']);
 }
 
+// NOVO: Obter configurações de cashback da loja
+$porcentagemCliente = 5.00;
+$porcentagemAdmin = 5.00;
+$porcentagemTotal = 10.00;
+
+try {
+    $db = Database::getConnection();
+    $configStmt = $db->prepare("
+        SELECT u.mvp,
+               COALESCE(l.porcentagem_cliente, 5.00) as porcentagem_cliente,
+               COALESCE(l.porcentagem_admin, 5.00) as porcentagem_admin,
+               COALESCE(l.cashback_ativo, 1) as cashback_ativo
+        FROM lojas l
+        JOIN usuarios u ON l.usuario_id = u.id
+        WHERE l.id = :loja_id
+    ");
+    $configStmt->bindParam(':loja_id', $storeId);
+    $configStmt->execute();
+    $configResult = $configStmt->fetch(PDO::FETCH_ASSOC);
+
+    if ($configResult) {
+        $porcentagemCliente = (float) $configResult['porcentagem_cliente'];
+        $porcentagemAdmin = (float) $configResult['porcentagem_admin'];
+        $porcentagemTotal = $porcentagemCliente + $porcentagemAdmin;
+    }
+} catch (Exception $e) {
+    error_log("Erro ao obter configurações da loja: " . $e->getMessage());
+}
+
 $result = TransactionController::getPendingTransactionsWithBalance($storeId, $filters, $page);
 
 $totalTransacoes = 0;
 $totalValorVendas = 0;
 $totalValorComissoes = 0;
 $totalSaldoUsado = 0;
+$totalComissaoLoja = 0;  // NOVO: Valor que a loja deve pagar
 
 if ($result['status'] && isset($result['data']['totais'])) {
     $totalTransacoes = $result['data']['totais']['total_transacoes'];
     $totalValorVendas = $result['data']['totais']['total_valor_vendas_originais'];
     $totalSaldoUsado = $result['data']['totais']['total_saldo_usado'];
-    
+
     $valorEfetivo = $totalValorVendas - $totalSaldoUsado;
-    $totalValorComissoes = $valorEfetivo * 0.10;
+    $totalValorComissoes = $valorEfetivo * ($porcentagemTotal / 100);
+    $totalComissaoLoja = $valorEfetivo * ($porcentagemAdmin / 100);  // CORREÇÃO: Loja paga só a parte da plataforma
 }
 ?>
 
