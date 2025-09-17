@@ -77,19 +77,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt->execute($params);
                 $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 
-                // CORREÇÃO: Calcular valores separadamente
+                // Calcular valores separadamente
                 foreach ($transactions as $transaction) {
                     $saldoUsado = $transaction['saldo_usado'] ?? 0;
                     $valorOriginal = $transaction['valor_total'];
                     $valorCobrado = $valorOriginal - $saldoUsado;
-                    
+
                     $totalOriginalValue += $valorOriginal;
                     $totalBalanceUsed += $saldoUsado;
-                    $totalTaxaPlataforma += floatval($transaction['valor_admin']);   // Taxa para Klube Cash
-                    $totalCashbackClientes += floatval($transaction['valor_cliente']); // Cashback para clientes
+                    $totalTaxaPlataforma += floatval($transaction['valor_admin']);   // Taxa para Klube Cash (5%)
+                    $totalCashbackClientes += floatval($transaction['valor_cliente']); // Cashback para clientes (5%)
                 }
-                
-                // CORREÇÃO: Valor total do PIX = taxa + cashback
+
+                // Valor total do pagamento = valor_admin + valor_cliente (conforme validação no TransactionController)
                 $totalValue = $totalTaxaPlataforma + $totalCashbackClientes;
             }
         } else {
