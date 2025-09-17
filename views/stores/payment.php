@@ -57,14 +57,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!empty($selectedTransactions)) {
                 $placeholders = implode(',', array_fill(0, count($selectedTransactions), '?'));
                 $stmt = $db->prepare("
-                    SELECT 
-                        t.*, 
+                    SELECT
+                        t.*,
                         u.nome as cliente_nome,
+                        (t.valor_cliente + t.valor_admin) as valor_total_comissao,
                         COALESCE(
-                            (SELECT SUM(cm.valor) 
-                             FROM cashback_movimentacoes cm 
-                             WHERE cm.usuario_id = t.usuario_id 
-                             AND cm.loja_id = t.loja_id 
+                            (SELECT SUM(cm.valor)
+                             FROM cashback_movimentacoes cm
+                             WHERE cm.usuario_id = t.usuario_id
+                             AND cm.loja_id = t.loja_id
                              AND cm.tipo_operacao = 'uso'
                              AND cm.transacao_uso_id = t.id), 0
                         ) as saldo_usado
