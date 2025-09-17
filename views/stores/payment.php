@@ -79,10 +79,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $saldoUsado = $transaction['saldo_usado'] ?? 0;
                     $valorOriginal = $transaction['valor_total'];
                     $valorCobrado = $valorOriginal - $saldoUsado;
-                    
+
                     $totalOriginalValue += $valorOriginal;
                     $totalBalanceUsed += $saldoUsado;
-                    $totalValue += $transaction['valor_cashback']; // Comissão a ser paga
+                    // Usar a mesma fórmula do TransactionController: valor_cliente + valor_admin
+                    $totalValue += (floatval($transaction['valor_cliente']) + floatval($transaction['valor_admin']));
                 }
             }
         } else {
@@ -189,7 +190,8 @@ if (!empty($selectedTransactions)) {
         $saldoUsado = $transaction['saldo_usado'] ?? 0;
         $totalOriginalValue += $transaction['valor_total'];
         $totalBalanceUsed += $saldoUsado;
-        $totalValue += $transaction['valor_cashback'];
+        // Usar a mesma fórmula do TransactionController: valor_cliente + valor_admin
+        $totalValue += (floatval($transaction['valor_cliente']) + floatval($transaction['valor_admin']));
     }
 }
 
