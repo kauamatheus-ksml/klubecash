@@ -1966,7 +1966,7 @@ class TransactionController {
                 return ['status' => false, 'message' => 'Dados obrigatórios faltando'];
             }
             
-            // Verificar autenticação
+            // Verificar se o usuário está autenticado e é loja ou admin
             if (!AuthController::isAuthenticated()) {
                 return ['status' => false, 'message' => 'Usuário não autenticado.'];
             }
@@ -1987,20 +1987,18 @@ class TransactionController {
             
             error_log("registerPayment - IDs: " . implode(',', $transactionIds));
             
-            // CORREÇÃO PRINCIPAL: Calcular valor total correto (comissão + cashback)
+            // CORREÇÃO: Validar se todas as transações existem e calcular valor total correto
             $placeholders = implode(',', array_fill(0, count($transactionIds), '?'));
             $validateStmt = $db->prepare("
                 SELECT 
                     id,
-                    (valor_cliente + valor_admin) as valor_total_comissao,
-                    valor_admin as comissao_loja,
-                    valor_cliente as cashback_cliente,
+                    (valor_cliente + valor_admin) as comissao_total,
                     status,
                     loja_id
                 FROM transacoes_cashback 
                 WHERE id IN ($placeholders) AND loja_id = ? AND status = ?
             ");
-
+            
             $validateParams = array_merge($transactionIds, [$data['loja_id'], TRANSACTION_PENDING]);
             $validateStmt->execute($validateParams);
             $transactions = $validateStmt->fetchAll(PDO::FETCH_ASSOC);
@@ -2012,11 +2010,11 @@ class TransactionController {
                     'message' => 'Algumas transações não foram encontradas ou não estão pendentes. Esperado: ' . count($transactionIds) . ', Encontrado: ' . count($transactions)
                 ];
             }
-
-            // CORREÇÃO: Calcular valor total correto (comissão + cashback)
+            
+            // CORREÇÃO: Calcular valor total correto (soma das comissões totais)
             $totalCalculated = 0;
             foreach ($transactions as $transaction) {
-                $totalCalculated += $transaction['valor_total_comissao']; // Soma comissão + cashback
+                $totalCalculated += $transaction['comissao_total'];
             }
             
             // Validar se o valor informado bate com o calculado
@@ -2035,7 +2033,6 @@ class TransactionController {
                 return ['status' => false, 'message' => 'Valor total deve ser maior que zero'];
             }
             
-            // Resto da função continua igual...
             // Iniciar transação no banco de dados
             $db->beginTransaction();
             
@@ -2087,31 +2084,42 @@ class TransactionController {
                 self::createNotification(
                     1, // Admin padrão
                     'Novo pagamento registrado',
-                    'Nova solicitação de pagamento de comissão de R$ ' . number_format($totalCalculated, 2, ',', '.'),
+                    'Nova solicitação de pagamento de comissão de R$ ' . number_format($totalCalculated, 2, ',', '.') . ' aguardando aprovação.',
                     'info'
                 );
                 
+                // 5. Log de sucesso
+                error_log("registerPayment - Pagamento registrado com sucesso: ID=$paymentId, Valor=$totalCalculated, Transações=" . implode(',', $transactionIds));
+                
+                // Commit da transação
                 $db->commit();
+                error_log("registerPayment - Sucesso total!");
                 
                 return [
                     'status' => true,
-                    'message' => 'Pagamento registrado com sucesso.',
+                    'message' => 'Pagamento registrado com sucesso! Aguardando aprovação da administração.',
                     'data' => [
                         'payment_id' => $paymentId,
                         'valor_total' => $totalCalculated,
-                        'transacoes_count' => count($transactionIds)
+                        'total_transacoes' => count($transactionIds)
                     ]
                 ];
                 
             } catch (Exception $e) {
-                $db->rollBack();
-                error_log('Erro na transação de pagamento: ' . $e->getMessage());
-                return ['status' => false, 'message' => 'Erro ao processar pagamento: ' . $e->getMessage()];
+                // Rollback em caso de erro
+                if ($db->inTransaction()) {
+                    $db->rollBack();
+                }
+                error_log("registerPayment - Erro durante transação: " . $e->getMessage());
+                throw $e;
             }
             
         } catch (Exception $e) {
-            error_log('Erro ao registrar pagamento: ' . $e->getMessage());
-            return ['status' => false, 'message' => 'Erro interno. Tente novamente.'];
+            error_log("registerPayment - ERRO: " . $e->getMessage());
+            return [
+                'status' => false, 
+                'message' => 'Erro ao registrar pagamento: ' . $e->getMessage()
+            ];
         }
     }
     

@@ -40,8 +40,6 @@ $storeName = $store['nome_fantasia'];
 // Verificar se viemos da página de comissões pendentes
 $selectedTransactions = [];
 $totalValue = 0;
-$totalTaxaPlataforma = 0;  // CORREÇÃO: Adicionar variável para taxa da plataforma
-$totalCashbackClientes = 0; // CORREÇÃO: Adicionar variável para cashback dos clientes
 $totalOriginalValue = 0;
 $totalBalanceUsed = 0;
 $error = '';
@@ -57,15 +55,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!empty($selectedTransactions)) {
                 $placeholders = implode(',', array_fill(0, count($selectedTransactions), '?'));
                 $stmt = $db->prepare("
-                    SELECT
-                        t.*,
+                    SELECT 
+                        t.*, 
                         u.nome as cliente_nome,
-                        (t.valor_cliente + t.valor_admin) as valor_total_comissao,
                         COALESCE(
-                            (SELECT SUM(cm.valor)
-                             FROM cashback_movimentacoes cm
-                             WHERE cm.usuario_id = t.usuario_id
-                             AND cm.loja_id = t.loja_id
+                            (SELECT SUM(cm.valor) 
+                             FROM cashback_movimentacoes cm 
+                             WHERE cm.usuario_id = t.usuario_id 
+                             AND cm.loja_id = t.loja_id 
                              AND cm.tipo_operacao = 'uso'
                              AND cm.transacao_uso_id = t.id), 0
                         ) as saldo_usado
@@ -75,33 +72,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ");
                 
                 $params = array_merge($selectedTransactions, [$storeId]);
-                error_log("PAYMENT DEBUG - Parâmetros da consulta: " . print_r($params, true));
-                error_log("PAYMENT DEBUG - IDs selecionados: " . implode(',', $selectedTransactions));
-                error_log("PAYMENT DEBUG - Store ID: $storeId");
                 $stmt->execute($params);
                 $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 
-                // Calcular valores usando a mesma lógica do TransactionController
                 foreach ($transactions as $transaction) {
                     $saldoUsado = $transaction['saldo_usado'] ?? 0;
                     $valorOriginal = $transaction['valor_total'];
                     $valorCobrado = $valorOriginal - $saldoUsado;
-
+                    
                     $totalOriginalValue += $valorOriginal;
                     $totalBalanceUsed += $saldoUsado;
-                    $totalTaxaPlataforma += floatval($transaction['valor_admin']);   // Taxa para Klube Cash (5%)
-                    $totalCashbackClientes += floatval($transaction['valor_cliente']); // Cashback para clientes (5%)
-
-                    // DEBUG: Log valores individuais
-                    error_log("PAYMENT DEBUG - Transação ID: {$transaction['id']}, valor_cliente: {$transaction['valor_cliente']}, valor_admin: {$transaction['valor_admin']}, valor_total_comissao: {$transaction['valor_total_comissao']}");
-
-                    // Usar o mesmo cálculo do TransactionController: valor_cliente + valor_admin
-                    $totalValue += floatval($transaction['valor_total_comissao']);
+                    $totalValue += $transaction['valor_cashback']; // Comissão a ser paga
                 }
-
-                // DEBUG: Log totais
-                error_log("PAYMENT DEBUG - Total de transações encontradas: " . count($transactions));
-                error_log("PAYMENT DEBUG - Total calculado: $totalValue");
             }
         } else {
             $error = 'Nenhuma transação selecionada.';
@@ -158,8 +140,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     // Limpar dados da sessão
                     $selectedTransactions = [];
                     $totalValue = 0;
-                    $totalTaxaPlataforma = 0;
-                    $totalCashbackClientes = 0;
                     $totalOriginalValue = 0;
                     $totalBalanceUsed = 0;
                 } else {
@@ -181,15 +161,14 @@ $transactions = [];
 if (!empty($selectedTransactions)) {
     $placeholders = implode(',', array_fill(0, count($selectedTransactions), '?'));
     $stmt = $db->prepare("
-        SELECT
-            t.*,
+        SELECT 
+            t.*, 
             u.nome as cliente_nome,
-            (t.valor_cliente + t.valor_admin) as valor_total_comissao,
             COALESCE(
-                (SELECT SUM(cm.valor)
-                 FROM cashback_movimentacoes cm
-                 WHERE cm.usuario_id = t.usuario_id
-                 AND cm.loja_id = t.loja_id
+                (SELECT SUM(cm.valor) 
+                 FROM cashback_movimentacoes cm 
+                 WHERE cm.usuario_id = t.usuario_id 
+                 AND cm.loja_id = t.loja_id 
                  AND cm.tipo_operacao = 'uso'
                  AND cm.transacao_uso_id = t.id), 0
             ) as saldo_usado
@@ -202,22 +181,15 @@ if (!empty($selectedTransactions)) {
     $stmt->execute($params);
     $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    // Recalcular totais usando a mesma lógica do TransactionController
+    // Recalcular totais
     $totalValue = 0;
-    $totalTaxaPlataforma = 0;
-    $totalCashbackClientes = 0;
     $totalOriginalValue = 0;
     $totalBalanceUsed = 0;
-
     foreach ($transactions as $transaction) {
         $saldoUsado = $transaction['saldo_usado'] ?? 0;
         $totalOriginalValue += $transaction['valor_total'];
         $totalBalanceUsed += $saldoUsado;
-        $totalTaxaPlataforma += floatval($transaction['valor_admin']);   // Taxa para Klube Cash
-        $totalCashbackClientes += floatval($transaction['valor_cliente']); // Cashback para clientes
-
-        // Usar o mesmo cálculo do TransactionController: valor_cliente + valor_admin
-        $totalValue += floatval($transaction['valor_total_comissao']);
+        $totalValue += $transaction['valor_cashback'];
     }
 }
 

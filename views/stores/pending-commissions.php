@@ -47,51 +47,20 @@ if (isset($_GET['valor_max']) && !empty($_GET['valor_max'])) {
     $filters['valor_max'] = floatval($_GET['valor_max']);
 }
 
-// NOVO: Obter configurações de cashback da loja
-$porcentagemCliente = 5.00;
-$porcentagemAdmin = 5.00;
-$porcentagemTotal = 10.00;
-
-try {
-    $db = Database::getConnection();
-    $configStmt = $db->prepare("
-        SELECT u.mvp,
-               COALESCE(l.porcentagem_cliente, 5.00) as porcentagem_cliente,
-               COALESCE(l.porcentagem_admin, 5.00) as porcentagem_admin,
-               COALESCE(l.cashback_ativo, 1) as cashback_ativo
-        FROM lojas l
-        JOIN usuarios u ON l.usuario_id = u.id
-        WHERE l.id = :loja_id
-    ");
-    $configStmt->bindParam(':loja_id', $storeId);
-    $configStmt->execute();
-    $configResult = $configStmt->fetch(PDO::FETCH_ASSOC);
-
-    if ($configResult) {
-        $porcentagemCliente = (float) $configResult['porcentagem_cliente'];
-        $porcentagemAdmin = (float) $configResult['porcentagem_admin'];
-        $porcentagemTotal = $porcentagemCliente + $porcentagemAdmin;
-    }
-} catch (Exception $e) {
-    error_log("Erro ao obter configurações da loja: " . $e->getMessage());
-}
-
 $result = TransactionController::getPendingTransactionsWithBalance($storeId, $filters, $page);
 
 $totalTransacoes = 0;
 $totalValorVendas = 0;
 $totalValorComissoes = 0;
 $totalSaldoUsado = 0;
-$totalComissaoLoja = 0;  // NOVO: Valor que a loja deve pagar
 
 if ($result['status'] && isset($result['data']['totais'])) {
     $totalTransacoes = $result['data']['totais']['total_transacoes'];
     $totalValorVendas = $result['data']['totais']['total_valor_vendas_originais'];
     $totalSaldoUsado = $result['data']['totais']['total_saldo_usado'];
-
+    
     $valorEfetivo = $totalValorVendas - $totalSaldoUsado;
-    $totalValorComissoes = $valorEfetivo * ($porcentagemTotal / 100);
-    $totalComissaoLoja = $valorEfetivo * ($porcentagemAdmin / 100);  // CORREÇÃO: Loja paga só a parte da plataforma
+    $totalValorComissoes = $valorEfetivo * 0.10;
 }
 ?>
 
@@ -103,7 +72,7 @@ if ($result['status'] && isset($result['data']['totais'])) {
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
     <title>Comissões Pendentes - Klube Cash</title>
     
-    <link rel="stylesheet" href="../../assets/css/views/stores/pending-commissions.css?v=<?php echo ASSETS_VERSION; ?>">
+    <link rel="stylesheet" href="../../assets/css/views/stores/pending-commissions.css">
     <link rel="stylesheet" href="../../assets/css/openpix-styles.css">
 
     <link rel="stylesheet" href="/assets/css/sidebar-lojista.css">
@@ -137,9 +106,9 @@ if ($result['status'] && isset($result['data']['totais'])) {
                 </div>
                 
                 <div class="stat-card">
-                    <div class="stat-card-title">Sua Comissão Devida</div>
-                    <div class="stat-card-value">R$ <?php echo number_format($totalComissaoLoja, 2, ',', '.'); ?></div>
-                    <div class="stat-card-subtitle">Valor a pagar ao Klube Cash (<?php echo number_format($porcentagemAdmin, 1); ?>%)</div>
+                    <div class="stat-card-title">Valor Total de Comissões</div>
+                    <div class="stat-card-value">R$ <?php echo number_format($totalValorComissoes, 2, ',', '.'); ?></div>
+                    <div class="stat-card-subtitle">Valor a pagar ao Klube Cash (10%)</div>
                 </div>
             </div>
             
@@ -208,7 +177,7 @@ if ($result['status'] && isset($result['data']['totais'])) {
                                         <th>Valor Original</th>
                                         <th>Saldo Usado</th>
                                         <th>Valor Cobrado</th>
-                                        <th>Sua Comissão</th>
+                                        <th>Comissão Total</th>
                                         <th>Cashback Cliente</th>
                                     </tr>
                                 </thead>
@@ -224,14 +193,14 @@ if ($result['status'] && isset($result['data']['totais'])) {
                                             $saldoUsado = floatval($transaction['saldo_usado'] ?? 0);
                                             $valorCobrado = $valorOriginal - $saldoUsado;
                                             
-                                            $comissaoLoja = $valorCobrado * ($porcentagemAdmin / 100);     // Só o que a loja paga
-                                            $cashbackCliente = $valorCobrado * ($porcentagemCliente / 100); // Para referência
+                                            $comissaoTotal = $valorCobrado * 0.10;
+                                            $cashbackCliente = $valorCobrado * 0.05;
                                             ?>
                                             <tr>
                                                 <td>
                                                     <input type="checkbox" name="transacoes[]" value="<?php echo $transaction['id']; ?>" 
                                                         class="transaction-checkbox" 
-                                                        data-value="<?php echo number_format($comissaoLoja, 2, '.', ''); ?>">
+                                                        data-value="<?php echo number_format($comissaoTotal, 2, '.', ''); ?>">
                                                 </td>
                                                 <td><?php echo htmlspecialchars($transaction['codigo_transacao'] ?? 'N/A'); ?></td>
                                                 <td>
@@ -255,7 +224,7 @@ if ($result['status'] && isset($result['data']['totais'])) {
                                                         <small class="desconto">(com desconto)</small>
                                                     <?php endif; ?>
                                                 </td>
-                                                <td><strong>R$ <?php echo number_format($comissaoLoja, 2, ',', '.'); ?></strong></td>
+                                                <td><strong>R$ <?php echo number_format($comissaoTotal, 2, ',', '.'); ?></strong></td>
                                                 <td>R$ <?php echo number_format($cashbackCliente, 2, ',', '.'); ?></td>
                                             </tr>
                                         <?php endforeach; ?>
@@ -281,8 +250,8 @@ if ($result['status'] && isset($result['data']['totais'])) {
                                     <span class="label">Total saldo usado:</span>
                                     <span class="value" id="totalBalanceUsed">R$ 0,00</span>
                                 </div>
-                                <div class="summary-item highlight">
-                                    <span class="label">Sua comissão a pagar:</span>
+                                <div class="summary-item">
+                                    <span class="label">Valor total a pagar:</span>
                                     <span class="value" id="totalCommissionValue">R$ 0,00</span>
                                 </div>
                             </div>
@@ -354,12 +323,11 @@ if ($result['status'] && isset($result['data']['totais'])) {
                         </div>
                         
                         <div class="info-section">
-                            <h4>💰 Como funciona o sistema:</h4>
+                            <h4>🔔 Distribuição dos 10% de comissão:</h4>
                             <ul>
-                                <li><strong>Você paga <?php echo number_format($porcentagemAdmin, 1); ?>%</strong> para o Klube Cash (apenas sua comissão)</li>
-                                <li><strong>Klube Cash paga <?php echo number_format($porcentagemCliente, 1); ?>%</strong> para o cliente (cashback)</li>
-                                <li><strong>Total: <?php echo number_format($porcentagemTotal, 1); ?>%</strong> sobre valor efetivamente cobrado</li>
-                                <li><strong>Você não paga diretamente ao cliente</strong> - apenas sua comissão</li>
+                                <li><strong>5% para o cliente:</strong> Vira cashback disponível para usar na sua loja</li>
+                                <li><strong>5% para o Klube Cash:</strong> Nossa receita pela plataforma</li>
+                                <li><strong>0% para sua loja:</strong> Você não recebe cashback, apenas oferece o benefício</li>
                             </ul>
                         </div>
                         
