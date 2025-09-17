@@ -75,6 +75,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ");
                 
                 $params = array_merge($selectedTransactions, [$storeId]);
+                error_log("PAYMENT DEBUG - Parâmetros da consulta: " . print_r($params, true));
+                error_log("PAYMENT DEBUG - IDs selecionados: " . implode(',', $selectedTransactions));
+                error_log("PAYMENT DEBUG - Store ID: $storeId");
                 $stmt->execute($params);
                 $transactions = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 
@@ -89,9 +92,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $totalTaxaPlataforma += floatval($transaction['valor_admin']);   // Taxa para Klube Cash (5%)
                     $totalCashbackClientes += floatval($transaction['valor_cliente']); // Cashback para clientes (5%)
 
+                    // DEBUG: Log valores individuais
+                    error_log("PAYMENT DEBUG - Transação ID: {$transaction['id']}, valor_cliente: {$transaction['valor_cliente']}, valor_admin: {$transaction['valor_admin']}, valor_total_comissao: {$transaction['valor_total_comissao']}");
+
                     // Usar o mesmo cálculo do TransactionController: valor_cliente + valor_admin
                     $totalValue += floatval($transaction['valor_total_comissao']);
                 }
+
+                // DEBUG: Log totais
+                error_log("PAYMENT DEBUG - Total de transações encontradas: " . count($transactions));
+                error_log("PAYMENT DEBUG - Total calculado: $totalValue");
             }
         } else {
             $error = 'Nenhuma transação selecionada.';
