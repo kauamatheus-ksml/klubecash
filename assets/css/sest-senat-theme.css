@@ -7,7 +7,7 @@
     --primary-color: #1E3A8A; /* Azul SEST SENAT */
     --primary-light: #E6EFFF; /* Azul claro */
     --primary-dark: #1E40AF; /* Azul escuro */
-    --secondary-color: #059669; /* Verde complementar */
+    --secondary-color: #1E3A8A; /* Verde complementar */
     --accent-color: #DC2626; /* Vermelho para destaques */
 
     /* Mantém as outras variáveis do KlubeCash */
@@ -117,23 +117,92 @@
     border-top: 3px solid var(--primary-color);
 }
 
-/* Estilos mais específicos para garantir que sejam aplicados */
+/* SOBRESCREVER COMPLETAMENTE TODAS AS CORES LARANJA */
 .sest-senat-theme * {
     /* Forçar aplicação das variáveis CSS */
 }
 
+/* Botões e elementos primários */
 .sest-senat-theme .btn-primary,
 .sest-senat-theme button[type="submit"],
-.sest-senat-theme .submit-btn {
+.sest-senat-theme .submit-btn,
+.sest-senat-theme .btn-success,
+.sest-senat-theme .primary-btn,
+.sest-senat-theme .action-btn {
     background: #1E3A8A !important;
     border-color: #1E3A8A !important;
+    color: white !important;
 }
 
 .sest-senat-theme .btn-primary:hover,
 .sest-senat-theme button[type="submit"]:hover,
-.sest-senat-theme .submit-btn:hover {
+.sest-senat-theme .submit-btn:hover,
+.sest-senat-theme .btn-success:hover,
+.sest-senat-theme .primary-btn:hover,
+.sest-senat-theme .action-btn:hover {
     background: #1E40AF !important;
     border-color: #1E40AF !important;
+}
+
+/* Sobrescrever qualquer cor laranja (#FF7A00, #E06E00, etc.) */
+.sest-senat-theme [style*="#FF7A00"],
+.sest-senat-theme [style*="#E06E00"],
+.sest-senat-theme [style*="rgb(255, 122, 0)"] {
+    background: #1E3A8A !important;
+    border-color: #1E3A8A !important;
+}
+
+/* Links e elementos de destaque */
+.sest-senat-theme a,
+.sest-senat-theme .link,
+.sest-senat-theme .text-primary {
+    color: #1E3A8A !important;
+}
+
+.sest-senat-theme a:hover,
+.sest-senat-theme .link:hover {
+    color: #1E40AF !important;
+}
+
+/* Badges e indicadores */
+.sest-senat-theme .badge,
+.sest-senat-theme .tag,
+.sest-senat-theme .status-active {
+    background: #1E3A8A !important;
+    color: white !important;
+}
+
+/* Bordas e divisores */
+.sest-senat-theme .border-primary,
+.sest-senat-theme .border-accent {
+    border-color: #1E3A8A !important;
+}
+
+/* Backgrounds */
+.sest-senat-theme .bg-primary,
+.sest-senat-theme .highlight {
+    background: #E6EFFF !important;
+}
+
+/* Cards e panels */
+.sest-senat-theme .card-primary,
+.sest-senat-theme .panel-primary {
+    border-left: 4px solid #1E3A8A !important;
+}
+
+/* Formulários */
+.sest-senat-theme input:focus,
+.sest-senat-theme textarea:focus,
+.sest-senat-theme select:focus {
+    border-color: #1E3A8A !important;
+    box-shadow: 0 0 0 2px rgba(30, 58, 138, 0.2) !important;
+}
+
+/* Checkbox e radio personalizados */
+.sest-senat-theme input[type="checkbox"]:checked,
+.sest-senat-theme input[type="radio"]:checked {
+    background: #1E3A8A !important;
+    border-color: #1E3A8A !important;
 }
 
 /* Indicador visual claro para debugging */
