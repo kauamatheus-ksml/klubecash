@@ -438,7 +438,7 @@ $activeMenu = 'dashboard';
                     <div class="info-item">
                         <span class="info-number">4</span>
                         <div>
-                            <h4>Liberação do Cashback</h4>
+                            <h4>Liberação do Cashback 1</h4>
                             <p>Após aprovação do seu pagamento, o cashback é liberado para o cliente usar na sua loja</p>
                         </div>
                     </div>
