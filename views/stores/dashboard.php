@@ -123,10 +123,14 @@ foreach ($monthlyStats as $stat) {
 
 // Definir menu ativo
 $activeMenu = 'dashboard';
+
+// Carregar tema SEST SENAT
+$isSestSenat = AuthController::isSestSenat();
+$themeClass = AuthController::getThemeClass();
 ?>
 
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" class="<?php echo $themeClass; ?>">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -135,6 +139,10 @@ $activeMenu = 'dashboard';
     <link rel="stylesheet" href="../../assets/css/views/stores/dashboard.css">
     
     <link rel="stylesheet" href="/assets/css/sidebar-lojista.css">
+    <?php if ($isSestSenat): ?>
+    <!-- CSS personalizado para SEST SENAT -->
+    <link rel="stylesheet" href="../../assets/css/sest-senat-theme.css">
+    <?php endif; ?>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
