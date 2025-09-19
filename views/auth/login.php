@@ -25,7 +25,6 @@ if (isset($_SESSION['user_id']) && !isset($_GET['force_login'])) {
     }
 }
 
-
 // Processar o formulário de login
 $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {

@@ -79,10 +79,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $saldoUsado = $transaction['saldo_usado'] ?? 0;
                     $valorOriginal = $transaction['valor_total'];
                     $valorCobrado = $valorOriginal - $saldoUsado;
-                    
+
                     $totalOriginalValue += $valorOriginal;
                     $totalBalanceUsed += $saldoUsado;
-                    $totalValue += $transaction['valor_cashback']; // Comissão a ser paga
+                    $totalValue += $transaction['valor_cashback']; // Comissão Total a Pagar
                 }
             }
         } else {
@@ -189,7 +189,7 @@ if (!empty($selectedTransactions)) {
         $saldoUsado = $transaction['saldo_usado'] ?? 0;
         $totalOriginalValue += $transaction['valor_total'];
         $totalBalanceUsed += $saldoUsado;
-        $totalValue += $transaction['valor_cashback'];
+        $totalValue += $transaction['valor_cashback']; // Comissão Total a Pagar
     }
 }
 
@@ -288,7 +288,7 @@ $activeMenu = 'payment';
                                             <small class="desconto">(com desconto)</small>
                                         <?php endif; ?>
                                     </td>
-                                    <td>R$ <?php echo number_format($transaction['valor_cashback'], 2, ',', '.'); ?></td>
+                                    <td><strong>R$ <?php echo number_format($transaction['valor_cashback'], 2, ',', '.'); ?></strong></td>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>

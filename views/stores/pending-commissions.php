@@ -59,8 +59,13 @@ if ($result['status'] && isset($result['data']['totais'])) {
     $totalValorVendas = $result['data']['totais']['total_valor_vendas_originais'];
     $totalSaldoUsado = $result['data']['totais']['total_saldo_usado'];
     
-    $valorEfetivo = $totalValorVendas - $totalSaldoUsado;
-    $totalValorComissoes = $valorEfetivo * 0.10;
+    // CORREÇÃO: Calcular total de comissões baseado nos valores reais das transações
+    $totalValorComissoes = 0;
+    if ($result['status'] && isset($result['data']['transacoes'])) {
+        foreach ($result['data']['transacoes'] as $transaction) {
+            $totalValorComissoes += floatval($transaction['valor_cashback']);
+        }
+    }
 }
 ?>
 
@@ -80,7 +85,7 @@ if ($result['status'] && isset($result['data']['totais'])) {
 <body>
     <?php include '../../views/components/sidebar-lojista-responsiva.php'; ?>
     
-    <div class="main-content" id="mainContent">
+    <div class="container main-content">
         <div class="dashboard-wrapper">
             <div class="dashboard-header">
                 <h1>Comissões Pendentes</h1>
@@ -106,9 +111,9 @@ if ($result['status'] && isset($result['data']['totais'])) {
                 </div>
                 
                 <div class="stat-card">
-                    <div class="stat-card-title">Valor Total de Comissões</div>
+                    <div class="stat-card-title">Comissão Total a Pagar</div>
                     <div class="stat-card-value">R$ <?php echo number_format($totalValorComissoes, 2, ',', '.'); ?></div>
-                    <div class="stat-card-subtitle">Valor a pagar ao Klube Cash (10%)</div>
+                    <div class="stat-card-subtitle">Valor total devido ao Klube Cash</div>
                 </div>
             </div>
             
@@ -193,8 +198,9 @@ if ($result['status'] && isset($result['data']['totais'])) {
                                             $saldoUsado = floatval($transaction['saldo_usado'] ?? 0);
                                             $valorCobrado = $valorOriginal - $saldoUsado;
                                             
-                                            $comissaoTotal = $valorCobrado * 0.10;
-                                            $cashbackCliente = $valorCobrado * 0.05;
+                                            // CORREÇÃO: Usar o valor_cashback da transação como Comissão Total a Pagar
+                                            $comissaoTotal = floatval($transaction['valor_cashback']);
+                                            $cashbackCliente = floatval($transaction['valor_cliente']);
                                             ?>
                                             <tr>
                                                 <td>
