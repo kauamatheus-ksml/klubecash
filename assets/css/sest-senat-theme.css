@@ -1,7 +1,8 @@
 /* CSS Personalizado para Usuários SEST SENAT */
 /* Mantém o padrão KlubeCash mas com as cores institucionais do SEST SENAT */
 
-:root.sest-senat-theme {
+:root.sest-senat-theme,
+.sest-senat-theme {
     /* Cores SEST SENAT */
     --primary-color: #1E3A8A; /* Azul SEST SENAT */
     --primary-light: #E6EFFF; /* Azul claro */
@@ -114,6 +115,39 @@
 /* Customização do footer se existir */
 .sest-senat-theme .sidebar-footer {
     border-top: 3px solid var(--primary-color);
+}
+
+/* Estilos mais específicos para garantir que sejam aplicados */
+.sest-senat-theme * {
+    /* Forçar aplicação das variáveis CSS */
+}
+
+.sest-senat-theme .btn-primary,
+.sest-senat-theme button[type="submit"],
+.sest-senat-theme .submit-btn {
+    background: #1E3A8A !important;
+    border-color: #1E3A8A !important;
+}
+
+.sest-senat-theme .btn-primary:hover,
+.sest-senat-theme button[type="submit"]:hover,
+.sest-senat-theme .submit-btn:hover {
+    background: #1E40AF !important;
+    border-color: #1E40AF !important;
+}
+
+/* Indicador visual claro para debugging */
+.sest-senat-theme::before {
+    content: "SEST SENAT THEME ATIVO";
+    position: fixed;
+    top: 0;
+    right: 0;
+    background: #1E3A8A;
+    color: white;
+    padding: 5px 10px;
+    font-size: 12px;
+    z-index: 9999;
+    border-bottom-left-radius: 5px;
 }
 
 /* Responsividade */
