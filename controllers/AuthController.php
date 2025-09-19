@@ -37,8 +37,8 @@ public static function login($email, $senha, $remember = false) {
         
         // Buscar usuário
         $stmt = $db->prepare("
-            SELECT id, nome, email, senha_hash, tipo, status, loja_vinculada_id, subtipo_funcionario
-            FROM usuarios 
+            SELECT id, nome, email, senha_hash, tipo, status, loja_vinculada_id, subtipo_funcionario, senat
+            FROM usuarios
             WHERE email = ? AND tipo IN ('cliente', 'admin', 'loja', 'funcionario')
         ");
         $stmt->execute([$email]);
@@ -75,6 +75,7 @@ public static function login($email, $senha, $remember = false) {
         $_SESSION['user_name'] = $user['nome'];
         $_SESSION['user_email'] = $user['email'];
         $_SESSION['user_type'] = $user['tipo'];
+        $_SESSION['user_senat'] = $user['senat'] ?? 'Não';
         $_SESSION['last_activity'] = time();
         
         error_log("LOGIN: Sessão básica definida - User ID: {$user['id']}");
@@ -1061,6 +1062,28 @@ public static function debugStoreAccess() {
         }
         
         return $_SESSION['user_id'];
+    }
+
+    /**
+     * Verifica se o usuário atual é SEST SENAT
+     *
+     * @return bool Verdadeiro se o usuário for SEST SENAT
+     */
+    public static function isSestSenat() {
+        if (!self::isAuthenticated()) {
+            return false;
+        }
+
+        return isset($_SESSION['user_senat']) && $_SESSION['user_senat'] === 'Sim';
+    }
+
+    /**
+     * Obtém a classe CSS apropriada para o tema do usuário
+     *
+     * @return string Nome da classe CSS para o tema
+     */
+    public static function getThemeClass() {
+        return self::isSestSenat() ? 'sest-senat-theme' : '';
     }
 }
 

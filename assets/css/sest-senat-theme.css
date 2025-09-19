@@ -1,0 +1,130 @@
+/* CSS Personalizado para Usuários SEST SENAT */
+/* Mantém o padrão KlubeCash mas com as cores institucionais do SEST SENAT */
+
+:root.sest-senat-theme {
+    /* Cores SEST SENAT */
+    --primary-color: #1E3A8A; /* Azul SEST SENAT */
+    --primary-light: #E6EFFF; /* Azul claro */
+    --primary-dark: #1E40AF; /* Azul escuro */
+    --secondary-color: #059669; /* Verde complementar */
+    --accent-color: #DC2626; /* Vermelho para destaques */
+
+    /* Mantém as outras variáveis do KlubeCash */
+    --white: #FFFFFF;
+    --light-gray: #F8F9FA;
+    --medium-gray: #6C757D;
+    --dark-gray: #212529;
+    --border-color: #E9ECEF;
+    --shadow-light: 0 2px 10px rgba(30, 58, 138, 0.08);
+    --shadow-medium: 0 4px 20px rgba(30, 58, 138, 0.12);
+    --border-radius: 12px;
+    --border-radius-small: 8px;
+    --font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --sidebar-width: 250px;
+}
+
+/* Logo container personalizado para SEST SENAT */
+.sest-senat-theme .sidebar-header .logo-container {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.sest-senat-theme .sidebar-header .logo-sest-senat {
+    width: 40px;
+    height: 40px;
+    object-fit: contain;
+}
+
+.sest-senat-theme .sidebar-header .logo-klubecash {
+    width: 32px;
+    height: 32px;
+    object-fit: contain;
+}
+
+/* Ajustes nos botões primários */
+.sest-senat-theme .btn-primary,
+.sest-senat-theme .sidebar-nav a.active {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+    border-color: var(--primary-color);
+}
+
+.sest-senat-theme .btn-primary:hover,
+.sest-senat-theme .sidebar-nav a:hover {
+    background: var(--primary-dark);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(30, 58, 138, 0.25);
+}
+
+/* Ajustes nos links da sidebar */
+.sest-senat-theme .sidebar-nav a {
+    color: var(--dark-gray);
+    transition: var(--transition);
+}
+
+.sest-senat-theme .sidebar-nav a:hover {
+    background: var(--primary-light);
+    color: var(--primary-color);
+}
+
+.sest-senat-theme .sidebar-nav a.active {
+    background: var(--primary-color);
+    color: var(--white);
+}
+
+/* Cards e componentes */
+.sest-senat-theme .card {
+    border: 1px solid var(--border-color);
+    box-shadow: var(--shadow-light);
+}
+
+.sest-senat-theme .card-header {
+    background: var(--primary-light);
+    border-bottom: 1px solid rgba(30, 58, 138, 0.1);
+}
+
+/* Badges e indicadores */
+.sest-senat-theme .badge-primary {
+    background: var(--primary-color);
+}
+
+.sest-senat-theme .badge-success {
+    background: var(--secondary-color);
+}
+
+/* Elementos de destaque */
+.sest-senat-theme .alert-info {
+    background: var(--primary-light);
+    border-color: var(--primary-color);
+    color: var(--primary-dark);
+}
+
+/* Header identificador SEST SENAT */
+.sest-senat-theme .sidebar-header::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+}
+
+/* Customização do footer se existir */
+.sest-senat-theme .sidebar-footer {
+    border-top: 3px solid var(--primary-color);
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+    .sest-senat-theme .logo-sest-senat {
+        width: 32px;
+        height: 32px;
+    }
+
+    .sest-senat-theme .logo-klubecash {
+        width: 28px;
+        height: 28px;
+    }
+}

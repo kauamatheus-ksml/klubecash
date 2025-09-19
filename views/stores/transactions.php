@@ -44,8 +44,13 @@ $storeId = $store['id'];
 $activeMenu = 'transactions';
 ?>
 
+<?php
+// Carregar tema SEST SENAT se necessário
+require_once '../../controllers/AuthController.php';
+$themeClass = AuthController::getThemeClass();
+?>
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" class="<?php echo $themeClass; ?>">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
