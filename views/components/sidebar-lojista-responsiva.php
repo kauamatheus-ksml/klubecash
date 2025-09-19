@@ -62,17 +62,7 @@ $itens_menu_principal = [
         'contador' => 0 // Será preenchido dinamicamente se necessário
     ]
 ];
-
-// Verificar se o usuário é SEST SENAT
-require_once '../../controllers/AuthController.php';
-$isSestSenat = AuthController::isSestSenat();
-$themeClass = AuthController::getThemeClass();
 ?>
-
-<?php if ($isSestSenat): ?>
-<!-- CSS personalizado para SEST SENAT -->
-<link rel="stylesheet" href="../../assets/css/sest-senat-theme.css">
-<?php endif; ?>
 
 <!-- Overlay para Mobile -->
 <div class="overlay-sidebar-mobile" id="overlaySidebarMobile"></div>
@@ -85,21 +75,13 @@ $themeClass = AuthController::getThemeClass();
 </button>
 
 <!-- Sidebar Principal -->
-<aside class="sidebar-lojista-responsiva <?php echo $themeClass; ?>" id="sidebarLojistaResponsiva" role="navigation" aria-label="Menu principal">
+<aside class="sidebar-lojista-responsiva" id="sidebarLojistaResponsiva" role="navigation" aria-label="Menu principal">
     
     <!-- Cabeçalho da Sidebar -->
     <div class="cabecalho-sidebar-lojista">
         <div class="container-logo-sidebar">
-            <?php if ($isSestSenat): ?>
-                <!-- Logo SEST SENAT + KlubeCash para clientes especiais -->
-                <img src="../../assets/images/sest-senat-logo.png" alt="SEST SENAT" class="logo-sest-senat">
-                <img src="/assets/images/KlubeCashLOGO (1).png" alt="Klube Cash" class="logo-klubecash">
-                <span class="texto-logo-sidebar">SEST SENAT</span>
-            <?php else: ?>
-                <!-- Logo padrão KlubeCash -->
-                <img src="/assets/images/KlubeCashLOGO (1).png" alt="Klube Cash" class="logo-sidebar-lojista">
-                <span class="texto-logo-sidebar">KlubeCash</span>
-            <?php endif; ?>
+            <img src="/assets/images/KlubeCashLOGO (1).png" alt="Klube Cash" class="logo-sidebar-lojista">
+            <span class="texto-logo-sidebar">KlubeCash</span>
         </div>
         
         <!-- Botão Colapsar Desktop -->

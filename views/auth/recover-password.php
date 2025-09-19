@@ -102,15 +102,9 @@ if (isset($_GET['token']) && !empty($_GET['token'])) {
         }
     }
 }
-
-// Carregar tema SEST SENAT
-require_once '../../controllers/AuthController.php';
-$isSestSenat = AuthController::isSestSenat();
-$themeClass = AuthController::getThemeClass();
 ?>
-
 <!DOCTYPE html>
-<html lang="pt-BR" class="<?php echo $themeClass; ?>">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -689,10 +683,6 @@ $themeClass = AuthController::getThemeClass();
             padding-right: 48px;
         }
     </style>
-    <?php if ($isSestSenat): ?>
-    <!-- CSS personalizado para SEST SENAT -->
-    <link rel="stylesheet" href="../../assets/css/sest-senat-theme.css">
-    <?php endif; ?>
 </head>
 <body>
     <div class="recover-container">

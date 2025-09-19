@@ -231,7 +231,7 @@ $profileCompletion = $totalSteps > 0 ? ($completedSteps / $totalSteps) * 100 : 0
 ?>
 
 <!DOCTYPE html>
-<html lang="pt-BR" class="<?php echo $themeClass; ?>">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -240,10 +240,6 @@ $profileCompletion = $totalSteps > 0 ? ($completedSteps / $totalSteps) * 100 : 0
     <link rel="stylesheet" href="../../assets/css/views/client/profile.css">
     <!-- Font Awesome para ícones -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <?php if ($isSestSenat): ?>
-    <!-- CSS personalizado para SEST SENAT -->
-    <link rel="stylesheet" href="../../assets/css/sest-senat-theme.css">
-    <?php endif; ?>
 </head>
 <body>
     <!-- Incluir navbar -->

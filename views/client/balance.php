@@ -187,7 +187,7 @@ function formatMonth($yearMonth) {
 ?>
 
 <!DOCTYPE html>
-<html lang="pt-BR" class="<?php echo $themeClass; ?>">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -195,10 +195,6 @@ function formatMonth($yearMonth) {
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
     <link rel="stylesheet" href="../../assets/css/views/client/balance-new.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <?php if ($isSestSenat): ?>
-    <!-- CSS personalizado para SEST SENAT -->
-    <link rel="stylesheet" href="../../assets/css/sest-senat-theme.css">
-    <?php endif; ?>
 </head>
 <body>
     <!-- Incluir navegação navbar -->

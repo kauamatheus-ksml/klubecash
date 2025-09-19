@@ -69,15 +69,8 @@ if ($result['status'] && isset($result['data']['totais'])) {
 }
 ?>
 
-
-// Carregar tema SEST SENAT
-require_once '../../controllers/AuthController.php';
-$isSestSenat = AuthController::isSestSenat();
-$themeClass = AuthController::getThemeClass();
-?>
-
 <!DOCTYPE html>
-<html lang="pt-BR" class="<?php echo $themeClass; ?>">
+<html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -88,10 +81,6 @@ $themeClass = AuthController::getThemeClass();
     <link rel="stylesheet" href="../../assets/css/openpix-styles.css">
 
     <link rel="stylesheet" href="/assets/css/sidebar-lojista.css">
-    <?php if ($isSestSenat): ?>
-    <!-- CSS personalizado para SEST SENAT -->
-    <link rel="stylesheet" href="../../assets/css/sest-senat-theme.css">
-    <?php endif; ?>
 </head>
 <body>
     <?php include '../../views/components/sidebar-lojista-responsiva.php'; ?>

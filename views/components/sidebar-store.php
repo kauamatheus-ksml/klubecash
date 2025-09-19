@@ -86,19 +86,10 @@ $menuItems = [
         'icon' => '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>'
     ]
 ];
-
-// Verificar se o usuário é SEST SENAT
-require_once '../../controllers/AuthController.php';
-$isSestSenat = AuthController::isSestSenat();
-$themeClass = AuthController::getThemeClass();
 ?>
 
 <!-- CSS da Sidebar Incorporado -->
 <link rel="stylesheet" href="../../assets/css/sidebar-store-perfect.css">
-<?php if ($isSestSenat): ?>
-<!-- CSS personalizado para SEST SENAT -->
-<link rel="stylesheet" href="../../assets/css/sest-senat-theme.css">
-<?php endif; ?>
 
 <!-- Mobile Toggle -->
 <button class="klube-mobile-toggle" id="klubeMobileToggle" aria-label="Abrir menu">
@@ -113,21 +104,13 @@ $themeClass = AuthController::getThemeClass();
 <div class="klube-overlay" id="klubeOverlay"></div>
 
 <!-- Sidebar -->
-<aside class="klube-sidebar <?php echo $themeClass; ?>" id="klubeSidebar">
+<aside class="klube-sidebar" id="klubeSidebar">
     
     <!-- Header -->
     <header class="klube-sidebar-header">
         <div class="klube-logo-container">
-            <?php if ($isSestSenat): ?>
-                <!-- Logo SEST SENAT + KlubeCash para clientes especiais -->
-                <img src="../../assets/images/sest-senat-logo.png" alt="SEST SENAT" class="logo-sest-senat">
-                <img src="../../assets/images/logo-icon.png" alt="Klube Cash" class="logo-klubecash">
-                <span class="klube-logo-text">SEST SENAT</span>
-            <?php else: ?>
-                <!-- Logo padrão KlubeCash -->
-                <img src="../../assets/images/logo-icon.png" alt="Klube Cash" class="klube-logo">
-                <span class="klube-logo-text">Klube Cash</span>
-            <?php endif; ?>
+            <img src="../../assets/images/logo-icon.png" alt="Klube Cash" class="klube-logo">
+            <span class="klube-logo-text">Klube Cash</span>
         </div>
         <button class="klube-collapse-btn" id="klubeCollapseBtn" aria-label="Recolher menu">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
