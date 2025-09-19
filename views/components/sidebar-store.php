@@ -1,4 +1,3 @@
-
 <?php
 /**
  * Sidebar da Loja - Versão Corrigida

@@ -171,10 +171,9 @@ $permissions = [
     
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="../../assets/css/views/stores/employees.css">
-    <link rel="stylesheet" href="/assets/css/sidebar-lojista.css">
 </head>
 <body>
-    <?php include '../../views/components/sidebar-lojista-responsiva.php'; ?>
+    <?php include_once '../components/sidebar-store.php'; ?>
     
     <div class="main-content" id="mainContent">
         <div class="page-wrapper">
@@ -819,7 +818,7 @@ $permissions = [
             <p>Carregando...</p>
         </div>
     </div>
-    <script src="/assets/js/sidebar-lojista.js"></script>
+    
     <script src="../../assets/js/stores/employees.js"></script>
 </body>
 </html>

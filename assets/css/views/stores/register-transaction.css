@@ -725,117 +725,95 @@
         }
 
         /* ========================================
-           RESUMO DA TRANSAÇÃO - DESIGN CLEAN
+           SIMULAÇÃO DE CASHBACK
         ======================================== */
         .cashback-simulator {
-            background: var(--white);
-            border-radius: var(--border-radius-sm);
-            padding: 1.5rem;
+            background: linear-gradient(135deg, var(--primary-light) 0%, var(--white) 100%);
+            border-radius: var(--border-radius);
+            padding: 2rem;
             margin: 2rem 0;
-            border: 1px solid #E1E7F0;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            border: 2px solid var(--primary-color);
         }
 
         .simulator-header {
             display: flex;
             align-items: center;
-            gap: 0.75rem;
-            margin-bottom: 1.25rem;
-            padding-bottom: 1rem;
-            border-bottom: 1px solid #F1F5F9;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
         }
 
         .simulator-icon {
-            width: 40px;
-            height: 40px;
-            background: #F8FAFC;
-            border: 2px solid #E2E8F0;
-            border-radius: 8px;
+            width: 60px;
+            height: 60px;
+            background: var(--primary-color);
+            border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            color: var(--secondary-color);
-            font-size: 1.2rem;
+            color: var(--white);
+            font-size: 1.5rem;
         }
 
         .simulator-title {
-            font-size: 1.2rem;
-            font-weight: 600;
-            color: var(--secondary-color);
-            margin: 0;
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--primary-color);
         }
 
         .simulator-details {
-            background: transparent;
-            border: none;
-            box-shadow: none;
-            border-radius: 0;
+            background: var(--white);
+            border-radius: var(--border-radius-sm);
+            overflow: hidden;
+            box-shadow: var(--shadow-md);
+            border: 1px solid rgba(0,0,0,0.05);
         }
 
         .simulator-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 0.75rem 0;
-            border-bottom: 1px solid #F1F5F9;
-            transition: none;
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+            transition: var(--transition);
         }
 
         .simulator-item:hover {
-            background: transparent;
+            background: var(--light-gray);
         }
 
         .simulator-item:last-child {
             border-bottom: none;
-            padding-bottom: 0;
         }
 
         .simulator-item.total {
-            background: #F8FAFC;
-            border: 1px solid #E2E8F0;
-            border-radius: 6px;
-            padding: 1rem;
-            margin-top: 0.75rem;
-            color: var(--secondary-color);
-            font-weight: 600;
-            font-size: 1rem;
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+            color: var(--white);
+            font-weight: 700;
+            font-size: 1.1rem;
         }
 
         .simulator-item.balance-used {
-            background: #F0FDF4;
-            border: 1px solid #BBF7D0;
-            border-radius: 6px;
-            padding: 0.75rem;
-            margin: 0.5rem 0;
+            background: linear-gradient(135deg, var(--success-light) 0%, var(--white) 100%);
+            border-left: 4px solid var(--success-color);
         }
 
         .simulator-label {
-            color: var(--medium-gray);
+            color: var(--secondary-color);
             font-weight: 500;
-            font-size: 0.95rem;
         }
 
         .simulator-item.total .simulator-label {
-            color: var(--secondary-color);
-        }
-
-        .simulator-item.balance-used .simulator-label {
-            color: #166534;
+            color: var(--white);
         }
 
         .simulator-value {
-            font-weight: 600;
-            font-size: 1rem;
-            color: var(--dark-gray);
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: var(--primary-color);
         }
 
         .simulator-item.total .simulator-value {
-            color: var(--secondary-color);
-            font-weight: 700;
-        }
-
-        .simulator-item.balance-used .simulator-value {
-            color: #166534;
+            color: var(--white);
         }
 
         /* ========================================
@@ -895,210 +873,6 @@
             cursor: not-allowed;
             transform: none;
             opacity: 0.6;
-        }
-
-        /* ========================================
-           SISTEMA DE TOAST UNIFICADO
-        ======================================== */
-        .toast-container {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 10000;
-            display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
-            max-width: 420px;
-            width: 100%;
-        }
-
-        .toast {
-            background: #10B981;
-            color: white;
-            padding: 1rem 1.25rem;
-            border-radius: 12px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.12), 0 4px 16px rgba(0,0,0,0.08);
-            font-weight: 500;
-            animation: slideInRight 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-            display: flex;
-            align-items: flex-start;
-            gap: 0.75rem;
-            border: 1px solid rgba(255,255,255,0.1);
-            backdrop-filter: blur(8px);
-            position: relative;
-            overflow: hidden;
-        }
-
-        /* Tipos de Toast */
-        .toast.success {
-            background: linear-gradient(135deg, #10B981 0%, #059669 100%);
-            border-color: rgba(16, 185, 129, 0.3);
-        }
-
-        .toast.error {
-            background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
-            border-color: rgba(239, 68, 68, 0.3);
-        }
-
-        .toast.warning {
-            background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
-            border-color: rgba(245, 158, 11, 0.3);
-        }
-
-        .toast.info {
-            background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
-            border-color: rgba(59, 130, 246, 0.3);
-        }
-
-        .toast.loading {
-            background: linear-gradient(135deg, #8B5CF6 0%, #7C3AED 100%);
-            border-color: rgba(139, 92, 246, 0.3);
-        }
-
-        /* Ícone do Toast */
-        .toast-icon {
-            width: 22px;
-            height: 22px;
-            flex-shrink: 0;
-            margin-top: 1px;
-        }
-
-        .toast-icon.loading {
-            animation: spin 1.5s linear infinite;
-        }
-
-        /* Conteúdo do Toast */
-        .toast-content {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .toast-title {
-            font-weight: 600;
-            font-size: 0.95rem;
-            margin-bottom: 0.25rem;
-            line-height: 1.3;
-        }
-
-        .toast-message {
-            font-size: 0.875rem;
-            opacity: 0.95;
-            line-height: 1.4;
-            word-wrap: break-word;
-        }
-
-        /* Botão de Fechar */
-        .toast-close {
-            position: absolute;
-            top: 8px;
-            right: 8px;
-            background: rgba(255,255,255,0.2);
-            border: none;
-            color: white;
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 14px;
-            opacity: 0.7;
-            transition: all 0.2s ease;
-        }
-
-        .toast-close:hover {
-            opacity: 1;
-            background: rgba(255,255,255,0.3);
-            transform: scale(1.1);
-        }
-
-        /* Barra de Progresso */
-        .toast-progress {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            height: 3px;
-            background: rgba(255,255,255,0.3);
-            border-radius: 0 0 12px 12px;
-            transition: width linear;
-        }
-
-        /* Animações */
-        @keyframes slideInRight {
-            from {
-                transform: translateX(100%) scale(0.95);
-                opacity: 0;
-            }
-            to {
-                transform: translateX(0) scale(1);
-                opacity: 1;
-            }
-        }
-
-        @keyframes slideOutRight {
-            from {
-                transform: translateX(0) scale(1);
-                opacity: 1;
-            }
-            to {
-                transform: translateX(100%) scale(0.95);
-                opacity: 0;
-            }
-        }
-
-        @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
-
-        /* Responsividade */
-        @media (max-width: 768px) {
-            .toast-container {
-                top: 10px;
-                right: 10px;
-                left: 10px;
-                max-width: none;
-            }
-
-            .toast {
-                padding: 0.875rem 1rem;
-                border-radius: 10px;
-            }
-
-            .toast-title {
-                font-size: 0.9rem;
-            }
-
-            .toast-message {
-                font-size: 0.825rem;
-            }
-
-            .toast-icon {
-                width: 20px;
-                height: 20px;
-            }
-        }
-
-        @media (max-width: 480px) {
-            .toast-container {
-                top: 10px;
-                right: 8px;
-                left: 8px;
-            }
-
-            .toast {
-                padding: 0.75rem 0.875rem;
-                gap: 0.625rem;
-            }
-
-            .toast-title {
-                font-size: 0.875rem;
-            }
-
-            .toast-message {
-                font-size: 0.8rem;
-            }
         }
 
         /* ========================================

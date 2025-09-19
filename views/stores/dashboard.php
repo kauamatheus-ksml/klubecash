@@ -29,7 +29,6 @@ if (!$storeId || !$store) {
 
 // Obter conexão com banco para as queries
 $db = Database::getConnection();
-$activeMenu = 'dashboard';
 
 // Obter estatísticas da loja
 // 1. Total de vendas registradas
@@ -133,13 +132,12 @@ $activeMenu = 'dashboard';
     <title>Dashboard da Loja - Klube Cash</title>
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
     <link rel="stylesheet" href="../../assets/css/views/stores/dashboard.css">
-    <link rel="stylesheet" href="/assets/css/sidebar-lojista.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <div class="dashboard-container">
         <!-- Incluir o componente sidebar -->
-        <?php include '../../views/components/sidebar-lojista-responsiva.php'; ?>
+        <?php include_once '../components/sidebar-store.php'; ?>
         
         <div class="main-content" id="mainContent">
             <div class="dashboard-header">
@@ -167,21 +165,8 @@ $activeMenu = 'dashboard';
                 
                 <div class="card">
                     <div class="card-content">
-                        <h3>Valor Total
-                            <button class="value-toggle-btn" data-target="valor-total" onclick="toggleValueVisibility('valor-total')">
-                                <svg class="eye-open" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                                    <circle cx="12" cy="12" r="3"></circle>
-                                </svg>
-                                <svg class="eye-closed" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
-                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
-                                    <line x1="1" y1="1" x2="23" y2="23"></line>
-                                </svg>
-                            </button>
-                        </h3>
-                        <div class="card-value">
-                            <span class="hideable-value" data-id="valor-total" data-original="R$ <?php echo number_format($salesStats['valor_total_vendas'], 2, ',', '.'); ?>">R$ <?php echo number_format($salesStats['valor_total_vendas'], 2, ',', '.'); ?></span>
-                        </div>
+                        <h3>Valor Total</h3>
+                        <div class="card-value">R$ <?php echo number_format($salesStats['valor_total_vendas'], 2, ',', '.'); ?></div>
                         <div class="card-period">Em vendas processadas</div>
                     </div>
                     <div class="card-icon success">
@@ -194,21 +179,8 @@ $activeMenu = 'dashboard';
                 
                 <div class="card">
                     <div class="card-content">
-                        <h3>Comissões Pendentes (10%)
-                            <button class="value-toggle-btn" data-target="comissoes-pendentes" onclick="toggleValueVisibility('comissoes-pendentes')">
-                                <svg class="eye-open" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                                    <circle cx="12" cy="12" r="3"></circle>
-                                </svg>
-                                <svg class="eye-closed" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
-                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
-                                    <line x1="1" y1="1" x2="23" y2="23"></line>
-                                </svg>
-                            </button>
-                        </h3>
-                        <div class="card-value">
-                            <span class="hideable-value" data-id="comissoes-pendentes" data-original="R$ <?php echo number_format($pendingStats['valor_pendente'], 2, ',', '.'); ?>">R$ <?php echo number_format($pendingStats['valor_pendente'], 2, ',', '.'); ?></span>
-                        </div>
+                        <h3>Comissões Pendentes (10%)</h3>
+                        <div class="card-value">R$ <?php echo number_format($pendingStats['valor_pendente'], 2, ',', '.'); ?></div>
                         <div class="card-period"><?php echo number_format($pendingStats['total_pendentes'], 0, ',', '.'); ?> transações aguardando pagamento</div>
                     </div>
                     <div class="card-icon warning">
@@ -222,21 +194,8 @@ $activeMenu = 'dashboard';
                 
                 <div class="card">
                     <div class="card-content">
-                        <h3>Cashback Gerado (5%)
-                            <button class="value-toggle-btn" data-target="cashback-gerado" onclick="toggleValueVisibility('cashback-gerado')">
-                                <svg class="eye-open" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                                    <circle cx="12" cy="12" r="3"></circle>
-                                </svg>
-                                <svg class="eye-closed" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
-                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
-                                    <line x1="1" y1="1" x2="23" y2="23"></line>
-                                </svg>
-                            </button>
-                        </h3>
-                        <div class="card-value">
-                            <span class="hideable-value" data-id="cashback-gerado" data-original="R$ <?php echo number_format($salesStats['valor_total_cliente'], 2, ',', '.'); ?>">R$ <?php echo number_format($salesStats['valor_total_cliente'], 2, ',', '.'); ?></span>
-                        </div>
+                        <h3>Cashback Gerado (5%)</h3>
+                        <div class="card-value">R$ <?php echo number_format($salesStats['valor_total_cliente'], 2, ',', '.'); ?></div>
                         <div class="card-period">Destinado aos clientes</div>
                     </div>
                     <div class="card-icon info">
@@ -338,30 +297,8 @@ $activeMenu = 'dashboard';
                                 <th>Data</th>
                                 <th>Cliente</th>
                                 <th>Código</th>
-                                <th>Valor
-                                    <button class="value-toggle-btn table-header-toggle" data-target="table-valor" onclick="toggleTableColumnVisibility('table-valor')">
-                                        <svg class="eye-open" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                                            <circle cx="12" cy="12" r="3"></circle>
-                                        </svg>
-                                        <svg class="eye-closed" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
-                                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
-                                            <line x1="1" y1="1" x2="23" y2="23"></line>
-                                        </svg>
-                                    </button>
-                                </th>
-                                <th>Cashback
-                                    <button class="value-toggle-btn table-header-toggle" data-target="table-cashback" onclick="toggleTableColumnVisibility('table-cashback')">
-                                        <svg class="eye-open" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                                            <circle cx="12" cy="12" r="3"></circle>
-                                        </svg>
-                                        <svg class="eye-closed" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
-                                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
-                                            <line x1="1" y1="1" x2="23" y2="23"></line>
-                                        </svg>
-                                    </button>
-                                </th>
+                                <th>Valor</th>
+                                <th>Cashback</th>
                                 <th>Status</th>
                             </tr>
                         </thead>
@@ -372,12 +309,8 @@ $activeMenu = 'dashboard';
                                         <td data-label="Data"><?php echo date('d/m/Y H:i', strtotime($transaction['data_transacao'])); ?></td>
                                         <td data-label="Cliente"><?php echo htmlspecialchars($transaction['cliente_nome']); ?></td>
                                         <td data-label="Código"><?php echo htmlspecialchars($transaction['codigo_transacao'] ?? 'N/A'); ?></td>
-                                        <td data-label="Valor" class="table-hideable-column" data-column="table-valor">
-                                            <span class="hideable-value table-value" data-id="table-valor" data-original="R$ <?php echo number_format($transaction['valor_total'], 2, ',', '.'); ?>">R$ <?php echo number_format($transaction['valor_total'], 2, ',', '.'); ?></span>
-                                        </td>
-                                        <td data-label="Cashback" class="table-hideable-column" data-column="table-cashback">
-                                            <span class="hideable-value table-value" data-id="table-cashback" data-original="R$ <?php echo number_format($transaction['valor_cashback'], 2, ',', '.'); ?>">R$ <?php echo number_format($transaction['valor_cashback'], 2, ',', '.'); ?></span>
-                                        </td>
+                                        <td data-label="Valor">R$ <?php echo number_format($transaction['valor_total'], 2, ',', '.'); ?></td>
+                                        <td data-label="Cashback">R$ <?php echo number_format($transaction['valor_cashback'], 2, ',', '.'); ?></td>
                                         <td data-label="Status">
                                             <span class="status-badge <?php echo $transaction['status']; ?>">
                                                 <?php 
@@ -453,6 +386,5 @@ $activeMenu = 'dashboard';
     </div>
     
     <script src="../../assets/js/views/stores/dashboard.js"></script>
-    <script src="/assets/js/sidebar-lojista.js"></script>
 </body>
 </html>

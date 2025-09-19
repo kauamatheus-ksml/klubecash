@@ -14,10 +14,7 @@
       "Bash(git filter-branch:*)",
       "Bash(git add:*)",
       "Read(//c/Users/Kaua/Documents/GitHub/**)",
-      "Bash(git checkout:*)",
-      "Bash(start test-toggle.html)",
-      "Bash(npm install:*)",
-      "Bash(http-server:*)"
+      "Bash(git checkout:*)"
     ],
     "deny": [],
     "ask": []

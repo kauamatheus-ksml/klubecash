@@ -85,30 +85,6 @@ $data = []; // Array para manter dados do formulário
 
 debug_log("Variáveis de controle inicializadas");
 
-// Função para normalizar URL do website
-function normalizeWebsiteUrl($url) {
-    if (empty($url)) {
-        return '';
-    }
-
-    $url = trim($url);
-
-    // Se não começar com protocolo, adiciona https://
-    if (!preg_match('/^https?:\/\//', $url)) {
-        $url = 'https://' . $url;
-    }
-
-    // Sanitizar e validar
-    $sanitized = filter_var($url, FILTER_SANITIZE_URL);
-
-    // Validar se é uma URL válida
-    if (filter_var($sanitized, FILTER_VALIDATE_URL)) {
-        return $sanitized;
-    }
-
-    return '';
-}
-
 // Função de processamento de upload (mantida original)
 function processLogoUpload($file, $storeLogosDir) {
     if (!isset($file) || $file['error'] === UPLOAD_ERR_NO_FILE) {
@@ -195,7 +171,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'confirma_senha' => $_POST['confirma_senha'] ?? '',
             'categoria' => trim(htmlspecialchars($_POST['categoria'] ?? '', ENT_QUOTES, 'UTF-8')),
             'descricao' => trim(htmlspecialchars($_POST['descricao'] ?? '', ENT_QUOTES, 'UTF-8')),
-            'website' => normalizeWebsiteUrl(trim($_POST['website'] ?? '')),
+            'website' => trim(filter_var($_POST['website'] ?? '', FILTER_SANITIZE_URL)),
             'endereco' => [
                 'cep' => trim(htmlspecialchars($_POST['cep'] ?? '', ENT_QUOTES, 'UTF-8')),
                 'logradouro' => trim(htmlspecialchars($_POST['logradouro'] ?? '', ENT_QUOTES, 'UTF-8')),
@@ -1074,13 +1050,13 @@ debug_log("Dados de seleção preparados, iniciando renderização da página");
                             
                             <div class="form-group full-width">
                                 <label class="form-label" for="website">Website (opcional)</label>
-                                <input
-                                    type="text"
-                                    id="website"
-                                    name="website"
-                                    class="form-input"
+                                <input 
+                                    type="url" 
+                                    id="website" 
+                                    name="website" 
+                                    class="form-input" 
                                     value="<?php echo isset($data['website']) ? htmlspecialchars($data['website']) : ''; ?>"
-                                    placeholder="cleacasamentos.com.br ou https://www.minhaloja.com.br"
+                                    placeholder="https://www.minhaloja.com.br"
                                 >
                                 <div class="validation-message" id="website_msg"></div>
                             </div>
@@ -1781,22 +1757,17 @@ debug_log("Dados de seleção preparados, iniciando renderização da página");
         // Configurar validação em tempo real
         function setupRealtimeValidation() {
             const inputs = document.querySelectorAll('.form-input, .form-select');
-
+            
             inputs.forEach(input => {
                 input.addEventListener('blur', function() {
                     if (this.hasAttribute('required') && !this.value.trim()) {
                         showFieldError(this, 'Este campo é obrigatório');
                     } else {
                         clearFieldError(this);
-
+                        
                         // Validações específicas
                         if (this.type === 'email' && this.value && !isValidEmail(this.value)) {
                             showFieldError(this, 'Email inválido');
-                        }
-
-                        // Validação para website
-                        if (this.id === 'website' && this.value && !isValidWebsite(this.value)) {
-                            showFieldError(this, 'Website inválido. Use o formato: exemplo.com.br ou https://exemplo.com.br');
                         }
                     }
                 });
@@ -1847,22 +1818,6 @@ debug_log("Dados de seleção preparados, iniciando renderização da página");
         function isValidEmail(email) {
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             return emailRegex.test(email);
-        }
-
-        function isValidWebsite(website) {
-            if (!website || !website.trim()) return true; // Campo opcional
-
-            // Remove espaços
-            website = website.trim();
-
-            // Se não começar com protocolo, adiciona https://
-            if (!website.match(/^https?:\/\//)) {
-                website = 'https://' + website;
-            }
-
-            // Validação de URL mais permissiva
-            const urlRegex = /^https?:\/\/([\w-]+\.)+[\w-]+(\/.*)?$/;
-            return urlRegex.test(website);
         }
 
         // Navegação por teclado
