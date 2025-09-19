@@ -162,7 +162,7 @@ $permissions = [
 ?>
 
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" class="<?php echo $themeClass; ?>">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -172,6 +172,10 @@ $permissions = [
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="stylesheet" href="../../assets/css/views/stores/employees.css">
     <link rel="stylesheet" href="/assets/css/sidebar-lojista.css">
+    <?php if ($isSestSenat): ?>
+    <!-- CSS personalizado para SEST SENAT -->
+    <link rel="stylesheet" href="../../assets/css/sest-senat-theme.css">
+    <?php endif; ?>
 </head>
 <body>
     <?php include '../../views/components/sidebar-lojista-responsiva.php'; ?>

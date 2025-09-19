@@ -306,7 +306,7 @@ $activeMenu = 'profile';
 ?>
 
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" class="<?php echo $themeClass; ?>">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -315,6 +315,10 @@ $activeMenu = 'profile';
     <link rel="stylesheet" href="../../assets/css/views/stores/profile.css">
     <link rel="stylesheet" href="/assets/css/sidebar-lojista.css">
 
+    <?php if ($isSestSenat): ?>
+    <!-- CSS personalizado para SEST SENAT -->
+    <link rel="stylesheet" href="../../assets/css/sest-senat-theme.css">
+    <?php endif; ?>
 </head>
 <body>
     <!-- Incluir sidebar da loja -->

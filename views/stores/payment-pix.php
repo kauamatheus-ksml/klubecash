@@ -47,7 +47,7 @@ $activeMenu = 'payment-pix';
 ?>
 
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" class="<?php echo $themeClass; ?>">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -57,6 +57,10 @@ $activeMenu = 'payment-pix';
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
     <script src="../../assets/js/mercadopago-sdk.js?v=2.1.0"></script>
+    <?php if ($isSestSenat): ?>
+    <!-- CSS personalizado para SEST SENAT -->
+    <link rel="stylesheet" href="../../assets/css/sest-senat-theme.css">
+    <?php endif; ?>
 </head>
 <body>
     <?php include_once '../components/sidebar-store.php'; ?>
