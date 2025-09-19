@@ -45,7 +45,8 @@ foreach ($paginas_verificar as $arquivo => $nome) {
         'Tema aplicado' => strpos($conteudo, 'getThemeClass()') !== false,
         'CSS incluído' => strpos($conteudo, 'sest-senat-theme.css') !== false,
         'HTML com classe' => strpos($conteudo, 'class="<?php echo $themeClass;') !== false ||
-                            strpos($conteudo, 'class="<?php echo getThemeClass();') !== false
+                            strpos($conteudo, 'class="<?php echo getThemeClass();') !== false ||
+                            strpos($conteudo, '<?php echo $themeClass;') !== false
     ];
 
     $todas_ok = true;

@@ -224,6 +224,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $activeMenu = 'register-transaction';
 ?>
 
+
+// Carregar tema SEST SENAT
+require_once '../../controllers/AuthController.php';
+$isSestSenat = AuthController::isSestSenat();
+$themeClass = AuthController::getThemeClass();
+?>
+
 <!DOCTYPE html>
 <html lang="pt-BR" class="<?php echo $themeClass; ?>">
 <head>
