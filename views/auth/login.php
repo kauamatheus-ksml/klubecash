@@ -64,9 +64,12 @@ $urlSuccess = $_GET['success'] ?? '';
 if (!empty($urlError)) {
     $error = urldecode($urlError);
 }
+
+// Incluir tema SEST SENAT
+require_once '../../includes/sest-senat-theme.php';
 ?>
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" class="<?php echo getThemeClass(); ?>">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
