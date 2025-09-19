@@ -4,14 +4,14 @@
 ===================================================== */
 
 :root {
-    --cor-primaria-klube: #F1780C;
-    --cor-secundaria-klube: #ff7700;
+    --cor-primaria-klube: #012f63;
+    --cor-secundaria-klube: #012f63;
     --cor-texto-principal: #1f2937;
     --cor-texto-secundario: #6b7280;
     --cor-fundo-sidebar: #ffffff;
     --cor-fundo-hover: #f9fafb;
     --cor-borda-sidebar: #e5e7eb;
-    --cor-ativa-menu: #F1780C;
+    --cor-ativa-menu: #012f63;
     --cor-sair-botao: #ef4444;
     --cor-overlay: rgba(0, 0, 0, 0.5);
     --largura-sidebar-expandida: 280px;
