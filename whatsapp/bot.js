@@ -588,6 +588,50 @@ Para testar o menu, envie qualquer mensagem.`;
     }
 });
 
+/**
+ * ENDPOINT DE TESTE FORÇADO - Para testar sem WhatsApp conectado
+ */
+app.post('/send-test-force', async (req, res) => {
+    try {
+        const { phone, message, secret } = req.body;
+
+        if (secret !== CONFIG.webhookSecret) {
+            log('❌ Tentativa de acesso com secret inválido no teste forçado');
+            return res.status(401).json({
+                success: false,
+                error: 'Acesso não autorizado'
+            });
+        }
+
+        if (!phone || !message) {
+            return res.status(400).json({
+                success: false,
+                error: 'Telefone e mensagem são obrigatórios'
+            });
+        }
+
+        // SIMULAR ENVIO MESMO SEM WHATSAPP CONECTADO
+        log(`📤 TESTE FORÇADO: Simulando envio para ${phone}`);
+        log(`📝 MENSAGEM: ${message.substring(0, 100)}...`);
+
+        res.json({
+            success: true,
+            message: 'Mensagem enviada com sucesso (SIMULADO para teste)',
+            phone: phone,
+            simulated: true,
+            whatsapp_ready: isReady,
+            timestamp: new Date().toISOString()
+        });
+
+    } catch (error) {
+        log(`❌ Erro no teste forçado: ${error.message}`, 'error');
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
 // === INICIALIZAR SERVIDOR ===
 app.listen(CONFIG.port, () => {
     log(`🌐 Servidor WhatsApp Bot rodando na porta ${CONFIG.port}`);
