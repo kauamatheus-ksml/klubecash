@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Você está offline - Klube Cash</title>
+    
+    <!-- Meta tags para PWA -->
+    <meta name="description" content="Klube Cash - Página offline">
+    <meta name="theme-color" content="#FF7A00">
+    
+    <style>
+        /* === VARIÁVEIS CSS === */
+        :root {
+            --primary-color: #FF7A00;
+            --primary-dark: #E06600;
+            --primary-light: #FFB366;
+            --secondary-color: #1A1A1A;
+            --white: #FFFFFF;
+            --gray-100: #F3F4F6;
+            --gray-500: #6B7280;
+            --gray-700: #374151;
+            --success: #10B981;
+            --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        /* === RESET E BASE === */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-family);
+            background: linear-gradient(135deg, var(--gray-100) 0%, var(--white) 100%);
+            color: var(--gray-700);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            line-height: 1.6;
+        }
+
+        /* === CONTAINER PRINCIPAL === */
+        .offline-container {
+            max-width: 28rem;
+            width: 100%;
+            text-align: center;
+            background: var(--white);
+            border-radius: 1.5rem;
+            padding: 3rem 2rem;
+            box-shadow: 
+                0 10px 25px -5px rgba(0, 0, 0, 0.1),
+                0 20px 40px -10px rgba(0, 0, 0, 0.05);
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* === DECORAÇÃO DE FUNDO === */
+        .offline-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary-color), var(--primary-light));
+        }
+
+        /* === ÍCONE OFFLINE === */
+        .offline-icon {
+            width: 5rem;
+            height: 5rem;
+            margin: 0 auto 2rem;
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .offline-icon svg {
+            width: 2.5rem;
+            height: 2.5rem;
+            fill: var(--white);
+        }
+
+        /* === LOGO DO KLUBE CASH === */
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--primary-color);
+            margin-bottom: 1rem;
+            letter-spacing: -0.025em;
+        }
+
+        /* === TÍTULO === */
+        .offline-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--secondary-color);
+            margin-bottom: 0.75rem;
+        }
+
+        /* === DESCRIÇÃO === */
+        .offline-description {
+            font-size: 1rem;
+            color: var(--gray-500);
+            margin-bottom: 2rem;
+            line-height: 1.7;
+        }
+
+        /* === LISTA DE RECURSOS OFFLINE === */
+        .offline-features {
+            text-align: left;
+            margin: 2rem 0;
+            background: var(--gray-100);
+            border-radius: 1rem;
+            padding: 1.5rem;
+        }
+
+        .offline-features h3 {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: var(--secondary-color);
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+
+        .offline-features ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .offline-features li {
+            padding: 0.5rem 0;
+            display: flex;
+            align-items: center;
+            font-size: 0.9rem;
+            color: var(--gray-700);
+        }
+
+        .offline-features li::before {
+            content: '✓';
+            color: var(--success);
+            font-weight: bold;
+            margin-right: 0.75rem;
+            font-size: 1rem;
+        }
+
+        /* === BOTÃO DE RECONEXÃO === */
+        .retry-button {
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
+            color: var(--white);
+            border: none;
+            padding: 0.875rem 2rem;
+            border-radius: 0.75rem;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(255, 122, 0, 0.3);
+            margin-top: 1rem;
+            width: 100%;
+        }
+
+        .retry-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(255, 122, 0, 0.4);
+        }
+
+        .retry-button:active {
+            transform: translateY(0);
+        }
+
+        /* === STATUS DE CONEXÃO === */
+        .connection-status {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.5rem 1rem;
+            border-radius: 2rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-top: 1.5rem;
+            background-color: #FEE2E2;
+            color: #DC2626;
+        }
+
+        .connection-status.online {
+            background-color: #D1FAE5;
+            color: #059669;
+        }
+
+        .connection-status::before {
+            content: '●';
+            margin-right: 0.5rem;
+            font-size: 0.75rem;
+        }
+
+        /* === ANIMAÇÕES === */
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .offline-container {
+            animation: fadeIn 0.6s ease-out;
+        }
+
+        /* === RESPONSIVIDADE === */
+        @media (max-width: 480px) {
+            .offline-container {
+                padding: 2rem 1.5rem;
+                margin: 1rem;
+            }
+
+            .offline-title {
+                font-size: 1.25rem;
+            }
+
+            .offline-description {
+                font-size: 0.9rem;
+            }
+
+            .offline-icon {
+                width: 4rem;
+                height: 4rem;
+            }
+
+            .offline-icon svg {
+                width: 2rem;
+                height: 2rem;
+            }
+        }
+
+        /* === MODO ESCURO === */
+        @media (prefers-color-scheme: dark) {
+            body {
+                background: linear-gradient(135deg, #1F2937 0%, #111827 100%);
+            }
+
+            .offline-container {
+                background: #1F2937;
+                color: #F9FAFB;
+            }
+
+            .offline-title {
+                color: var(--white);
+            }
+
+            .offline-description {
+                color: #D1D5DB;
+            }
+
+            .offline-features {
+                background: #374151;
+            }
+
+            .offline-features h3 {
+                color: var(--white);
+            }
+
+            .offline-features li {
+                color: #D1D5DB;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="offline-container">
+        <!-- Logo do Klube Cash -->
+        <div class="logo">KLUBE CASH</div>
+        
+        <!-- Ícone de offline -->
+        <div class="offline-icon">
+            <svg viewBox="0 0 24 24">
+                <path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.07 2.93 1 9zm8 8l3 3 3-3c-1.65-1.66-4.34-1.66-6 0zm-4-4l2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/>
+                <path d="M12 4C8.12 4 4.73 5.82 2.5 8.5L4 10c1.73-2.73 4.67-4 8-4s6.27 1.27 8 4l1.5-1.5C19.27 5.82 15.88 4 12 4z" opacity="0.3"/>
+            </svg>
+        </div>
+
+        <!-- Título principal -->
+        <h1 class="offline-title">Você está offline</h1>
+        
+        <!-- Descrição -->
+        <p class="offline-description">
+            Sem conexão com a internet no momento. Algumas funcionalidades ainda estão disponíveis enquanto você está offline.
+        </p>
+
+        <!-- Recursos disponíveis offline -->
+        <div class="offline-features">
+            <h3>Disponível offline:</h3>
+            <ul>
+                <li>Visualizar saldo de cashback salvo</li>
+                <li>Consultar histórico de transações</li>
+                <li>Ver lojas parceiras cadastradas</li>
+                <li>Acessar informações do perfil</li>
+                <li>Navegar entre as páginas principais</li>
+            </ul>
+        </div>
+
+        <!-- Status de conexão -->
+        <div class="connection-status" id="connectionStatus">
+            Sem conexão
+        </div>
+
+        <!-- Botão de tentar novamente -->
+        <button class="retry-button" onclick="tentarReconectar()">
+            Tentar Reconectar
+        </button>
+    </div>
+
+    <script>
+        // === FUNÇÕES DE CONECTIVIDADE ===
+        
+        /**
+         * Tenta reconectar verificando a conectividade
+         */
+        function tentarReconectar() {
+            // Mostra estado de carregamento
+            const button = document.querySelector('.retry-button');
+            const originalText = button.textContent;
+            button.textContent = 'Verificando...';
+            button.style.opacity = '0.7';
+            
+            // Tenta fazer uma requisição simples para verificar conectividade
+            fetch('/', { 
+                method: 'HEAD',
+                mode: 'no-cors',
+                cache: 'no-cache'
+            })
+            .then(() => {
+                // Se chegou aqui, está online
+                atualizarStatusConexao(true);
+                setTimeout(() => {
+                    window.location.reload();
+                }, 500);
+            })
+            .catch(() => {
+                // Ainda offline
+                atualizarStatusConexao(false);
+                button.textContent = originalText;
+                button.style.opacity = '1';
+                
+                // Feedback visual de erro
+                button.style.background = '#EF4444';
+                setTimeout(() => {
+                    button.style.background = '';
+                }, 1000);
+            });
+        }
+
+        /**
+         * Atualiza o status visual de conexão
+         * @param {boolean} isOnline - Status da conexão
+         */
+        function atualizarStatusConexao(isOnline) {
+            const statusElement = document.getElementById('connectionStatus');
+            
+            if (isOnline) {
+                statusElement.textContent = 'Conectado';
+                statusElement.classList.add('online');
+            } else {
+                statusElement.textContent = 'Sem conexão';
+                statusElement.classList.remove('online');
+            }
+        }
+
+        /**
+         * Monitora mudanças no status de conexão
+         */
+        function monitorarConexao() {
+            // Listener para eventos de rede
+            window.addEventListener('online', () => {
+                atualizarStatusConexao(true);
+                // Auto-reconecta quando volta online
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            });
+
+            window.addEventListener('offline', () => {
+                atualizarStatusConexao(false);
+            });
+
+            // Verifica status inicial
+            atualizarStatusConexao(navigator.onLine);
+        }
+
+        /**
+         * Inicialização da página
+         */
+        function inicializar() {
+            monitorarConexao();
+            
+            // Verifica conectividade periodicamente
+            setInterval(() => {
+                if (navigator.onLine) {
+                    tentarReconectar();
+                }
+            }, 10000); // Verifica a cada 10 segundos
+        }
+
+        // === INICIALIZAÇÃO ===
+        document.addEventListener('DOMContentLoaded', inicializar);
+
+        // === ATALHOS DE TECLADO ===
+        document.addEventListener('keydown', (e) => {
+            // F5 ou Ctrl+R para reconectar
+            if (e.key === 'F5' || (e.ctrlKey && e.key === 'r')) {
+                e.preventDefault();
+                tentarReconectar();
+            }
+        });
+    </script>
+</body>
+</html>
