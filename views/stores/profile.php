@@ -312,18 +312,8 @@ $activeMenu = 'profile';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Perfil da Loja - Klube Cash</title>
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
-    <?php
-    // Determinar qual CSS carregar baseado no campo senat do usuário
-    $profileCssFile = 'profile.css'; // CSS padrão
-    $sidebarCssFile = 'sidebar-lojista.css'; // CSS da sidebar padrão
-
-    if (isset($_SESSION['user_senat']) && ($_SESSION['user_senat'] === 'sim' || $_SESSION['user_senat'] === 'Sim')) {
-        $profileCssFile = 'profile_sest.css'; // CSS para usuários senat=sim
-        $sidebarCssFile = 'sidebar-lojista_sest.css'; // CSS da sidebar para usuários senat=sim
-    }
-    ?>
-    <link rel="stylesheet" href="../../assets/css/views/stores/<?php echo htmlspecialchars($profileCssFile); ?>">
-    <link rel="stylesheet" href="/assets/css/<?php echo htmlspecialchars($sidebarCssFile); ?>">
+    <link rel="stylesheet" href="../../assets/css/views/stores/profile.css">
+    <link rel="stylesheet" href="/assets/css/sidebar-lojista.css">
 
 </head>
 <body>

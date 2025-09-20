@@ -116,75 +116,31 @@ try {
                 
                 // Verificar se o pagamento ainda precisa ser processado
                 if (in_array($payment['status'], ['pendente', 'pix_aguardando'])) {
-
-                    error_log("WEBHOOK: Iniciando aprovação automática do pagamento {$payment['id']}");
-
-                    // 1. Primeiro, atualizar o status do pagamento
-                    $updatePaymentStmt = $db->prepare("
-                        UPDATE pagamentos_comissao
-                        SET status = 'aprovado',
-                            data_aprovacao = NOW(),
-                            mp_status = 'approved',
-                            pix_paid_at = NOW(),
-                            observacao_admin = ?
-                        WHERE id = ?
-                    ");
-                    $observacao = 'Pagamento PIX aprovado automaticamente via Mercado Pago - ID MP: ' . $mpPaymentId;
-                    $updatePaymentStmt->execute([$observacao, $payment['id']]);
-
-                    // 2. Buscar transações relacionadas ao pagamento
-                    $transactionsStmt = $db->prepare("
-                        SELECT tc.*
-                        FROM pagamentos_transacoes pt
-                        JOIN transacoes_cashback tc ON pt.transacao_id = tc.id
-                        WHERE pt.pagamento_id = ?
-                    ");
-                    $transactionsStmt->execute([$payment['id']]);
-                    $transactions = $transactionsStmt->fetchAll(PDO::FETCH_ASSOC);
-
-                    $totalCashbackLiberado = 0;
-                    $transacoesAprovadas = 0;
-
-                    // 3. Processar cada transação
-                    foreach ($transactions as $transaction) {
-                        // Atualizar status da transação
-                        $updateTransactionStmt = $db->prepare("
-                            UPDATE transacoes_cashback
-                            SET status = 'aprovado'
+                    
+                    // Usar o TransactionController para aprovar automaticamente
+                    $result = TransactionController::approvePaymentAutomatically(
+                        $payment['id'], 
+                        'Pagamento PIX aprovado automaticamente via Mercado Pago - ID MP: ' . $mpPaymentId
+                    );
+                    
+                    if ($result['status']) {
+                        error_log("WEBHOOK: ✅ Pagamento aprovado com sucesso - ID: {$payment['id']}");
+                        error_log("WEBHOOK: Cashback liberado: R$ " . ($result['data']['cashback_liberado'] ?? '0.00'));
+                        error_log("WEBHOOK: Transações aprovadas: " . ($result['data']['transacoes_aprovadas'] ?? '0'));
+                        
+                        // Atualizar também o status do MP no nosso banco
+                        $updateMpStmt = $db->prepare("
+                            UPDATE pagamentos_comissao 
+                            SET mp_status = 'approved',
+                                pix_paid_at = NOW()
                             WHERE id = ?
                         ");
-                        $updateTransactionStmt->execute([$transaction['id']]);
-
-                        // Creditar cashback usando o modelo CashbackBalance
-                        require_once __DIR__ . '/../models/CashbackBalance.php';
-                        $balanceModel = new CashbackBalance();
-
-                        $cashbackValue = $transaction['valor_cliente'];
-                        if ($cashbackValue > 0) {
-                            $description = "Cashback da compra - Transação #{$transaction['id']} (Pagamento #{$payment['id']} aprovado via MP)";
-
-                            $creditResult = $balanceModel->addBalance(
-                                $transaction['usuario_id'],
-                                $transaction['loja_id'],
-                                $cashbackValue,
-                                $description,
-                                $transaction['id']
-                            );
-
-                            if ($creditResult) {
-                                $totalCashbackLiberado += $cashbackValue;
-                                $transacoesAprovadas++;
-                                error_log("WEBHOOK: Cashback creditado - Transação: {$transaction['id']}, Valor: R$ {$cashbackValue}");
-                            } else {
-                                error_log("WEBHOOK: ERRO ao creditar cashback - Transação: {$transaction['id']}");
-                            }
-                        }
+                        $updateMpStmt->execute([$payment['id']]);
+                        
+                    } else {
+                        error_log("WEBHOOK: ❌ Erro ao aprovar pagamento: " . $result['message']);
                     }
-
-                    error_log("WEBHOOK: ✅ Pagamento aprovado com sucesso - ID: {$payment['id']}");
-                    error_log("WEBHOOK: Cashback liberado: R$ " . number_format($totalCashbackLiberado, 2, '.', ''));
-                    error_log("WEBHOOK: Transações aprovadas: {$transacoesAprovadas}");
-
+                    
                 } else {
                     error_log("WEBHOOK: Pagamento já foi processado - Status: {$payment['status']}");
                 }

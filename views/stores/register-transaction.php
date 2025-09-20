@@ -232,22 +232,10 @@ $activeMenu = 'register-transaction';
     <title>Registrar Venda - Klube Cash</title>
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <?php
-    // Determinar qual CSS carregar baseado no campo senat do usuário
-    $profileCssFile = 'profile.css'; // CSS padrão
-    $registerCssFile = 'register-transaction.css'; // CSS padrão
-    $sidebarCssFile = 'sidebar-lojista.css'; // CSS da sidebar padrão
-
-    if (isset($_SESSION['user_senat']) && ($_SESSION['user_senat'] === 'sim' || $_SESSION['user_senat'] === 'Sim')) {
-        $profileCssFile = 'profile_sest.css'; // CSS para usuários senat=sim
-        $registerCssFile = 'register-transaction_sest.css'; // CSS para usuários senat=sim
-        $sidebarCssFile = 'sidebar-lojista_sest.css'; // CSS da sidebar para usuários senat=sim
-    }
-    ?>
-    <link rel="stylesheet" href="../../assets/css/views/stores/<?php echo htmlspecialchars($profileCssFile); ?>">
+    <link rel="stylesheet" href="../../assets/css/views/stores/profile.css">
     <!-- CSS Customizado para a nova interface -->
-    <link rel="stylesheet" href="/assets/css/<?php echo htmlspecialchars($sidebarCssFile); ?>">
-    <link rel="stylesheet" href="../../assets/css/views/stores/<?php echo htmlspecialchars($registerCssFile); ?>">
+    <link rel="stylesheet" href="/assets/css/sidebar-lojista.css">
+    <link rel="stylesheet" href="../../assets/css/views/stores/register-transaction.css">
     <style>
 /* Estilos específicos para cliente visitante nesta página */
 .visitor-client-section {
