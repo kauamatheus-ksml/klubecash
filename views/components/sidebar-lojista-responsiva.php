@@ -158,20 +158,34 @@ $itens_menu_principal = [
                 </li>
                 
                 <li class="item-menu-sidebar" role="none">
-                    <a href="<?php echo LOGOUT_URL; ?>" 
+                    <a href="<?php echo LOGOUT_URL; ?>"
                        class="link-menu-sidebar link-sair-sidebar"
                        data-menu="sair"
                        role="menuitem"
                        onclick="return confirm('Tem certeza que deseja sair?')">
-                        
+
                         <svg class="icone-menu-sidebar" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
                         </svg>
-                        
+
                         <span class="texto-menu-sidebar">Sair</span>
                     </a>
                 </li>
             </ul>
+
+            <!-- Logo SENAT - Exibida apenas para usuários senat=sim -->
+            <?php if (isset($_SESSION['user_senat']) && ($_SESSION['user_senat'] === 'sim' || $_SESSION['user_senat'] === 'Sim')): ?>
+            <div class="senat-logo-container">
+                <div class="senat-logo-wrapper">
+                    <img src="/assets/images/sestlogosenac.png"
+                         alt="SENAT"
+                         class="senat-logo-expandida">
+                    <img src="/assets/images/sestlogosenac.png"
+                         alt="SENAT"
+                         class="senat-logo-colapsada">
+                </div>
+            </div>
+            <?php endif; ?>
         </div>
     </nav>
 

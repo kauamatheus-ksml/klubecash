@@ -632,16 +632,115 @@ body.sidebar-mobile-aberta {
 }
 
 /* =====================================================
+   LOGO SENAT - ESTILOS ESPECIAIS
+===================================================== */
+
+.senat-logo-container {
+    position: relative;
+    margin-top: 20px;
+    padding: 15px 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-top: 1px solid var(--cor-borda-sidebar);
+    background-color: rgba(1, 47, 99, 0.05);
+}
+
+.senat-logo-wrapper {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+}
+
+/* Logo quando sidebar expandida */
+.senat-logo-expandida {
+    max-width: 120px;
+    height: auto;
+    transition: var(--transicao-padrao);
+    opacity: 1;
+    display: block;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+/* Logo quando sidebar colapsada */
+.senat-logo-colapsada {
+    max-width: 40px;
+    height: auto;
+    transition: var(--transicao-padrao);
+    opacity: 0;
+    display: none;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+/* Estados da sidebar colapsada */
+.sidebar-lojista-responsiva.colapsada .senat-logo-expandida {
+    opacity: 0;
+    display: none;
+}
+
+.sidebar-lojista-responsiva.colapsada .senat-logo-colapsada {
+    opacity: 1;
+    display: block;
+}
+
+.sidebar-lojista-responsiva.colapsada .senat-logo-container {
+    padding: 15px 10px;
+    min-height: 70px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Responsividade da logo SENAT */
+@media (max-width: 768px) {
+    .senat-logo-container {
+        padding: 12px 15px;
+    }
+
+    .senat-logo-expandida {
+        max-width: 100px;
+    }
+
+    .senat-logo-colapsada {
+        max-width: 35px;
+    }
+}
+
+@media (max-width: 480px) {
+    .senat-logo-expandida {
+        max-width: 80px;
+    }
+
+    .senat-logo-colapsada {
+        max-width: 30px;
+    }
+}
+
+/* Hover effect na logo */
+.senat-logo-expandida:hover,
+.senat-logo-colapsada:hover {
+    transform: scale(1.05);
+    filter: drop-shadow(0 4px 8px rgba(1, 47, 99, 0.2));
+}
+
+/* =====================================================
    IMPRESSÃO
 ===================================================== */
 
 @media print {
     .sidebar-lojista-responsiva,
     .botao-toggle-mobile,
-    .overlay-sidebar-mobile {
+    .overlay-sidebar-mobile,
+    .senat-logo-container {
         display: none !important;
     }
-    
+
     .conteudo-principal-ajustado {
         margin-left: 0 !important;
     }
