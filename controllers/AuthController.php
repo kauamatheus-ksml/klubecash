@@ -75,7 +75,7 @@ public static function login($email, $senha, $remember = false) {
         $_SESSION['user_name'] = $user['nome'];
         $_SESSION['user_email'] = $user['email'];
         $_SESSION['user_type'] = $user['tipo'];
-        $_SESSION['user_senat'] = $user['senat'] ?? 'nao';
+        $_SESSION['user_senat'] = $user['senat'] ?? 'Não';
         $_SESSION['last_activity'] = time();
         
         error_log("LOGIN: Sessão básica definida - User ID: {$user['id']}");

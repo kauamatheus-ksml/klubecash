@@ -135,7 +135,7 @@ $activeMenu = 'dashboard';
     <?php
     // Determinar qual CSS carregar baseado no campo senat do usuário
     $cssFile = 'dashboard.css'; // CSS padrão
-    if (isset($_SESSION['user_senat']) && $_SESSION['user_senat'] === 'sim') {
+    if (isset($_SESSION['user_senat']) && ($_SESSION['user_senat'] === 'sim' || $_SESSION['user_senat'] === 'Sim')) {
         $cssFile = 'dashboard_sest.css'; // CSS para usuários senat=sim
     }
     ?>
@@ -143,7 +143,7 @@ $activeMenu = 'dashboard';
     <?php
     // Determinar qual CSS da sidebar carregar baseado no campo senat do usuário
     $sidebarCssFile = 'sidebar-lojista.css'; // CSS da sidebar padrão
-    if (isset($_SESSION['user_senat']) && $_SESSION['user_senat'] === 'sim') {
+    if (isset($_SESSION['user_senat']) && ($_SESSION['user_senat'] === 'sim' || $_SESSION['user_senat'] === 'Sim')) {
         $sidebarCssFile = 'sidebar-lojista_sest.css'; // CSS da sidebar para usuários senat=sim
     }
     ?>
