@@ -167,6 +167,20 @@ public static function sendMessage($phone, $message) {
     }
     private static function sendViaBot($phone, $message) {
         try {
+            // --- INÍCIO DA CORREÇÃO DEFINITIVA ---
+            // Validação final para garantir que o telefone não é nulo ou inválido antes do envio.
+            $cleanPhone = preg_replace('/\D/', '', $phone);
+            if (strlen($cleanPhone) < 10) {
+                // Se o telefone for inválido neste ponto, não tenta enviar e retorna um erro claro.
+                $errorMsg = "Tentativa de envio para número de telefone inválido ou ausente: '{$phone}'";
+                error_log("WhatsAppBot ERRO: " . $errorMsg);
+                return [
+                    'success' => false,
+                    'error' => $errorMsg
+                ];
+            }
+            // --- FIM DA CORREÇÃO DEFINITIVA ---
+
             $data = [
                 'phone' => $phone,
                 'message' => $message,
