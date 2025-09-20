@@ -1,9 +1,10 @@
+
 /* ========================================
            VARIÁVEIS CSS E RESET
         ======================================== */
         :root {
-            --primary-color: #012f63;
-            --primary-dark: #012f63;
+            --primary-color: #FF7A00;
+            --primary-dark: #E06E00;
             --primary-light: #FFF0E6;
             --secondary-color: #2A3F54;
             --success-color: #28A745;
