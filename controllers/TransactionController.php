@@ -2666,33 +2666,29 @@ class TransactionController {
                 $notificationData && !empty($notificationData['cliente_telefone'])) {
                 
                 try {
-                    // Carregar a classe do WhatsAppBot se ainda não estiver carregada
+                    // Carregar a classe WhatsApp
                     if (!class_exists('WhatsAppBot')) {
                         require_once __DIR__ . '/../utils/WhatsAppBot.php';
                     }
-
-                    // Buscar o telefone do cliente que fez a compra
-                    $userStmt = $db->prepare("SELECT telefone, nome FROM usuarios WHERE id = ?");
-                    $userStmt->execute([$data['usuario_id']]);
-                    $userData = $userStmt->fetch(PDO::FETCH_ASSOC);
-
-                    // Verificar se o cliente tem WhatsApp cadastrado
-                    if ($userData && !empty($userData['telefone'])) {
-                        // Preparar as informações da transação para a mensagem
-                        $whatsappData = [
-                            'valor_cashback' => $valorCashbackCliente,
-                            'nome_loja' => $store['nome_fantasia']
-                        ];
-
-                        // Enviar a notificação via WhatsApp
-                        WhatsAppBot::sendNewTransactionNotification(
-                            $userData['telefone'],
-                            $whatsappData
-                        );
-                    }
-                } catch (Exception $e) {
-                    // Logar o erro, mas não impedir o fluxo principal da transação
-                    error_log("Erro ao tentar enviar notificação de nova transação via WhatsApp: " . $e->getMessage());
+                    
+                    // Preparar dados estruturados para o template de cashback liberado
+                    $whatsappTransactionData = [
+                        'valor_cashback' => $cashbackValue,
+                        'nome_loja' => $nomeLoja
+                    ];
+                    
+                    // Enviar notificação via WhatsApp usando template específico
+                    WhatsAppBot::sendCashbackReleasedNotification(
+                        $notificationData['cliente_telefone'], 
+                        $whatsappTransactionData
+                    );
+                    
+                    // O resultado será automaticamente registrado em nosso sistema de logs
+                    // Você poderá monitorar o sucesso na interface que acabamos de validar
+                    
+                } catch (Exception $whatsappException) {
+                    // Log específico para erros de WhatsApp sem afetar o fluxo principal
+                    error_log("WhatsApp Cashback Liberado - Erro: " . $whatsappException->getMessage());
                 }
             }
             
