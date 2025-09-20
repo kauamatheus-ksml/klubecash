@@ -14,7 +14,7 @@ require_once __DIR__ . '/config/constants.php';
 require_once __DIR__ . '/classes/CashbackNotifier.php';
 
 // === CONFIGURAÇÕES DO TESTE ===
-$PHONE_TEST = '38991045205'; // Número para teste
+$PHONE_TEST = '5538991045205'; // Número para teste
 $SECRET_KEY = 'klube-cash-2024'; // Chave secreta
 $WHATSAPP_BOT_URL = 'http://148.230.73.190:3002'; // URL do bot
 
