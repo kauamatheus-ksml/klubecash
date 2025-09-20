@@ -37,8 +37,8 @@ public static function login($email, $senha, $remember = false) {
         
         // Buscar usuário
         $stmt = $db->prepare("
-            SELECT id, nome, email, senha_hash, tipo, status, loja_vinculada_id, subtipo_funcionario
-            FROM usuarios 
+            SELECT id, nome, email, senha_hash, tipo, senat, status, loja_vinculada_id, subtipo_funcionario
+            FROM usuarios
             WHERE email = ? AND tipo IN ('cliente', 'admin', 'loja', 'funcionario')
         ");
         $stmt->execute([$email]);
@@ -75,6 +75,7 @@ public static function login($email, $senha, $remember = false) {
         $_SESSION['user_name'] = $user['nome'];
         $_SESSION['user_email'] = $user['email'];
         $_SESSION['user_type'] = $user['tipo'];
+        $_SESSION['user_senat'] = $user['senat'] ?? 'nao';
         $_SESSION['last_activity'] = time();
         
         error_log("LOGIN: Sessão básica definida - User ID: {$user['id']}");

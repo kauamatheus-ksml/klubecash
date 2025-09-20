@@ -132,8 +132,22 @@ $activeMenu = 'dashboard';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard da Loja - Klube Cash</title>
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
-    <link rel="stylesheet" href="../../assets/css/views/stores/dashboard.css">
-    <link rel="stylesheet" href="/assets/css/sidebar-lojista.css">
+    <?php
+    // Determinar qual CSS carregar baseado no campo senat do usuário
+    $cssFile = 'dashboard.css'; // CSS padrão
+    if (isset($_SESSION['user_senat']) && $_SESSION['user_senat'] === 'sim') {
+        $cssFile = 'dashboard_sest.css'; // CSS para usuários senat=sim
+    }
+    ?>
+    <link rel="stylesheet" href="../../assets/css/views/stores/<?php echo htmlspecialchars($cssFile); ?>">
+    <?php
+    // Determinar qual CSS da sidebar carregar baseado no campo senat do usuário
+    $sidebarCssFile = 'sidebar-lojista.css'; // CSS da sidebar padrão
+    if (isset($_SESSION['user_senat']) && $_SESSION['user_senat'] === 'sim') {
+        $sidebarCssFile = 'sidebar-lojista_sest.css'; // CSS da sidebar para usuários senat=sim
+    }
+    ?>
+    <link rel="stylesheet" href="/assets/css/<?php echo htmlspecialchars($sidebarCssFile); ?>">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
