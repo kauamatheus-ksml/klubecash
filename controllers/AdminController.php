@@ -13,7 +13,6 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-
 // Verificar se é uma requisição AJAX válida
 $isAjaxRequest = (
     isset($_POST['action']) || 
