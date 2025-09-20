@@ -19,10 +19,10 @@ class NotificationTrigger {
     
     /**
      * Dispara notificação para uma transação específica
-     *
+     * 
      * Este método é thread-safe e não bloqueia o processo principal.
      * Se a notificação falhar, a transação continua funcionando normalmente.
-     *
+     * 
      * @param int $transactionId ID da transação recém-criada
      * @param array $options Opções adicionais (debug, async, etc.)
      * @return array Resultado da operação
@@ -33,7 +33,7 @@ class NotificationTrigger {
             if (!is_numeric($transactionId) || $transactionId <= 0) {
                 throw new Exception('ID da transação inválido');
             }
-
+            
             // Verificar se notificações estão habilitadas
             if (!defined('CASHBACK_NOTIFICATIONS_ENABLED') || !CASHBACK_NOTIFICATIONS_ENABLED) {
                 return [
@@ -42,48 +42,19 @@ class NotificationTrigger {
                     'skipped' => true
                 ];
             }
-
+            
             // Definir se deve ser assíncrono (padrão: sim)
             $async = $options['async'] ?? true;
             $debug = $options['debug'] ?? false;
-            $useRetrySystem = $options['use_retry'] ?? true;
-
-            $result = null;
-
+            
             if ($async) {
                 // Envio assíncrono (não bloqueia o processo principal)
-                $result = self::sendAsync($transactionId, $debug);
+                return self::sendAsync($transactionId, $debug);
             } else {
                 // Envio síncrono (para debug ou casos especiais)
-                $result = self::sendSync($transactionId, $debug);
+                return self::sendSync($transactionId, $debug);
             }
-
-            // Integrar com sistema de retry se habilitado
-            if ($useRetrySystem && !$result['success'] && !isset($result['skipped'])) {
-                try {
-                    require_once __DIR__ . '/CashbackRetrySystem.php';
-                    $retrySystem = new CashbackRetrySystem();
-                    $retrySystem->registerFailure($transactionId, $result['message'], 1);
-
-                    $result['retry_scheduled'] = true;
-                } catch (Exception $e) {
-                    error_log('Erro ao registrar retry: ' . $e->getMessage());
-                    $result['retry_error'] = $e->getMessage();
-                }
-            } else if ($useRetrySystem && $result['success']) {
-                // Marcar como sucesso no sistema de retry se existir um registro pendente
-                try {
-                    require_once __DIR__ . '/CashbackRetrySystem.php';
-                    $retrySystem = new CashbackRetrySystem();
-                    $retrySystem->markAsSuccess($transactionId);
-                } catch (Exception $e) {
-                    // Não é crítico, apenas logar
-                    error_log('Erro ao marcar sucesso no retry: ' . $e->getMessage());
-                }
-            }
-
-            return $result;
-
+            
         } catch (Exception $e) {
             error_log('Erro no NotificationTrigger: ' . $e->getMessage());
             return [

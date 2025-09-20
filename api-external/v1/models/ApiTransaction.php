@@ -72,26 +72,6 @@ class ApiTransaction {
             $status
         ])) {
             $transactionId = $this->db->lastInsertId();
-
-            // === INTEGRAÇÃO WHATSAPP: Notificação automática de nova transação ===
-            try {
-                $triggerPath = __DIR__ . '/../../../utils/NotificationTrigger.php';
-                if (file_exists($triggerPath)) {
-                    require_once $triggerPath;
-
-                    if (class_exists('NotificationTrigger')) {
-                        $notificationResult = NotificationTrigger::send($transactionId);
-
-                        // Log do resultado para debug
-                        error_log("[API-EXTERNAL] Notificação enviada para transação {$transactionId}: " .
-                                 ($notificationResult['success'] ? 'SUCESSO' : 'FALHA'));
-                    }
-                }
-            } catch (Exception $e) {
-                // Não afetar a criação da transação se notificação falhar
-                error_log("[API-EXTERNAL] Erro ao enviar notificação para transação {$transactionId}: " . $e->getMessage());
-            }
-
             return $this->getTransactionById($transactionId);
         }
         

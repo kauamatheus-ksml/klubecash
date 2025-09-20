@@ -17,8 +17,7 @@
       "Bash(git checkout:*)",
       "Bash(start test-toggle.html)",
       "Bash(npm install:*)",
-      "Bash(http-server:*)",
-      "Bash(npm start)"
+      "Bash(http-server:*)"
     ],
     "deny": [],
     "ask": []

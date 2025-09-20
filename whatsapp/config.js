@@ -15,7 +15,7 @@ module.exports = {
     },
 
     // CORRIGIR - Usar porta do .env
-    port: process.env.PORT || 3003,
+    port: process.env.PORT || 3002,
 
     // Keywords para consulta de saldo
     saldoKeywords: [
@@ -24,8 +24,7 @@ module.exports = {
         'consulta',
         'dinheiro',
         'valor',
-        'quanto tenho',
-        'vala'
+        'quanto tenho'
     ],
 
     // Mensagens padrão
