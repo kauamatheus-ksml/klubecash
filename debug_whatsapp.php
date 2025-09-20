@@ -13,7 +13,7 @@ echo "Iniciando teste...<hr>";
 
 // --- CONFIGURAÇÃO MANUAL ---
 // Altere este ID para um ID de uma transação REAL e recente no seu banco de dados.
-$testTransactionId = 100; // <--- COLOQUE UM ID DE TRANSAÇÃO VÁLIDO AQUI
+$testTransactionId = 10000; // <--- COLOQUE UM ID DE TRANSAÇÃO VÁLIDO AQUI
 // --------------------------
 
 // 1. Carregando dependências essenciais
