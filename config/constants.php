@@ -104,7 +104,7 @@ define('BIG_PURCHASE_THRESHOLD', 200.00);
 
 
 // === CONFIGURAÇÕES WHATSAPP BOT ===
-define('WHATSAPP_BOT_URL', 'http://localhost:3002');
+define('WHATSAPP_BOT_URL', 'http://148.230.73.190:3002');
 define('WHATSAPP_BOT_SECRET', 'klube-cash-2024');
 define('WHATSAPP_ENABLED', true);
 define('WHATSAPP_TIMEOUT', 30);

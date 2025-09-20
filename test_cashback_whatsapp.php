@@ -16,7 +16,7 @@ require_once __DIR__ . '/classes/CashbackNotifier.php';
 // === CONFIGURAÇÕES DO TESTE ===
 $PHONE_TEST = '5538991045205'; // Número para teste
 $SECRET_KEY = 'klube-cash-2024'; // Chave secreta
-$WHATSAPP_BOT_URL = 'http://localhost:3002'; // URL do bot
+$WHATSAPP_BOT_URL = 'http://148.230.73.190:3002'; // URL do bot
 
 echo "=== TESTE DE NOTIFICAÇÃO CASHBACK VIA WHATSAPP ===\n";
 echo "Data/Hora: " . date('Y-m-d H:i:s') . "\n";
