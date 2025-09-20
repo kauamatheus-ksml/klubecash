@@ -77,10 +77,20 @@ if ($result['status'] && isset($result['data']['totais'])) {
     <link rel="shortcut icon" type="image/jpg" href="../../assets/images/icons/KlubeCashLOGO.ico"/>
     <title>Comissões Pendentes - Klube Cash</title>
     
-    <link rel="stylesheet" href="../../assets/css/views/stores/pending-commissions.css">
+    <?php
+    // Determinar qual CSS carregar baseado no campo senat do usuário
+    $pendingCommissionsCssFile = 'pending-commissions.css'; // CSS padrão
+    $sidebarCssFile = 'sidebar-lojista.css'; // CSS da sidebar padrão
+
+    if (isset($_SESSION['user_senat']) && ($_SESSION['user_senat'] === 'sim' || $_SESSION['user_senat'] === 'Sim')) {
+        $pendingCommissionsCssFile = 'pending-commissions_sest.css'; // CSS para usuários senat=sim
+        $sidebarCssFile = 'sidebar-lojista_sest.css'; // CSS da sidebar para usuários senat=sim
+    }
+    ?>
+    <link rel="stylesheet" href="../../assets/css/views/stores/<?php echo htmlspecialchars($pendingCommissionsCssFile); ?>">
     <link rel="stylesheet" href="../../assets/css/openpix-styles.css">
 
-    <link rel="stylesheet" href="/assets/css/sidebar-lojista.css">
+    <link rel="stylesheet" href="/assets/css/<?php echo htmlspecialchars($sidebarCssFile); ?>">
 </head>
 <body>
     <?php include '../../views/components/sidebar-lojista-responsiva.php'; ?>
