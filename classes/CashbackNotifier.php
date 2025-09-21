@@ -244,18 +244,31 @@ class CashbackNotifier {
         
         switch ($messageType) {
             case 'first_purchase':
-                return "🎉 *Parabéns {$nome}!*\n\n" .
-                       "Sua primeira compra no *Klube Cash* foi registrada com sucesso!\n\n" .
-                       "📋 *Detalhes da sua compra:*\n" .
-                       "🏪 Loja: {$loja}\n" .
-                       "💰 Valor: {$valorCompra}\n" .
-                       "🎁 Seu cashback: *{$valorCashback}*\n\n" .
-                       "ℹ️ *Como funciona:*\n" .
-                       "1️⃣ Sua compra está sendo validada pela loja\n" .
-                       "2️⃣ Em até 7 dias seu cashback estará disponível\n" .
-                       "3️⃣ Você poderá usar o dinheiro em novas compras na mesma loja\n\n" .
-                       "📱 Acompanhe pelo app: " . SITE_URL . "\n\n" .
-                       "Bem-vindo(a) ao *Klube Cash*! 🧡";
+                if ($status === 'aprovado') {
+                    return "🎉 *Parabéns {$nome}!*\n\n" .
+                           "Sua primeira compra no *Klube Cash* foi APROVADA!\n\n" .
+                           "📋 *Detalhes da sua compra:*\n" .
+                           "🏪 Loja: {$loja}\n" .
+                           "💰 Valor: {$valorCompra}\n" .
+                           "🎁 Seu cashback: *{$valorCashback}*\n\n" .
+                           "✅ *Seu cashback já está DISPONÍVEL!*\n" .
+                           "💳 Use agora mesmo em sua próxima compra na {$loja}!\n\n" .
+                           "📱 Acompanhe pelo app: " . SITE_URL . "\n\n" .
+                           "Bem-vindo(a) ao *Klube Cash*! 🧡";
+                } else {
+                    return "🎉 *Parabéns {$nome}!*\n\n" .
+                           "Sua primeira compra no *Klube Cash* foi registrada com sucesso!\n\n" .
+                           "📋 *Detalhes da sua compra:*\n" .
+                           "🏪 Loja: {$loja}\n" .
+                           "💰 Valor: {$valorCompra}\n" .
+                           "🎁 Seu cashback: *{$valorCashback}*\n\n" .
+                           "ℹ️ *Como funciona:*\n" .
+                           "1️⃣ Sua compra está sendo validada pela loja\n" .
+                           "2️⃣ Em até 7 dias seu cashback estará disponível\n" .
+                           "3️⃣ Você poderá usar o dinheiro em novas compras na mesma loja\n\n" .
+                           "📱 Acompanhe pelo app: " . SITE_URL . "\n\n" .
+                           "Bem-vindo(a) ao *Klube Cash*! 🧡";
+                }
                        
             case 'big_purchase':
                 return "🚀 *Uau, {$nome}!*\n\n" .
