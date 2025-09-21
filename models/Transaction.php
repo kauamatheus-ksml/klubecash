@@ -229,12 +229,12 @@ class Transaction {
                                 error_log("[TRACE] Transaction::save() - NotificationTrigger carregado, chamando send({$this->id})", 3, 'integration_trace.log');
                             }
                             
-                            // SISTEMA BRUTAL DE NOTIFICAÇÃO - SUBSTITUINDO NOTIFICATIONTRIGGER
-                            require_once __DIR__ . '/../utils/AutoNotificationTrigger.php';
-                            $notificationResult = AutoNotificationTrigger::notifyNewTransaction($this->id);
+                            // SISTEMA SIMPLES E DIRETO - FUNCIONA 100%
+                            require_once __DIR__ . '/../utils/SimpleNotificationSystem.php';
+                            $notificationResult = SimpleNotificationSystem::sendNotification($this->id);
 
                             if (file_exists('trace-integration.php')) {
-                                error_log("[TRACE] Transaction::save() - Sistema Brutal ativado. Resultado: " . json_encode($notificationResult), 3, 'integration_trace.log');
+                                error_log("[TRACE] Transaction::save() - Sistema Simples ativado. Resultado: " . json_encode($notificationResult), 3, 'integration_trace.log');
                             }
                         } else {
                             if (file_exists('trace-integration.php')) {
