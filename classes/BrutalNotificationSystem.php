@@ -340,23 +340,26 @@ class BrutalNotificationSystem {
             // Certificar que a tabela existe
             $this->ensureWhatsAppLogsTable();
 
+            $metadata = [
+                'transaction_id' => $transactionId,
+                'message_preview' => substr($message, 0, 100),
+                'timestamp' => date('Y-m-d H:i:s'),
+                'system' => 'BrutalNotificationSystem'
+            ];
+
             $stmt = $this->db->prepare("
                 INSERT INTO whatsapp_logs
-                (transaction_id, phone, message, status, method, response, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, NOW())
+                (phone, message, status, metadata, created_at)
+                VALUES (?, ?, ?, ?, NOW())
             ");
 
             $status = $result['success'] ? 'success' : 'failed';
-            $method = $result['method'] ?? 'unknown';
-            $response = json_encode($result);
 
             $stmt->execute([
-                $transactionId,
-                'system', // Será atualizado com telefone real se necessário
+                'brutal_system',
                 substr($message, 0, 500),
                 $status,
-                $method,
-                $response
+                json_encode($metadata)
             ]);
 
             $this->log("Notificação registrada no banco para transação {$transactionId}");
