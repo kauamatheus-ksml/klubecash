@@ -240,6 +240,7 @@ class CashbackNotifier {
         $valorCompra = $this->formatCurrency($transactionData['valor_total']);
         $valorCashback = $this->formatCurrency($transactionData['valor_cliente']);
         $percentual = $transactionData['loja_percentual'];
+        $status = $transactionData['status'];
         
         switch ($messageType) {
             case 'first_purchase':
