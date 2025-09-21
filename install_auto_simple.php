@@ -177,21 +177,28 @@ php utils/AutoNotificationTrigger.php >> logs/cron_notifications.log 2>&1
         // Criar PHP para cron também
         $phpCronContent = '<?php
 /**
- * Script PHP para execução via cron
+ * Script PHP para execução via cron - VERSÃO CORRIGIDA
  */
 
 // Mudar para diretório correto
 chdir(__DIR__);
 
-// Executar verificação automática
-if (file_exists("utils/AutoNotificationTrigger.php")) {
+// Executar verificação automática usando sistema corrigido
+if (file_exists("classes/FixedBrutalNotificationSystem.php")) {
+    require_once "classes/FixedBrutalNotificationSystem.php";
+
+    $system = new FixedBrutalNotificationSystem();
+    $result = $system->checkAndProcessNewTransactions();
+
+    echo "[" . date("Y-m-d H:i:s") . "] Cron executado (FIXED): " . json_encode($result) . "\n";
+} else if (file_exists("utils/AutoNotificationTrigger.php")) {
     require_once "utils/AutoNotificationTrigger.php";
 
     $result = AutoNotificationTrigger::checkAllPendingNotifications();
 
-    echo "[" . date("Y-m-d H:i:s") . "] Cron executado: " . json_encode($result) . "\n";
+    echo "[" . date("Y-m-d H:i:s") . "] Cron executado (FALLBACK): " . json_encode($result) . "\n";
 } else {
-    echo "[" . date("Y-m-d H:i:s") . "] Erro: Arquivo de trigger não encontrado\n";
+    echo "[" . date("Y-m-d H:i:s") . "] Erro: Nenhum sistema de notificação encontrado\n";
 }
 ?>';
 
