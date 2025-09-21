@@ -1,8 +1,8 @@
 // bot.js
-// Bot WhatsApp Klube Cash - Versão 2.1 Corrigida
+// Bot WhatsApp Klube Cash - Versão 2.2 Estável
 // Sistema completo com menu dinâmico e cadastro
 
-const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
+const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const axios = require('axios');
 const express = require('express');
@@ -25,7 +25,7 @@ const client = new Client({
             '--disable-accelerated-2d-canvas',
             '--no-first-run',
             '--no-zygote',
-            '--single-process',
+            // '--single-process', // REMOVIDO: Este argumento pode causar instabilidade em alguns servidores.
             '--disable-gpu'
         ]
     }
@@ -65,7 +65,7 @@ async function initializeBot() {
     }
     
     isInitializing = true;
-    log('🚀 Inicializando WhatsApp Bot Klube Cash v2.1...');
+    log('🚀 Inicializando WhatsApp Bot Klube Cash v2.2...');
     
     try {
         await client.initialize();
@@ -500,7 +500,7 @@ app.get('/status', (req, res) => {
         uptime: process.uptime(),
         menu_system: 'dynamic',
         timestamp: new Date().toISOString(),
-        version: '2.1.0'
+        version: '2.2.0' // Versão atualizada
     };
     
     log('📊 Status consultado');
@@ -565,8 +565,8 @@ app.post('/send-test', async (req, res) => {
             });
         }
 
-        const testPhone = '34991191534';
-        const testMessage = `🧪 *Teste Klube Cash WhatsApp Bot v2.1*
+        const testPhone = '34991191534'; // ATENÇÃO: Trocar para um número de teste válido
+        const testMessage = `🧪 *Teste Klube Cash WhatsApp Bot v2.2*
 
 Sistema de Menu Dinâmico Ativado! ✅
 
@@ -604,7 +604,7 @@ initializeBot();
 process.on('SIGINT', async () => {
     log('🛑 Encerrando bot...');
     if (client) {
-        await client.close();
+        await client.destroy(); // Usar destroy() para um encerramento limpo
     }
     process.exit(0);
 });
@@ -612,7 +612,7 @@ process.on('SIGINT', async () => {
 process.on('SIGTERM', async () => {
     log('🛑 Recebido sinal de término...');
     if (client) {
-        await client.close();
+        await client.destroy(); // Usar destroy() para um encerramento limpo
     }
     process.exit(0);
 });
