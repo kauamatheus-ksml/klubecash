@@ -92,7 +92,7 @@ class CashbackNotifier {
      * @param int $transactionId ID da transação
      * @return array|null Dados da transação ou null se não encontrada
      */
-    private function getTransactionData($transactionId) {
+    public function getTransactionData($transactionId) {
         try {
             $stmt = $this->db->prepare("
                 SELECT 
@@ -144,7 +144,7 @@ class CashbackNotifier {
      * @param int $userId ID do usuário
      * @return array Perfil detalhado do cliente
      */
-    private function getClientProfile($userId) {
+    public function getClientProfile($userId) {
         try {
             $stmt = $this->db->prepare("
                 SELECT 
@@ -202,7 +202,7 @@ class CashbackNotifier {
      * @param array $clientProfile Perfil do cliente
      * @return string Tipo da mensagem
      */
-    private function determineMessageType($transactionData, $clientProfile) {
+    public function determineMessageType($transactionData, $clientProfile) {
         // Primeira compra - mensagem educativa
         if ($clientProfile['is_first_purchase']) {
             return 'first_purchase';
@@ -234,7 +234,7 @@ class CashbackNotifier {
      * @param array $clientProfile Perfil do cliente
      * @return string Mensagem formatada
      */
-    private function generateMessage($messageType, $transactionData, $clientProfile) {
+    public function generateMessage($messageType, $transactionData, $clientProfile) {
         $nome = $transactionData['cliente_nome'];
         $loja = $transactionData['loja_nome'];
         $valorCompra = $this->formatCurrency($transactionData['valor_total']);
