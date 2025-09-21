@@ -213,8 +213,8 @@ class Transaction {
                 }
                 
                 // === INTEGRAÇÃO WHATSAPP: Notificação automática de nova transação ===
-                // Disparar notificação apenas para transações pendentes (novas)
-                if ($this->status === TRANSACTION_PENDING) {
+                // Disparar notificação para transações pendentes E aprovadas (ambas são novas)
+                if ($this->status === TRANSACTION_PENDING || $this->status === TRANSACTION_APPROVED) {
                     try {
                         if (file_exists('trace-integration.php')) {
                             error_log("[TRACE] Transaction::save() - Status é PENDENTE, iniciando processo de notificação", 3, 'integration_trace.log');
