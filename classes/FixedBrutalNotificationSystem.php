@@ -264,11 +264,19 @@ class FixedBrutalNotificationSystem {
      */
     
     /**
-     * Método 1: API direta do bot WhatsApp (NOVO)
+     * Método 1: API direta do bot WhatsApp (MULTI-URL)
      */
     private function sendViaDirectAPI($phone, $message) {
         try {
-            $botUrl = "http://localhost:3002/send-message";
+            // Múltiplas URLs possíveis para o bot
+            $botUrls = [
+                "http://localhost:3002/send-message",        // Bot local
+                "http://127.0.0.1:3002/send-message",        // Bot local alternativo
+                "https://klubecash.com:3002/send-message",   // Bot no servidor (HTTPS)
+                "http://klubecash.com:3002/send-message",    // Bot no servidor (HTTP)
+                "http://localhost:3000/send-message",        // Porta alternativa
+                "http://localhost:3001/send-message"         // Porta alternativa
+            ];
 
             $data = [
                 "phone" => $phone,
@@ -276,43 +284,54 @@ class FixedBrutalNotificationSystem {
                 "secret" => "klube-cash-2024"
             ];
 
-            $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, $botUrl);
-            curl_setopt($ch, CURLOPT_POST, true);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-            curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                "Content-Type: application/json",
-                "Accept: application/json"
-            ]);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+            // Tentar cada URL até encontrar uma que funciona
+            foreach ($botUrls as $botUrl) {
+                $this->log("Tentando bot em: {$botUrl}");
 
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
+                $ch = curl_init();
+                curl_setopt($ch, CURLOPT_URL, $botUrl);
+                curl_setopt($ch, CURLOPT_POST, true);
+                curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+                curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                    "Content-Type: application/json",
+                    "Accept: application/json"
+                ]);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+                curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // Para HTTPS
 
-            if ($httpCode === 200) {
-                $result = json_decode($response, true);
-                if ($result && $result["success"]) {
-                    $this->log("WhatsApp enviado via bot: {$phone}");
-                    return [
-                        "success" => true,
-                        "method" => "direct_bot_api",
-                        "response" => $result
-                    ];
+                $response = curl_exec($ch);
+                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $error = curl_error($ch);
+                curl_close($ch);
+
+                if ($httpCode === 200 && $response) {
+                    $result = json_decode($response, true);
+                    if ($result && $result["success"]) {
+                        $this->log("WhatsApp enviado via bot: {$botUrl} -> {$phone}");
+                        return [
+                            "success" => true,
+                            "method" => "direct_bot_api",
+                            "bot_url" => $botUrl,
+                            "response" => $result
+                        ];
+                    } else {
+                        $this->log("Bot respondeu mas com erro: " . ($result["error"] ?? "Erro desconhecido"));
+                        continue; // Tentar próxima URL
+                    }
                 } else {
-                    return [
-                        "success" => false,
-                        "error" => $result["error"] ?? "Erro no bot"
-                    ];
+                    $this->log("Falha na URL {$botUrl}: HTTP {$httpCode}, Error: {$error}");
+                    continue; // Tentar próxima URL
                 }
-            } else {
-                return [
-                    "success" => false,
-                    "error" => "HTTP {$httpCode}: Bot não respondeu"
-                ];
             }
+
+            // Se chegou aqui, todas as URLs falharam
+            return [
+                "success" => false,
+                "error" => "Nenhuma URL do bot respondeu corretamente",
+                "urls_tested" => count($botUrls)
+            ];
 
         } catch (Exception $e) {
             return ["success" => false, "error" => $e->getMessage()];
