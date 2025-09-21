@@ -11,7 +11,7 @@ ini_set('display_errors', 1);
 class SimpleAutoNotificationInstaller {
 
     public function install() {
-        echo "<h2>🔧 INSTALANDO NOTIFICAÇÕES AUTOMÁTICAS</h2>\n";
+        echo "<h2>🔧 INSTALANDO NOTIFICAÇÕES AUTOMÁTICAS (VERSÃO SIMPLES)</h2>\n";
 
         try {
             // 1. Verificar arquivos
@@ -31,10 +31,17 @@ class SimpleAutoNotificationInstaller {
             $this->showInstructions();
 
             echo "<h3>✅ INSTALAÇÃO CONCLUÍDA!</h3>\n";
+            echo "<div style='background: #d4edda; padding: 15px; border-radius: 5px; margin: 10px 0;'>";
+            echo "<h4>🎉 Sistema instalado com sucesso!</h4>";
+            echo "<p>O sistema automático de notificações foi configurado e está pronto para uso.</p>";
+            echo "</div>";
 
         } catch (Exception $e) {
-            echo "<h3>❌ ERRO: " . $e->getMessage() . "</h3>\n";
-            echo "<pre>" . $e->getTraceAsString() . "</pre>\n";
+            echo "<h3>❌ ERRO: " . htmlspecialchars($e->getMessage()) . "</h3>\n";
+            echo "<div style='background: #f8d7da; padding: 15px; border-radius: 5px; margin: 10px 0;'>";
+            echo "<h4>Detalhes do erro:</h4>";
+            echo "<pre style='font-size: 12px;'>" . htmlspecialchars($e->getTraceAsString()) . "</pre>";
+            echo "</div>";
         }
     }
 
