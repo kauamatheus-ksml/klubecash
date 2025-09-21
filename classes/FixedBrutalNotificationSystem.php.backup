@@ -262,63 +262,6 @@ class FixedBrutalNotificationSystem {
     /**
      * Método 2: Simulação via webhook
      */
-    
-    /**
-     * Método 1: API direta do bot WhatsApp (NOVO)
-     */
-    private function sendViaDirectAPI($phone, $message) {
-        try {
-            $botUrl = "http://localhost:3002/send-message";
-
-            $data = [
-                "phone" => $phone,
-                "message" => $message,
-                "secret" => "klube-cash-2024"
-            ];
-
-            $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, $botUrl);
-            curl_setopt($ch, CURLOPT_POST, true);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
-            curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                "Content-Type: application/json",
-                "Accept: application/json"
-            ]);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
-
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
-
-            if ($httpCode === 200) {
-                $result = json_decode($response, true);
-                if ($result && $result["success"]) {
-                    $this->log("WhatsApp enviado via bot: {$phone}");
-                    return [
-                        "success" => true,
-                        "method" => "direct_bot_api",
-                        "response" => $result
-                    ];
-                } else {
-                    return [
-                        "success" => false,
-                        "error" => $result["error"] ?? "Erro no bot"
-                    ];
-                }
-            } else {
-                return [
-                    "success" => false,
-                    "error" => "HTTP {$httpCode}: Bot não respondeu"
-                ];
-            }
-
-        } catch (Exception $e) {
-            return ["success" => false, "error" => $e->getMessage()];
-        }
-    }
-
     private function sendViaWebhookSimulation($phone, $message) {
         try {
             if (!defined('SITE_URL')) {
