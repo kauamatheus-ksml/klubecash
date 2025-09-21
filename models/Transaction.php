@@ -217,7 +217,7 @@ class Transaction {
                 if ($this->status === TRANSACTION_PENDING || $this->status === TRANSACTION_APPROVED) {
                     try {
                         if (file_exists('trace-integration.php')) {
-                            error_log("[TRACE] Transaction::save() - Status é PENDENTE, iniciando processo de notificação", 3, 'integration_trace.log');
+                            error_log("[TRACE] Transaction::save() - Status é {$this->status}, iniciando processo de notificação", 3, 'integration_trace.log');
                         }
                         
                         // Verificar se o arquivo NotificationTrigger existe antes de incluir
