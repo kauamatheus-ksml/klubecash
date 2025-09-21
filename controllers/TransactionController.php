@@ -1192,10 +1192,21 @@ class TransactionController {
                         // Log de início da notificação
                         error_log("[FIXED] TransactionController::registerTransaction() - Iniciando notificação para ID: {$transactionId}, status: {$transactionStatus}");
 
-                        // Usar sistema corrigido de notificação
-                        require_once __DIR__ . '/../classes/FixedBrutalNotificationSystem.php';
-                        $notificationSystem = new FixedBrutalNotificationSystem();
-                        $result = $notificationSystem->forceNotifyTransaction($transactionId);
+                        // Usar sistema corrigido de notificação (com verificação de segurança)
+                        $systemPath = __DIR__ . '/../classes/FixedBrutalNotificationSystem.php';
+                        if (file_exists($systemPath)) {
+                            require_once $systemPath;
+                            if (class_exists('FixedBrutalNotificationSystem')) {
+                                $notificationSystem = new FixedBrutalNotificationSystem();
+                                $result = $notificationSystem->forceNotifyTransaction($transactionId);
+                            } else {
+                                error_log("[FIXED] TransactionController - Classe FixedBrutalNotificationSystem não encontrada");
+                                $result = ['success' => false, 'message' => 'Classe não encontrada'];
+                            }
+                        } else {
+                            error_log("[FIXED] TransactionController - Arquivo não encontrado: {$systemPath}");
+                            $result = ['success' => false, 'message' => 'Sistema não encontrado'];
+                        }
 
                         // Log do resultado
                         if ($result['success']) {
@@ -1592,9 +1603,20 @@ class TransactionController {
             try {
                 error_log("[FIXED] TransactionController::registerTransactionFixed() - Disparando notificação para transação {$transactionId}");
 
-                require_once __DIR__ . '/../classes/FixedBrutalNotificationSystem.php';
-                $notificationSystem = new FixedBrutalNotificationSystem();
-                $result = $notificationSystem->forceNotifyTransaction($transactionId);
+                $systemPath = __DIR__ . '/../classes/FixedBrutalNotificationSystem.php';
+                if (file_exists($systemPath)) {
+                    require_once $systemPath;
+                    if (class_exists('FixedBrutalNotificationSystem')) {
+                        $notificationSystem = new FixedBrutalNotificationSystem();
+                        $result = $notificationSystem->forceNotifyTransaction($transactionId);
+                    } else {
+                        error_log("[FIXED] TransactionController::registerTransactionFixed() - Classe não encontrada");
+                        $result = ['success' => false, 'message' => 'Classe não encontrada'];
+                    }
+                } else {
+                    error_log("[FIXED] TransactionController::registerTransactionFixed() - Arquivo não encontrado: {$systemPath}");
+                    $result = ['success' => false, 'message' => 'Sistema não encontrado'];
+                }
 
                 if ($result['success']) {
                     error_log("[FIXED] TransactionController::registerTransactionFixed() - Notificação enviada: " . $result['message']);
