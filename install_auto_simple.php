@@ -237,9 +237,27 @@ AutoNotificationTrigger::onTransactionCreated($transactionId);</pre>';
     public function testWebhook() {
         echo "<h2>🧪 TESTANDO WEBHOOK</h2>\n";
 
+        // Buscar uma transação real para teste
+        try {
+            if (file_exists('config/database.php')) {
+                require_once 'config/database.php';
+                $db = Database::getConnection();
+
+                $stmt = $db->query("SELECT id FROM transacoes_cashback ORDER BY id DESC LIMIT 1");
+                $transaction = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                $testId = $transaction ? $transaction['id'] : '999';
+            } else {
+                $testId = '999';
+            }
+        } catch (Exception $e) {
+            $testId = '999';
+            echo "<p>⚠️ Usando ID de teste: {$e->getMessage()}</p>\n";
+        }
+
         // Simular chamada do webhook
         $data = [
-            'transaction_id' => '999',
+            'transaction_id' => $testId,
             'action' => 'test'
         ];
 
@@ -257,7 +275,7 @@ AutoNotificationTrigger::onTransactionCreated($transactionId);</pre>';
         $error = curl_error($ch);
         curl_close($ch);
 
-        echo "<p><strong>Resultado do teste:</strong></p>\n";
+        echo "<p><strong>Resultado do teste (ID: {$testId}):</strong></p>\n";
         echo "<p>• Código HTTP: {$httpCode}</p>\n";
 
         if ($error) {
@@ -268,7 +286,13 @@ AutoNotificationTrigger::onTransactionCreated($transactionId);</pre>';
         echo "<pre>" . htmlspecialchars($response) . "</pre>\n";
 
         if ($httpCode === 200) {
-            echo "<p>✅ Webhook funcionando!</p>\n";
+            $responseData = json_decode($response, true);
+            if ($responseData && isset($responseData['success']) && $responseData['success']) {
+                echo "<p>✅ Webhook funcionando perfeitamente!</p>\n";
+                echo "<p>• Sistema: " . ($responseData['system'] ?? 'N/A') . "</p>\n";
+            } else {
+                echo "<p>⚠️ Webhook responde mas com avisos</p>\n";
+            }
         } else {
             echo "<p>❌ Problema no webhook</p>\n";
         }
