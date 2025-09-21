@@ -22,7 +22,6 @@ try {
     $transaction->setValorTotal(50.00); // Valor diferente para identificar
     $transaction->setDataTransacao(date('Y-m-d H:i:s'));
     $transaction->setStatus(TRANSACTION_PENDING);
-    $transaction->setCriadoPor(9); // Simulando criação por funcionário da loja
 
     // Calcular distribuição automática
     $transaction->calcularDistribuicao();
