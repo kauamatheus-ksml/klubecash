@@ -121,6 +121,8 @@ class AutoNotificationTrigger {
         }
     }
 
+}
+
 // CHAMADA AUTOMÁTICA SE EXECUTADO DIRETAMENTE
 if (basename($_SERVER['PHP_SELF']) === 'AutoNotificationTrigger.php') {
     echo "=== EXECUTANDO VERIFICAÇÃO AUTOMÁTICA ===\n";
