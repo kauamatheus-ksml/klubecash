@@ -368,7 +368,8 @@ class CashbackNotifier {
                     'whatsapp_response' => $responseData
                 ];
             }
-            
+            */
+
         } catch (Exception $e) {
             error_log('Erro ao enviar WhatsApp: ' . $e->getMessage());
             return [
