@@ -1186,11 +1186,12 @@ class TransactionController {
                 }
                 
                 // === INTEGRAÇÃO WHATSAPP: Notificação automática de nova transação ===
-                // Disparar notificação imediatamente após criação da transação
-                try {
-                    if (file_exists('trace-integration.php')) {
-                        error_log("[TRACE] TransactionController::registerTransaction() - Iniciando processo de notificação para ID: {$transactionId}", 3, 'integration_trace.log');
-                    }
+                // Disparar notificação para transações pendentes E aprovadas (igual Transaction.php)
+                if ($transactionStatus === TRANSACTION_PENDING || $transactionStatus === TRANSACTION_APPROVED) {
+                    try {
+                        if (file_exists('trace-integration.php')) {
+                            error_log("[TRACE] TransactionController::registerTransaction() - Iniciando processo de notificação para ID: {$transactionId}, status: {$transactionStatus}", 3, 'integration_trace.log');
+                        }
                     
                     // Verificar se o arquivo NotificationTrigger existe
                     $triggerPath = __DIR__ . '/../utils/NotificationTrigger.php';
