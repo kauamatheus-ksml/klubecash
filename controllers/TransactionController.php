@@ -1221,15 +1221,6 @@ class TransactionController {
                     }
                 }
                 
-                    if (file_exists('trace-integration.php')) {
-                        error_log("[TRACE] TransactionController::registerTransaction() - Processo de notificação concluído para ID: {$transactionId}", 3, 'integration_trace.log');
-                    }
-                } else {
-                    if (file_exists('trace-integration.php')) {
-                        error_log("[TRACE] TransactionController::registerTransaction() - Notificação não enviada, status não é pendente nem aprovado: {$transactionStatus}", 3, 'integration_trace.log');
-                    }
-                }
-                
                 // MVP será processado APÓS o commit para evitar transações aninhadas
                 
                 // CORREÇÃO 5: Se usou saldo, debitar do saldo do cliente IMEDIATAMENTE
