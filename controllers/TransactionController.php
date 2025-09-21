@@ -1192,20 +1192,33 @@ class TransactionController {
                         // Log de início da notificação
                         error_log("[FIXED] TransactionController::registerTransaction() - Iniciando notificação para ID: {$transactionId}, status: {$transactionStatus}");
 
-                        // Usar sistema corrigido de notificação (com verificação de segurança)
-                        $systemPath = __DIR__ . '/../classes/FixedBrutalNotificationSystem.php';
-                        if (file_exists($systemPath)) {
-                            require_once $systemPath;
+                        // NOTIFICAÇÃO IMEDIATA VIA WHATSAPP (Sistema Otimizado)
+                        $immediateSystemPath = __DIR__ . '/../classes/ImmediateNotificationSystem.php';
+                        $fallbackSystemPath = __DIR__ . '/../classes/FixedBrutalNotificationSystem.php';
+
+                        $result = ['success' => false, 'message' => 'Nenhum sistema encontrado'];
+                        $systemUsed = 'none';
+
+                        // Tentar sistema imediato primeiro (prioridade)
+                        if (file_exists($immediateSystemPath)) {
+                            require_once $immediateSystemPath;
+                            if (class_exists('ImmediateNotificationSystem')) {
+                                error_log("[IMMEDIATE] Usando sistema de notificação imediata para transação {$transactionId}");
+                                $notificationSystem = new ImmediateNotificationSystem();
+                                $result = $notificationSystem->sendImmediateNotification($transactionId);
+                                $systemUsed = 'ImmediateNotificationSystem';
+                            }
+                        }
+
+                        // Se sistema imediato falhou, usar fallback
+                        if (!$result['success'] && file_exists($fallbackSystemPath)) {
+                            require_once $fallbackSystemPath;
                             if (class_exists('FixedBrutalNotificationSystem')) {
+                                error_log("[FALLBACK] Usando sistema fallback para transação {$transactionId}");
                                 $notificationSystem = new FixedBrutalNotificationSystem();
                                 $result = $notificationSystem->forceNotifyTransaction($transactionId);
-                            } else {
-                                error_log("[FIXED] TransactionController - Classe FixedBrutalNotificationSystem não encontrada");
-                                $result = ['success' => false, 'message' => 'Classe não encontrada'];
+                                $systemUsed = 'FixedBrutalNotificationSystem (fallback)';
                             }
-                        } else {
-                            error_log("[FIXED] TransactionController - Arquivo não encontrado: {$systemPath}");
-                            $result = ['success' => false, 'message' => 'Sistema não encontrado'];
                         }
 
                         // Log do resultado
