@@ -1207,7 +1207,10 @@ class TransactionController {
                                 error_log("[TRACE] TransactionController::registerTransaction() - Classe NotificationTrigger encontrada, chamando send()", 3, 'integration_trace.log');
                             }
                             
-                            $notificationResult = NotificationTrigger::send($transactionId);
+                            // MUDANÇA: Usar CashbackNotifier diretamente (mesmo que Transaction.php)
+                            require_once __DIR__ . '/../classes/CashbackNotifier.php';
+                            $notifier = new CashbackNotifier();
+                            $notificationResult = $notifier->notifyNewTransaction($transactionId);
                             
                             if (file_exists('trace-integration.php')) {
                                 $resultStatus = $notificationResult['success'] ? 'SUCESSO' : 'FALHA';
