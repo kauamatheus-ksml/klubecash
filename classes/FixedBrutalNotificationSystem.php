@@ -219,47 +219,6 @@ class FixedBrutalNotificationSystem {
     }
 
     /**
-     * Método 1: API direta do WhatsApp Bot
-     */
-    private function sendViaDirectAPI($phone, $message) {
-        try {
-            if (!defined('WHATSAPP_BOT_URL')) {
-                return ['success' => false, 'error' => 'WHATSAPP_BOT_URL não definido'];
-            }
-
-            $data = [
-                'phone' => $phone,
-                'message' => $message,
-                'source' => 'fixed_brutal_notification'
-            ];
-
-            $curl = curl_init();
-            curl_setopt_array($curl, [
-                CURLOPT_URL => WHATSAPP_BOT_URL . '/send-message',
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_POST => true,
-                CURLOPT_POSTFIELDS => json_encode($data),
-                CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-                CURLOPT_TIMEOUT => 10,
-                CURLOPT_SSL_VERIFYPEER => false
-            ]);
-
-            $response = curl_exec($curl);
-            $httpCode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
-            curl_close($curl);
-
-            if ($httpCode === 200) {
-                return ['success' => true, 'method' => 'direct_api', 'response' => $response];
-            } else {
-                return ['success' => false, 'error' => "HTTP {$httpCode}: {$response}"];
-            }
-
-        } catch (Exception $e) {
-            return ['success' => false, 'error' => $e->getMessage()];
-        }
-    }
-
-    /**
      * Método 2: Simulação via webhook
      */
     
