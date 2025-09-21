@@ -1,13 +1,22 @@
 <?php
 /**
+ * HABILITAR EXIBIÇÃO DE ERROS PARA DEPURAÇÃO
+ * Remova ou comente estas duas linhas quando o sistema estiver em produção.
+ */
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
+
+/**
  * INSTALADOR DE NOTIFICAÇÕES AUTOMÁTICAS - KLUBE CASH
  *
  * Script para integrar automaticamente o sistema de notificações
  * nos pontos onde transações são criadas/atualizadas
  */
 
-require_once 'config/database.php';
-require_once 'utils/AutoNotificationTrigger.php';
+// Garante que o script não falhe se os arquivos não existirem ANTES de tentar incluí-los.
+// A lógica de verificação de erro cuidará de reportar a ausência.
+@require_once 'config/database.php';
+@require_once 'utils/AutoNotificationTrigger.php';
 
 class AutoNotificationInstaller {
 
@@ -21,6 +30,11 @@ class AutoNotificationInstaller {
             // 1. Verificar arquivos principais
             echo "<h3>1. Verificando arquivos...</h3>\n";
             $this->checkFiles();
+
+            // Lança uma exceção se arquivos essenciais estiverem faltando
+            if (!empty($this->errors)) {
+                throw new Exception("Arquivos essenciais não encontrados. A instalação não pode continuar.");
+            }
 
             // 2. Instalar hooks nos controladores
             echo "<h3>2. Instalando hooks...</h3>\n";
@@ -38,14 +52,22 @@ class AutoNotificationInstaller {
             echo "<p>As notificações agora serão enviadas automaticamente!</p>\n";
 
         } catch (Exception $e) {
-            echo "<h3>❌ ERRO: " . $e->getMessage() . "</h3>\n";
+            echo "<h3>❌ ERRO NA INSTALAÇÃO: " . $e->getMessage() . "</h3>\n";
+            if (!empty($this->errors)) {
+                echo "<p>Detalhes:</p><ul>";
+                foreach ($this->errors as $error) {
+                    echo "<li>" . htmlspecialchars($error) . "</li>";
+                }
+                echo "</ul>";
+            }
         }
     }
 
     private function checkFiles() {
         $requiredFiles = [
-            'classes/FixedBrutalNotificationSystem.php',
+            'config/database.php', // Adicionado para verificação
             'utils/AutoNotificationTrigger.php',
+            'classes/FixedBrutalNotificationSystem.php',
             'run_single_notification.php'
         ];
 
@@ -63,15 +85,15 @@ class AutoNotificationInstaller {
         // Arquivos para modificar
         $files = [
             'controllers/TransactionController.php' => 'TransactionController',
-            'controllers/AdminController.php' => 'AdminController',
-            'controllers/ClientController.php' => 'ClientController'
+            'controllers/AdminController.php'       => 'AdminController',
+            'controllers/ClientController.php'      => 'ClientController'
         ];
 
         foreach ($files as $file => $controller) {
             if (file_exists($file)) {
                 $this->addHookToFile($file, $controller);
             } else {
-                echo "<p>⚠️ Arquivo não encontrado: {$file}</p>\n";
+                echo "<p>⚠️ Arquivo a ser modificado não encontrado: {$file}</p>\n";
             }
         }
     }
@@ -80,14 +102,17 @@ class AutoNotificationInstaller {
         $content = file_get_contents($file);
 
         // Hook para adicionar após lastInsertId
+        // ==================================================================
+        // CORREÇÃO APLICADA AQUI: A barra invertida (\) foi trocada pela barra normal (/)
+        // ==================================================================
         $hookCode = '
-                // AUTO NOTIFICATION TRIGGER - KLUBE CASH
-                try {
-                    require_once __DIR__ . \'/../utils/AutoNotificationTrigger.php\';
-                    AutoNotificationTrigger::onTransactionCreated($transactionId);
-                } catch (Exception $e) {
-                    error_log("Erro no trigger de notificação: " . $e->getMessage());
-                }';
+            // AUTO NOTIFICATION TRIGGER - KLUBE CASH
+            try {
+                require_once __DIR__ . \'/../utils/AutoNotificationTrigger.php\';
+                AutoNotificationTrigger::onTransactionCreated($transactionId);
+            } catch (Exception $e) {
+                error_log("Erro no trigger de notificação: " . $e->getMessage());
+            }';
 
         // Procurar padrões onde transações são inseridas
         $patterns = [
@@ -101,7 +126,7 @@ class AutoNotificationInstaller {
             if (preg_match($pattern, $content)) {
                 // Verificar se o hook já não existe
                 if (strpos($content, 'AUTO NOTIFICATION TRIGGER') === false) {
-                    $content = preg_replace($pattern, '$1' . $hookCode, $content);
+                    $content = preg_replace($pattern, '$1' . $hookCode, $content, 1); // Adiciona o hook apenas uma vez
                     $modified = true;
                     break;
                 }
@@ -109,19 +134,24 @@ class AutoNotificationInstaller {
         }
 
         if ($modified) {
-            file_put_contents($file, $content);
-            echo "<p>✅ Hook instalado em: {$file}</p>\n";
+            if (is_writable($file)) {
+                file_put_contents($file, $content);
+                echo "<p>✅ Hook instalado em: {$file}</p>\n";
+            } else {
+                echo "<p>❌ ERRO DE PERMISSÃO: Não foi possível escrever no arquivo {$file}. Verifique as permissões.</p>\n";
+                $this->errors[] = "Não foi possível escrever no arquivo: {$file}";
+            }
         } else {
-            echo "<p>⚠️ Padrão não encontrado ou hook já existe em: {$file}</p>\n";
+            echo "<p>ℹ️ Padrão de código não encontrado ou hook já existe em: {$file}</p>\n";
         }
     }
 
     private function createWebhook() {
         // Criar webhook simples para integração externa
+        $webhookFile = 'webhook_notification.php';
         $webhookContent = '<?php
 /**
  * WEBHOOK DE NOTIFICAÇÕES AUTOMÁTICAS
- *
  * Endpoint para disparar notificações via HTTP
  */
 
@@ -153,7 +183,8 @@ if (!empty($secret) && $secret !== "klube-cash-webhook-2024") {
 
 // Executar notificação
 try {
-    require_once "utils/AutoNotificationTrigger.php";
+    // Garante que o caminho seja relativo ao webhook
+    require_once __DIR__ . "/utils/AutoNotificationTrigger.php";
 
     $transactionId = $input["transaction_id"];
     $action = $input["action"] ?? "webhook";
@@ -168,21 +199,30 @@ try {
 
 } catch (Exception $e) {
     http_response_code(500);
+    error_log("Webhook Error: " . $e->getMessage()); // Log do erro
     echo json_encode([
         "error" => "Erro interno",
         "message" => $e->getMessage()
     ]);
 }
 ?>';
-
-        file_put_contents('webhook_notification.php', $webhookContent);
-        echo "<p>✅ Webhook criado: webhook_notification.php</p>\n";
+        
+        if (is_writable('.')) {
+             file_put_contents($webhookFile, $webhookContent);
+             echo "<p>✅ Webhook criado: {$webhookFile}</p>\n";
+        } else {
+             echo "<p>❌ ERRO DE PERMISSÃO: Não foi possível criar o arquivo {$webhookFile} na pasta raiz. Verifique as permissões.</p>\n";
+             $this->errors[] = "Não foi possível criar o arquivo: {$webhookFile}";
+        }
     }
 
     private function testIntegration() {
         try {
             // Testar trigger direto
-            require_once 'utils/AutoNotificationTrigger.php';
+            if (!class_exists('Database') || !class_exists('AutoNotificationTrigger')) {
+                 echo "<p>⚠️ Classes Database ou AutoNotificationTrigger não encontradas. Teste cancelado.</p>\n";
+                 return;
+            }
 
             // Buscar uma transação recente para teste
             $db = Database::getConnection();
@@ -201,7 +241,7 @@ try {
             }
 
         } catch (Exception $e) {
-            echo "<p>❌ Erro no teste: " . $e->getMessage() . "</p>\n";
+            echo "<p>❌ Erro no teste de integração: " . $e->getMessage() . "</p>\n";
         }
     }
 
@@ -217,14 +257,32 @@ try {
 
         foreach ($files as $file) {
             if (file_exists($file)) {
-                $content = file_get_contents($file);
+                if (is_writable($file)) {
+                    $content = file_get_contents($file);
 
-                // Remover o bloco do hook
-                $pattern = '/\n\s*\/\/ AUTO NOTIFICATION TRIGGER - KLUBE CASH.*?}\s*catch.*?}\s*/s';
-                $content = preg_replace($pattern, '', $content);
+                    // Remover o bloco do hook
+                    $pattern = '/\s*\/\/ AUTO NOTIFICATION TRIGGER - KLUBE CASH.*?\}\s*catch.*?\}\s*/s';
+                    $newContent = preg_replace($pattern, '', $content);
+                    
+                    if ($newContent !== $content) {
+                        file_put_contents($file, $newContent);
+                        echo "<p>✅ Hook removido de: {$file}</p>\n";
+                    } else {
+                        echo "<p>ℹ️ Hook não encontrado em: {$file}</p>\n";
+                    }
+                } else {
+                    echo "<p>❌ ERRO DE PERMISSÃO: Não foi possível modificar o arquivo {$file} para remover o hook.</p>\n";
+                }
+            }
+        }
 
-                file_put_contents($file, $content);
-                echo "<p>✅ Hook removido de: {$file}</p>\n";
+        // Remover webhook
+        if (file_exists('webhook_notification.php')) {
+            if (is_writable('webhook_notification.php')) {
+                unlink('webhook_notification.php');
+                echo "<p>✅ Webhook removido: webhook_notification.php</p>\n";
+            } else {
+                echo "<p>❌ ERRO DE PERMISSÃO: Não foi possível remover o arquivo webhook_notification.php.</p>\n";
             }
         }
 
@@ -248,14 +306,19 @@ if (isset($_GET['action'])) {
     <head>
         <title>Instalador de Notificações Automáticas - Klube Cash</title>
         <style>
-            body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
-            .container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-            .btn { background: #FF7A00; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 10px 5px; }
+            body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; color: #333; }
+            .container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); max-width: 800px; margin: auto; }
+            h1, h2, h3 { color: #FF7A00; }
+            h3 { border-bottom: 1px solid #eee; padding-bottom: 5px; margin-top: 25px; }
+            .btn { background: #FF7A00; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; margin: 10px 5px; border: none; cursor: pointer; font-size: 16px; }
             .btn:hover { background: #e56a00; }
             .btn.danger { background: #dc3545; }
             .btn.danger:hover { background: #c82333; }
-            .info { background: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 5px; margin: 10px 0; }
-            .warning { background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 10px 0; }
+            .info { background: #e2f0ff; border-left: 5px solid #0069d9; padding: 15px; margin: 20px 0; }
+            .warning { background: #fff3cd; border-left: 5px solid #ffc107; padding: 15px; margin: 20px 0; }
+            ul, ol { line-height: 1.6; }
+            code { background: #eee; padding: 2px 5px; border-radius: 3px; }
+            p, li { color: #555; }
         </style>
     </head>
     <body>
@@ -263,42 +326,36 @@ if (isset($_GET['action'])) {
             <h1>🔧 Instalador de Notificações Automáticas</h1>
 
             <div class="info">
-                <h3>📋 O que será instalado:</h3>
+                <h3>📋 O que este script faz:</h3>
                 <ul>
-                    <li>✅ Hooks automáticos nos controladores de transação</li>
-                    <li>✅ Sistema de execução em background</li>
-                    <li>✅ Webhook para integração externa</li>
-                    <li>✅ Logs de monitoramento</li>
+                    <li>Verifica se os arquivos necessários para o sistema de notificação existem.</li>
+                    <li>Modifica os arquivos de controller para adicionar um "gatilho" (hook) que dispara a notificação sempre que uma transação for criada.</li>
+                    <li>Cria um arquivo de webhook (`webhook_notification.php`) para permitir integrações externas.</li>
+                    <li>Executa um teste para garantir que a integração foi bem-sucedida.</li>
                 </ul>
             </div>
 
             <div class="warning">
                 <h3>⚠️ Importante:</h3>
-                <p>Este instalador irá modificar os seguintes arquivos:</p>
+                <p>Este instalador irá <strong>modificar</strong> os seguintes arquivos:</p>
                 <ul>
-                    <li>controllers/TransactionController.php</li>
-                    <li>controllers/AdminController.php</li>
-                    <li>controllers/ClientController.php</li>
+                    <li><code>controllers/TransactionController.php</code></li>
+                    <li><code>controllers/AdminController.php</code></li>
+                    <li><code>controllers/ClientController.php</code></li>
                 </ul>
-                <p><strong>Faça backup dos arquivos antes de continuar!</strong></p>
+                <p><strong>É altamente recomendado fazer um backup desses arquivos antes de continuar!</strong></p>
             </div>
-
-            <h3>Como funciona:</h3>
-            <ol>
-                <li>Toda vez que uma transação for criada/atualizada, o sistema dispara automaticamente uma notificação</li>
-                <li>A notificação é executada em background para não atrasar a resposta da API</li>
-                <li>Logs são gerados para monitoramento</li>
-                <li>Sistema compatível com a estrutura atual do banco</li>
-            </ol>
 
             <h3>Ações:</h3>
             <a href="?action=install" class="btn">🚀 Instalar Sistema Automático</a>
-            <a href="?action=uninstall" class="btn danger">🗑️ Desinstalar (Remover Hooks)</a>
+            <a href="?action=uninstall" class="btn danger">🗑️ Desinstalar (Remover Hooks e Webhook)</a>
 
             <h3>Após a instalação:</h3>
-            <p>• Teste criando uma nova transação</p>
-            <p>• Verifique os logs em: <code>logs/auto_trigger.log</code></p>
-            <p>• Use o webhook: <code>webhook_notification.php</code> para integração externa</p>
+            <ol>
+                <li>Teste criando uma nova transação no seu sistema.</li>
+                <li>Verifique os logs de erro do servidor e o arquivo <code>logs/auto_trigger.log</code> (se configurado) para confirmar o envio.</li>
+                <li>O webhook estará disponível em: <code>webhook_notification.php</code> para ser usado por outros sistemas.</li>
+            </ol>
         </div>
     </body>
     </html>
