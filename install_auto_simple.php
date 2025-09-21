@@ -103,31 +103,42 @@ try {
     // Log da tentativa
     error_log("Webhook recebido para transação: " . $transactionId);
 
-    // Executar notificação
-    if (file_exists("utils/AutoNotificationTrigger.php")) {
+    // Executar notificação usando sistema corrigido
+    if (file_exists("classes/FixedBrutalNotificationSystem.php")) {
+        require_once "classes/FixedBrutalNotificationSystem.php";
+
+        $system = new FixedBrutalNotificationSystem();
+        $result = $system->forceNotifyTransaction($transactionId);
+
+        echo json_encode([
+            "success" => $result['success'],
+            "message" => $result['message'],
+            "transaction_id" => $transactionId,
+            "timestamp" => date("Y-m-d H:i:s"),
+            "system" => "FixedBrutalNotificationSystem"
+        ]);
+    } else if (file_exists("utils/AutoNotificationTrigger.php")) {
         require_once "utils/AutoNotificationTrigger.php";
         AutoNotificationTrigger::triggerNotification($transactionId, "webhook");
 
         echo json_encode([
             "success" => true,
-            "message" => "Notificação disparada",
+            "message" => "Notificação disparada via AutoTrigger",
             "transaction_id" => $transactionId,
             "timestamp" => date("Y-m-d H:i:s")
         ]);
-    } else {
+    } else if (file_exists("run_single_notification.php")) {
         // Fallback: executar script diretamente
-        if (file_exists("run_single_notification.php")) {
-            $command = "php run_single_notification.php " . escapeshellarg($transactionId) . " webhook > /dev/null 2>&1 &";
-            exec($command);
+        $command = "php run_single_notification.php " . escapeshellarg($transactionId) . " webhook > /dev/null 2>&1 &";
+        exec($command);
 
-            echo json_encode([
-                "success" => true,
-                "message" => "Notificação disparada via fallback",
-                "transaction_id" => $transactionId
-            ]);
-        } else {
-            throw new Exception("Sistema de notificação não encontrado");
-        }
+        echo json_encode([
+            "success" => true,
+            "message" => "Notificação disparada via fallback",
+            "transaction_id" => $transactionId
+        ]);
+    } else {
+        throw new Exception("Sistema de notificação não encontrado");
     }
 
 } catch (Exception $e) {
