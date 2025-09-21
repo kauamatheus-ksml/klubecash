@@ -25,9 +25,9 @@ class WhatsAppBot {
         self::$timeout = defined('WHATSAPP_TIMEOUT') ? WHATSAPP_TIMEOUT : 30;
         
         // Lógica de detecção automática de modo produção vs simulação
-        if (strpos(self::$botUrl, 'ngrok') !== false || strpos(self::$botUrl, '54.207.165.92') !== false) {
-            // Detectamos conexão via ngrok = modo produção real
-            self::$accessToken = 'REAL_CONNECTION_VIA_NGROK';
+        if (strpos(self::$botUrl, 'ngrok') !== false || strpos(self::$botUrl, '148.230.73.190') !== false) {
+            // Detectamos conexão via ngrok ou servidor de produção = modo produção real
+            self::$accessToken = 'REAL_CONNECTION_PRODUCTION';
             self::$phoneNumberId = 'PRODUCTION_MODE_ACTIVE';
         } else {
             // Conexão local = modo simulação
@@ -43,8 +43,8 @@ class WhatsAppBot {
     public static function isConnected() {
         self::initializeConfig();
         
-        // Se detectou ngrok na URL, assumir conectado
-        if (strpos(self::$botUrl, 'ngrok') !== false) {
+        // Se detectou ngrok ou servidor de produção na URL, assumir conectado
+        if (strpos(self::$botUrl, 'ngrok') !== false || strpos(self::$botUrl, '148.230.73.190') !== false) {
             return true;
         }
         
