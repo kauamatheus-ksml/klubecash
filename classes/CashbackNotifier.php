@@ -268,12 +268,22 @@ class CashbackNotifier {
                        "Continue economizando no *Klube Cash*! 🧡";
                        
             case 'vip_client':
-                return "⭐ *{$nome}*, sua compra foi registrada!*\n\n" .
-                       "🏪 {$loja}\n" .
-                       "💰 Compra: {$valorCompra}\n" .
-                       "🎁 Cashback: *{$valorCashback}*\n\n" .
-                       "⏰ Liberação em até 7 dias úteis.\n\n" .
-                       "Obrigado por ser um cliente *Klube Cash*! 🧡";
+                if ($status === 'aprovado') {
+                    return "🎉 *{$nome}*, sua compra foi APROVADA!*\n\n" .
+                           "🏪 {$loja}\n" .
+                           "💰 Compra: {$valorCompra}\n" .
+                           "🎁 Cashback: *{$valorCashback}*\n\n" .
+                           "✅ *Cashback já DISPONÍVEL para uso!*\n\n" .
+                           "💳 Use agora mesmo em sua próxima compra na {$loja}!\n\n" .
+                           "Obrigado por ser um cliente *Klube Cash*! 🧡";
+                } else {
+                    return "⭐ *{$nome}*, sua compra foi registrada!*\n\n" .
+                           "🏪 {$loja}\n" .
+                           "💰 Compra: {$valorCompra}\n" .
+                           "🎁 Cashback: *{$valorCashback}*\n\n" .
+                           "⏰ Liberação em até 7 dias úteis.\n\n" .
+                           "Obrigado por ser um cliente *Klube Cash*! 🧡";
+                }
                        
             default: // regular_client
                 return "✅ *{$nome}, tudo certo!*\n\n" .
