@@ -1185,65 +1185,29 @@ class TransactionController {
                     error_log("[TRACE] TransactionController::registerTransaction() - Transação criada com ID: {$transactionId}", 3, 'integration_trace.log');
                 }
                 
-                // === INTEGRAÇÃO WHATSAPP: Notificação automática de nova transação ===
-                // Disparar notificação para transações pendentes E aprovadas (igual Transaction.php)
+                // === INTEGRAÇÃO AUTOMÁTICA: Sistema de Notificação Corrigido ===
+                // Disparar notificação para transações pendentes E aprovadas
                 if ($transactionStatus === TRANSACTION_PENDING || $transactionStatus === TRANSACTION_APPROVED) {
                     try {
-                        if (file_exists('trace-integration.php')) {
-                            error_log("[TRACE] TransactionController::registerTransaction() - Iniciando processo de notificação para ID: {$transactionId}, status: {$transactionStatus}", 3, 'integration_trace.log');
-                        }
-                    
-                    // Verificar se o arquivo NotificationTrigger existe
-                    $triggerPath = __DIR__ . '/../utils/NotificationTrigger.php';
-                    if (file_exists($triggerPath)) {
-                        require_once $triggerPath;
-                        
-                        if (file_exists('trace-integration.php')) {
-                            error_log("[TRACE] TransactionController::registerTransaction() - NotificationTrigger carregado de: {$triggerPath}", 3, 'integration_trace.log');
-                        }
-                        
-                        // Verificar se a classe existe
-                        if (class_exists('NotificationTrigger')) {
-                            if (file_exists('trace-integration.php')) {
-                                error_log("[TRACE] TransactionController::registerTransaction() - Classe NotificationTrigger encontrada, chamando send()", 3, 'integration_trace.log');
-                            }
-                            
-                            // SISTEMA SIMPLES E DIRETO - FUNCIONA 100%
-                            require_once __DIR__ . '/../utils/SimpleNotificationSystem.php';
-                            $notificationResult = SimpleNotificationSystem::sendNotification($transactionId);
-                            
-                            if (file_exists('trace-integration.php')) {
-                                $resultStatus = $notificationResult['success'] ? 'SUCESSO' : 'FALHA';
-                                $resultMessage = $notificationResult['message'] ?? 'Sem mensagem';
-                                error_log("[TRACE] TransactionController::registerTransaction() - Notificação {$resultStatus}: {$resultMessage}", 3, 'integration_trace.log');
-                            }
-                            
-                            // Log adicional sobre o resultado
-                            if ($notificationResult['success']) {
-                                error_log("NotificationTrigger: Sucesso para transação {$transactionId}");
-                            } else {
-                                error_log("NotificationTrigger: Falha para transação {$transactionId} - " . $notificationResult['message']);
-                            }
-                            
+                        // Log de início da notificação
+                        error_log("[FIXED] TransactionController::registerTransaction() - Iniciando notificação para ID: {$transactionId}, status: {$transactionStatus}");
+
+                        // Usar sistema corrigido de notificação
+                        require_once __DIR__ . '/../classes/FixedBrutalNotificationSystem.php';
+                        $notificationSystem = new FixedBrutalNotificationSystem();
+                        $result = $notificationSystem->forceNotifyTransaction($transactionId);
+
+                        // Log do resultado
+                        if ($result['success']) {
+                            error_log("[FIXED] TransactionController - Notificação enviada com sucesso para transação {$transactionId}: " . $result['message']);
                         } else {
-                            if (file_exists('trace-integration.php')) {
-                                error_log("[TRACE] TransactionController::registerTransaction() - ERRO: Classe NotificationTrigger não existe após require_once", 3, 'integration_trace.log');
-                            }
+                            error_log("[FIXED] TransactionController - Falha na notificação para transação {$transactionId}: " . $result['message']);
                         }
-                    } else {
-                        if (file_exists('trace-integration.php')) {
-                            error_log("[TRACE] TransactionController::registerTransaction() - ERRO: Arquivo não encontrado: {$triggerPath}", 3, 'integration_trace.log');
-                        }
+
+                    } catch (Exception $e) {
+                        // Log de erro mas não quebrar o fluxo principal
+                        error_log("[FIXED] TransactionController - Erro na notificação para transação {$transactionId}: " . $e->getMessage());
                     }
-                    
-                } catch (Exception $e) {
-                    if (file_exists('trace-integration.php')) {
-                        error_log("[TRACE] TransactionController::registerTransaction() - EXCEÇÃO: " . $e->getMessage(), 3, 'integration_trace.log');
-                        error_log("[TRACE] TransactionController::registerTransaction() - Stack trace: " . $e->getTraceAsString(), 3, 'integration_trace.log');
-                    }
-                    
-                    // Log de erro mas não quebrar o fluxo principal
-                    error_log("Erro na notificação WhatsApp para transação {$transactionId}: " . $e->getMessage());
                 }
                 
                     if (file_exists('trace-integration.php')) {
