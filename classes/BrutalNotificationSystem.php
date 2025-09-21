@@ -315,15 +315,21 @@ class BrutalNotificationSystem {
      * Verificar se transação já foi notificada
      */
     private function wasAlreadyNotified($transactionId) {
-        $stmt = $this->db->prepare("
-            SELECT COUNT(*) FROM whatsapp_logs
-            WHERE transaction_id = :transaction_id
-              AND status = 'success'
-        ");
-        $stmt->bindParam(':transaction_id', $transactionId);
-        $stmt->execute();
-
-        return $stmt->fetchColumn() > 0;
+        // Verificar se a tabela existe e tem as colunas corretas
+        try {
+            $stmt = $this->db->prepare("
+                SELECT COUNT(*) FROM whatsapp_logs
+                WHERE JSON_EXTRACT(metadata, '$.transaction_id') = :transaction_id
+                  AND status = 'success'
+            ");
+            $stmt->bindParam(':transaction_id', $transactionId);
+            $stmt->execute();
+            return $stmt->fetchColumn() > 0;
+        } catch (Exception $e) {
+            // Se a consulta falhar, assumir que não foi notificada
+            $this->log("Erro ao verificar notificação anterior: " . $e->getMessage());
+            return false;
+        }
     }
 
     /**
