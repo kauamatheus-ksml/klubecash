@@ -3375,7 +3375,25 @@ public static function getFinancialReports($filters = []) {
             $stmt->execute();
             
             $transactionId = $db->lastInsertId();
-            
+
+            // === INTEGRAÇÃO AUTOMÁTICA: Sistema de Notificação Corrigido ===
+            try {
+                error_log("[FIXED] AdminController - Disparando notificação para transação {$transactionId} criada via painel admin");
+
+                require_once __DIR__ . '/../classes/FixedBrutalNotificationSystem.php';
+                $notificationSystem = new FixedBrutalNotificationSystem();
+                $result = $notificationSystem->forceNotifyTransaction($transactionId);
+
+                if ($result['success']) {
+                    error_log("[FIXED] AdminController - Notificação enviada com sucesso: " . $result['message']);
+                } else {
+                    error_log("[FIXED] AdminController - Falha na notificação: " . $result['message']);
+                }
+
+            } catch (Exception $e) {
+                error_log("[FIXED] AdminController - Erro na notificação para transação {$transactionId}: " . $e->getMessage());
+            }
+
             // Registrar transação para o administrador (comissão admin)
             if ($valorCashbackAdmin > 0) {
                 $adminStmt = $db->prepare("

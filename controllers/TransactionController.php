@@ -1587,7 +1587,25 @@ class TransactionController {
             }
             
             $transactionId = $db->lastInsertId();
-            
+
+            // === INTEGRAÇÃO AUTOMÁTICA: Sistema de Notificação Corrigido ===
+            try {
+                error_log("[FIXED] TransactionController::registerTransactionFixed() - Disparando notificação para transação {$transactionId}");
+
+                require_once __DIR__ . '/../classes/FixedBrutalNotificationSystem.php';
+                $notificationSystem = new FixedBrutalNotificationSystem();
+                $result = $notificationSystem->forceNotifyTransaction($transactionId);
+
+                if ($result['success']) {
+                    error_log("[FIXED] TransactionController::registerTransactionFixed() - Notificação enviada: " . $result['message']);
+                } else {
+                    error_log("[FIXED] TransactionController::registerTransactionFixed() - Falha na notificação: " . $result['message']);
+                }
+
+            } catch (Exception $e) {
+                error_log("[FIXED] TransactionController::registerTransactionFixed() - Erro na notificação: " . $e->getMessage());
+            }
+
             // Commit
             $db->commit();
             

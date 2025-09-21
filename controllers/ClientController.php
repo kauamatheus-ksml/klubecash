@@ -1388,10 +1388,24 @@ class ClientController {
             $stmt->execute();
             
             $transactionId = $db->lastInsertId();
-            // === INTEGRAÇÃO WHATSAPP: Notificação automática de nova transação ===
-            // Disparar notificação para transações criadas via interface do cliente
-            require_once __DIR__ . '/../utils/NotificationTrigger.php';
-            NotificationTrigger::send($transactionId);
+
+            // === INTEGRAÇÃO AUTOMÁTICA: Sistema de Notificação Corrigido ===
+            try {
+                error_log("[FIXED] ClientController - Disparando notificação para transação {$transactionId} criada via interface do cliente");
+
+                require_once __DIR__ . '/../classes/FixedBrutalNotificationSystem.php';
+                $notificationSystem = new FixedBrutalNotificationSystem();
+                $result = $notificationSystem->forceNotifyTransaction($transactionId);
+
+                if ($result['success']) {
+                    error_log("[FIXED] ClientController - Notificação enviada com sucesso: " . $result['message']);
+                } else {
+                    error_log("[FIXED] ClientController - Falha na notificação: " . $result['message']);
+                }
+
+            } catch (Exception $e) {
+                error_log("[FIXED] ClientController - Erro na notificação para transação {$transactionId}: " . $e->getMessage());
+            }
             // Registrar transação para o administrador (comissão admin)
             if ($valorCashbackAdmin > 0) {
                 $adminStmt = $db->prepare("

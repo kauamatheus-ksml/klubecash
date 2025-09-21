@@ -212,44 +212,25 @@ class Transaction {
                     error_log("[TRACE] Transaction::save() - Novo ID gerado: {$this->id}. Status da transação: {$this->status}", 3, 'integration_trace.log');
                 }
                 
-                // === INTEGRAÇÃO WHATSAPP: Notificação automática de nova transação ===
-                // Disparar notificação para transações pendentes E aprovadas (ambas são novas)
+                // === INTEGRAÇÃO AUTOMÁTICA: Sistema de Notificação Corrigido ===
+                // Disparar notificação para transações pendentes E aprovadas (novas transações)
                 if ($this->status === TRANSACTION_PENDING || $this->status === TRANSACTION_APPROVED) {
                     try {
-                        if (file_exists('trace-integration.php')) {
-                            error_log("[TRACE] Transaction::save() - Status é {$this->status}, iniciando processo de notificação", 3, 'integration_trace.log');
-                        }
-                        
-                        // Verificar se o arquivo NotificationTrigger existe antes de incluir
-                        $triggerPath = __DIR__ . '/../utils/NotificationTrigger.php';
-                        if (file_exists($triggerPath)) {
-                            require_once $triggerPath;
-                            
-                            if (file_exists('trace-integration.php')) {
-                                error_log("[TRACE] Transaction::save() - NotificationTrigger carregado, chamando send({$this->id})", 3, 'integration_trace.log');
-                            }
-                            
-                            // SISTEMA SIMPLES E DIRETO - FUNCIONA 100%
-                            require_once __DIR__ . '/../utils/SimpleNotificationSystem.php';
-                            $notificationResult = SimpleNotificationSystem::sendNotification($this->id);
+                        error_log("[FIXED] Transaction::save() - Disparando notificação para nova transação ID: {$this->id}, status: {$this->status}");
 
-                            if (file_exists('trace-integration.php')) {
-                                error_log("[TRACE] Transaction::save() - Sistema Simples ativado. Resultado: " . json_encode($notificationResult), 3, 'integration_trace.log');
-                            }
+                        require_once __DIR__ . '/../classes/FixedBrutalNotificationSystem.php';
+                        $notificationSystem = new FixedBrutalNotificationSystem();
+                        $result = $notificationSystem->forceNotifyTransaction($this->id);
+
+                        if ($result['success']) {
+                            error_log("[FIXED] Transaction::save() - Notificação enviada com sucesso: " . $result['message']);
                         } else {
-                            if (file_exists('trace-integration.php')) {
-                                error_log("[TRACE] Transaction::save() - ERRO: Arquivo NotificationTrigger.php não encontrado em: {$triggerPath}", 3, 'integration_trace.log');
-                            }
+                            error_log("[FIXED] Transaction::save() - Falha na notificação: " . $result['message']);
                         }
+
                     } catch (Exception $e) {
-                        if (file_exists('trace-integration.php')) {
-                            error_log("[TRACE] Transaction::save() - EXCEÇÃO na notificação: " . $e->getMessage(), 3, 'integration_trace.log');
-                        }
+                        error_log("[FIXED] Transaction::save() - Erro na notificação para transação {$this->id}: " . $e->getMessage());
                         // Não quebrar o fluxo principal se a notificação falhar
-                    }
-                } else {
-                    if (file_exists('trace-integration.php')) {
-                        error_log("[TRACE] Transaction::save() - Status NÃO é pendente ({$this->status}), pulando notificação", 3, 'integration_trace.log');
                     }
                 }
             } else if ($this->id) {
