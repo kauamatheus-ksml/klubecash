@@ -11,7 +11,13 @@ require_once __DIR__ . '/controllers/AuthController.php';
 
 echo "=== TESTE TRANSACTIONCONTROLLER CORRIGIDO ===\n\n";
 
+// Simular sessão PHP
+if (!session_id()) {
+    session_start();
+}
+
 // Simular autenticação como loja
+$_SESSION['authenticated'] = true;
 $_SESSION['user_type'] = 'store';
 $_SESSION['user_id'] = 59;
 $_SESSION['store_id'] = 59;
