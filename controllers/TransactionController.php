@@ -1221,11 +1221,13 @@ class TransactionController {
                             }
                         }
 
-                        // Log do resultado
+                        // Log detalhado do resultado
                         if ($result['success']) {
-                            error_log("[FIXED] TransactionController - Notificação enviada com sucesso para transação {$transactionId}: " . $result['message']);
+                            $method = $result['method_used'] ?? 'unknown';
+                            $timeInfo = isset($result['all_results']) ? $this->getTimeInfo($result['all_results']) : '';
+                            error_log("[SUCCESS] TransactionController - Notificação enviada via {$systemUsed} usando método {$method} para transação {$transactionId}{$timeInfo}");
                         } else {
-                            error_log("[FIXED] TransactionController - Falha na notificação para transação {$transactionId}: " . $result['message']);
+                            error_log("[FAIL] TransactionController - Falha na notificação para transação {$transactionId} via {$systemUsed}: " . $result['message']);
                         }
 
                     } catch (Exception $e) {
