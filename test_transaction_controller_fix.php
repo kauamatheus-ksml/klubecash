@@ -16,9 +16,9 @@ if (!session_id()) {
     session_start();
 }
 
-// Simular autenticação como loja
+// Simular autenticação como loja (usar constante correta)
 $_SESSION['authenticated'] = true;
-$_SESSION['user_type'] = 'store';
+$_SESSION['user_type'] = USER_TYPE_STORE; // 'loja'
 $_SESSION['user_id'] = 59;
 $_SESSION['store_id'] = 59;
 
