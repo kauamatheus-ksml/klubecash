@@ -374,17 +374,15 @@ class BrutalNotificationSystem {
      */
     private function ensureWhatsAppLogsTable() {
         try {
+            // Usar estrutura compatível com a tabela existente
             $this->db->exec("
                 CREATE TABLE IF NOT EXISTS whatsapp_logs (
                     id INT AUTO_INCREMENT PRIMARY KEY,
-                    transaction_id INT,
                     phone VARCHAR(20),
                     message TEXT,
                     status ENUM('success', 'failed', 'pending') DEFAULT 'pending',
-                    method VARCHAR(50),
-                    response TEXT,
+                    metadata JSON,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    INDEX idx_transaction (transaction_id),
                     INDEX idx_status (status),
                     INDEX idx_created (created_at)
                 )
