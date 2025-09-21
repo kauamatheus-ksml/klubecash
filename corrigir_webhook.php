@@ -25,6 +25,7 @@ try {
 
     // 2. Copiar versão corrigida
     echo "<h3>2. Instalando webhook corrigido...</h3>\n";
+    
 
     if (file_exists('webhook_notification_fixed.php')) {
         $content = file_get_contents('webhook_notification_fixed.php');
