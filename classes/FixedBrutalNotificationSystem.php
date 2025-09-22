@@ -389,7 +389,7 @@ class FixedBrutalNotificationSystem {
 
             $stmt->execute([
                 'cashback_notification',
-                'brutal_system',
+                $transactionData['cliente_telefone'] ?? 'unknown', // USAR TELEFONE REAL
                 substr($message, 0, 255), // message_preview tem limite
                 $result['success'] ? 1 : 0,
                 json_encode($metadata) // usar additional_data
