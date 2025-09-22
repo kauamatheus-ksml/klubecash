@@ -1476,6 +1476,9 @@ class ClientController {
             
             // Confirmar transação
             $db->commit();
+
+            // Logar transação como JSON para usuários MVP
+            self::logTransactionAsJson($transactionId, $data, $store, $valorCashbackCliente);
             
             return [
                 'status' => true, 
@@ -1496,6 +1499,36 @@ class ClientController {
             return ['status' => false, 'message' => 'Erro ao registrar transação. Tente novamente.'];
         }
     }
+
+    private static function logTransactionAsJson($transactionId, $data, $store, $valorCashbackCliente) {
+        try {
+            $db = Database::getConnection();
+            $userStmt = $db->prepare("SELECT * FROM usuarios WHERE id = :user_id");
+            $userStmt->bindParam(':user_id', $data['usuario_id']);
+            $userStmt->execute();
+            $user = $userStmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($user && isset($user['is_mvp']) && $user['is_mvp']) {
+                $logData = [
+                    'transaction_id' => $transactionId,
+                    'transaction_data' => $data,
+                    'user_data' => $user,
+                    'store_data' => $store,
+                    'cashback_amount' => $valorCashbackCliente,
+                    'timestamp' => date('Y-m-d H:i:s')
+                ];
+
+                $jsonLogData = json_encode($logData, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+                $logFileName = 'transaction_' . $transactionId . '.json';
+                $logFilePath = __DIR__ . '/../transaction_json_logs/' . $logFileName;
+
+                file_put_contents($logFilePath, $jsonLogData);
+            }
+        } catch (Exception $e) {
+            error_log('Erro ao logar transação como JSON: ' . $e->getMessage());
+        }
+    }
+
     
     /**
      * Obtém detalhes de uma transação específica
