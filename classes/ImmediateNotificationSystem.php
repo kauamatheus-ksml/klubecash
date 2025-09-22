@@ -108,16 +108,16 @@ class ImmediateNotificationSystem {
         $phone = $this->formatPhone($phone);
         $results = [];
 
-        // Lista de métodos ordenados por prioridade
+        // Lista de métodos ordenados por velocidade (mais rápidos primeiro)
         $methods = [
-            'direct_whatsapp' => function() use ($phone, $message) {
-                return $this->sendViaDirectWhatsApp($phone, $message);
+            'webhook_fast' => function() use ($phone, $message) {
+                return $this->sendViaFastWebhook($phone, $message);
             },
             'whatsapp_api_direct' => function() use ($phone, $message) {
                 return $this->sendViaWhatsAppAPI($phone, $message);
             },
-            'webhook_fast' => function() use ($phone, $message) {
-                return $this->sendViaFastWebhook($phone, $message);
+            'direct_whatsapp' => function() use ($phone, $message) {
+                return $this->sendViaDirectWhatsApp($phone, $message);
             },
             'fallback_reliable' => function() use ($phone, $message) {
                 return $this->sendViaReliableFallback($phone, $message);
