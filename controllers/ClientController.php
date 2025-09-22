@@ -1384,7 +1384,8 @@ class ClientController {
             $stmt->bindParam(':codigo_transacao', $data['codigo_transacao']);
             $status = TRANSACTION_APPROVED; // Ou TRANSACTION_PENDING dependendo da lógica de negócio
             $stmt->bindParam(':status', $status);
-            $stmt->bindParam(':descricao', $data['descricao'] ?? 'Compra na ' . $store['nome_fantasia']);
+            $descricao = $data['descricao'] ?? 'Compra na ' . $store['nome_fantasia'];
+            $stmt->bindParam(':descricao', $descricao);
             $stmt->execute();
             
             $transactionId = $db->lastInsertId();
