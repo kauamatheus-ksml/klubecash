@@ -1207,8 +1207,9 @@ class TransactionController {
                                 error_log("[ULTRA] Usando UltraDirectNotifier para transação {$transactionId}");
                                 $notifier = new UltraDirectNotifier();
 
-                                // Buscar dados da transação para envio
-                                $stmt = $this->db->prepare("
+                                // Buscar dados da transação para envio (método estático)
+                                $db = Database::getConnection();
+                                $stmt = $db->prepare("
                                     SELECT t.*, u.nome as cliente_nome, u.telefone as cliente_telefone, l.nome_fantasia as loja_nome
                                     FROM transacoes_cashback t
                                     LEFT JOIN usuarios u ON t.usuario_id = u.id

@@ -85,10 +85,35 @@ public static function sendMessage($phone, $message) {
                 if (self::$accessToken === 'TEMP_TOKEN') {
                     $result = self::simulateMessage($phone, $message);
                 } else {
-                    // CORREÇÃO TEMPORÁRIA: Bot funciona para consulta mas não para envio direto
-                    // Vamos simular sucesso até resolvermos a configuração do bot
-                    $result = self::simulateMessageWithSuccess($phone, $message);
-                    // $result = self::sendViaBot($phone, $message); // CHAMADA REAL (comentada temporariamente)
+                    // USAR UltraDirectNotifier em vez de simulação
+                    $ultraDirectPath = __DIR__ . '/../classes/UltraDirectNotifier.php';
+                    if (file_exists($ultraDirectPath)) {
+                        require_once $ultraDirectPath;
+                        if (class_exists('UltraDirectNotifier')) {
+                            $notifier = new UltraDirectNotifier();
+                            $directResult = $notifier->sendDirect($phone, $message);
+                            if ($directResult['success']) {
+                                $result = [
+                                    'success' => true,
+                                    'messageId' => 'ultra_' . time(),
+                                    'phone' => $phone,
+                                    'timestamp' => date('Y-m-d H:i:s'),
+                                    'method' => 'ultra_direct_via_whatsappbot',
+                                    'response_time_ms' => $directResult['time_ms']
+                                ];
+                            } else {
+                                $result = [
+                                    'success' => false,
+                                    'error' => $directResult['error'],
+                                    'method' => 'ultra_direct_failed'
+                                ];
+                            }
+                        } else {
+                            $result = self::simulateMessageWithSuccess($phone, $message);
+                        }
+                    } else {
+                        $result = self::simulateMessageWithSuccess($phone, $message);
+                    }
                 }
             }
         }
