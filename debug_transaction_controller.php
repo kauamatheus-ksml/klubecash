@@ -43,6 +43,18 @@ try {
     ini_set('display_errors', 1);
     ini_set('log_errors', 1);
 
+    echo "\n🚀 Simulando sessão de loja autenticada...\n";
+
+    // Simular sessão de loja para bypass da autenticação
+    if (!isset($_SESSION)) {
+        session_start();
+    }
+    $_SESSION['user_id'] = 59; // ID da loja Sync Holding
+    $_SESSION['user_type'] = 'loja'; // ou USER_TYPE_STORE se definido
+    $_SESSION['store_id'] = 59;
+
+    echo "✅ Sessão simulada: user_id={$_SESSION['user_id']}, user_type={$_SESSION['user_type']}\n";
+
     echo "\n🚀 Criando instância do TransactionController...\n";
 
     // Simular dados de uma transação real (campos obrigatórios)
