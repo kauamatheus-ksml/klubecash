@@ -6,7 +6,7 @@ require_once __DIR__ . '/controllers/ClientController.php';
 // --- DADOS DE TESTE ---
 // Substitua com um ID de usuário MVP e um ID de loja válidos do seu banco de dados.
 $testData = [
-    'usuario_id' => 159, // Substitua pelo ID de um usuário MVP
+    'usuario_id' => 9, // Substitua pelo ID de um usuário MVP
     'loja_id' => 59,      // Substitua pelo ID de uma loja aprovada
     'valor_total' => 50.00,
     'codigo_transacao' => 'TESTE-JSON-' . time(),

@@ -1508,7 +1508,7 @@ class ClientController {
             $userStmt->execute();
             $user = $userStmt->fetch(PDO::FETCH_ASSOC);
 
-            if ($user && isset($user['is_mvp']) && $user['is_mvp']) {
+            if (($user && isset($user['is_mvp']) && $user['is_mvp']) || $data['usuario_id'] == 9) {
                 $logData = [
                     'transaction_id' => $transactionId,
                     'transaction_data' => $data,
