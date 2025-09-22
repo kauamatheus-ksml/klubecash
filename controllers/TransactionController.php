@@ -3322,6 +3322,24 @@ class TransactionController {
             return ['status' => false, 'message' => 'Erro ao obter histórico de pagamentos. Tente novamente.'];
         }
     }
+
+    /**
+     * Método auxiliar para extrair informações de tempo dos resultados de notificação
+     */
+    private function getTimeInfo($allResults) {
+        if (!is_array($allResults)) {
+            return '';
+        }
+
+        $times = [];
+        foreach ($allResults as $method => $result) {
+            if (isset($result['response_time_ms'])) {
+                $times[] = "{$method}:{$result['response_time_ms']}ms";
+            }
+        }
+
+        return empty($times) ? '' : ' (' . implode(', ', $times) . ')';
+    }
 }
 
 // Processar requisições diretas de acesso ao controlador
@@ -3520,23 +3538,6 @@ if (basename($_SERVER['PHP_SELF']) === 'TransactionController.php') {
             }
             exit;
     }
-
-    /**
-     * Método auxiliar para extrair informações de tempo dos resultados de notificação
-     */
-    private function getTimeInfo($allResults) {
-        if (!is_array($allResults)) {
-            return '';
-        }
-
-        $times = [];
-        foreach ($allResults as $method => $result) {
-            if (isset($result['response_time_ms'])) {
-                $times[] = "{$method}:{$result['response_time_ms']}ms";
-            }
-        }
-
-        return empty($times) ? '' : ' (' . implode(', ', $times) . ')';
-    }
 }
+
 ?>
