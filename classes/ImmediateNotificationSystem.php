@@ -147,7 +147,32 @@ class ImmediateNotificationSystem {
     }
 
     /**
-     * Método 1: API WhatsApp direta (múltiplas URLs)
+     * Método 1: Sistema direto de WhatsApp (NOVO)
+     */
+    private function sendViaDirectWhatsApp($phone, $message) {
+        try {
+            require_once __DIR__ . '/DirectWhatsAppSender.php';
+
+            if (class_exists('DirectWhatsAppSender')) {
+                $sender = new DirectWhatsAppSender();
+                $result = $sender->sendMessage($phone, $message);
+
+                return [
+                    'success' => $result['success'],
+                    'method' => 'direct_whatsapp_' . ($result['method'] ?? 'unknown'),
+                    'response' => $result,
+                    'error' => $result['success'] ? null : ($result['error'] ?? 'Erro desconhecido')
+                ];
+            } else {
+                return ['success' => false, 'error' => 'DirectWhatsAppSender não encontrado'];
+            }
+        } catch (Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Método 2: API WhatsApp direta (múltiplas URLs)
      */
     private function sendViaWhatsAppAPI($phone, $message) {
         try {
