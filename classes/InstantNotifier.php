@@ -12,7 +12,13 @@ class InstantNotifier {
     private $logFile;
 
     public function __construct() {
-        $this->webhookUrl = (isset($_SERVER['HTTPS']) ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'] . '/api/instant-whatsapp.php';
+        // Determinar URL base
+        if (isset($_SERVER['HTTP_HOST'])) {
+            $this->webhookUrl = (isset($_SERVER['HTTPS']) ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'] . '/api/instant-whatsapp.php';
+        } else {
+            // Fallback para CLI ou quando não há HTTP_HOST
+            $this->webhookUrl = 'https://klubecash.com/api/instant-whatsapp.php';
+        }
         $this->logFile = __DIR__ . '/../logs/instant_notifier.log';
 
         // Criar diretório se não existir
