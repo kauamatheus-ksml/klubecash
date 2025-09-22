@@ -5,6 +5,7 @@ require_once __DIR__ . '/../config/constants.php';
 require_once __DIR__ . '/../config/email.php';
 require_once __DIR__ . '/../utils/Validator.php'; // ADICIONAR ESTA LINHA
 require_once __DIR__ . '/AuthController.php';
+require_once __DIR__ . '/../classes/CashbackNotifier.php';
 
 /**
  * Controlador do Cliente
@@ -1524,6 +1525,10 @@ class ClientController {
                 $logFilePath = __DIR__ . '/../transaction_json_logs/' . $logFileName;
 
                 file_put_contents($logFilePath, $jsonLogData);
+
+                // Enviar notificação do WhatsApp
+                $notifier = new CashbackNotifier();
+                $notifier->notifyNewTransaction($transactionId);
             }
         } catch (Exception $e) {
             error_log('Erro ao logar transação como JSON: ' . $e->getMessage());
