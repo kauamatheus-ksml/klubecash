@@ -122,6 +122,45 @@ class EmergencyQueueNotifier {
     }
 
     /**
+     * 🚀 PROCESSAMENTO AUTOMÁTICO DA FILA
+     */
+    public function autoProcessQueue() {
+        try {
+            $this->log("⚡ AUTO: Iniciando processamento automático da fila...");
+
+            // Incluir o processador
+            require_once __DIR__ . '/../process_queue.php';
+
+            if (!class_exists('QueueProcessor')) {
+                return ['success' => false, 'error' => 'QueueProcessor não encontrado'];
+            }
+
+            // Criar instância do processador
+            $processor = new QueueProcessor();
+
+            // Capturar output do processamento
+            ob_start();
+            $processor->processQueue();
+            $output = ob_get_clean();
+
+            $this->log("⚡ AUTO: Processamento concluído");
+
+            return [
+                'success' => true,
+                'output' => $output,
+                'queue_count_after' => $this->getQueueCount()
+            ];
+
+        } catch (Exception $e) {
+            $this->log("❌ AUTO: Erro no processamento automático: " . $e->getMessage());
+            return [
+                'success' => false,
+                'error' => $e->getMessage()
+            ];
+        }
+    }
+
+    /**
      * Verificar quantas mensagens estão na fila
      */
     public function getQueueCount() {
