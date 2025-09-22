@@ -1,8 +1,7 @@
 <?php
 require_once __DIR__ . '/config/database.php';
-require_once __DIR__ . '/controllers/TransactionController.php';
 
-echo "=== SIMULANDO TRANSAÇÃO REAL ===\n";
+echo "=== TESTE DIRETO DO ULTRADIRECTNOTIFIER ===\n";
 
 // Dados reais de transação
 $transactionData = [
@@ -22,11 +21,14 @@ echo "- Telefone: " . $transactionData['cliente_telefone'] . "\n";
 echo "- Nome: " . $transactionData['cliente_nome'] . "\n";
 echo "- Valor: R$ " . $transactionData['valor_total'] . "\n";
 
-echo "\n=== EXECUTANDO NOTIFICAÇÃO ===\n";
+echo "\n=== TESTANDO ULTRADIRECTNOTIFIER ===\n";
 
-// Chamar método de notificação diretamente
-TransactionController::notifyTransaction($transactionData);
+require_once __DIR__ . '/classes/UltraDirectNotifier.php';
+$notifier = new UltraDirectNotifier();
+$result = $notifier->notifyTransaction($transactionData);
+
+echo "Resultado: " . json_encode($result, JSON_PRETTY_PRINT) . "\n";
 
 echo "\n=== TESTE CONCLUÍDO ===\n";
-echo "Verifique o log: logs/ultra_direct.log\n";
+echo "Mensagem enviada com telefone REAL: " . $transactionData['cliente_telefone'] . "\n";
 ?>
