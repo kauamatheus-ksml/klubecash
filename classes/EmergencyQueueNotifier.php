@@ -48,12 +48,29 @@ class EmergencyQueueNotifier {
 
         if (file_put_contents($queueFile, json_encode($queueItem, JSON_PRETTY_PRINT))) {
             $this->log("🚨 EMERGÊNCIA: Mensagem adicionada à fila - ID: {$messageId}, Telefone: {$phone}");
-            return [
-                'success' => true,
-                'message_id' => $messageId,
-                'method' => 'emergency_queue',
-                'queue_file' => $queueFile
-            ];
+
+            // 🚀 PROCESSAMENTO AUTOMÁTICO IMEDIATO
+            $this->log("⚡ AUTO: Iniciando processamento automático...");
+            $autoResult = $this->autoProcessQueue();
+
+            if ($autoResult['success']) {
+                $this->log("✅ AUTO: Mensagem processada automaticamente com sucesso!");
+                return [
+                    'success' => true,
+                    'message_id' => $messageId,
+                    'method' => 'emergency_auto_processed',
+                    'auto_result' => $autoResult
+                ];
+            } else {
+                $this->log("⚠️ AUTO: Processamento automático falhou, mensagem permanece na fila");
+                return [
+                    'success' => true,
+                    'message_id' => $messageId,
+                    'method' => 'emergency_queue_pending',
+                    'queue_file' => $queueFile,
+                    'auto_error' => $autoResult['error']
+                ];
+            }
         } else {
             $this->log("❌ ERRO: Falha ao adicionar à fila - Telefone: {$phone}");
             return [
