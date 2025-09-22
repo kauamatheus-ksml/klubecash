@@ -227,12 +227,12 @@ class FixedBrutalNotificationSystem {
      */
     private function sendViaDirectAPI($phone, $message) {
         try {
-            // Múltiplas URLs possíveis para o bot
+            // Múltiplas URLs possíveis para o bot (ATUALIZADAS PARA 3003)
             $botUrls = [
-                "http://localhost:3002/send-message",        // Bot local
-                "http://127.0.0.1:3002/send-message",        // Bot local alternativo
-                "https://klubecash.com:3002/send-message",   // Bot no servidor (HTTPS)
-                "http://klubecash.com:3002/send-message",    // Bot no servidor (HTTP)
+                "http://localhost:3003/send-message",        // Bot local (porta corrigida)
+                "http://127.0.0.1:3003/send-message",        // Bot local alternativo
+                "https://klubecash.com:3003/send-message",   // Bot no servidor (HTTPS)
+                "http://klubecash.com:3003/send-message",    // Bot no servidor (HTTP)
                 "http://localhost:3000/send-message",        // Porta alternativa
                 "http://localhost:3001/send-message"         // Porta alternativa
             ];
