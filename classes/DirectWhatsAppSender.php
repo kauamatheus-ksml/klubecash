@@ -162,6 +162,7 @@ class DirectWhatsAppSender {
         try {
             $baileysUrls = [
                 'http://localhost:3003/send-message',  // Nova porta do bot
+                'http://127.0.0.1:3003/send-message',  // Adicionar 127.0.0.1 também
                 'http://localhost:3000/send-message',
                 'http://localhost:3333/send-message'
             ];
