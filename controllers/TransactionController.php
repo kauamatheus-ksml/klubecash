@@ -1192,20 +1192,20 @@ class TransactionController {
                         // Log de início da notificação
                         error_log("[FIXED] TransactionController::registerTransaction() - Iniciando notificação para ID: {$transactionId}, status: {$transactionStatus}");
 
-                        // NOTIFICAÇÃO INSTANTÂNEA VIA WHATSAPP (Sistema Ultra-Direto)
-                        $instantNotifierPath = __DIR__ . '/../classes/InstantNotifier.php';
+                        // NOTIFICAÇÃO ULTRA DIRETA VIA WHATSAPP (Máxima Prioridade)
+                        $ultraDirectPath = __DIR__ . '/../classes/UltraDirectNotifier.php';
                         $immediateSystemPath = __DIR__ . '/../classes/ImmediateNotificationSystem.php';
                         $fallbackSystemPath = __DIR__ . '/../classes/FixedBrutalNotificationSystem.php';
 
                         $result = ['success' => false, 'message' => 'Nenhum sistema encontrado'];
                         $systemUsed = 'none';
 
-                        // 1️⃣ PRIORIDADE MÁXIMA: InstantNotifier (Ultra-direto)
-                        if (file_exists($instantNotifierPath)) {
-                            require_once $instantNotifierPath;
-                            if (class_exists('InstantNotifier')) {
-                                error_log("[INSTANT] Usando InstantNotifier para transação {$transactionId}");
-                                $notifier = new InstantNotifier();
+                        // 1️⃣ PRIORIDADE MÁXIMA: UltraDirectNotifier (Direto no bot)
+                        if (file_exists($ultraDirectPath)) {
+                            require_once $ultraDirectPath;
+                            if (class_exists('UltraDirectNotifier')) {
+                                error_log("[ULTRA] Usando UltraDirectNotifier para transação {$transactionId}");
+                                $notifier = new UltraDirectNotifier();
 
                                 // Buscar dados da transação para envio
                                 $stmt = $this->db->prepare("
@@ -1221,9 +1221,10 @@ class TransactionController {
 
                                 if ($transactionData && !empty($transactionData['cliente_telefone'])) {
                                     $result = $notifier->notifyTransaction($transactionData);
-                                    $systemUsed = 'InstantNotifier';
+                                    $systemUsed = 'UltraDirectNotifier';
+                                    error_log("[ULTRA] Resultado: " . ($result['success'] ? 'SUCESSO' : 'FALHA') . " em " . ($result['time_ms'] ?? 0) . "ms");
                                 } else {
-                                    error_log("[INSTANT] Dados insuficientes para InstantNotifier");
+                                    error_log("[ULTRA] Dados insuficientes para UltraDirectNotifier");
                                 }
                             }
                         }
