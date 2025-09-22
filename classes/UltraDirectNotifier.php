@@ -81,11 +81,17 @@ class UltraDirectNotifier {
      * Notificar transação (método principal)
      */
     public function notifyTransaction($transactionData) {
-        $nome = $transactionData['cliente_nome'] ?? 'Cliente';
-        $valor = number_format($transactionData['valor_total'] ?? 0, 2, ',', '.');
-        $cashback = number_format($transactionData['valor_cliente'] ?? 0, 2, ',', '.');
-        $loja = $transactionData['loja_nome'] ?? 'Loja';
-        $status = $transactionData['status'] ?? 'pendente';
+        // 🔍 SE TEMOS transaction_id, BUSCAR DADOS REAIS DO BANCO
+        $realData = $this->getRealTransactionData($transactionData);
+
+        $nome = $realData['cliente_nome'] ?? 'Cliente';
+        $valor = number_format($realData['valor_total'] ?? 0, 2, ',', '.');
+        $cashback = number_format($realData['valor_cliente'] ?? 0, 2, ',', '.');
+        $loja = $realData['loja_nome'] ?? 'Loja';
+        $status = $realData['status'] ?? 'pendente';
+        $phone = $realData['cliente_telefone'] ?? 'unknown';
+
+        $this->log("📱 TELEFONE RESOLVIDO: {$phone} para transação " . ($realData['transaction_id'] ?? 'sem ID'));
 
         // Mensagem otimizada
         if ($status === 'aprovado') {
@@ -102,7 +108,67 @@ class UltraDirectNotifier {
                       "💳 https://klubecash.com";
         }
 
-        return $this->sendDirect($transactionData['cliente_telefone'], $message);
+        return $this->sendDirect($phone, $message);
+    }
+
+    /**
+     * 🔍 BUSCAR DADOS REAIS DA TRANSAÇÃO NO BANCO
+     */
+    private function getRealTransactionData($transactionData) {
+        // Se já temos dados completos, usar direto
+        if (!empty($transactionData['cliente_telefone']) && $transactionData['cliente_telefone'] !== 'unknown') {
+            return $transactionData;
+        }
+
+        // Buscar transaction_id no additional_data ou direto
+        $transactionId = null;
+        if (isset($transactionData['transaction_id'])) {
+            $transactionId = $transactionData['transaction_id'];
+        } elseif (isset($transactionData['additional_data'])) {
+            $additionalData = is_string($transactionData['additional_data'])
+                ? json_decode($transactionData['additional_data'], true)
+                : $transactionData['additional_data'];
+            $transactionId = $additionalData['transaction_id'] ?? null;
+        }
+
+        if (!$transactionId) {
+            $this->log("❌ Sem transaction_id para buscar dados reais");
+            return $transactionData;
+        }
+
+        try {
+            require_once __DIR__ . '/../config/database.php';
+            $db = Database::getConnection();
+
+            $sql = "SELECT
+                        t.id as transaction_id,
+                        t.valor_total,
+                        t.valor_cliente,
+                        t.status,
+                        u.nome as cliente_nome,
+                        u.telefone as cliente_telefone,
+                        l.nome as loja_nome
+                    FROM transactions t
+                    JOIN users u ON t.cliente_id = u.id
+                    JOIN lojas l ON t.loja_id = l.id
+                    WHERE t.id = ?";
+
+            $stmt = $db->prepare($sql);
+            $stmt->execute([$transactionId]);
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($result) {
+                $this->log("✅ Dados reais encontrados para transação {$transactionId}");
+                return array_merge($transactionData, $result);
+            } else {
+                $this->log("❌ Transação {$transactionId} não encontrada no banco");
+                return $transactionData;
+            }
+
+        } catch (Exception $e) {
+            $this->log("❌ Erro ao buscar dados reais: " . $e->getMessage());
+            return $transactionData;
+        }
     }
 
     /**
