@@ -15,7 +15,7 @@ module.exports = {
     },
 
     // CORRIGIR - Usar porta do .env
-    port: process.env.PORT || 3002,
+    port: process.env.PORT || 3003,
 
     // Keywords para consulta de saldo
     saldoKeywords: [

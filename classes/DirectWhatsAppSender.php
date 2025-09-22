@@ -161,6 +161,7 @@ class DirectWhatsAppSender {
     private function sendViaBaileys($phone, $message) {
         try {
             $baileysUrls = [
+                'http://localhost:3003/send-message',  // Nova porta do bot
                 'http://localhost:3000/send-message',
                 'http://localhost:3333/send-message'
             ];
