@@ -46,9 +46,9 @@ try {
 
     $insertStmt = $db->prepare("
         INSERT INTO transacoes_cashback
-        (codigo_transacao, usuario_id, loja_id, valor_total, valor_cliente, status,
-         metodo_pagamento, observacao, data_transacao, data_criacao_usuario)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        (codigo_transacao, usuario_id, loja_id, valor_total, valor_cliente, valor_cashback,
+         valor_admin, valor_loja, status, descricao, data_transacao, data_criacao_usuario)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
     ");
 
     $success = $insertStmt->execute([
@@ -56,9 +56,11 @@ try {
         $testUser['id'],
         $testStore['id'],
         $valor,
-        $cashback,
+        $cashback, // valor_cliente
+        $cashback, // valor_cashback (mesmo valor)
+        0.00, // valor_admin
+        0.00, // valor_loja
         'pendente',
-        'Dinheiro',
         'Teste simples de notificação automática'
     ]);
 
