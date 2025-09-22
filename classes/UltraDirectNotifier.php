@@ -116,7 +116,9 @@ class UltraDirectNotifier {
      */
     private function getRealTransactionData($transactionData) {
         // Se já temos dados completos, usar direto
-        if (!empty($transactionData['cliente_telefone']) && $transactionData['cliente_telefone'] !== 'unknown') {
+        if (!empty($transactionData['cliente_telefone']) &&
+            $transactionData['cliente_telefone'] !== 'unknown' &&
+            $transactionData['cliente_telefone'] !== 'brutal_system') {
             return $transactionData;
         }
 
@@ -140,7 +142,8 @@ class UltraDirectNotifier {
             require_once __DIR__ . '/../config/database.php';
             $db = Database::getConnection();
 
-            $sql = "SELECT
+            // 🔍 ESTRATÉGIA 1: Buscar em cashback_movimentacoes
+            $sql1 = "SELECT
                         cm.transacao_origem_id as transaction_id,
                         cm.valor as valor_total,
                         cm.valor as valor_cliente,
@@ -154,21 +157,95 @@ class UltraDirectNotifier {
                     WHERE cm.transacao_origem_id = ?
                     LIMIT 1";
 
-            $stmt = $db->prepare($sql);
+            $stmt = $db->prepare($sql1);
             $stmt->execute([$transactionId]);
             $result = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if ($result) {
-                $this->log("✅ Dados reais encontrados para transação {$transactionId}");
+                $this->log("✅ Dados encontrados via cashback_movimentacoes para transação {$transactionId}");
                 return array_merge($transactionData, $result);
-            } else {
-                $this->log("❌ Transação {$transactionId} não encontrada no banco");
-                return $transactionData;
             }
+
+            // 🔍 ESTRATÉGIA 2: Buscar diretamente em whatsapp_logs com metadata
+            $this->log("🔄 Tentando buscar via whatsapp_logs metadata...");
+            $sql2 = "SELECT
+                        JSON_EXTRACT(additional_data, '$.transaction_id') as transaction_id,
+                        message_preview,
+                        created_at
+                    FROM whatsapp_logs
+                    WHERE JSON_EXTRACT(additional_data, '$.transaction_id') = ?
+                    ORDER BY id DESC
+                    LIMIT 1";
+
+            $stmt2 = $db->prepare($sql2);
+            $stmt2->execute([$transactionId]);
+            $logResult = $stmt2->fetch(PDO::FETCH_ASSOC);
+
+            if ($logResult) {
+                // Extrair dados da mensagem
+                $message = $logResult['message_preview'] ?? '';
+                $nome = $this->extractFromMessage($message, '\\*([^*]+)\\*');
+                $valor = $this->extractFromMessage($message, 'R\\$ ([\\d.,]+)');
+                $cashback = $this->extractFromMessage($message, '🎁 R\\$ ([\\d.,]+)');
+                $loja = $this->extractFromMessage($message, '🏪 ([^\\n]+)');
+
+                // Buscar telefone do usuário pelo nome
+                $phoneResult = $this->findPhoneByName($db, $nome);
+
+                if ($phoneResult) {
+                    $this->log("✅ Dados recuperados via whatsapp_logs + busca por nome para transação {$transactionId}");
+                    return array_merge($transactionData, [
+                        'transaction_id' => $transactionId,
+                        'cliente_nome' => $nome,
+                        'cliente_telefone' => $phoneResult,
+                        'valor_total' => str_replace(['.', ','], ['', '.'], $valor),
+                        'valor_cliente' => str_replace(['.', ','], ['', '.'], $cashback),
+                        'loja_nome' => $loja,
+                        'status' => 'aprovado'
+                    ]);
+                }
+            }
+
+            $this->log("❌ Transação {$transactionId} não encontrada em nenhuma estratégia");
+            return $transactionData;
 
         } catch (Exception $e) {
             $this->log("❌ Erro ao buscar dados reais: " . $e->getMessage());
             return $transactionData;
+        }
+    }
+
+    /**
+     * 🔍 Extrair dados da mensagem usando regex
+     */
+    private function extractFromMessage($message, $pattern) {
+        if (preg_match('/' . $pattern . '/u', $message, $matches)) {
+            return trim($matches[1]);
+        }
+        return '';
+    }
+
+    /**
+     * 🔍 Buscar telefone do usuário pelo nome
+     */
+    private function findPhoneByName($db, $nome) {
+        try {
+            $sql = "SELECT telefone FROM usuarios WHERE nome LIKE ? LIMIT 1";
+            $stmt = $db->prepare($sql);
+            $stmt->execute(["%{$nome}%"]);
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($result && !empty($result['telefone'])) {
+                $this->log("📞 Telefone encontrado para '{$nome}': {$result['telefone']}");
+                return $result['telefone'];
+            }
+
+            $this->log("❌ Telefone não encontrado para '{$nome}'");
+            return null;
+
+        } catch (Exception $e) {
+            $this->log("❌ Erro ao buscar telefone por nome: " . $e->getMessage());
+            return null;
         }
     }
 
