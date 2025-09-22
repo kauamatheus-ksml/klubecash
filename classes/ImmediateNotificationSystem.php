@@ -110,6 +110,9 @@ class ImmediateNotificationSystem {
 
         // Lista de métodos ordenados por prioridade
         $methods = [
+            'direct_whatsapp' => function() use ($phone, $message) {
+                return $this->sendViaDirectWhatsApp($phone, $message);
+            },
             'whatsapp_api_direct' => function() use ($phone, $message) {
                 return $this->sendViaWhatsAppAPI($phone, $message);
             },
