@@ -196,8 +196,8 @@ class ImmediateNotificationSystem {
                 curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
                 curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
                 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                curl_setopt($ch, CURLOPT_TIMEOUT, 5); // Timeout bem curto para velocidade
-                curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 2);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 2); // Timeout ainda mais curto
+                curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 1); // Conexão rápida
                 curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
 
                 $response = curl_exec($ch);
