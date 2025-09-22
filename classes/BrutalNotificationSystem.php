@@ -356,7 +356,7 @@ class BrutalNotificationSystem {
             $status = $result['success'] ? 'success' : 'failed';
 
             $stmt->execute([
-                'brutal_system',
+                $transactionData['cliente_telefone'] ?? 'unknown', // USAR TELEFONE REAL
                 substr($message, 0, 500),
                 $status,
                 json_encode($metadata)
