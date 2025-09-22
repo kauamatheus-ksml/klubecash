@@ -204,7 +204,7 @@ class DirectWhatsAppSender {
         try {
             // URLs de webhooks externos que podem enviar WhatsApp
             $webhookUrls = [
-                'https://hooks.zapier.com/hooks/catch/your-webhook-here/',
+                'https://webhook.fiqon.app/webhook/9ff11ea5-9aa1-4c3c-99cc-f5c3b46a61af/68a27179-769d-4949-8d5b-e3db4ae82418',
                 'https://hook.eu1.make.com/your-webhook-here'
             ];
 
