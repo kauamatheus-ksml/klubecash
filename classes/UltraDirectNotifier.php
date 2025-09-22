@@ -69,6 +69,30 @@ class UltraDirectNotifier {
 
         } catch (Exception $e) {
             $this->log("❌ ERRO DIRETO: " . $e->getMessage());
+
+            // 🚨 FALLBACK DE EMERGÊNCIA: Usar sistema de fila
+            $this->log("🚨 ATIVANDO FALLBACK DE EMERGÊNCIA - Sistema de fila");
+
+            try {
+                require_once __DIR__ . '/EmergencyQueueNotifier.php';
+                if (class_exists('EmergencyQueueNotifier')) {
+                    $emergencyNotifier = new EmergencyQueueNotifier();
+                    $emergencyResult = $emergencyNotifier->addToQueue($phone, $message);
+
+                    if ($emergencyResult['success']) {
+                        $this->log("✅ EMERGÊNCIA: Mensagem adicionada à fila com sucesso!");
+                        return [
+                            'success' => true,
+                            'method' => 'emergency_fallback',
+                            'message_id' => $emergencyResult['message_id'],
+                            'fallback_reason' => $e->getMessage()
+                        ];
+                    }
+                }
+            } catch (Exception $emergencyError) {
+                $this->log("❌ FALHA TOTAL: Erro no sistema de emergência: " . $emergencyError->getMessage());
+            }
+
             return [
                 'success' => false,
                 'error' => $e->getMessage(),
