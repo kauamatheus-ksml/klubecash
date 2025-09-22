@@ -45,11 +45,12 @@ try {
 
     echo "\n🚀 Criando instância do TransactionController...\n";
 
-    // Simular dados de uma transação real
+    // Simular dados de uma transação real (campos obrigatórios)
     $transactionData = [
         'usuario_id' => 162,  // Cecilia que tem telefone
         'loja_id' => 59,      // Sync Holding
         'valor_total' => 200.00,
+        'codigo_transacao' => 'TEST_' . time(), // Campo obrigatório
         'percentual_cashback' => 5.0,
         'descricao' => 'Teste via TransactionController'
     ];
