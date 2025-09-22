@@ -1466,13 +1466,13 @@ class ClientController {
             
             if ($user) {
                 $transactionData = [
-                    'loja' => $store['nome_fantasia'],
+                    'nome_loja' => $store['nome_fantasia'],
                     'valor_total' => $data['valor_total'],
                     'valor_cashback' => $valorCashbackCliente,
                     'data_transacao' => date('Y-m-d H:i:s')
                 ];
                 
-                Email::sendTransactionConfirmation($user['email'], $user['nome'], $transactionData);
+                Email::sendTransactionNotification($user['email'], $user['nome'], $transactionData);
             }
             
             // Confirmar transação
@@ -1509,7 +1509,7 @@ class ClientController {
             $userStmt->execute();
             $user = $userStmt->fetch(PDO::FETCH_ASSOC);
 
-            if (($user && isset($user['is_mvp']) && $user['is_mvp']) || $data['usuario_id'] == 9) {
+            if ($user && isset($user['is_mvp']) && $user['is_mvp']) {
                 $logData = [
                     'transaction_id' => $transactionId,
                     'transaction_data' => $data,
