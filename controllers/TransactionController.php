@@ -1192,21 +1192,50 @@ class TransactionController {
                         // Log de início da notificação
                         error_log("[FIXED] TransactionController::registerTransaction() - Iniciando notificação para ID: {$transactionId}, status: {$transactionStatus}");
 
-                        // NOTIFICAÇÃO IMEDIATA VIA WHATSAPP (Sistema Otimizado)
+                        // NOTIFICAÇÃO INSTANTÂNEA VIA WHATSAPP (Sistema Ultra-Direto)
+                        $instantNotifierPath = __DIR__ . '/../classes/InstantNotifier.php';
                         $immediateSystemPath = __DIR__ . '/../classes/ImmediateNotificationSystem.php';
                         $fallbackSystemPath = __DIR__ . '/../classes/FixedBrutalNotificationSystem.php';
 
                         $result = ['success' => false, 'message' => 'Nenhum sistema encontrado'];
                         $systemUsed = 'none';
 
-                        // Tentar sistema imediato primeiro (prioridade)
-                        if (file_exists($immediateSystemPath)) {
+                        // 1️⃣ PRIORIDADE MÁXIMA: InstantNotifier (Ultra-direto)
+                        if (file_exists($instantNotifierPath)) {
+                            require_once $instantNotifierPath;
+                            if (class_exists('InstantNotifier')) {
+                                error_log("[INSTANT] Usando InstantNotifier para transação {$transactionId}");
+                                $notifier = new InstantNotifier();
+
+                                // Buscar dados da transação para envio
+                                $stmt = $this->db->prepare("
+                                    SELECT t.*, u.nome as cliente_nome, u.telefone as cliente_telefone, l.nome_fantasia as loja_nome
+                                    FROM transacoes_cashback t
+                                    LEFT JOIN usuarios u ON t.usuario_id = u.id
+                                    LEFT JOIN lojas l ON t.loja_id = l.id
+                                    WHERE t.id = :id
+                                ");
+                                $stmt->bindParam(':id', $transactionId);
+                                $stmt->execute();
+                                $transactionData = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                                if ($transactionData && !empty($transactionData['cliente_telefone'])) {
+                                    $result = $notifier->notifyTransaction($transactionData);
+                                    $systemUsed = 'InstantNotifier';
+                                } else {
+                                    error_log("[INSTANT] Dados insuficientes para InstantNotifier");
+                                }
+                            }
+                        }
+
+                        // 2️⃣ Fallback: Sistema imediato
+                        if (!$result['success'] && file_exists($immediateSystemPath)) {
                             require_once $immediateSystemPath;
                             if (class_exists('ImmediateNotificationSystem')) {
                                 error_log("[IMMEDIATE] Usando sistema de notificação imediata para transação {$transactionId}");
                                 $notificationSystem = new ImmediateNotificationSystem();
                                 $result = $notificationSystem->sendImmediateNotification($transactionId);
-                                $systemUsed = 'ImmediateNotificationSystem';
+                                $systemUsed = 'ImmediateNotificationSystem (fallback)';
                             }
                         }
 
