@@ -177,10 +177,10 @@ class ImmediateNotificationSystem {
     private function sendViaWhatsAppAPI($phone, $message) {
         try {
             $botUrls = [
-                "http://localhost:3002/send-message",
-                "http://127.0.0.1:3002/send-message",
+                "http://localhost:3003/send-message",
+                "http://127.0.0.1:3003/send-message",
                 "https://klubecash.com/api/whatsapp-bot/send-message",
-                "http://klubecash.com:3002/send-message"
+                "http://klubecash.com:3003/send-message"
             ];
 
             $data = [
@@ -342,13 +342,13 @@ class ImmediateNotificationSystem {
             }
 
             $metadata = [
-                'transaction_id' => $transactionId,
-                'message_preview' => substr($message, 0, 100),
-                'timestamp' => date('Y-m-d H:i:s'),
-                'system' => 'ImmediateNotificationSystem',
-                'success_methods' => $successMethods,
-                'failed_methods' => $failMethods,
-                'total_methods_tried' => count($results)
+                'tx_id' => $transactionId,
+                'msg' => substr($message, 0, 50),
+                'ts' => date('Y-m-d H:i:s'),
+                'sys' => 'immediate',
+                'ok' => array_slice($successMethods, 0, 2), // Limitar a 2 métodos
+                'fail' => array_slice($failMethods, 0, 2), // Limitar a 2 métodos
+                'count' => count($results)
             ];
 
             $stmt = $this->db->prepare("
