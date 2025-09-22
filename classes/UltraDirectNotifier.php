@@ -141,17 +141,18 @@ class UltraDirectNotifier {
             $db = Database::getConnection();
 
             $sql = "SELECT
-                        t.id as transaction_id,
-                        t.valor_total,
-                        t.valor_cliente,
-                        t.status,
+                        cm.transacao_origem_id as transaction_id,
+                        cm.valor,
+                        cm.valor as valor_cliente,
+                        'aprovado' as status,
                         u.nome as cliente_nome,
                         u.telefone as cliente_telefone,
                         l.nome as loja_nome
-                    FROM transactions t
-                    JOIN users u ON t.cliente_id = u.id
-                    JOIN lojas l ON t.loja_id = l.id
-                    WHERE t.id = ?";
+                    FROM cashback_movimentacoes cm
+                    JOIN usuarios u ON cm.usuario_id = u.id
+                    JOIN lojas l ON cm.loja_id = l.id
+                    WHERE cm.transacao_origem_id = ?
+                    LIMIT 1";
 
             $stmt = $db->prepare($sql);
             $stmt->execute([$transactionId]);
