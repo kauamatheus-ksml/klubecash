@@ -1636,33 +1636,47 @@ class TransactionController {
             
             $transactionId = $db->lastInsertId();
 
-            // === INTEGRAÇÃO AUTOMÁTICA: Sistema de Notificação Corrigido ===
+            // === INTEGRAÇÃO AUTOMÁTICA: UltraDirectNotifier (PRIORIDADE MÁXIMA) ===
             try {
-                error_log("[FIXED] TransactionController::registerTransactionFixed() - Disparando notificação para transação {$transactionId}");
+                error_log("[ULTRA] TransactionController::registerTransactionFixed() - Disparando notificação ULTRA para transação {$transactionId}");
 
-                $systemPath = __DIR__ . '/../classes/FixedBrutalNotificationSystem.php';
-                if (file_exists($systemPath)) {
-                    require_once $systemPath;
-                    if (class_exists('FixedBrutalNotificationSystem')) {
-                        $notificationSystem = new FixedBrutalNotificationSystem();
-                        $result = $notificationSystem->forceNotifyTransaction($transactionId);
+                // 🚀 PRIORIDADE 1: UltraDirectNotifier (Direto no bot)
+                $ultraPath = __DIR__ . '/../classes/UltraDirectNotifier.php';
+                if (file_exists($ultraPath)) {
+                    require_once $ultraPath;
+                    if (class_exists('UltraDirectNotifier')) {
+                        $notifier = new UltraDirectNotifier();
+
+                        // Preparar dados da transação (usando ID recém-criado)
+                        $transactionData = [
+                            'transaction_id' => $transactionId,
+                            'cliente_telefone' => 'brutal_system', // Será resolvido pelo UltraDirectNotifier
+                            'additional_data' => json_encode([
+                                'transaction_id' => $transactionId,
+                                'system' => 'registerTransactionFixed',
+                                'timestamp' => date('Y-m-d H:i:s')
+                            ])
+                        ];
+
+                        $result = $notifier->notifyTransaction($transactionData);
+                        error_log("[ULTRA] registerTransactionFixed - Resultado: " . ($result['success'] ? 'SUCESSO' : 'FALHA') . " em " . ($result['time_ms'] ?? 0) . "ms");
                     } else {
-                        error_log("[FIXED] TransactionController::registerTransactionFixed() - Classe não encontrada");
-                        $result = ['success' => false, 'message' => 'Classe não encontrada'];
+                        error_log("[ULTRA] TransactionController::registerTransactionFixed() - Classe UltraDirectNotifier não encontrada");
+                        $result = ['success' => false, 'message' => 'Classe UltraDirectNotifier não encontrada'];
                     }
                 } else {
-                    error_log("[FIXED] TransactionController::registerTransactionFixed() - Arquivo não encontrado: {$systemPath}");
-                    $result = ['success' => false, 'message' => 'Sistema não encontrado'];
+                    error_log("[ULTRA] TransactionController::registerTransactionFixed() - Arquivo não encontrado: {$ultraPath}");
+                    $result = ['success' => false, 'message' => 'UltraDirectNotifier não encontrado'];
                 }
 
                 if ($result['success']) {
-                    error_log("[FIXED] TransactionController::registerTransactionFixed() - Notificação enviada: " . $result['message']);
+                    error_log("[ULTRA] TransactionController::registerTransactionFixed() - Notificação ULTRA enviada com sucesso!");
                 } else {
-                    error_log("[FIXED] TransactionController::registerTransactionFixed() - Falha na notificação: " . $result['message']);
+                    error_log("[ULTRA] TransactionController::registerTransactionFixed() - Falha na notificação ULTRA: " . ($result['error'] ?? $result['message']));
                 }
 
             } catch (Exception $e) {
-                error_log("[FIXED] TransactionController::registerTransactionFixed() - Erro na notificação: " . $e->getMessage());
+                error_log("[ULTRA] TransactionController::registerTransactionFixed() - Erro na notificação ULTRA: " . $e->getMessage());
             }
 
             // Commit
