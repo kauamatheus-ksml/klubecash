@@ -142,12 +142,12 @@ class UltraDirectNotifier {
 
             $sql = "SELECT
                         cm.transacao_origem_id as transaction_id,
-                        cm.valor,
+                        cm.valor as valor_total,
                         cm.valor as valor_cliente,
                         'aprovado' as status,
                         u.nome as cliente_nome,
                         u.telefone as cliente_telefone,
-                        l.nome as loja_nome
+                        l.nome_fantasia as loja_nome
                     FROM cashback_movimentacoes cm
                     JOIN usuarios u ON cm.usuario_id = u.id
                     JOIN lojas l ON cm.loja_id = l.id
