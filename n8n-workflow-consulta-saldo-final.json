@@ -1,0 +1,374 @@
+{
+  "name": "Klube Cash - Consulta Saldo WhatsApp",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "webhook/consulta-saldo",
+        "responseMode": "responseNode"
+      },
+      "id": "webhook-receptor",
+      "name": "Webhook Receptor",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.data }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "validar-webhook",
+      "name": "Validar Webhook",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extrair dados da mensagem do webhook\nconst webhookData = $input.all()[0].json;\nconst messageData = webhookData.data || {};\n\n// Extrair telefone (remover sufixos do WhatsApp)\nlet phoneNumber = '';\nif (messageData.key && messageData.key.remoteJid) {\n  phoneNumber = messageData.key.remoteJid.replace('@s.whatsapp.net', '').replace('@c.us', '');\n}\n\n// Extrair texto da mensagem\nlet messageText = '';\nif (messageData.message) {\n  messageText = messageData.message.conversation || \n                messageData.message.extendedTextMessage?.text || \n                messageData.message.text || '';\n}\n\n// Verificar se é uma mensagem de consulta de saldo\nconst saldoKeywords = ['saldo', 'extrato', 'consulta', 'dinheiro', 'valor', 'quanto tenho'];\nconst isSaldoQuery = saldoKeywords.some(keyword => \n  messageText.toLowerCase().includes(keyword.toLowerCase())\n);\n\n// Verificar se é opção \"1\" do menu\nconst isOption1 = messageText.trim() === '1';\n\n// Determinar se deve processar como consulta de saldo\nconst shouldProcessSaldo = isSaldoQuery || isOption1;\n\n// Log para debug\nconsole.log('Phone:', phoneNumber);\nconsole.log('Message:', messageText);\nconsole.log('Should process saldo:', shouldProcessSaldo);\n\nreturn {\n  phoneNumber: phoneNumber,\n  messageText: messageText,\n  shouldProcessSaldo: shouldProcessSaldo,\n  webhookData: webhookData\n};"
+      },
+      "id": "processar-mensagem",
+      "name": "Processar Mensagem",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 240]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.shouldProcessSaldo }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "verificar-saldo",
+      "name": "Verificar se é Consulta Saldo",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [900, 240]
+    },
+    {
+      "parameters": {
+        "url": "https://klubecash.com/api/whatsapp-saldo.php",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\n  \"phone\": \"{{ $json.phoneNumber }}\",\n  \"secret\": \"klube-cash-2024\"\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "consultar-saldo-api",
+      "name": "Consultar Saldo API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1120, 180]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.success }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "verificar-sucesso-api",
+      "name": "Verificar Sucesso API",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1340, 180]
+    },
+    {
+      "parameters": {
+        "url": "https://evolutionapi.klubecash.com/message/sendText/KluebCash",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "HONejkqQLlxZoeYiaQxmUczVRTdqscw2"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\n  \"number\": \"{{ $('Processar Mensagem').item.json.phoneNumber }}\",\n  \"text\": \"{{ $json.message }}\"\n}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "enviar-saldo-whatsapp",
+      "name": "Enviar Saldo WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1560, 120]
+    },
+    {
+      "parameters": {
+        "url": "https://evolutionapi.klubecash.com/message/sendText/KluebCash",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "HONejkqQLlxZoeYiaQxmUczVRTdqscw2"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\n  \"number\": \"{{ $('Processar Mensagem').item.json.phoneNumber }}\",\n  \"text\": \"❌ Erro ao consultar saldo. Tente novamente mais tarde.\"\n}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "enviar-erro-saldo",
+      "name": "Enviar Erro Saldo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1560, 240]
+    },
+    {
+      "parameters": {
+        "url": "https://evolutionapi.klubecash.com/message/sendText/KluebCash",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "HONejkqQLlxZoeYiaQxmUczVRTdqscw2"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\n  \"number\": \"{{ $json.phoneNumber }}\",\n  \"text\": \"🏪 *Klube Cash* - Bem-vindo!\\n\\nDigite o número da opção desejada:\\n\\n1️⃣ Consultar Saldo\\n\\nOu envie uma mensagem com palavras como: saldo, extrato, consulta\"\n}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "enviar-menu-principal",
+      "name": "Enviar Menu Principal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1120, 360]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "✅ Webhook recebido e processado com sucesso"
+      },
+      "id": "resposta-webhook",
+      "name": "Resposta Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1780, 180]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "❌ Webhook inválido ou dados incompletos"
+      },
+      "id": "resposta-erro-webhook",
+      "name": "Resposta Erro Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [680, 400]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook Receptor": {
+      "main": [
+        [
+          {
+            "node": "Validar Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar Webhook": {
+      "main": [
+        [
+          {
+            "node": "Processar Mensagem",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Resposta Erro Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processar Mensagem": {
+      "main": [
+        [
+          {
+            "node": "Verificar se é Consulta Saldo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar se é Consulta Saldo": {
+      "main": [
+        [
+          {
+            "node": "Consultar Saldo API",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Enviar Menu Principal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar Saldo API": {
+      "main": [
+        [
+          {
+            "node": "Verificar Sucesso API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar Sucesso API": {
+      "main": [
+        [
+          {
+            "node": "Enviar Saldo WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Enviar Erro Saldo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar Saldo WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Resposta Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar Erro Saldo": {
+      "main": [
+        [
+          {
+            "node": "Resposta Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar Menu Principal": {
+      "main": [
+        [
+          {
+            "node": "Resposta Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "1",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "id": "klube-cash-saldo-workflow-final"
+}
