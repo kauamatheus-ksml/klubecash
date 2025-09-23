@@ -1,0 +1,386 @@
+{
+  "name": "Klube Cash - Consulta Saldo WhatsApp (Evolution API)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "webhook/whatsapp",
+        "options": {}
+      },
+      "id": "5b48c2d7-f8f8-4ad5-b2c5-8a4d6c9b7e1f",
+      "name": "Webhook WhatsApp",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [100, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "c2e8f9a1-4b7d-4e6c-8f2a-1d9e5b3c7a6f",
+              "leftValue": "={{ $json.data?.key?.fromMe }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "notEqual"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a8b2c4d6-e9f1-4a5b-8c7d-3e6f9a2b5c8e",
+      "name": "Filtrar Mensagens",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [300, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Processar dados da mensagem Evolution API\nconst input = $input.all()[0].json;\n\n// Tentar acessar dados de diferentes estruturas possíveis\nlet data = input.data || input.body?.data || input;\nlet key = data.key || data.message?.key || {};\nlet message = data.message || {};\n\n// Extrair telefone\nlet phone = '';\nif (key.remoteJid) {\n  phone = key.remoteJid.replace('@s.whatsapp.net', '').replace('@c.us', '').replace(/\\D/g, '');\n} else if (data.from) {\n  phone = data.from.replace('@s.whatsapp.net', '').replace('@c.us', '').replace(/\\D/g, '');\n}\n\n// Extrair texto da mensagem\nlet messageText = '';\nif (message.conversation) {\n  messageText = message.conversation;\n} else if (message.extendedTextMessage?.text) {\n  messageText = message.extendedTextMessage.text;\n} else if (data.body) {\n  messageText = data.body;\n} else if (typeof data === 'string') {\n  messageText = data;\n}\n\nmessageText = (messageText || '').toLowerCase().trim();\n\n// Verificar se é keyword de saldo\nconst saldoKeywords = ['saldo', 'extrato', 'consulta', 'dinheiro', 'valor', 'quanto tenho'];\nconst isSaldoKeyword = saldoKeywords.some(keyword => messageText.includes(keyword));\n\n// Verificar se é mensagem própria\nconst fromMe = key.fromMe || data.fromMe || false;\n\n// Log para debug\nconsole.log('📥 Dados recebidos:', JSON.stringify(input, null, 2));\nconsole.log(`📱 Telefone: ${phone}`);\nconsole.log(`💬 Mensagem: ${messageText}`);\nconsole.log(`🔍 É keyword de saldo: ${isSaldoKeyword}`);\nconsole.log(`📤 É mensagem própria: ${fromMe}`);\n\n// Retornar dados processados\nreturn {\n  phone: phone,\n  message: messageText,\n  messageText: messageText,\n  isSaldoKeyword: isSaldoKeyword,\n  fromMe: fromMe,\n  timestamp: new Date().toISOString(),\n  originalData: input\n};"
+      },
+      "id": "b9c3d5e7-f2a4-4b6c-9d8e-4f7a2c5b8d9e",
+      "name": "Processar Dados",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "e4f5a6b7-c8d9-4e2f-a5b6-3f8e1c4d7a9b",
+              "leftValue": "={{ $json.phone }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            },
+            {
+              "id": "f5g6h7i8-d9e0-4f3g-b6c7-4a9f2d5e8g1h",
+              "leftValue": "={{ $json.fromMe }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equal"
+              }
+            },
+            {
+              "id": "g6h7i8j9-e0f1-4g4h-c7d8-5b0a3e6f9h2i",
+              "leftValue": "={{ $json.isSaldoKeyword }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equal"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c4d6e8f0-a2b5-4c7d-8e9f-5a3b6c9d2e5f",
+      "name": "É Consulta Saldo?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://klubecash.com/api/whatsapp-saldo.php",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "jsonParameters": "{\n  \"phone\": \"{{ $json.phone }}\",\n  \"secret\": \"klube-cash-2024\"\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "d5e7f9a1-b3c6-4d8e-9f2a-6b4c7e5d8f1a",
+      "name": "Consultar Saldo API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [900, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Processar resposta da API\nconst apiResponse = $input.all()[0].json;\nconst userData = $input.all()[1].json; // Dados do usuário do node anterior\n\nconsole.log('📊 Resposta da API:', JSON.stringify(apiResponse));\nconsole.log('👤 Dados do usuário:', JSON.stringify(userData));\n\n// Usar telefone dos dados processados\nconst userPhone = userData.phone;\n\n// Verificar resposta da API\nif (!apiResponse) {\n  return {\n    phone: userPhone,\n    message: '❌ Erro de comunicação com o servidor. Tente novamente.',\n    success: false\n  };\n}\n\n// Se há uma mensagem específica, usar ela\nif (apiResponse.message) {\n  return {\n    phone: userPhone,\n    message: apiResponse.message,\n    success: apiResponse.success || true,\n    user_found: apiResponse.user_found,\n    total_lojas: apiResponse.total_lojas || 0,\n    saldo_total: apiResponse.saldo_total || 0\n  };\n}\n\n// Fallback se não houver mensagem\nif (!apiResponse.success) {\n  return {\n    phone: userPhone,\n    message: '❌ Erro ao consultar saldo. Tente novamente em alguns minutos.',\n    success: false\n  };\n}\n\n// Se usuário não foi encontrado\nif (!apiResponse.user_found) {\n  return {\n    phone: userPhone,\n    message: '❌ Usuário não encontrado. Cadastre-se em https://klubecash.com',\n    success: false\n  };\n}\n\n// Resposta genérica de sucesso\nreturn {\n  phone: userPhone,\n  message: '✅ Consulta realizada com sucesso!',\n  success: true,\n  user_found: true\n};"
+      },
+      "id": "e6f8a0b2-c4d7-4e9f-a3b5-7c5d8f6a9c2e",
+      "name": "Processar Resposta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 200]
+    },
+    {
+      "parameters": {
+        "url": "https://evolutionapi.klubecash.com/message/sendText/KluebCash",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "HONejkqQLlxZoeYiaQxmUczVRTdqscw2"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "jsonParameters": "{\n  \"number\": \"{{ $json.phone }}\",\n  \"text\": \"{{ $json.message }}\",\n  \"delay\": 1000\n}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "f7a9b1c3-d5e8-4f0a-b6c9-8d6f9c2e5a8b",
+      "name": "Enviar Resposta Evolution",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1300, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Log de sucesso\nconst response = $input.all()[0].json;\nconst userData = $input.all()[1].json;\n\nconsole.log(`✅ Resposta enviada para ${userData.phone}`);\nconsole.log(`📤 Mensagem: ${userData.message}`);\nconsole.log(`📊 Status Evolution:`, JSON.stringify(response));\n\nreturn {\n  success: true,\n  phone: userData.phone,\n  sent_at: new Date().toISOString(),\n  evolution_response: response\n};"
+      },
+      "id": "a1b2c3d4-e5f6-4a7b-8c9d-1e2f3a4b5c6d",
+      "name": "Log Sucesso",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1500, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "h7i8j9k0-f1g2-4h5i-d8e9-6c1b4f7a0j3k",
+              "leftValue": "={{ $json.phone }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            },
+            {
+              "id": "i8j9k0l1-g2h3-4i6j-e9f0-7d2c5a8b1k4l",
+              "leftValue": "={{ $json.fromMe }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equal"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "h8i9j0k1-b4c7-4d8e-9f2a-6b5c8d1e4f7a",
+      "name": "É Mensagem Válida?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [700, 450]
+    },
+    {
+      "parameters": {
+        "url": "https://evolutionapi.klubecash.com/message/sendText/KluebCash",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "HONejkqQLlxZoeYiaQxmUczVRTdqscw2"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "jsonParameters": "{\n  \"number\": \"{{ $json.phone }}\",\n  \"text\": \"🏪 *Klube Cash* - Bem-vindo!\\n\\nDigite *saldo* para consultar seu saldo de cashback.\\n\\n💡 Você também pode acessar:\\nhttps://klubecash.com\",\n  \"delay\": 1000\n}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "b2c3d4e5-f6a7-4b8c-9d0e-2f3a4b5c6d7e",
+      "name": "Enviar Menu Padrão",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [900, 450]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Log de menu padrão\nconst phone = $input.all()[0].json.phone;\nconst message = $input.all()[0].json.message;\n\nconsole.log(`📝 Menu padrão enviado para ${phone}`);\nconsole.log(`💬 Mensagem original: ${message}`);\n\nreturn {\n  phone: phone,\n  original_message: message,\n  action: 'menu_padrao',\n  timestamp: new Date().toISOString()\n};"
+      },
+      "id": "c3d4e5f6-a7b8-4c9d-0e1f-3a4b5c6d7e8f",
+      "name": "Log Menu Padrão",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 450]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Filtrar Mensagens",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtrar Mensagens": {
+      "main": [
+        [
+          {
+            "node": "Processar Dados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processar Dados": {
+      "main": [
+        [
+          {
+            "node": "É Consulta Saldo?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "É Mensagem Válida?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "É Consulta Saldo?": {
+      "main": [
+        [
+          {
+            "node": "Consultar Saldo API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar Saldo API": {
+      "main": [
+        [
+          {
+            "node": "Processar Resposta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processar Resposta": {
+      "main": [
+        [
+          {
+            "node": "Enviar Resposta Evolution",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar Resposta Evolution": {
+      "main": [
+        [
+          {
+            "node": "Log Sucesso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "É Mensagem Válida?": {
+      "main": [
+        [
+          {
+            "node": "Enviar Menu Padrão",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar Menu Padrão": {
+      "main": [
+        [
+          {
+            "node": "Log Menu Padrão",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "timezone": "America/Sao_Paulo",
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": {},
+  "meta": {
+    "instanceId": "klube-cash-saldo"
+  },
+  "tags": [
+    {
+      "createdAt": "2024-09-23T12:00:00.000Z",
+      "updatedAt": "2024-09-23T12:00:00.000Z",
+      "id": "1",
+      "name": "whatsapp"
+    },
+    {
+      "createdAt": "2024-09-23T12:00:00.000Z",
+      "updatedAt": "2024-09-23T12:00:00.000Z",
+      "id": "2",
+      "name": "klubecash"
+    }
+  ]
+}
