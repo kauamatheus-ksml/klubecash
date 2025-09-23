@@ -184,6 +184,69 @@ try {
                     error_log("WEBHOOK: ✅ Pagamento aprovado com sucesso - ID: {$payment['id']}");
                     error_log("WEBHOOK: Cashback liberado: R$ " . number_format($totalCashbackLiberado, 2, '.', ''));
                     error_log("WEBHOOK: Transações aprovadas: {$transacoesAprovadas}");
+                    
+                    // === NOTIFICAÇÃO N8N PARA CASHBACK LIBERADO ===
+                    try {
+                        require_once __DIR__ . '/../api/n8n-webhook.php';
+                        
+                        $liberationResults = [];
+                        foreach ($transactions as $transaction) {
+                            $n8nResult = N8nWebhook::sendTransactionData($transaction['id'], 'cashback_liberado');
+                            $liberationResults[$transaction['id']] = $n8nResult;
+                            error_log("WEBHOOK: N8N cashback liberado para transação {$transaction['id']}: " . ($n8nResult ? 'sucesso' : 'falha'));
+                            
+                            // Backup direto Evolution se N8N falhar
+                            if (!$n8nResult) {
+                                try {
+                                    require_once __DIR__ . '/../utils/EvolutionWhatsApp.php';
+                                    
+                                    $clientStmt = $db->prepare("
+                                        SELECT u.nome, u.telefone, l.nome_fantasia as loja_nome, t.valor_cliente as valor_cashback
+                                        FROM usuarios u 
+                                        JOIN transacoes_cashback t ON u.id = t.usuario_id
+                                        JOIN lojas l ON t.loja_id = l.id
+                                        WHERE t.id = ?
+                                    ");
+                                    $clientStmt->execute([$transaction['id']]);
+                                    $clientData = $clientStmt->fetch(PDO::FETCH_ASSOC);
+                                    
+                                    if ($clientData && $clientData['telefone']) {
+                                        $notificationData = [
+                                            'transaction_id' => $transaction['id'],
+                                            'valor_cashback' => $clientData['valor_cashback'],
+                                            'nome_loja' => $clientData['loja_nome'],
+                                            'nome_cliente' => $clientData['nome']
+                                        ];
+                                        
+                                        $evolutionResult = EvolutionWhatsApp::sendCashbackReleasedNotification(
+                                            $clientData['telefone'], 
+                                            $notificationData
+                                        );
+                                        
+                                        error_log("WEBHOOK: Evolution backup para transação {$transaction['id']}: " . ($evolutionResult['success'] ? 'sucesso' : 'falha'));
+                                        $liberationResults[$transaction['id'] . '_evolution'] = $evolutionResult['success'];
+                                    }
+                                    
+                                } catch (Exception $evolutionE) {
+                                    error_log("WEBHOOK: Erro Evolution backup para transação {$transaction['id']}: " . $evolutionE->getMessage());
+                                }
+                            }
+                        }
+                        
+                        error_log("WEBHOOK: Resumo liberação cashback: " . json_encode($liberationResults));
+                        
+                    } catch (Exception $e) {
+                        error_log("WEBHOOK: Erro ao enviar notificação de cashback liberado: " . $e->getMessage());
+                    }
+                    
+                    // Atualizar também o status do MP no nosso banco
+                    $updateMpStmt = $db->prepare("
+                        UPDATE pagamentos_comissao 
+                        SET mp_status = 'approved',
+                            pix_paid_at = NOW()
+                        WHERE id = ?
+                    ");
+                    $updateMpStmt->execute([$payment['id']]);
 
                 } else {
                     error_log("WEBHOOK: Pagamento já foi processado - Status: {$payment['status']}");

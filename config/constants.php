@@ -309,6 +309,35 @@ if (!defined('ENVIRONMENT')) {
     define('ENVIRONMENT', 'production');
     define('LOG_LEVEL', 'INFO');
 }
+
+// === CONFIGURAÇÕES N8N E WHATSAPP EVOLUTION API (ADICIONAR) ===
+define('N8N_ENABLED', true);
+define('N8N_WEBHOOK_URL', 'https://n8n.klubecash.com/webhook/klube-cash-transaction');
+define('N8N_WEBHOOK_SECRET', 'klube-cash-secret-2024');
+define('N8N_TIMEOUT', 15);
+
+// === EVOLUTION API CONFIGURAÇÕES ===
+define('EVOLUTION_API_ENABLED', true);
+define('EVOLUTION_API_URL', 'https://evolutionapi.klubecash.com');
+define('EVOLUTION_API_KEY', 'HONejkqQLlxZoeYiaQxmUczVRTdqscw2');
+define('EVOLUTION_INSTANCE', 'KluebCash');
+define('EVOLUTION_TIMEOUT', 30);
+
+// === CONFIGURAÇÕES WHATSAPP ATUALIZADAS ===
+define('WHATSAPP_ENABLED', true);
+define('WHATSAPP_BOT_URL', 'https://evolutionapi.klubecash.com');
+define('WHATSAPP_BOT_SECRET', 'klube-cash-2024');
+define('WHATSAPP_TIMEOUT', 30);
+
+// === CONFIGURAÇÕES DE LOG PARA INTEGRAÇÃO ===
+define('INTEGRATION_LOG_ENABLED', true);
+define('INTEGRATION_LOG_PATH', '../../integration_trace.log');
+
+// === CONFIGURAÇÕES DE NOTIFICAÇÃO ===
+define('NOTIFICATION_RETRY_ATTEMPTS', 3);
+define('NOTIFICATION_RETRY_DELAY', 5); // segundos
+
+
 // === SINCRONIZAÇÃO PWA ===
 define('PWA_SYNC_INTERVAL', 300); // 5 minutos
 define('PWA_FULL_SYNC_INTERVAL', 604800); // 7 dias

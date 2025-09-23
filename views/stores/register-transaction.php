@@ -183,23 +183,90 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 
                 if ($result['status']) {
-                    // === INTEGRAÇÃO WHATSAPP DIRETA ===
+                    $transactionId = $result['data']['transaction_id'];
+                    
+                    // === INTEGRAÇÃO PRIORIZADA N8N WEBHOOK ===
+                    $integrationResults = [];
+                    
                     try {
-                        require_once '../../utils/NotificationTrigger.php';
-                        $notificationResult = NotificationTrigger::send($result['data']['transaction_id']);
-                        error_log("[TRACE] register-transaction.php - Notificação enviada: " . json_encode($notificationResult), 3, '../../integration_trace.log');
+                        require_once '../../api/n8n-webhook.php';
+                        $n8nResult = N8nWebhook::sendTransactionData($transactionId, 'nova_transacao');
+                        $integrationResults['n8n'] = $n8nResult;
+                        error_log("[TRACE] register-transaction.php - N8N Webhook: " . ($n8nResult ? 'sucesso' : 'falha'), 3, '../../integration_trace.log');
                     } catch (Exception $e) {
-                        error_log("[TRACE] register-transaction.php - ERRO na notificação: " . $e->getMessage(), 3, '../../integration_trace.log');
+                        $integrationResults['n8n'] = false;
+                        error_log("[TRACE] register-transaction.php - ERRO N8N: " . $e->getMessage(), 3, '../../integration_trace.log');
                     }
+
+                    // === BACKUP EVOLUTION API DIRETA ===
+                    if (!$integrationResults['n8n']) {
+                        try {
+                            require_once '../../utils/EvolutionWhatsApp.php';
+                            
+                            // Buscar dados do cliente para notificação
+                            $db = Database::getConnection();
+                            $clientStmt = $db->prepare("
+                                SELECT u.nome, u.telefone, l.nome_fantasia as loja_nome
+                                FROM usuarios u 
+                                JOIN transacoes_cashback t ON u.id = t.usuario_id
+                                JOIN lojas l ON t.loja_id = l.id
+                                WHERE t.id = ?
+                            ");
+                            $clientStmt->execute([$transactionId]);
+                            $clientData = $clientStmt->fetch(PDO::FETCH_ASSOC);
+                            
+                            if ($clientData && $clientData['telefone']) {
+                                $notificationData = [
+                                    'transaction_id' => $transactionId,
+                                    'valor_cashback' => $result['data']['valor_cashback'],
+                                    'valor_usado' => $valorSaldoUsado,
+                                    'nome_loja' => $clientData['loja_nome'],
+                                    'nome_cliente' => $clientData['nome']
+                                ];
+                                
+                                $evolutionResult = EvolutionWhatsApp::sendNewTransactionNotification(
+                                    $clientData['telefone'], 
+                                    $notificationData
+                                );
+                                
+                                $integrationResults['evolution'] = $evolutionResult['success'];
+                                error_log("[TRACE] register-transaction.php - Evolution API: " . ($evolutionResult['success'] ? 'sucesso' : 'falha'), 3, '../../integration_trace.log');
+                            } else {
+                                $integrationResults['evolution'] = false;
+                                error_log("[TRACE] register-transaction.php - Cliente sem telefone para Evolution", 3, '../../integration_trace.log');
+                            }
+                            
+                        } catch (Exception $e) {
+                            $integrationResults['evolution'] = false;
+                            error_log("[TRACE] register-transaction.php - ERRO Evolution: " . $e->getMessage(), 3, '../../integration_trace.log');
+                        }
+                    }
+
+                    // === INTEGRAÇÃO WHATSAPP LEGADO (TERCEIRO BACKUP) ===
+                    if (!$integrationResults['n8n'] && !$integrationResults['evolution']) {
+                        try {
+                            require_once '../../utils/NotificationTrigger.php';
+                            $notificationResult = NotificationTrigger::send($transactionId);
+                            $integrationResults['legacy'] = $notificationResult['success'];
+                            error_log("[TRACE] register-transaction.php - Legacy WhatsApp: " . ($notificationResult['success'] ? 'sucesso' : 'falha'), 3, '../../integration_trace.log');
+                        } catch (Exception $e) {
+                            $integrationResults['legacy'] = false;
+                            error_log("[TRACE] register-transaction.php - ERRO Legacy: " . $e->getMessage(), 3, '../../integration_trace.log');
+                        }
+                    }
+
+                    // Log do resultado final da integração
+                    error_log("[TRACE] register-transaction.php - Resumo integração: " . json_encode($integrationResults), 3, '../../integration_trace.log');
 
                     // ✅ AUDITORIA: Registrar quem criou a transação
                     StoreHelper::logUserAction($_SESSION['user_id'], 'criou_transacao', [
                         'loja_id' => $storeId,
-                        'transaction_id' => $result['data']['transaction_id'],
+                        'transaction_id' => $transactionId,
                         'valor_total' => $valorTotal,
                         'cliente_id' => $clientId,
                         'codigo_transacao' => $codigoTransacao,
-                        'valor_saldo_usado' => $valorSaldoUsado
+                        'valor_saldo_usado' => $valorSaldoUsado,
+                        'integration_results' => $integrationResults
                     ]);
 
                     error_log("FORM DEBUG: Transação registrada com sucesso - ID: " . $result['data']['transaction_id']);
@@ -208,7 +275,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     // Salvar dados de sucesso na sessão e redirecionar
                     $_SESSION['transaction_is_mvp'] = isset($result['data']['is_mvp']) && $result['data']['is_mvp'];
                     $_SESSION['transaction_valor_cashback'] = $result['data']['valor_cashback'] ?? 0;
-                    $_SESSION['transaction_id'] = $result['data']['transaction_id'];
+                    $_SESSION['transaction_id'] = $transactionId;
+                    $_SESSION['integration_results'] = $integrationResults;
 
                     // Redirecionar para evitar reenvio do formulário
                     header('Location: ' . $_SERVER['REQUEST_URI']);
