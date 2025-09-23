@@ -1,4 +1,22 @@
 <?php
+/**
+ * Classe EvolutionWhatsApp - Klube Cash
+ *
+ * Esta classe implementa integração direta com a Evolution API para envio
+ * de mensagens WhatsApp. Serve como backup quando N8N não está disponível
+ * e para funcionalidades específicas que requerem acesso direto à API.
+ *
+ * Funcionalidades:
+ * - Envio de mensagens de texto
+ * - Formatação automática de telefone
+ * - Logging detalhado de mensagens
+ * - Notificações de transação e cashback
+ * - Teste de conectividade
+ *
+ * Versão: 2.0 - Melhorado com logging e estatísticas
+ * Autor: Sistema Klube Cash
+ */
+
 require_once __DIR__ . '/../config/constants.php';
 require_once __DIR__ . '/../config/database.php';
 
@@ -20,7 +38,9 @@ class EvolutionWhatsApp {
             // Preparar dados da mensagem
             $messageData = [
                 'number' => $phoneFormatted,
-                'text' => $message
+                'textMessage' => [
+                    'text' => $message
+                ]
             ];
             
             // URL da Evolution API
@@ -243,6 +263,154 @@ class EvolutionWhatsApp {
         } catch (Exception $e) {
             return ['success' => false, 'error' => $e->getMessage()];
         }
+    }
+
+    /**
+     * Obtém estatísticas de mensagens
+     *
+     * @param string $period Período para estatísticas
+     * @return array Estatísticas
+     */
+    public static function getStats($period = '24h') {
+        try {
+            $db = Database::getConnection();
+
+            $periodFilter = '';
+            switch ($period) {
+                case '1h':
+                    $periodFilter = 'created_at >= NOW() - INTERVAL 1 HOUR';
+                    break;
+                case '24h':
+                    $periodFilter = 'created_at >= NOW() - INTERVAL 24 HOUR';
+                    break;
+                case '7d':
+                    $periodFilter = 'created_at >= NOW() - INTERVAL 7 DAY';
+                    break;
+                case '30d':
+                    $periodFilter = 'created_at >= NOW() - INTERVAL 30 DAY';
+                    break;
+                default:
+                    $periodFilter = 'created_at >= NOW() - INTERVAL 24 HOUR';
+            }
+
+            $stmt = $db->prepare("
+                SELECT
+                    COUNT(*) as total,
+                    SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) as success_count,
+                    SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) as error_count,
+                    AVG(CASE WHEN success = 1 THEN 1.0 ELSE 0.0 END) * 100 as success_rate
+                FROM whatsapp_evolution_logs
+                WHERE {$periodFilter}
+            ");
+
+            $stmt->execute();
+            $stats = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            return [
+                'success' => true,
+                'period' => $period,
+                'stats' => $stats
+            ];
+
+        } catch (Exception $e) {
+            return [
+                'success' => false,
+                'error' => $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Busca logs de mensagens
+     *
+     * @param array $filters Filtros de busca
+     * @param int $limit Limite de registros
+     * @return array Logs de mensagens
+     */
+    public static function getLogs($filters = [], $limit = 100) {
+        try {
+            $db = Database::getConnection();
+
+            $where = ['1=1'];
+            $params = [];
+
+            // Filtro por telefone
+            if (!empty($filters['phone'])) {
+                $where[] = 'phone LIKE ?';
+                $params[] = '%' . $filters['phone'] . '%';
+            }
+
+            // Filtro por sucesso
+            if (isset($filters['success'])) {
+                $where[] = 'success = ?';
+                $params[] = $filters['success'] ? 1 : 0;
+            }
+
+            // Filtro por período
+            if (!empty($filters['period'])) {
+                switch ($filters['period']) {
+                    case '1h':
+                        $where[] = 'created_at >= NOW() - INTERVAL 1 HOUR';
+                        break;
+                    case '24h':
+                        $where[] = 'created_at >= NOW() - INTERVAL 24 HOUR';
+                        break;
+                    case '7d':
+                        $where[] = 'created_at >= NOW() - INTERVAL 7 DAY';
+                        break;
+                }
+            }
+
+            $whereClause = implode(' AND ', $where);
+            $limitClause = intval($limit);
+
+            $stmt = $db->prepare("
+                SELECT
+                    id,
+                    phone,
+                    LEFT(message, 100) as message_preview,
+                    success,
+                    event_type,
+                    created_at
+                FROM whatsapp_evolution_logs
+                WHERE {$whereClause}
+                ORDER BY created_at DESC
+                LIMIT {$limitClause}
+            ");
+
+            $stmt->execute($params);
+            $logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            return [
+                'success' => true,
+                'logs' => $logs,
+                'count' => count($logs)
+            ];
+
+        } catch (Exception $e) {
+            return [
+                'success' => false,
+                'error' => $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Log interno da classe
+     *
+     * @param string $message Mensagem de log
+     */
+    private static function log($message) {
+        if (defined('INTEGRATION_LOG_ENABLED') && INTEGRATION_LOG_ENABLED) {
+            $logFile = defined('INTEGRATION_LOG_PATH') ? INTEGRATION_LOG_PATH : __DIR__ . '/../logs/evolution.log';
+            $timestamp = date('Y-m-d H:i:s');
+            $logMessage = "[{$timestamp}] {$message}" . PHP_EOL;
+
+            @file_put_contents($logFile, $logMessage, FILE_APPEND | LOCK_EX);
+        }
+
+        // Log também no error_log do PHP
+        error_log($message);
     }
 }
 ?>

@@ -35,7 +35,7 @@ class N8nWebhook {
                 SELECT
                     t.id,
                     t.codigo_transacao,
-                    t.valor_transacao,
+                    t.valor_total,
                     t.valor_cashback,
                     t.valor_saldo_usado,
                     t.data_criacao,
@@ -82,7 +82,7 @@ class N8nWebhook {
                 'transacao' => [
                     'id' => intval($transaction['id']),
                     'codigo' => $transaction['codigo_transacao'],
-                    'valor_total' => floatval($transaction['valor_transacao']),
+                    'valor_total' => floatval($transaction['valor_total']), // CORRIGIDO: era valor_transacao
                     'valor_cashback' => floatval($transaction['valor_cashback']),
                     'valor_saldo_usado' => floatval($transaction['valor_saldo_usado']),
                     'data_criacao' => $transaction['data_criacao'],
@@ -128,7 +128,9 @@ class N8nWebhook {
             
             // Criar payload sem assinatura primeiro
             $payload = json_encode($data);
-            
+            error_log("DEBUG N8N: Payload completo sendo enviado: " . $finalPayload);
+            error_log("DEBUG N8N: URL destino: " . $webhookUrl);
+            error_log("DEBUG N8N: Transaction ID: " . $data['transacao']['id']);
             // Adicionar assinatura de segurança
             $signature = hash_hmac('sha256', $payload, $webhookSecret);
             $data['signature'] = $signature;
