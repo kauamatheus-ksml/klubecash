@@ -311,7 +311,7 @@ class Email {
         <p><a href="' . SITE_URL . '/views/client/statement.php" class="btn">Ver Meu Extrato</a></p>
         <p>Atenciosamente,<br>Equipe Klube Cash</p>';
         
-        return self::send($to, $subject, $message, $name);
+        return self::queueEmail($to, $subject, $message, $name);
     }
     
     /**
