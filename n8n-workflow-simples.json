@@ -66,6 +66,7 @@
     },
     {
       "parameters": {
+        "method": "POST",
         "url": "https://klubecash.com/api/whatsapp-saldo.php",
         "sendHeaders": true,
         "headerParameters": {
@@ -73,6 +74,10 @@
             {
               "name": "Content-Type",
               "value": "application/json"
+            },
+            {
+              "name": "User-Agent",
+              "value": "n8n-klubecash-workflow"
             }
           ]
         },

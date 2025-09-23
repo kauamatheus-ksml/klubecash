@@ -24,6 +24,7 @@
     },
     {
       "parameters": {
+        "method": "POST",
         "url": "https://klubecash.com/api/whatsapp-saldo.php",
         "sendHeaders": true,
         "headerParameters": {
