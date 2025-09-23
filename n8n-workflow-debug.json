@@ -1,0 +1,114 @@
+{
+  "name": "Klube Cash - Debug API Saldo",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "webhook/debug"
+      },
+      "id": "webhook-debug",
+      "name": "Webhook Debug",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Log todos os dados recebidos\nconst input = $input.all()[0].json;\nconsole.log('🔍 DEBUG - Dados completos recebidos:', JSON.stringify(input, null, 2));\n\n// Retornar dados de teste fixos\nreturn {\n  phone: '34991191534',\n  message: 'saldo',\n  debug: true,\n  timestamp: new Date().toISOString(),\n  originalInput: input\n};"
+      },
+      "id": "debug-process",
+      "name": "Debug Dados",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://klubecash.com/api/whatsapp-saldo.php",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "User-Agent",
+              "value": "n8n-debug-workflow"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "jsonParameters": "{\n  \"phone\": \"{{ $json.phone }}\",\n  \"secret\": \"klube-cash-2024\"\n}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "fullResponse": true
+          }
+        }
+      },
+      "id": "api-test",
+      "name": "Teste API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Analisar resposta da API\nconst response = $input.all()[0].json;\nconsole.log('📊 Resposta completa da API:', JSON.stringify(response, null, 2));\n\n// Verificar status e headers\nconst statusCode = response.statusCode || 'unknown';\nconst headers = response.headers || {};\nconst body = response.body || response;\n\nconsole.log(`📈 Status Code: ${statusCode}`);\nconsole.log('📋 Headers:', JSON.stringify(headers, null, 2));\nconsole.log('📄 Body:', JSON.stringify(body, null, 2));\n\nreturn {\n  statusCode: statusCode,\n  success: statusCode === 200,\n  headers: headers,\n  body: body,\n  error: statusCode !== 200 ? `HTTP ${statusCode}` : null,\n  timestamp: new Date().toISOString()\n};"
+      },
+      "id": "analyze-response",
+      "name": "Analisar Resposta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Debug": {
+      "main": [
+        [
+          {
+            "node": "Debug Dados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Debug Dados": {
+      "main": [
+        [
+          {
+            "node": "Teste API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Teste API": {
+      "main": [
+        [
+          {
+            "node": "Analisar Resposta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "timezone": "America/Sao_Paulo"
+  },
+  "staticData": {},
+  "meta": {},
+  "tags": []
+}
