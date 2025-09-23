@@ -1,6 +1,23 @@
 <?php
-require_once '../config/database.php';
-require_once '../config/constants.php';
+/**
+ * API N8N Webhook - Klube Cash
+ *
+ * Esta classe implementa integração com N8N para automação de notificações WhatsApp.
+ * Processa dados de transações e cashback, valida assinaturas HMAC para segurança,
+ * e fornece logging completo para monitoramento.
+ *
+ * Configurações necessárias em constants.php:
+ * - N8N_WEBHOOK_URL: URL do webhook N8N
+ * - N8N_WEBHOOK_SECRET: Secret para validação HMAC SHA256
+ * - N8N_TIMEOUT: Timeout para requisições (padrão: 15 segundos)
+ *
+ * Versão: 2.0
+ * Autor: Sistema Klube Cash
+ */
+
+header('Content-Type: application/json');
+require_once __DIR__ . '/../config/constants.php';
+require_once __DIR__ . '/../config/database.php';
 
 class N8nWebhook {
     
@@ -15,10 +32,10 @@ class N8nWebhook {
             
             // Buscar dados completos da transação
             $stmt = $db->prepare("
-                SELECT 
+                SELECT
                     t.id,
                     t.codigo_transacao,
-                    t.valor_total,
+                    t.valor_transacao,
                     t.valor_cashback,
                     t.valor_saldo_usado,
                     t.data_criacao,
@@ -65,7 +82,7 @@ class N8nWebhook {
                 'transacao' => [
                     'id' => intval($transaction['id']),
                     'codigo' => $transaction['codigo_transacao'],
-                    'valor_total' => floatval($transaction['valor_total']),
+                    'valor_total' => floatval($transaction['valor_transacao']),
                     'valor_cashback' => floatval($transaction['valor_cashback']),
                     'valor_saldo_usado' => floatval($transaction['valor_saldo_usado']),
                     'data_criacao' => $transaction['data_criacao'],
@@ -221,5 +238,142 @@ class N8nWebhook {
             return false;
         }
     }
+
+    /**
+     * Obtém estatísticas dos webhooks
+     */
+    public static function getStats($period = '24h') {
+        try {
+            $db = Database::getConnection();
+
+            $periodFilter = '';
+            switch ($period) {
+                case '1h':
+                    $periodFilter = 'created_at >= NOW() - INTERVAL 1 HOUR';
+                    break;
+                case '24h':
+                    $periodFilter = 'created_at >= NOW() - INTERVAL 24 HOUR';
+                    break;
+                case '7d':
+                    $periodFilter = 'created_at >= NOW() - INTERVAL 7 DAY';
+                    break;
+                case '30d':
+                    $periodFilter = 'created_at >= NOW() - INTERVAL 30 DAY';
+                    break;
+                default:
+                    $periodFilter = 'created_at >= NOW() - INTERVAL 24 HOUR';
+            }
+
+            $stmt = $db->prepare("
+                SELECT
+                    COUNT(*) as total,
+                    SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) as success_count,
+                    SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) as error_count,
+                    AVG(CASE WHEN success = 1 THEN 1.0 ELSE 0.0 END) * 100 as success_rate
+                FROM n8n_webhook_logs
+                WHERE {$periodFilter}
+            ");
+
+            $stmt->execute();
+            $stats = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            return [
+                'success' => true,
+                'period' => $period,
+                'stats' => $stats
+            ];
+
+        } catch (Exception $e) {
+            return [
+                'success' => false,
+                'error' => $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Formata número de telefone para padrão brasileiro
+     */
+    private static function formatPhone($phone) {
+        $phone = preg_replace('/\D/', '', $phone);
+
+        if (strlen($phone) === 11 && substr($phone, 0, 1) !== '0') {
+            $phone = '55' . $phone;
+        } elseif (strlen($phone) === 10) {
+            $phone = '55' . $phone;
+        }
+
+        return $phone;
+    }
+}
+
+// === ENDPOINT PARA REQUISIÇÕES DIRETAS ===
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    try {
+        $input = json_decode(file_get_contents('php://input'), true);
+
+        if (!$input || !isset($input['transaction_id'])) {
+            http_response_code(400);
+            echo json_encode([
+                'success' => false,
+                'error' => 'transaction_id é obrigatório'
+            ]);
+            exit;
+        }
+
+        $transactionId = $input['transaction_id'];
+        $eventType = $input['event_type'] ?? 'nova_transacao';
+
+        $result = N8nWebhook::sendTransactionData($transactionId, $eventType);
+
+        http_response_code($result ? 200 : 500);
+        echo json_encode([
+            'success' => $result,
+            'transaction_id' => $transactionId,
+            'event_type' => $eventType
+        ]);
+
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode([
+            'success' => false,
+            'error' => $e->getMessage()
+        ]);
+    }
+
+} elseif ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    $action = $_GET['action'] ?? 'test';
+
+    switch ($action) {
+        case 'test':
+            $result = N8nWebhook::testConnection();
+            echo json_encode([
+                'success' => $result,
+                'message' => $result ? 'N8N conectado com sucesso' : 'Falha na conexão com N8N',
+                'timestamp' => date('c')
+            ]);
+            break;
+
+        case 'stats':
+            $period = $_GET['period'] ?? '24h';
+            $stats = N8nWebhook::getStats($period);
+            echo json_encode($stats);
+            break;
+
+        default:
+            http_response_code(400);
+            echo json_encode([
+                'success' => false,
+                'error' => 'Ação não reconhecida'
+            ]);
+    }
+
+} else {
+    http_response_code(405);
+    echo json_encode([
+        'success' => false,
+        'error' => 'Método não permitido'
+    ]);
 }
 ?>
