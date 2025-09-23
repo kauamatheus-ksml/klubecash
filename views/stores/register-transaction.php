@@ -1,4 +1,5 @@
 <?php
+error_log("DEBUG: register-transaction.php - INICIO");
 // views/stores/register-transaction.php
 // Incluir arquivos de configuração
 require_once '../../config/constants.php';
@@ -92,6 +93,7 @@ if (isset($_SESSION['transaction_id'])) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    error_log("DEBUG: register-transaction.php - POST request");
     // Verificar se já há uma transação de sucesso na sessão para evitar duplo envio
     if (isset($_SESSION['transaction_success'])) {
         // Redirecionar para evitar processamento duplo
