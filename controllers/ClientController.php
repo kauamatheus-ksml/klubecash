@@ -1510,26 +1510,24 @@ class ClientController {
             $userStmt->execute();
             $user = $userStmt->fetch(PDO::FETCH_ASSOC);
 
-            if (($user && isset($user['is_mvp']) && $user['is_mvp']) || $data['usuario_id'] == 9) {
-                $logData = [
-                    'transaction_id' => $transactionId,
-                    'transaction_data' => $data,
-                    'user_data' => $user,
-                    'store_data' => $store,
-                    'cashback_amount' => $valorCashbackCliente,
-                    'timestamp' => date('Y-m-d H:i:s')
-                ];
+            $logData = [
+                'transaction_id' => $transactionId,
+                'transaction_data' => $data,
+                'user_data' => $user,
+                'store_data' => $store,
+                'cashback_amount' => $valorCashbackCliente,
+                'timestamp' => date('Y-m-d H:i:s')
+            ];
 
-                $jsonLogData = json_encode($logData, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-                $logFileName = 'transaction_' . $transactionId . '.json';
-                $logFilePath = __DIR__ . '/../transaction_json_logs/' . $logFileName;
+            $jsonLogData = json_encode($logData, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+            $logFileName = 'transaction_' . $transactionId . '.json';
+            $logFilePath = __DIR__ . '/../transaction_json_logs/' . $logFileName;
 
-                file_put_contents($logFilePath, $jsonLogData);
+            file_put_contents($logFilePath, $jsonLogData);
 
-                // Enviar notificação do WhatsApp
-                $notifier = new CashbackNotifier();
-                $notifier->notifyNewTransaction($transactionId);
-            }
+            // Enviar notificação do WhatsApp
+            $notifier = new CashbackNotifier();
+            $notifier->notifyNewTransaction($transactionId);
         } catch (Exception $e) {
             error_log('Erro ao logar transação como JSON: ' . $e->getMessage());
         }
