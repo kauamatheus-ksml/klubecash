@@ -75,19 +75,20 @@ $isMvpTransaction = false;
 $transactionResult = null;
 
 // Verificar se há transação de sucesso na sessão
-if (isset($_SESSION['transaction_success'])) {
+if (isset($_SESSION['transaction_id'])) {
     $success = true;
-    $sessionData = $_SESSION['transaction_success'];
-    $isMvpTransaction = $sessionData['is_mvp'];
+    $isMvpTransaction = $_SESSION['transaction_is_mvp'];
     $transactionResult = [
         'data' => [
-            'valor_cashback' => $sessionData['valor_cashback'],
-            'transaction_id' => $sessionData['transaction_id']
+            'valor_cashback' => $_SESSION['transaction_valor_cashback'],
+            'transaction_id' => $_SESSION['transaction_id']
         ]
     ];
 
     // Limpar dados da sessão após uso
-    unset($_SESSION['transaction_success']);
+    unset($_SESSION['transaction_is_mvp']);
+    unset($_SESSION['transaction_valor_cashback']);
+    unset($_SESSION['transaction_id']);
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
