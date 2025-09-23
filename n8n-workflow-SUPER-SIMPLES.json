@@ -1,0 +1,99 @@
+{
+  "name": "Klube Cash - SUPER SIMPLES",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "webhook/super-simples"
+      },
+      "id": "webhook-super",
+      "name": "Webhook Super Simples",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Dados fixos para teste (sem processamento complexo)\nreturn {\n  phone: '34991191534',\n  secret: 'klube-cash-2024',\n  message: 'saldo',\n  test: true\n};"
+      },
+      "id": "dados-fixos",
+      "name": "Dados Fixos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "https://klubecash.com/api/whatsapp-saldo.php",
+        "options": {
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "phone": "={{ $json.phone }}",
+            "secret": "={{ $json.secret }}"
+          },
+          "bodyType": "json"
+        }
+      },
+      "id": "api-teste",
+      "name": "API Teste",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Verificar se funcionou\nconst response = $input.all()[0].json;\nconsole.log('✅ SUCESSO! Resposta da API:', JSON.stringify(response, null, 2));\n\nreturn {\n  success: true,\n  apiResponse: response,\n  message: response.message || 'API funcionou!',\n  timestamp: new Date().toISOString()\n};"
+      },
+      "id": "verificar-sucesso",
+      "name": "Verificar Sucesso",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Super Simples": {
+      "main": [
+        [
+          {
+            "node": "Dados Fixos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dados Fixos": {
+      "main": [
+        [
+          {
+            "node": "API Teste",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API Teste": {
+      "main": [
+        [
+          {
+            "node": "Verificar Sucesso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "timezone": "America/Sao_Paulo"
+  },
+  "staticData": {},
+  "meta": {},
+  "tags": []
+}

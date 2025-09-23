@@ -1,24 +1,27 @@
 {
-  "errorMessage": "(messageText || \"\").toLowerCase is not a function [line 22]",
-  "errorDescription": "TypeError",
-  "errorDetails": {},
+  "errorMessage": "Method not allowed - please check you are using the right HTTP method",
+  "errorDescription": "Método não permitido. Use POST.",
+  "errorDetails": {
+    "rawErrorMessage": [
+      "405 - \"{\\\"success\\\":false,\\\"error\\\":\\\"M\\\\u00e9todo n\\\\u00e3o permitido. Use POST.\\\"}\""
+    ],
+    "httpCode": "405"
+  },
   "n8nDetails": {
-    "nodeName": "Processar Dados",
-    "nodeType": "n8n-nodes-base.code",
-    "nodeVersion": 2,
+    "nodeName": "API Saldo",
+    "nodeType": "n8n-nodes-base.httpRequest",
+    "nodeVersion": 3,
+    "itemIndex": 0,
+    "time": "23/09/2025, 12:01:43",
     "n8nVersion": "1.112.4 (Self Hosted)",
     "binaryDataMode": "default",
     "stackTrace": [
-      "TypeError: (messageText || \"\").toLowerCase is not a function",
-      "    at /usr/local/lib/node_modules/n8n/node_modules/.pnpm/n8n-nodes-base@file+packages+nodes-base_@aws-sdk+credential-providers@3.808.0_asn1.js@5_afd197edb2c1f848eae21a96a97fab23/node_modules/n8n-nodes-base/dist/nodes/Code:22:35",
-      "    at /usr/local/lib/node_modules/n8n/node_modules/.pnpm/n8n-nodes-base@file+packages+nodes-base_@aws-sdk+credential-providers@3.808.0_asn1.js@5_afd197edb2c1f848eae21a96a97fab23/node_modules/n8n-nodes-base/dist/nodes/Code:39:2",
-      "    at VM2 Wrapper.apply (/usr/local/lib/node_modules/n8n/node_modules/.pnpm/@n8n+vm2@3.9.25/node_modules/@n8n/vm2/lib/bridge.js:490:11)",
-      "    at NodeVM.run (/usr/local/lib/node_modules/n8n/node_modules/.pnpm/@n8n+vm2@3.9.25/node_modules/@n8n/vm2/lib/nodevm.js:497:23)",
-      "    at JavaScriptSandbox.runCodeAllItems (/usr/local/lib/node_modules/n8n/node_modules/.pnpm/n8n-nodes-base@file+packages+nodes-base_@aws-sdk+credential-providers@3.808.0_asn1.js@5_afd197edb2c1f848eae21a96a97fab23/node_modules/n8n-nodes-base/nodes/Code/JavaScriptSandbox.ts:73:36)",
-      "    at ExecuteContext.execute (/usr/local/lib/node_modules/n8n/node_modules/.pnpm/n8n-nodes-base@file+packages+nodes-base_@aws-sdk+credential-providers@3.808.0_asn1.js@5_afd197edb2c1f848eae21a96a97fab23/node_modules/n8n-nodes-base/nodes/Code/Code.node.ts:198:28)",
-      "    at WorkflowExecute.executeNode (/usr/local/lib/node_modules/n8n/node_modules/.pnpm/n8n-core@file+packages+core_@opentelemetry+api@1.9.0_@opentelemetry+sdk-trace-base@1.30_08b575bec2313d5d8a4cc75358971443/node_modules/n8n-core/src/execution-engine/workflow-execute.ts:1254:31)",
-      "    at WorkflowExecute.runNode (/usr/local/lib/node_modules/n8n/node_modules/.pnpm/n8n-core@file+packages+core_@opentelemetry+api@1.9.0_@opentelemetry+sdk-trace-base@1.30_08b575bec2313d5d8a4cc75358971443/node_modules/n8n-core/src/execution-engine/workflow-execute.ts:1428:22)",
-      "    at /usr/local/lib/node_modules/n8n/node_modules/.pnpm/n8n-core@file+packages+core_@opentelemetry+api@1.9.0_@opentelemetry+sdk-trace-base@1.30_08b575bec2313d5d8a4cc75358971443/node_modules/n8n-core/src/execution-engine/workflow-execute.ts:1761:38",
+      "NodeApiError: Method not allowed - please check you are using the right HTTP method",
+      "    at ExecuteContext.execute (/usr/local/lib/node_modules/n8n/node_modules/.pnpm/n8n-nodes-base@file+packages+nodes-base_@aws-sdk+credential-providers@3.808.0_asn1.js@5_afd197edb2c1f848eae21a96a97fab23/node_modules/n8n-nodes-base/nodes/HttpRequest/V3/HttpRequestV3.node.ts:847:16)",
+      "    at processTicksAndRejections (node:internal/process/task_queues:105:5)",
+      "    at WorkflowExecute.executeNode (/usr/local/lib/node_modules/n8n/node_modules/.pnpm/n8n-core@file+packages+core_@opentelemetry+api@1.9.0_@opentelemetry+sdk-trace-base@1.30_08b575bec2313d5d8a4cc75358971443/node_modules/n8n-core/src/execution-engine/workflow-execute.ts:1254:8)",
+      "    at WorkflowExecute.runNode (/usr/local/lib/node_modules/n8n/node_modules/.pnpm/n8n-core@file+packages+core_@opentelemetry+api@1.9.0_@opentelemetry+sdk-trace-base@1.30_08b575bec2313d5d8a4cc75358971443/node_modules/n8n-core/src/execution-engine/workflow-execute.ts:1428:11)",
+      "    at /usr/local/lib/node_modules/n8n/node_modules/.pnpm/n8n-core@file+packages+core_@opentelemetry+api@1.9.0_@opentelemetry+sdk-trace-base@1.30_08b575bec2313d5d8a4cc75358971443/node_modules/n8n-core/src/execution-engine/workflow-execute.ts:1761:27",
       "    at /usr/local/lib/node_modules/n8n/node_modules/.pnpm/n8n-core@file+packages+core_@opentelemetry+api@1.9.0_@opentelemetry+sdk-trace-base@1.30_08b575bec2313d5d8a4cc75358971443/node_modules/n8n-core/src/execution-engine/workflow-execute.ts:2338:11"
     ]
   }
