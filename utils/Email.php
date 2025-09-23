@@ -40,6 +40,24 @@ class Email {
         error_log("Email configurado - Host: " . self::$host . ", Port: " . self::$port);
     }
     
+    public static function queueEmail($to, $subject, $message, $toName = '') {
+        try {
+            $db = Database::getConnection();
+            $stmt = $db->prepare("
+                INSERT INTO email_queue (to_email, to_name, subject, message, status)
+                VALUES (:to_email, :to_name, :subject, :message, 'pending')
+            ");
+            $stmt->bindParam(':to_email', $to);
+            $stmt->bindParam(':to_name', $toName);
+            $stmt->bindParam(':subject', $subject);
+            $stmt->bindParam(':message', $message);
+            return $stmt->execute();
+        } catch (Exception $e) {
+            error_log('Erro ao enfileirar email: ' . $e->getMessage());
+            return false;
+        }
+    }
+
     /**
      * Envia um email - MÉTODO PRINCIPAL CORRIGIDO
      */
