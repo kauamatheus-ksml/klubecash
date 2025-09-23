@@ -40,6 +40,7 @@ class Database {
             ];
             
             self::$connection = new PDO($dsn, DB_USER, DB_PASS, $options);
+            self::createEmailQueueTableIfNotExists(self::$connection);
             return self::$connection;
         } catch (PDOException $e) {
             // Registra o erro e retorna uma mensagem amigável
@@ -47,6 +48,19 @@ class Database {
             die("Não foi possível conectar ao banco de dados. Por favor, tente novamente mais tarde.");
         }
     }
+
+    private static function createEmailQueueTableIfNotExists($db) {
+        try {
+            $stmt = $db->query("SHOW TABLES LIKE 'email_queue'");
+            if ($stmt->rowCount() == 0) {
+                $createTable = "CREATE TABLE `email_queue` (\n                    `id` int(11) NOT NULL AUTO_INCREMENT,\n                    `to_email` varchar(255) NOT NULL,\n                    `to_name` varchar(255) DEFAULT NULL,\n                    `subject` varchar(255) NOT NULL,\n                    `message` text NOT NULL,\n                    `status` enum('pending','sending','sent','failed') NOT NULL DEFAULT 'pending',\n                    `attempts` int(11) NOT NULL DEFAULT 0,\n                    `last_attempt` timestamp NULL DEFAULT NULL,\n                    `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,\n                    PRIMARY KEY (`id`)\n                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;";
+                $db->exec($createTable);
+            }
+        } catch (PDOException $e) {
+            error_log('Erro ao criar tabela de fila de email: ' . $e->getMessage());
+        }
+    }
+
     
     /**
      * Fecha a conexão com o banco de dados
