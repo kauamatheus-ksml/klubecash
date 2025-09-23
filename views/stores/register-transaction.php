@@ -202,11 +202,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     // IMPLEMENTAR PADRÃO PRG (Post-Redirect-Get)
                     // Salvar dados de sucesso na sessão e redirecionar
-                    $_SESSION['transaction_success'] = [
-                        'is_mvp' => isset($result['data']['is_mvp']) && $result['data']['is_mvp'],
-                        'valor_cashback' => $result['data']['valor_cashback'] ?? 0,
-                        'transaction_id' => $result['data']['transaction_id']
-                    ];
+                    $_SESSION['transaction_is_mvp'] = isset($result['data']['is_mvp']) && $result['data']['is_mvp'];
+                    $_SESSION['transaction_valor_cashback'] = $result['data']['valor_cashback'] ?? 0;
+                    $_SESSION['transaction_id'] = $result['data']['transaction_id'];
 
                     // Redirecionar para evitar reenvio do formulário
                     header('Location: ' . $_SERVER['REQUEST_URI']);
