@@ -200,9 +200,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     error_log("FORM DEBUG: Transação registrada com sucesso - ID: " . $result['data']['transaction_id']);
 
-                    // Log para depurar o conteúdo de $result['data']
-                    error_log("DEBUG SESSION DATA: " . print_r($result['data'], true));
-
                     // IMPLEMENTAR PADRÃO PRG (Post-Redirect-Get)
                     // Salvar dados de sucesso na sessão e redirecionar
                     $_SESSION['transaction_success'] = [
