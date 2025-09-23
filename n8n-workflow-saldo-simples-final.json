@@ -39,6 +39,14 @@
                 "type": "string",
                 "operation": "equals"
               }
+            },
+            {
+              "leftValue": "={{ $json.telefone }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              }
             }
           ],
           "combinator": "and"
@@ -63,7 +71,7 @@
             {
               "column": "telefone",
               "condition": "=",
-              "value": "={{ $json.telefone || 'vazio' }}"
+              "value": "={{ $json.telefone }}"
             }
           ]
         },
