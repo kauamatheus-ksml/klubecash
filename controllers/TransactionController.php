@@ -1636,20 +1636,48 @@ class TransactionController {
             
             $transactionId = $db->lastInsertId();
 
-            // Enviar email de confirmação ao cliente
-            if ($user) {
-                $transactionData = [
-                    'nome_loja' => $store['nome_fantasia'],
-                    'valor_total' => $data['valor_total'],
-                    'valor_cashback' => $valorCashbackCliente,
-                    'data_transacao' => date('Y-m-d H:i:s')
-                ];
-                
-                Email::sendTransactionNotification($user['email'], $user['nome'], $transactionData);
-            }
+            // === INTEGRAÇÃO AUTOMÁTICA: UltraDirectNotifier (PRIORIDADE MÁXIMA) ===
+            try {
+                error_log("[ULTRA] TransactionController::registerTransactionFixed() - Disparando notificação ULTRA para transação {$transactionId}");
 
-            // Logar transação como JSON
-            self::logTransactionAsJson($transactionId, $data, $store, $valorCashbackCliente);
+                // 🚀 PRIORIDADE 1: UltraDirectNotifier (Direto no bot)
+                $ultraPath = __DIR__ . '/../classes/UltraDirectNotifier.php';
+                if (file_exists($ultraPath)) {
+                    require_once $ultraPath;
+                    if (class_exists('UltraDirectNotifier')) {
+                        $notifier = new UltraDirectNotifier();
+
+                        // Preparar dados da transação (usando ID recém-criado)
+                        $transactionData = [
+                            'transaction_id' => $transactionId,
+                            'cliente_telefone' => 'brutal_system', // Será resolvido pelo UltraDirectNotifier
+                            'additional_data' => json_encode([
+                                'transaction_id' => $transactionId,
+                                'system' => 'registerTransactionFixed',
+                                'timestamp' => date('Y-m-d H:i:s')
+                            ])
+                        ];
+
+                        $result = $notifier->notifyTransaction($transactionData);
+                        error_log("[ULTRA] registerTransactionFixed - Resultado: " . ($result['success'] ? 'SUCESSO' : 'FALHA') . " em " . ($result['time_ms'] ?? 0) . "ms");
+                    } else {
+                        error_log("[ULTRA] TransactionController::registerTransactionFixed() - Classe UltraDirectNotifier não encontrada");
+                        $result = ['success' => false, 'message' => 'Classe UltraDirectNotifier não encontrada'];
+                    }
+                } else {
+                    error_log("[ULTRA] TransactionController::registerTransactionFixed() - Arquivo não encontrado: {$ultraPath}");
+                    $result = ['success' => false, 'message' => 'UltraDirectNotifier não encontrado'];
+                }
+
+                if ($result['success']) {
+                    error_log("[ULTRA] TransactionController::registerTransactionFixed() - Notificação ULTRA enviada com sucesso!");
+                } else {
+                    error_log("[ULTRA] TransactionController::registerTransactionFixed() - Falha na notificação ULTRA: " . ($result['error'] ?? $result['message']));
+                }
+
+            } catch (Exception $e) {
+                error_log("[ULTRA] TransactionController::registerTransactionFixed() - Erro na notificação ULTRA: " . $e->getMessage());
+            }
 
             // Commit
             $db->commit();
@@ -3337,37 +3365,6 @@ class TransactionController {
         } catch (PDOException $e) {
             error_log('Erro ao obter histórico de pagamentos: ' . $e->getMessage());
             return ['status' => false, 'message' => 'Erro ao obter histórico de pagamentos. Tente novamente.'];
-        }
-    }
-
-    private static function logTransactionAsJson($transactionId, $data, $store, $valorCashbackCliente) {
-        try {
-            $db = Database::getConnection();
-            $userStmt = $db->prepare("SELECT * FROM usuarios WHERE id = :user_id");
-            $userStmt->bindParam(':user_id', $data['usuario_id']);
-            $userStmt->execute();
-            $user = $userStmt->fetch(PDO::FETCH_ASSOC);
-
-            $logData = [
-                'transaction_id' => $transactionId,
-                'transaction_data' => $data,
-                'user_data' => $user,
-                'store_data' => $store,
-                'cashback_amount' => $valorCashbackCliente,
-                'timestamp' => date('Y-m-d H:i:s')
-            ];
-
-            $jsonLogData = json_encode($logData, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-            $logFileName = 'transaction_' . $transactionId . '.json';
-            $logFilePath = __DIR__ . '/../transaction_json_logs/' . $logFileName;
-
-            file_put_contents($logFilePath, $jsonLogData);
-
-            // Enviar notificação do WhatsApp
-            $notifier = new CashbackNotifier();
-            $notifier->notifyNewTransaction($transactionId);
-        } catch (Exception $e) {
-            error_log('Erro ao logar transação como JSON: ' . $e->getMessage());
         }
     }
 
