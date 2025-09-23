@@ -1,0 +1,96 @@
+{
+  "name": "Klube Cash - Simulação CURL Exata",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "webhook/curl-sim"
+      },
+      "id": "webhook-curl",
+      "name": "Webhook CURL Sim",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Dados exatos do curl que funcionou\nreturn {\n  phone: '34991191534',\n  secret: 'klube-cash-2024',\n  curlTest: true\n};"
+      },
+      "id": "dados-curl",
+      "name": "Dados CURL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "uri": "https://klubecash.com/api/whatsapp-saldo.php",
+        "requestMethod": "POST",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": "{\"phone\":\"34991191534\",\"secret\":\"klube-cash-2024\"}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "curl-exact",
+      "name": "CURL Exato",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Verificar se curl simulation funcionou\nconst response = $input.all()[0].json;\nconsole.log('🎯 CURL SIMULATION Result:', JSON.stringify(response, null, 2));\n\n// Extrair dados da resposta\nlet success = false;\nlet message = '';\nlet userData = null;\n\nif (response && response.success) {\n  success = true;\n  message = response.message || 'Sucesso!';\n  userData = {\n    user_found: response.user_found,\n    timestamp: response.timestamp\n  };\n}\n\nreturn {\n  curlSimulationSuccess: success,\n  apiResponse: response,\n  message: message,\n  userData: userData,\n  recommendation: success ? '✅ CURL SIMULATION FUNCIONOU - Use esta configuração!' : '❌ Ainda há problemas',\n  nextStep: success ? 'Aplicar esta config no workflow principal' : 'Investigar mais',\n  timestamp: new Date().toISOString()\n};"
+      },
+      "id": "verificar-curl",
+      "name": "Verificar CURL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300]
+    }
+  ],
+  "connections": {
+    "Webhook CURL Sim": {
+      "main": [
+        [
+          {
+            "node": "Dados CURL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dados CURL": {
+      "main": [
+        [
+          {
+            "node": "CURL Exato",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CURL Exato": {
+      "main": [
+        [
+          {
+            "node": "Verificar CURL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "timezone": "America/Sao_Paulo"
+  },
+  "staticData": {},
+  "meta": {},
+  "tags": []
+}
