@@ -40,11 +40,6 @@ RewriteRule .* - [F,L]
 # Permitir acesso à API de saldo do WhatsApp
 RewriteRule ^api/whatsapp-saldo/?$ api/whatsapp-saldo.php [L,QSA]
 
-# === ROTAS N8N E INTEGRAÇÃO (ADICIONAR) ===
-RewriteRule ^api/n8n-webhook/?$ api/n8n-webhook.php [L,QSA]
-RewriteRule ^api/evolution-test/?$ api/evolution-test.php [L,QSA]
-RewriteRule ^admin/webhook-logs/?$ views/admin/webhook-logs.php [L]
-
 # Melhorar performance para requisições da API
 <FilesMatch "whatsapp-saldo\.php$">
     # Cache por 0 segundos (não cachear)
