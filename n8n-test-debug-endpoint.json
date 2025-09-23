@@ -1,0 +1,111 @@
+{
+  "name": "Klube Cash - Teste Debug Endpoint",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "webhook/debug-endpoint"
+      },
+      "id": "webhook-debug-endpoint",
+      "name": "Webhook Debug Endpoint",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "return {\n  phone: '34991191534',\n  secret: 'klube-cash-2024',\n  test: 'debug-endpoint'\n};"
+      },
+      "id": "prepare-debug",
+      "name": "Preparar Debug",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://klubecash.com/debug-secret.php",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "User-Agent",
+              "value": "n8n-debug-test"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "body": "{\"phone\":\"34991191534\",\"secret\":\"klube-cash-2024\"}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "fullResponse": true
+          }
+        }
+      },
+      "id": "test-debug-endpoint",
+      "name": "Testar Debug Endpoint",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.all()[0].json;\nconsole.log('🔍 DEBUG RESPONSE:', JSON.stringify(response, null, 2));\n\nlet body;\ntry {\n  body = typeof response.body === 'string' ? JSON.parse(response.body) : response.body;\n} catch (e) {\n  body = response.body;\n}\n\nconsole.log('📋 DEBUG INFO:', JSON.stringify(body.debug, null, 2));\nconsole.log('🔐 SECRET VALIDATION:', JSON.stringify(body.secret_validation, null, 2));\n\nreturn {\n  statusCode: response.statusCode,\n  debugInfo: body.debug,\n  secretValidation: body.secret_validation,\n  recommendation: body.secret_validation?.match ? \n    'Secret está correto - problema em outro lugar' : \n    'Secret não está chegando corretamente'\n};"
+      },
+      "id": "analyze-debug",
+      "name": "Analisar Debug",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Debug Endpoint": {
+      "main": [
+        [
+          {
+            "node": "Preparar Debug",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Debug": {
+      "main": [
+        [
+          {
+            "node": "Testar Debug Endpoint",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Testar Debug Endpoint": {
+      "main": [
+        [
+          {
+            "node": "Analisar Debug",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "timezone": "America/Sao_Paulo"
+  },
+  "staticData": {},
+  "meta": {},
+  "tags": []
+}

@@ -1,0 +1,107 @@
+{
+  "name": "Klube Cash - Teste Final Auth",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "webhook/final-test"
+      },
+      "id": "webhook-final",
+      "name": "Webhook Final",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Log de entrada\nconsole.log('🔍 Input recebido:', JSON.stringify($input.all()[0].json, null, 2));\n\n// Retornar dados exatamente como o curl que funcionou\nreturn {\n  phone: '34991191534',\n  secret: 'klube-cash-2024',\n  debug: true\n};"
+      },
+      "id": "prepare-data",
+      "name": "Preparar Dados",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://klubecash.com/api/whatsapp-saldo.php",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "body": "{\"phone\":\"34991191534\",\"secret\":\"klube-cash-2024\"}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "fullResponse": true
+          }
+        }
+      },
+      "id": "test-exact-curl",
+      "name": "Simular CURL Exato",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Analisar resposta detalhadamente\nconst response = $input.all()[0].json;\n\nconsole.log('📊 RESPOSTA COMPLETA:', JSON.stringify(response, null, 2));\n\n// Extrair informações importantes\nconst statusCode = response.statusCode;\nconst headers = response.headers || {};\nlet body;\n\n// Tentar parsear o body\ntry {\n  body = typeof response.body === 'string' ? JSON.parse(response.body) : response.body;\n} catch (e) {\n  body = response.body;\n}\n\nconsole.log('📈 Status:', statusCode);\nconsole.log('📋 Headers:', JSON.stringify(headers, null, 2));\nconsole.log('📄 Body:', JSON.stringify(body, null, 2));\n\n// Verificar se é erro de auth\nconst isAuthError = statusCode === 401 || \n                   (body && body.error && body.error.includes('autorizado'));\n\nreturn {\n  statusCode,\n  success: statusCode === 200,\n  isAuthError,\n  headers,\n  body,\n  diagnosis: isAuthError ? 'PROBLEMA DE AUTORIZAÇÃO' : \n            statusCode === 200 ? 'SUCESSO' : \n            'OUTRO ERRO',\n  timestamp: new Date().toISOString()\n};"
+      },
+      "id": "analyze-response",
+      "name": "Analisar Resposta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Final": {
+      "main": [
+        [
+          {
+            "node": "Preparar Dados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Dados": {
+      "main": [
+        [
+          {
+            "node": "Simular CURL Exato",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simular CURL Exato": {
+      "main": [
+        [
+          {
+            "node": "Analisar Resposta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "timezone": "America/Sao_Paulo"
+  },
+  "staticData": {},
+  "meta": {},
+  "tags": []
+}
