@@ -1,0 +1,516 @@
+{
+  "name": "Klube Cash - Consulta Saldo Inteligente (Evolution API)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "webhook/saldo-evolution",
+        "responseMode": "responseNode"
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "id": "webhook-receptor",
+      "name": "Webhook"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "instance-id",
+              "name": "instance",
+              "value": "KluebCash",
+              "type": "string"
+            },
+            {
+              "id": "phone-number",
+              "name": "phoneNumber",
+              "value": "={{ $json.data?.key?.remoteJid?.replace('@s.whatsapp.net', '')?.replace('@c.us', '') || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "message-text",
+              "name": "message",
+              "value": "={{ $json.data?.message?.conversation || $json.data?.message?.extendedTextMessage?.text || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "from-me",
+              "name": "fromMe",
+              "value": "={{ $json.data?.key?.fromMe || false }}",
+              "type": "boolean"
+            },
+            {
+              "id": "message-type",
+              "name": "messageType",
+              "value": "={{ $json.data?.messageType || 'conversation' }}",
+              "type": "string"
+            },
+            {
+              "id": "chat-id",
+              "name": "chatId",
+              "value": "={{ $json.data?.key?.remoteJid || '' }}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [460, 300],
+      "id": "extrair-dados",
+      "name": "Extrair Dados Evolution"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.fromMe }}",
+              "rightValue": "false",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "leftValue": "={{ $json.phoneNumber }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 300],
+      "id": "filtrar-mensagens",
+      "name": "Filtrar Mensagens"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.message }}",
+              "rightValue": "saldo",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "leftValue": "={{ $json.message }}",
+              "rightValue": "extrato",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "leftValue": "={{ $json.message }}",
+              "rightValue": "consulta",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "leftValue": "={{ $json.message }}",
+              "rightValue": "quanto tenho",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "leftValue": "={{ $json.message.trim() }}",
+              "rightValue": "1",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 180],
+      "id": "verificar-comando-saldo",
+      "name": "Verificar Comando Saldo"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "table": {
+          "__rl": true,
+          "value": "usuarios",
+          "mode": "name"
+        },
+        "where": {
+          "values": [
+            {
+              "column": "telefone",
+              "condition": "=",
+              "value": "={{ $json.phoneNumber }}"
+            }
+          ]
+        },
+        "limit": 1
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2,
+      "position": [900, 240],
+      "id": "buscar-usuario",
+      "name": "Buscar Usuário por Telefone"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.length }}",
+              "rightValue": "0",
+              "operator": {
+                "type": "string",
+                "operation": "greaterThan"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1120, 240],
+      "id": "verificar-usuario",
+      "name": "Verificar se Usuário Existe"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "table": {
+          "__rl": true,
+          "value": "cashback_saldos",
+          "mode": "name"
+        },
+        "where": {
+          "values": [
+            {
+              "column": "user_id",
+              "condition": "=",
+              "value": "={{ $json[0].id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2,
+      "position": [1340, 180],
+      "id": "buscar-saldos",
+      "name": "Buscar Saldos por ID"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Processar dados do usuário e saldos\nconst usuario = $('Buscar Usuário por Telefone').first().json[0];\nconst saldos = $input.all()[0].json;\nconst dadosExtração = $('Extrair Dados Evolution').first().json;\n\nlet mensagem = '';\n\nif (!usuario) {\n  mensagem = `❌ *Usuário não encontrado*\\n\\nOlá! Seu número ${dadosExtração.phoneNumber} não está cadastrado no sistema Klube Cash.\\n\\n📞 Entre em contato conosco para fazer seu cadastro e começar a acumular cashback!`;\n} else if (!saldos || saldos.length === 0) {\n  mensagem = `👋 *Olá, ${usuario.nome}!*\\n\\n💰 *Seu Saldo Atual: R$ 0,00*\\n\\nVocê ainda não possui movimentações em sua conta.\\n\\n🛍️ Faça suas compras nos estabelecimentos parceiros e comece a acumular cashback!`;\n} else {\n  // Calcular saldo total\n  let saldoTotal = 0;\n  let detalhes = [];\n  \n  saldos.forEach(saldo => {\n    saldoTotal += parseFloat(saldo.valor || 0);\n    \n    // Adicionar detalhes por carteira/tipo\n    if (saldo.tipo) {\n      detalhes.push(`${saldo.tipo}: R$ ${parseFloat(saldo.valor || 0).toFixed(2)}`);\n    }\n  });\n  \n  mensagem = `👋 *Olá, ${usuario.nome}!*\\n\\n💰 *Seu Saldo Total: R$ ${saldoTotal.toFixed(2)}*\\n\\n`;\n  \n  if (detalhes.length > 0) {\n    mensagem += `📊 *Detalhamento:*\\n${detalhes.join('\\n')}\\n\\n`;\n  }\n  \n  mensagem += `📅 *Última atualização:* ${new Date().toLocaleDateString('pt-BR')}\\n\\n`;\n  mensagem += `🏪 Continue comprando nos estabelecimentos parceiros para acumular mais cashback!`;\n  \n  if (saldoTotal >= 50) {\n    mensagem += `\\n\\n💡 *Dica:* Você já pode solicitar o resgate do seu cashback!`;\n  }\n}\n\nreturn {\n  mensagemPersonalizada: mensagem,\n  usuario: usuario,\n  saldoTotal: saldos ? saldos.reduce((total, s) => total + parseFloat(s.valor || 0), 0) : 0,\n  temSaldo: saldos && saldos.length > 0,\n  phoneNumber: dadosExtração.phoneNumber\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1560, 180],
+      "id": "processar-saldo",
+      "name": "Processar Saldo Personalizado"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://evolutionapi.klubecash.com/message/sendText/KluebCash",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "HONejkqQLlxZoeYiaQxmUczVRTdqscw2"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\n  \"number\": \"{{ $json.phoneNumber }}\",\n  \"text\": \"{{ $json.mensagemPersonalizada }}\"\n}",
+        "options": {
+          "timeout": 30000,
+          "followRedirect": true,
+          "followAllRedirects": true
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1780, 120],
+      "id": "enviar-resposta",
+      "name": "Enviar Resposta Personalizada"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://evolutionapi.klubecash.com/message/sendText/KluebCash",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "HONejkqQLlxZoeYiaQxmUczVRTdqscw2"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\n  \"number\": \"{{ $('Extrair Dados Evolution').item.json.phoneNumber }}\",\n  \"text\": \"❌ *Usuário não encontrado*\\n\\nOlá! Seu número não está cadastrado no sistema Klube Cash.\\n\\n📞 Entre em contato conosco para fazer seu cadastro e começar a acumular cashback!\"\n}",
+        "options": {
+          "timeout": 30000,
+          "followRedirect": true,
+          "followAllRedirects": true
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1340, 360],
+      "id": "enviar-usuario-nao-encontrado",
+      "name": "Enviar: Usuário Não Encontrado"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://evolutionapi.klubecash.com/message/sendText/KluebCash",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "apikey",
+              "value": "HONejkqQLlxZoeYiaQxmUczVRTdqscw2"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "jsonBody": "={\n  \"number\": \"{{ $('Extrair Dados Evolution').item.json.phoneNumber }}\",\n  \"text\": \"🚫 *Comando não reconhecido*\\n\\nPara consultar seu saldo, envie uma das palavras:\\n• saldo\\n• extrato\\n• consulta\\n• quanto tenho\\n\\nOu digite *1* para o menu principal.\"\n}",
+        "options": {
+          "timeout": 30000,
+          "followRedirect": true,
+          "followAllRedirects": true
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [900, 420],
+      "id": "enviar-comando-invalido",
+      "name": "Enviar: Comando Inválido"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "✅ Consulta de saldo processada com sucesso",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/plain; charset=utf-8"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [2000, 180],
+      "id": "resposta-webhook-sucesso",
+      "name": "Resposta Webhook"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Extrair Dados Evolution",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extrair Dados Evolution": {
+      "main": [
+        [
+          {
+            "node": "Filtrar Mensagens",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtrar Mensagens": {
+      "main": [
+        [
+          {
+            "node": "Verificar Comando Saldo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Enviar: Comando Inválido",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar Comando Saldo": {
+      "main": [
+        [
+          {
+            "node": "Buscar Usuário por Telefone",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Enviar: Comando Inválido",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Usuário por Telefone": {
+      "main": [
+        [
+          {
+            "node": "Verificar se Usuário Existe",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar se Usuário Existe": {
+      "main": [
+        [
+          {
+            "node": "Buscar Saldos por ID",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Enviar: Usuário Não Encontrado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Saldos por ID": {
+      "main": [
+        [
+          {
+            "node": "Processar Saldo Personalizado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processar Saldo Personalizado": {
+      "main": [
+        [
+          {
+            "node": "Enviar Resposta Personalizada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar Resposta Personalizada": {
+      "main": [
+        [
+          {
+            "node": "Resposta Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar: Usuário Não Encontrado": {
+      "main": [
+        [
+          {
+            "node": "Resposta Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar: Comando Inválido": {
+      "main": [
+        [
+          {
+            "node": "Resposta Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "1",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "id": "klube-saldo-evolution-corrigido-final"
+}
