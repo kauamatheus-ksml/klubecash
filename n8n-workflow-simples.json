@@ -82,8 +82,8 @@
           ]
         },
         "sendBody": true,
-        "contentType": "json",
-        "jsonParameters": "{\n  \"phone\": \"{{ $json.phone }}\",\n  \"secret\": \"klube-cash-2024\"\n}"
+        "contentType": "raw",
+        "body": "{\"phone\":\"{{ $json.phone }}\",\"secret\":\"klube-cash-2024\"}"
       },
       "id": "api-saldo",
       "name": "API Saldo",

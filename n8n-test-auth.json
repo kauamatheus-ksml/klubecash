@@ -1,0 +1,160 @@
+{
+  "name": "Klube Cash - Teste Autorização",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "webhook/auth-test"
+      },
+      "id": "webhook-auth",
+      "name": "Webhook Auth Test",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Dados fixos para teste\nreturn {\n  phone: '34991191534',\n  secret: 'klube-cash-2024',\n  timestamp: new Date().toISOString(),\n  test: 'auth-validation'\n};"
+      },
+      "id": "fixed-data",
+      "name": "Dados Fixos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://klubecash.com/api/whatsapp-saldo.php",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "User-Agent",
+              "value": "n8n-auth-test"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "body": "{\"phone\":\"34991191534\",\"secret\":\"klube-cash-2024\"}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "fullResponse": true
+          }
+        }
+      },
+      "id": "test-raw",
+      "name": "Teste RAW JSON",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [680, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://klubecash.com/api/whatsapp-saldo.php",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json; charset=utf-8"
+            },
+            {
+              "name": "User-Agent",
+              "value": "n8n-auth-test"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "jsonParameters": "{\n  \"phone\": \"{{ $json.phone }}\",\n  \"secret\": \"{{ $json.secret }}\"\n}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "fullResponse": true
+          }
+        }
+      },
+      "id": "test-json",
+      "name": "Teste JSON Template",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [680, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Analisar ambas as respostas\nconst rawResponse = $input.all()[0].json;\nconst jsonResponse = $input.all()[1].json;\n\nconsole.log('🧪 RAW Response:', JSON.stringify(rawResponse, null, 2));\nconsole.log('🧪 JSON Response:', JSON.stringify(jsonResponse, null, 2));\n\nreturn {\n  rawTest: {\n    statusCode: rawResponse.statusCode,\n    body: rawResponse.body,\n    success: rawResponse.statusCode === 200\n  },\n  jsonTest: {\n    statusCode: jsonResponse.statusCode,\n    body: jsonResponse.body,\n    success: jsonResponse.statusCode === 200\n  },\n  comparison: {\n    rawWorked: rawResponse.statusCode === 200,\n    jsonWorked: jsonResponse.statusCode === 200,\n    recommendation: rawResponse.statusCode === 200 ? 'Use RAW body' : 'Check auth'\n  },\n  timestamp: new Date().toISOString()\n};"
+      },
+      "id": "compare-results",
+      "name": "Comparar Resultados",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Auth Test": {
+      "main": [
+        [
+          {
+            "node": "Dados Fixos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dados Fixos": {
+      "main": [
+        [
+          {
+            "node": "Teste RAW JSON",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Teste JSON Template",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Teste RAW JSON": {
+      "main": [
+        [
+          {
+            "node": "Comparar Resultados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Teste JSON Template": {
+      "main": [
+        [
+          {
+            "node": "Comparar Resultados",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "timezone": "America/Sao_Paulo"
+  },
+  "staticData": {},
+  "meta": {},
+  "tags": []
+}
