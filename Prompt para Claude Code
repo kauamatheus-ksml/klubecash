@@ -1,0 +1,71 @@
+# Prompt para Claude Code: Implementação e Verificação Completa do Sistema de Automação WhatsApp N8N - Klube Cash
+
+## Contexto do Projeto
+
+Você está trabalhando em um sistema PHP chamado Klube Cash que implementa um sistema de cashback. Foi desenvolvido um sistema completo de automação de notificações WhatsApp usando N8N e Evolution API. O sistema atual apresenta erro de autenticação HTTP 401 com a Evolution API e precisa de verificação completa da implementação.
+
+## Objetivos Principais
+
+Verificar se todos os arquivos necessários foram criados corretamente conforme especificações técnicas definidas. Identificar e corrigir problemas de autenticação com a Evolution API que está retornando erro HTTP 401. Implementar sistema robusto de fallback entre N8N Webhook, Evolution API direta e sistema legado. Configurar logging completo para monitoramento e debugging das integrações.
+
+## Arquivos que Devem Ser Criados
+
+Crie o arquivo `api/n8n-webhook.php` contendo a classe N8nWebhook com métodos para envio de dados de transação para N8N, validação de assinatura HMAC, logging de chamadas de webhook, e teste de conectividade. O arquivo deve processar eventos de nova transação e cashback liberado.
+
+Crie o arquivo `api/evolution-test.php` para teste de conectividade da Evolution API, configurado para aceitar apenas requisições GET e retornar status da conexão em formato JSON estruturado.
+
+Crie o arquivo `utils/EvolutionWhatsApp.php` contendo a classe EvolutionWhatsApp com métodos para envio de mensagens, formatação de telefone, logging de mensagens, notificações de nova transação, notificações de cashback liberado, e teste de conectividade com a API.
+
+Crie o arquivo `views/admin/webhook-logs.php` contendo interface administrativa para visualização de logs, estatísticas de envio, filtros por período e tipo de evento, e tabelas responsivas para N8N e Evolution API.
+
+Crie o arquivo `test-integration.php` na raiz do projeto para teste completo da integração, incluindo conectividade N8N, Evolution API, envio de mensagens de teste, e webhook com transação real.
+
+## Modificações em Arquivos Existentes
+
+Modifique o arquivo `config/constants.php` adicionando constantes para N8N (N8N_ENABLED, N8N_WEBHOOK_URL, N8N_WEBHOOK_SECRET, N8N_TIMEOUT) e Evolution API (EVOLUTION_API_ENABLED, EVOLUTION_API_URL, EVOLUTION_API_KEY, EVOLUTION_INSTANCE, EVOLUTION_TIMEOUT). Configure as URLs corretas: N8N em https://n8n.klubecash.com/webhook/klube-cash-transaction e Evolution API em https://evolutionapi.klubecash.com.
+
+Modifique o arquivo `.htaccess` adicionando rotas para api/n8n-webhook, api/evolution-test, e admin/webhook-logs com parâmetros adequados para funcionamento correto.
+
+Substitua completamente o conteúdo do arquivo `utils/NotificationTrigger.php` pela versão 2.0 que implementa arquitetura de prioridades: N8N como principal, Evolution API como backup, e sistema legado como último recurso.
+
+Modifique o arquivo `views/stores/register-transaction.php` na seção de integração WhatsApp, substituindo a implementação atual pela nova arquitetura que tenta N8N primeiro, depois Evolution API direta, e finalmente sistema legado.
+
+Modifique o arquivo `api/mercadopago-webhook.php` adicionando seção de notificação N8N para cashback liberado após aprovação de pagamento, incluindo sistema de backup via Evolution API quando N8N falha.
+
+## Problemas Específicos a Resolver
+
+Investigar e corrigir o erro HTTP 401 da Evolution API. Verifique se a chave API (HONejkqQLlxZoeYiaQxmUczVRTdqscw2) está válida, se a instância "KluebCash" existe e está ativa, e se as permissões estão configuradas corretamente.
+
+Implementar tratamento robusto de erros em todas as integrações, garantindo que falhas em um método não impeçam tentativas nos métodos subsequentes.
+
+Configurar logging detalhado com prefixos identificáveis para facilitar debugging: "N8N Webhook:", "Evolution WhatsApp:", "NotificationTrigger:".
+
+Garantir que o sistema mantenha compatibilidade total com código existente, especialmente a interface pública NotificationTrigger::send($transactionId).
+
+## Configurações Técnicas Específicas
+
+Configure a Evolution API com URL https://evolutionapi.klubecash.com, instância "KluebCash", e chave API HONejkqQLlxZoeYiaQxmUczVRTdqscw2. Configure timeout de 30 segundos para operações.
+
+Configure N8N com URL https://n8n.klubecash.com/webhook/klube-cash-transaction, secret "klube-cash-secret-2024", e timeout de 15 segundos.
+
+Implemente validação de assinatura HMAC SHA256 para segurança do webhook N8N usando o secret configurado.
+
+Configure criação automática de tabelas de log: n8n_webhook_logs, whatsapp_evolution_logs, e webhook_errors quando necessário.
+
+## Testes e Validação
+
+Execute teste de conectividade da Evolution API através do endpoint /api/evolution-test e resolva qualquer problema de autenticação encontrado.
+
+Teste o envio de mensagem através da Evolution API usando número de teste e verifique se a resposta é bem-sucedida.
+
+Verifique se o webhook N8N está configurado corretamente e responde adequadamente a requisições de teste.
+
+Execute teste completo através do arquivo test-integration.php para validar toda a cadeia de integração.
+
+## Critérios de Sucesso
+
+O teste /api/evolution-test deve retornar status "success" com conexão bem-sucedida à Evolution API. Todas as notificações de nova transação devem ser enviadas via N8N ou Evolution API com logging adequado. Notificações de cashback liberado devem funcionar automaticamente após aprovação de pagamentos. Interface administrativa deve exibir estatísticas e logs de todas as integrações.
+
+Implemente verificações de fallback funcionando corretamente: N8N → Evolution API → Sistema Legado. Configure tratamento de erros que não interrompa operações principais do sistema. Mantenha compatibilidade total com código existente sem quebrar funcionalidades.
+
+Execute todos os testes e corrija qualquer problema encontrado antes de considerar a implementação completa. Documente no código qualquer alteração específica feita para resolver problemas encontrados durante a implementação.
