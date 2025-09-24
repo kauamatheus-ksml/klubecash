@@ -7,7 +7,7 @@ require_once __DIR__ . '/../models/CashbackBalance.php';
 require_once __DIR__ . '/ImageGenerator.php';
 
 /**
- * Classe para Consulta de Saldo
+ * Classe para Consulta de Saldo - Integração WhatsApp
  * Versão corrigida e testada
  */
 class SaldoConsulta {

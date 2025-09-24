@@ -1525,7 +1525,7 @@ class ClientController {
 
             file_put_contents($logFilePath, $jsonLogData);
 
-            // Enviar notificação
+            // Enviar notificação do WhatsApp
             $notifier = new CashbackNotifier();
             $notifier->notifyNewTransaction($transactionId);
         } catch (Exception $e) {
