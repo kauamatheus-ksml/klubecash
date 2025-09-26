@@ -60,7 +60,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   }
 
   if (!user || user.senat !== 'Sim') {
-    return <Navigate to="/login" replace />;
+    window.location.href = 'https://klubecash.com/cliente/escolher-carteira';
+    return null;
   }
 
   return <>{children}</>;

@@ -1,0 +1,26 @@
+
+Debug SestSenat
+Estado do Usuário
+Estado atual da autenticação
+
+Usuário logado: Sim
+{
+  "id": 123,
+  "nome": "Usuário Teste Senat",
+  "email": "teste@senat.com",
+  "tipo": "cliente",
+  "senat": "Sim",
+  "status": "ativo"
+}
+localStorage
+Dados salvos no navegador
+
+Dados no localStorage:
+{"id":123,"nome":"Usuário Teste Senat","email":"teste@senat.com","tipo":"cliente","senat":"Sim","status":"ativo"}
+Ações de Teste
+Ferramentas para testar o sistema
+
+Criar Usuário Teste
+Limpar localStorage
+Testar verifySession
+Recarregar Página
