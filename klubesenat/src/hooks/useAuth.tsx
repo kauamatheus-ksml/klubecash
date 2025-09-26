@@ -37,18 +37,26 @@ export const useAuthHook = () => {
   useEffect(() => {
     // Verificar se há usuário salvo no localStorage
     const savedUser = localStorage.getItem('senat_user');
+    console.log('Verificando localStorage senat_user:', savedUser);
+
     if (savedUser) {
       try {
         const parsedUser = JSON.parse(savedUser);
+        console.log('Dados do usuário parseados:', parsedUser);
+
         if (parsedUser.senat === 'Sim') {
+          console.log('Usuário válido do Senat, fazendo login automático');
           setUser(parsedUser);
         } else {
+          console.log('Usuário não é do Senat, removendo localStorage');
           localStorage.removeItem('senat_user');
         }
       } catch (error) {
         console.error('Erro ao recuperar usuário salvo:', error);
         localStorage.removeItem('senat_user');
       }
+    } else {
+      console.log('Nenhum usuário salvo no localStorage');
     }
   }, []);
 
@@ -83,6 +91,8 @@ export const useAuthHook = () => {
     setError(null);
 
     try {
+      console.log('Verificando dados da sessão:', sessionData);
+
       // Verificar se os dados da sessão são válidos
       if (sessionData && sessionData.senat === 'Sim') {
         const userData: User = {
@@ -94,11 +104,14 @@ export const useAuthHook = () => {
           status: sessionData.status || 'ativo'
         };
 
+        console.log('Dados do usuário processados:', userData);
         localStorage.setItem('senat_user', JSON.stringify(userData));
         setUser(userData);
+        console.log('Usuário definido no estado, login bem-sucedido');
         return userData;
       }
 
+      console.log('Dados da sessão inválidos ou usuário não é do Senat');
       return null;
     } catch (error) {
       console.error('Erro ao verificar sessão:', error);
