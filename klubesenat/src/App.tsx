@@ -44,7 +44,7 @@ const App = () => (
               path="/historico"
               element={
                 <ProtectedRoute>
-                  <History />
+                  <Historico />
                 </ProtectedRoute>
               }
             />
