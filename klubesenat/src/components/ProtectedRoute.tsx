@@ -39,8 +39,28 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   }
 
   if (!user || user.senat !== 'Sim') {
-    window.location.href = 'https://klubecash.com/cliente/escolher-carteira';
-    return null;
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-red-50 to-red-100 flex items-center justify-center">
+        <div className="text-center space-y-6 max-w-md px-4">
+          <div className="mx-auto w-16 h-16 bg-red-600 rounded-full flex items-center justify-center">
+            <svg className="h-8 w-8 text-white" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-bold text-gray-900">Acesso Negado</h2>
+            <p className="text-gray-600">Você precisa estar logado no sistema principal do Klube Cash com uma conta válida do Senat.</p>
+            <p className="text-sm text-gray-500">Estado do usuário: {user ? `${user.nome} (senat: ${user.senat})` : 'Não logado'}</p>
+          </div>
+          <button
+            onClick={() => window.location.href = 'http://localhost:8080/cliente/escolher-carteira'}
+            className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors"
+          >
+            Voltar ao Klube Cash
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return <>{children}</>;
