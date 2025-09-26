@@ -4,6 +4,23 @@ require_once '../../config/constants.php';
 require_once '../../config/database.php';
 require_once '../../controllers/AuthController.php';
 
+function resolveClientWalletDestination(): string
+{
+    $selectedWallet = $_SESSION['client_selected_wallet'] ?? '';
+    if ($selectedWallet === 'klubecash') {
+        return CLIENT_DASHBOARD_URL;
+    }
+
+    if ($selectedWallet === 'sestsenat') {
+        $sestUrl = trim((string) CLIENT_SESTSENAT_PORTAL_URL);
+        if ($sestUrl !== '') {
+            return $sestUrl;
+        }
+    }
+
+    return CLIENT_WALLET_SELECTOR_URL;
+}
+
 // Verificar se já existe uma sessão ativa
 session_start();
 if (isset($_SESSION['user_id']) && !isset($_GET['force_login'])) {
@@ -20,7 +37,7 @@ if (isset($_SESSION['user_id']) && !isset($_GET['force_login'])) {
         header('Location: ' . STORE_DASHBOARD_URL);
         exit;
     } else {
-        header('Location: ' . CLIENT_DASHBOARD_URL);
+        header('Location: ' . resolveClientWalletDestination());
         exit;
     }
 }
@@ -49,7 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // CORREÇÃO CRÍTICA: FUNCIONÁRIO VAI PARA STORE
                 header('Location: ' . STORE_DASHBOARD_URL);
             } else {
-                header('Location: ' . CLIENT_DASHBOARD_URL);
+                header('Location: ' . resolveClientWalletDestination());
             }
             exit;
         } else {

@@ -208,12 +208,14 @@ define('RECOVER_PASSWORD_URL', SITE_URL . '/recuperar-senha');
 define('LOGOUT_URL', SITE_URL . '/logout'); // ADICIONAR ESTA LINHA
 
 // === URLs DO CLIENTE ===
+define('CLIENT_WALLET_SELECTOR_URL', SITE_URL . '/cliente/escolher-carteira');
 define('CLIENT_DASHBOARD_URL', SITE_URL . '/cliente/dashboard');
 define('CLIENT_STATEMENT_URL', SITE_URL . '/cliente/extrato');
 define('CLIENT_STORES_URL', SITE_URL . '/cliente/lojas-parceiras');
 define('CLIENT_PROFILE_URL', SITE_URL . '/cliente/perfil');
 define('CLIENT_BALANCE_URL', SITE_URL . '/cliente/saldo');
 define('CLIENT_ACTIONS_URL', SITE_URL . '/cliente/actions');
+define('CLIENT_SESTSENAT_PORTAL_URL', ''); // TODO: definir URL final da página React
 
 
 // === CONFIGURAÇÕES DE CPF ===

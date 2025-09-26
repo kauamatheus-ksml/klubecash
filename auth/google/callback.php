@@ -1,33 +1,33 @@
-<?php
-// auth/google/callback.php - VERSÃO ATUALIZADA
+﻿<?php
+// auth/google/callback.php - VERSAO ATUALIZADA
 
 require_once '../../config/constants.php';
 require_once '../../config/database.php';
 require_once '../../controllers/AuthController.php';
 require_once '../../utils/GoogleAuth.php';
 
-// Iniciar sessão se não estiver iniciada
+// Iniciar sessao se nao estiver iniciada
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Log da requisição para debug
+// Log da requisicao para debug
 error_log('Google OAuth Callback: ' . json_encode($_GET));
 
-// Verificar se houve erro na autorização
+// Verificar se houve erro na autorizacao
 if (isset($_GET['error'])) {
     $error = $_GET['error'];
     $errorDescription = $_GET['error_description'] ?? 'Erro desconhecido';
     
-    error_log('Google OAuth: Erro na autorização - ' . $error . ': ' . $errorDescription);
+    error_log('Google OAuth: Erro na autorizacao - ' . $error . ': ' . $errorDescription);
     
     if ($error === 'access_denied') {
-        $message = 'Autorização cancelada pelo usuário.';
+        $message = 'Autorizacao cancelada pelo usuario.';
     } else {
-        $message = 'Erro na autorização: ' . $errorDescription;
+        $message = 'Erro na autorizacao: ' . $errorDescription;
     }
     
-    // Redirecionar para a página apropriada baseado na ação
+    // Redirecionar para a pagina apropriada baseado na acao
     $isRegister = isset($_SESSION['google_action']) && $_SESSION['google_action'] === 'register';
     $redirectUrl = $isRegister ? REGISTER_URL : LOGIN_URL;
     
@@ -35,26 +35,26 @@ if (isset($_GET['error'])) {
     exit;
 }
 
-// Verificar se recebeu o código de autorização
+// Verificar se recebeu o codigo de autorizacao
 if (!isset($_GET['code']) || !isset($_GET['state'])) {
-    error_log('Google OAuth: Código ou state não recebido');
+    error_log('Google OAuth: Codigo ou state nao recebido');
     
     $isRegister = isset($_SESSION['google_action']) && $_SESSION['google_action'] === 'register';
     $redirectUrl = $isRegister ? REGISTER_URL : LOGIN_URL;
     
-    header('Location: ' . $redirectUrl . '?error=' . urlencode('Parâmetros de autorização incompletos'));
+    header('Location: ' . $redirectUrl . '?error=' . urlencode('Parametros de autorizacao incompletos'));
     exit;
 }
 
 $code = $_GET['code'];
 $state = $_GET['state'];
 
-// Verificar se é registro ou login
+// Verificar se e registro ou login
 $isRegister = isset($_SESSION['google_action']) && $_SESSION['google_action'] === 'register';
 
-error_log('Google OAuth: Processando callback - Ação: ' . ($isRegister ? 'REGISTRO' : 'LOGIN'));
+error_log('Google OAuth: Processando callback - Acao: ' . ($isRegister ? 'REGISTRO' : 'LOGIN'));
 
-// Processar baseado na ação
+// Processar baseado na acao
 if ($isRegister) {
     $result = AuthController::googleRegister($code, $state);
     
@@ -62,7 +62,7 @@ if ($isRegister) {
         // Registro bem-sucedido
         error_log('Google OAuth: Registro bem-sucedido, redirecionando para dashboard');
         
-        // Para novos usuários, sempre redirecionar para cliente dashboard
+        // Para novos usuarios, sempre redirecionar para cliente dashboard
         $redirectUrl = CLIENT_DASHBOARD_URL;
         $successMessage = 'Registro realizado com sucesso! Bem-vindo ao Klube Cash!';
         
@@ -71,7 +71,7 @@ if ($isRegister) {
         // Erro no registro
         error_log('Google OAuth: Erro no registro - ' . $result['message']);
         
-        // Se usuário já existe, redirecionar para login
+        // Se usuario ja existe, redirecionar para login
         if (isset($result['redirect_to_login']) && $result['redirect_to_login']) {
             header('Location: ' . LOGIN_URL . '?error=' . urlencode($result['message']));
         } else {
@@ -84,7 +84,7 @@ if ($isRegister) {
     
     if ($result['status']) {
         // Login bem-sucedido
-        error_log('Google OAuth: Login bem-sucedido, redirecionando usuário tipo: ' . $_SESSION['user_type']);
+        error_log('Google OAuth: Login bem-sucedido, redirecionando usuario tipo: ' . $_SESSION['user_type']);
         
         switch ($_SESSION['user_type']) {
             case USER_TYPE_ADMIN:

@@ -138,7 +138,14 @@ if ($isLoggedIn) {
             $dashboardURL = ADMIN_DASHBOARD_URL;
             break;
         case 'cliente':
-            $dashboardURL = CLIENT_DASHBOARD_URL;
+            $selectedWallet = $_SESSION['client_selected_wallet'] ?? '';
+            if ($selectedWallet === 'klubecash') {
+                $dashboardURL = CLIENT_DASHBOARD_URL;
+            } else if ($selectedWallet === 'sestsenat' && trim((string) CLIENT_SESTSENAT_PORTAL_URL) !== '') {
+                $dashboardURL = CLIENT_SESTSENAT_PORTAL_URL;
+            } else {
+                $dashboardURL = CLIENT_WALLET_SELECTOR_URL;
+            }
             break;
         case 'loja':
             $dashboardURL = STORE_DASHBOARD_URL;
