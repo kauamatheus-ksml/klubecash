@@ -13,7 +13,7 @@ interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<User>;
   logout: () => void;
-  verifySession: (sessionId: string, email: string) => Promise<User | null>;
+  verifySession: (sessionData: any) => Promise<User | null>;
   isLoading: boolean;
   error: string | null;
   isAuthenticated: boolean;
@@ -57,42 +57,9 @@ export const useAuthHook = () => {
     setError(null);
 
     try {
-      // Fazer requisição para o sistema principal do Klube Cash via proxy
-      const response = await fetch('/api/auth/login-senat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email,
-          password,
-          require_senat: true
-        }),
-        credentials: 'include'
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Erro ao fazer login');
-      }
-
-      if (!data.success) {
-        throw new Error(data.message || 'Login falhou');
-      }
-
-      const userData = data.user;
-
-      // Verificar se o usuário é do Senat
-      if (userData.senat !== 'Sim') {
-        throw new Error('Acesso negado: Apenas usuários do Senat podem acessar este sistema');
-      }
-
-      // Salvar usuário no localStorage e no estado
-      localStorage.setItem('senat_user', JSON.stringify(userData));
-      setUser(userData);
-
-      return userData;
+      // Simular login - na prática, o usuário já está logado no sistema principal
+      // Este método é apenas para fallback, o login real acontece via redirecionamento
+      throw new Error('Use o sistema principal do Klube Cash para fazer login');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
       setError(errorMessage);
@@ -111,30 +78,25 @@ export const useAuthHook = () => {
     window.location.href = 'https://klubecash.com/cliente/escolher-carteira';
   };
 
-  const verifySession = async (sessionId: string, email: string): Promise<User | null> => {
+  const verifySession = async (sessionData: any): Promise<User | null> => {
     setIsLoading(true);
     setError(null);
 
     try {
-      const response = await fetch('/api/auth/verify-session-senat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          session_id: sessionId,
-          email,
-          require_senat: true
-        }),
-        credentials: 'include'
-      });
+      // Verificar se os dados da sessão são válidos
+      if (sessionData && sessionData.senat === 'Sim') {
+        const userData: User = {
+          id: sessionData.id || 0,
+          nome: sessionData.nome || sessionData.name || '',
+          email: sessionData.email || '',
+          tipo: sessionData.tipo || 'cliente',
+          senat: sessionData.senat,
+          status: sessionData.status || 'ativo'
+        };
 
-      const data = await response.json();
-
-      if (data.success && data.user.senat === 'Sim') {
-        localStorage.setItem('senat_user', JSON.stringify(data.user));
-        setUser(data.user);
-        return data.user;
+        localStorage.setItem('senat_user', JSON.stringify(userData));
+        setUser(userData);
+        return userData;
       }
 
       return null;
