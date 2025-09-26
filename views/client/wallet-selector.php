@@ -29,13 +29,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($selectedWallet === 'sestsenat') {
         $_SESSION['client_selected_wallet'] = 'sestsenat';
 
-        $targetUrl = resolveSestSenatUrl();
-        if ($targetUrl !== '') {
-            header('Location: ' . $targetUrl);
-            exit;
-        }
+        // Verificar se o usuário é do Senat
+        $userSenat = $_SESSION['user_senat'] ?? 'Não';
+        if ($userSenat !== 'Sim') {
+            $errors[] = 'Acesso negado: Apenas usuários do Senat podem acessar esta carteira.';
+        } else {
+            // Gerar token de sessão para o SestSenat
+            $sessionToken = bin2hex(random_bytes(32));
+            $_SESSION['senat_session_token'] = $sessionToken;
+            $_SESSION['senat_login_time'] = time();
 
-        $successMessage = 'Redirecionamento para a carteira SestSenat em breve. Aguarde a disponibilizacao do novo link.';
+            $targetUrl = resolveSestSenatUrl();
+            if ($targetUrl !== '') {
+                // Redirecionar com parâmetros de sessão
+                $redirectUrl = $targetUrl . '?session=' . urlencode($sessionToken) .
+                              '&email=' . urlencode($_SESSION['user_email']) .
+                              '&senat=' . urlencode($userSenat);
+                header('Location: ' . $redirectUrl);
+                exit;
+            }
+
+            $successMessage = 'Redirecionamento para a carteira SestSenat em breve. Aguarde a disponibilizacao do novo link.';
+        }
     }
 
     if (!in_array($selectedWallet, ['klubecash', 'sestsenat'], true)) {
