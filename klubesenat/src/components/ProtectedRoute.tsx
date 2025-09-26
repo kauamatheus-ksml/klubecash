@@ -60,7 +60,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <button
-              onClick={() => window.location.href = 'http://localhost:8080/cliente/escolher-carteira'}
+              onClick={() => window.location.href = 'https://klubecash.com/cliente/escolher-carteira'}
               className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors text-sm"
             >
               Voltar ao Klube Cash
