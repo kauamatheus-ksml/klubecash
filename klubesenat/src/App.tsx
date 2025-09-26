@@ -23,6 +23,7 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/debug" element={<Debug />} />
             <Route
               path="/"
               element={
@@ -43,7 +44,7 @@ const App = () => (
               path="/historico"
               element={
                 <ProtectedRoute>
-                  <Historico />
+                  <History />
                 </ProtectedRoute>
               }
             />
