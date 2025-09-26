@@ -215,8 +215,8 @@ define('CLIENT_STORES_URL', SITE_URL . '/cliente/lojas-parceiras');
 define('CLIENT_PROFILE_URL', SITE_URL . '/cliente/perfil');
 define('CLIENT_BALANCE_URL', SITE_URL . '/cliente/saldo');
 define('CLIENT_ACTIONS_URL', SITE_URL . '/cliente/actions');
-define('CLIENT_SESTSENAT_PORTAL_URL', 'http://localhost:8080');
-define('CLIENT_SESTSENAT_PORTAL_NETWORK_URL', 'http://192.168.100.53:8080');
+define('CLIENT_SESTSENAT_PORTAL_URL', 'http://localhost:8082');
+define('CLIENT_SESTSENAT_PORTAL_NETWORK_URL', 'http://192.168.100.53:8082');
 define('CLIENT_SESTSENAT_PORTAL_PROD_URL', 'https://sestsenat.klubecash.com');
 define('CLIENT_SESTSENAT_PORTAL_PROD_WWW_URL', 'https://www.sestsenat.klubecash.com');
 

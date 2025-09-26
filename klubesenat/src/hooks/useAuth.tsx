@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, createContext, useContext } from 'react';
 
 export interface User {
   id: number;
@@ -9,7 +9,25 @@ export interface User {
   status: string;
 }
 
-// Interface removida do hook - agora está no AuthProvider
+interface AuthContextType {
+  user: User | null;
+  login: (email: string, password: string) => Promise<User>;
+  logout: () => void;
+  verifySession: (sessionId: string, email: string) => Promise<User | null>;
+  isLoading: boolean;
+  error: string | null;
+  isAuthenticated: boolean;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
 
 export const useAuthHook = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -137,4 +155,19 @@ export const useAuthHook = () => {
     error,
     isAuthenticated: !!user && user.senat === 'Sim'
   };
+};
+
+// AuthProvider Component
+interface AuthProviderProps {
+  children: React.ReactNode;
+}
+
+export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+  const auth = useAuthHook();
+
+  return (
+    <AuthContext.Provider value={auth}>
+      {children}
+    </AuthContext.Provider>
+  );
 };

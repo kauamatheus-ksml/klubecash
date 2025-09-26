@@ -13,7 +13,7 @@ const Login = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { login, isLoading, error } = useAuth();
+  const { login, verifySession, isLoading, error } = useAuth();
 
   const [formData, setFormData] = useState({
     email: "",
@@ -34,36 +34,28 @@ const Login = () => {
 
   const handleAutoLogin = async (session: string, email: string) => {
     try {
-      const response = await fetch('/api/auth/verify-session', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          session,
-          email,
-          source: 'klubecash'
-        })
-      });
+      const user = await verifySession(session, email);
 
-      const data = await response.json();
-
-      if (data.success && data.user.senat === 'Sim') {
-        localStorage.setItem('senat_user', JSON.stringify(data.user));
+      if (user) {
         toast({
           title: "Login realizado com sucesso!",
-          description: `Bem-vindo ao SestSenat, ${data.user.nome}!`,
+          description: `Bem-vindo ao SestSenat, ${user.nome}!`,
         });
         navigate('/');
       } else {
         toast({
-          title: "Acesso negado",
-          description: "Apenas usuários do Senat podem acessar este sistema.",
+          title: "Sessão inválida",
+          description: "Não foi possível validar sua sessão. Faça login novamente.",
           variant: "destructive",
         });
       }
     } catch (error) {
       console.error('Erro no login automático:', error);
+      toast({
+        title: "Erro de conexão",
+        description: "Não foi possível conectar com o servidor. Tente novamente.",
+        variant: "destructive",
+      });
     }
   };
 
