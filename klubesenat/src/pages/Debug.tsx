@@ -4,14 +4,28 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 
 const Debug = () => {
-  const { user, verifySession } = useAuth();
+  const { user, verifySession, isLoading, error, isAuthenticated } = useAuth();
   const [localStorageData, setLocalStorageData] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<any>({});
 
   useEffect(() => {
     // Verificar localStorage ao carregar
     const data = localStorage.getItem('senat_user');
     setLocalStorageData(data);
-  }, []);
+
+    // Coletar informações de debug
+    const info = {
+      userFromHook: user,
+      isLoading,
+      error,
+      isAuthenticated,
+      localStorageRaw: data,
+      localStorageParsed: data ? JSON.parse(data) : null,
+      timestamp: new Date().toISOString()
+    };
+    setDebugInfo(info);
+    console.log('Debug: Estado completo do useAuth:', info);
+  }, [user, isLoading, error, isAuthenticated]);
 
   const createTestUser = () => {
     const testUser = {
@@ -25,7 +39,12 @@ const Debug = () => {
 
     localStorage.setItem('senat_user', JSON.stringify(testUser));
     setLocalStorageData(JSON.stringify(testUser));
-    console.log('Usuário teste criado:', testUser);
+    console.log('Debug: Usuário teste criado:', testUser);
+
+    // Recarregar página para forçar o useAuth processar os novos dados
+    setTimeout(() => {
+      window.location.reload();
+    }, 100);
   };
 
   const clearLocalStorage = () => {
@@ -60,11 +79,33 @@ const Debug = () => {
               <div>
                 <strong>Usuário logado:</strong> {user ? 'Sim' : 'Não'}
               </div>
+              <div>
+                <strong>isLoading:</strong> {isLoading ? 'Sim' : 'Não'}
+              </div>
+              <div>
+                <strong>isAuthenticated:</strong> {isAuthenticated ? 'Sim' : 'Não'}
+              </div>
+              <div>
+                <strong>error:</strong> {error || 'Nenhum'}
+              </div>
               {user && (
                 <div className="bg-green-50 p-4 rounded">
+                  <strong>Dados do usuário:</strong>
                   <pre>{JSON.stringify(user, null, 2)}</pre>
                 </div>
               )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Debug Completo</CardTitle>
+            <CardDescription>Informações detalhadas do sistema</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="bg-gray-50 p-4 rounded">
+              <pre>{JSON.stringify(debugInfo, null, 2)}</pre>
             </div>
           </CardContent>
         </Card>
@@ -96,9 +137,24 @@ const Debug = () => {
             <CardDescription>Ferramentas para testar o sistema</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex space-x-4">
+            <div className="flex flex-wrap gap-2">
               <Button onClick={createTestUser}>
                 Criar Usuário Teste
+              </Button>
+              <Button onClick={() => {
+                const realUser = {
+                  id: 9,
+                  nome: "Kaua Matheus da Silva Lope",
+                  email: "kauamatheus920@gmail.com",
+                  tipo: "cliente",
+                  senat: "Sim",
+                  status: "ativo"
+                };
+                localStorage.setItem('senat_user', JSON.stringify(realUser));
+                console.log('Debug: Usuário real ID 9 criado:', realUser);
+                setTimeout(() => window.location.reload(), 100);
+              }} variant="default" className="bg-green-600 hover:bg-green-700">
+                Simular Usuário ID 9
               </Button>
               <Button onClick={clearLocalStorage} variant="outline">
                 Limpar localStorage

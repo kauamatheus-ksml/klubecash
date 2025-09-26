@@ -48,10 +48,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 // Redirecionar com JavaScript para passar dados via localStorage
                 echo '<script>
-                    console.log("Dados do usuário:", ' . json_encode($userData) . ');
-                    localStorage.setItem("senat_user", ' . json_encode(json_encode($userData)) . ');
-                    console.log("localStorage definido, redirecionando...");
-                    window.location.href = "' . $targetUrl . '";
+                    console.log("PHP: Dados do usuário:", ' . json_encode($userData) . ');
+
+                    var userData = ' . json_encode($userData) . ';
+                    var userDataJson = JSON.stringify(userData);
+
+                    console.log("PHP: userData object:", userData);
+                    console.log("PHP: userDataJson string:", userDataJson);
+
+                    localStorage.setItem("senat_user", userDataJson);
+
+                    var stored = localStorage.getItem("senat_user");
+                    console.log("PHP: Dados armazenados no localStorage:", stored);
+                    console.log("PHP: localStorage keys:", Object.keys(localStorage));
+
+                    console.log("PHP: Redirecionando para:", "' . $targetUrl . '");
+
+                    setTimeout(function() {
+                        window.location.href = "' . $targetUrl . '";
+                    }, 500);
                 </script>';
                 exit;
             }
