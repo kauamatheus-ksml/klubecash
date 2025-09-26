@@ -11,10 +11,7 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['user_type']) || $_SESSION[
 
 function resolveSestSenatUrl(): string
 {
-    // Usar URL de produção se estiver em ambiente de produção
-    if (SITE_URL === 'https://klubecash.com') {
-        return trim((string) CLIENT_SESTSENAT_PORTAL_PROD_URL);
-    }
+    // Sempre usar localhost porque a produção ainda não está pronta
     return trim((string) CLIENT_SESTSENAT_PORTAL_URL);
 }
 
