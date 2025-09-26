@@ -51,13 +51,38 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
             <h2 className="text-2xl font-bold text-gray-900">Acesso Negado</h2>
             <p className="text-gray-600">Você precisa estar logado no sistema principal do Klube Cash com uma conta válida do Senat.</p>
             <p className="text-sm text-gray-500">Estado do usuário: {user ? `${user.nome} (senat: ${user.senat})` : 'Não logado'}</p>
+            <div className="text-xs text-gray-400 mt-2 p-2 bg-gray-100 rounded">
+              <strong>Debug localStorage:</strong><br/>
+              senat_user: {localStorage.getItem('senat_user') || 'null'}<br/>
+              Quantidade de itens: {localStorage.length}<br/>
+              URL atual: {window.location.href}
+            </div>
           </div>
-          <button
-            onClick={() => window.location.href = 'http://localhost:8080/cliente/escolher-carteira'}
-            className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors"
-          >
-            Voltar ao Klube Cash
-          </button>
+          <div className="space-y-2">
+            <button
+              onClick={() => window.location.href = 'http://localhost:8080/cliente/escolher-carteira'}
+              className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors"
+            >
+              Voltar ao Klube Cash
+            </button>
+            <button
+              onClick={() => {
+                const testUser = {
+                  id: 123,
+                  nome: "Usuário Teste Senat",
+                  email: "teste@senat.com",
+                  tipo: "cliente",
+                  senat: "Sim",
+                  status: "ativo"
+                };
+                localStorage.setItem('senat_user', JSON.stringify(testUser));
+                window.location.reload();
+              }}
+              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Testar com Usuário Fake
+            </button>
+          </div>
         </div>
       </div>
     );

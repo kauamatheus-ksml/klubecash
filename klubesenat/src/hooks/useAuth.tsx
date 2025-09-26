@@ -35,43 +35,29 @@ export const useAuthHook = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    console.log('=== DEBUG useAuth useEffect ===');
-
     // Verificar se há usuário salvo no localStorage
     const savedUser = localStorage.getItem('senat_user');
-    console.log('Verificando localStorage senat_user:', savedUser);
-    console.log('localStorage keys:', Object.keys(localStorage));
-
-    // Debug todos os items do localStorage
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      const value = localStorage.getItem(key);
-      console.log(`localStorage[${key}]:`, value);
-    }
+    console.log('SestSenat: Verificando localStorage senat_user:', savedUser);
 
     if (savedUser) {
       try {
         const parsedUser = JSON.parse(savedUser);
-        console.log('Dados do usuário parseados:', parsedUser);
-        console.log('parsedUser.senat:', parsedUser.senat);
-        console.log('Tipo:', typeof parsedUser.senat);
+        console.log('SestSenat: Dados do usuário parseados:', parsedUser);
 
         if (parsedUser.senat === 'Sim') {
-          console.log('✅ Usuário válido do Senat, fazendo login automático');
+          console.log('SestSenat: ✅ Usuário válido do Senat, fazendo login automático');
           setUser(parsedUser);
         } else {
-          console.log('❌ Usuário não é do Senat, removendo localStorage');
+          console.log('SestSenat: ❌ Usuário não é do Senat, removendo localStorage');
           localStorage.removeItem('senat_user');
         }
       } catch (error) {
-        console.error('❌ Erro ao recuperar usuário salvo:', error);
+        console.error('SestSenat: ❌ Erro ao recuperar usuário salvo:', error);
         localStorage.removeItem('senat_user');
       }
     } else {
-      console.log('❌ Nenhum usuário salvo no localStorage');
+      console.log('SestSenat: ❌ Nenhum usuário salvo no localStorage');
     }
-
-    console.log('=== FIM DEBUG useAuth ===');
   }, []);
 
   const login = async (email: string, password: string): Promise<User> => {
@@ -105,7 +91,7 @@ export const useAuthHook = () => {
     setError(null);
 
     // Redirecionar para o Klube Cash
-    window.location.href = 'https://klubecash.com/cliente/escolher-carteira';
+    window.location.href = 'http://localhost:8080/cliente/escolher-carteira';
   };
 
   const verifySession = async (sessionData: any): Promise<User | null> => {
