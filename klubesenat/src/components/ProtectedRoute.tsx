@@ -1,6 +1,5 @@
 import { ReactNode, useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { Navigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 
 interface ProtectedRouteProps {
@@ -8,39 +7,19 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const { user, verifySession, isLoading } = useAuth();
-  const [isChecking, setIsChecking] = useState(true);
+  const { user, isLoading } = useAuth();
+  const [isInitializing, setIsInitializing] = useState(true);
 
   useEffect(() => {
-    const checkAuth = async () => {
-      if (user) {
-        setIsChecking(false);
-        return;
-      }
+    // Dar tempo para o useAuth processar o localStorage
+    const timer = setTimeout(() => {
+      setIsInitializing(false);
+    }, 100);
 
-      // Verificar se há dados no localStorage (vindos do Klube Cash)
-      const savedUser = localStorage.getItem('senat_user');
-      if (savedUser) {
-        try {
-          const userData = JSON.parse(savedUser);
-          if (userData.senat === 'Sim') {
-            await verifySession(userData);
-            setIsChecking(false);
-            return;
-          }
-        } catch (error) {
-          console.error('Erro ao verificar dados salvos:', error);
-          localStorage.removeItem('senat_user');
-        }
-      }
+    return () => clearTimeout(timer);
+  }, []);
 
-      setIsChecking(false);
-    };
-
-    checkAuth();
-  }, [user, verifySession]);
-
-  if (isChecking || isLoading) {
+  if (isInitializing || isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="text-center space-y-6 max-w-md px-4">
