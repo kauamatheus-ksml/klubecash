@@ -34,18 +34,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($userSenat !== 'Sim') {
             $errors[] = 'Acesso negado: Apenas usuários do Senat podem acessar esta carteira.';
         } else {
-            // Gerar token de sessão para o SestSenat
-            $sessionToken = bin2hex(random_bytes(32));
-            $_SESSION['senat_session_token'] = $sessionToken;
-            $_SESSION['senat_login_time'] = time();
-
             $targetUrl = resolveSestSenatUrl();
             if ($targetUrl !== '') {
-                // Redirecionar com parâmetros de sessão
-                $redirectUrl = $targetUrl . '?session=' . urlencode($sessionToken) .
-                              '&email=' . urlencode($_SESSION['user_email']) .
-                              '&senat=' . urlencode($userSenat);
-                header('Location: ' . $redirectUrl);
+                // Preparar dados do usuário para o SestSenat
+                $userData = [
+                    'id' => $_SESSION['user_id'],
+                    'nome' => $_SESSION['user_name'],
+                    'email' => $_SESSION['user_email'],
+                    'tipo' => $_SESSION['user_type'],
+                    'senat' => $userSenat,
+                    'status' => 'ativo'
+                ];
+
+                // Redirecionar com JavaScript para passar dados via localStorage
+                echo '<script>
+                    localStorage.setItem("senat_user", ' . json_encode(json_encode($userData)) . ');
+                    window.location.href = "' . $targetUrl . '";
+                </script>';
                 exit;
             }
 
