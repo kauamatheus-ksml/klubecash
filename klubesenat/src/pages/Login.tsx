@@ -20,21 +20,25 @@ const Login = () => {
     password: ""
   });
 
-  // Verificar se há dados de sessão vindos do sistema principal
+  // Verificar se há dados salvos no localStorage
   useEffect(() => {
-    const userSession = searchParams.get('session');
-    const userEmail = searchParams.get('email');
-    const userSenat = searchParams.get('senat');
-
-    if (userSession && userEmail && userSenat === 'Sim') {
-      // Tentar login automático com sessão do sistema principal
-      handleAutoLogin(userSession, userEmail);
+    const savedUser = localStorage.getItem('senat_user');
+    if (savedUser) {
+      try {
+        const userData = JSON.parse(savedUser);
+        if (userData.senat === 'Sim') {
+          handleAutoLogin(userData);
+        }
+      } catch (error) {
+        console.error('Erro ao verificar dados salvos:', error);
+        localStorage.removeItem('senat_user');
+      }
     }
-  }, [searchParams]);
+  }, []);
 
-  const handleAutoLogin = async (session: string, email: string) => {
+  const handleAutoLogin = async (userData: any) => {
     try {
-      const user = await verifySession(session, email);
+      const user = await verifySession(userData);
 
       if (user) {
         toast({
@@ -45,15 +49,15 @@ const Login = () => {
       } else {
         toast({
           title: "Sessão inválida",
-          description: "Não foi possível validar sua sessão. Faça login novamente.",
+          description: "Não foi possível validar sua sessão. Acesse pelo Klube Cash.",
           variant: "destructive",
         });
       }
     } catch (error) {
       console.error('Erro no login automático:', error);
       toast({
-        title: "Erro de conexão",
-        description: "Não foi possível conectar com o servidor. Tente novamente.",
+        title: "Erro de autenticação",
+        description: "Acesse através do sistema Klube Cash.",
         variant: "destructive",
       });
     }
