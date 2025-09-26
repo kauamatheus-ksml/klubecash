@@ -65,9 +65,17 @@ export const useAuthHook = () => {
     setError(null);
 
     try {
-      // Simular login - na prática, o usuário já está logado no sistema principal
-      // Este método é apenas para fallback, o login real acontece via redirecionamento
-      throw new Error('Use o sistema principal do Klube Cash para fazer login');
+      // Para testes, vamos permitir login direto se há dados no localStorage
+      const savedUser = localStorage.getItem('senat_user');
+      if (savedUser) {
+        const userData = JSON.parse(savedUser);
+        if (userData.senat === 'Sim') {
+          setUser(userData);
+          return userData;
+        }
+      }
+
+      throw new Error('Acesse através do sistema principal do Klube Cash');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
       setError(errorMessage);
