@@ -210,6 +210,31 @@ $isFuncionario = $userType === 'funcionario';
         flex-shrink: 0;
     }
 
+    .navbar-logout-quick {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        padding: 0.55rem 1.05rem;
+        border-radius: var(--border-radius);
+        background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+        color: var(--white);
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.85rem;
+        box-shadow: var(--shadow-sm);
+        transition: var(--transition-normal);
+    }
+
+    .navbar-logout-quick svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    .navbar-logout-quick:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-lg);
+    }
+
     /* Botão de login melhorado para visitantes */
     .navbar-login-btn {
         display: flex;
@@ -493,6 +518,11 @@ $isFuncionario = $userType === 'funcionario';
             gap: 0.5rem;
         }
 
+        .navbar-logout-quick {
+            padding: 0.6rem 1rem;
+            font-size: 0.9rem;
+        }
+
         .navbar-menu-item {
             width: 100%;
         }
@@ -768,6 +798,14 @@ $isFuncionario = $userType === 'funcionario';
                         </a>
                     </div>
                 </div>
+                <?php if ($isClient): ?>
+                    <a href="<?php echo LOGOUT_URL; ?>" class="navbar-logout-quick" title="Sair da sua conta" aria-label="Sair da conta">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H9m4 4v1a3 3 0 01-3 3H7a3 3 0 01-3-3V7a3 3 0 013-3h3a3 3 0 013 3v1" />
+                        </svg>
+                        <span>Sair</span>
+                    </a>
+                <?php endif; ?>
             <?php else: ?>
                 <!-- Botões para visitantes -->
                 <a href="<?php echo SITE_URL; ?>/views/auth/login.php" class="navbar-login-btn">
