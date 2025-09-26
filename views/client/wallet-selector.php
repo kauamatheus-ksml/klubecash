@@ -48,7 +48,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 // Redirecionar com JavaScript para passar dados via localStorage
                 echo '<script>
+                    console.log("Dados do usuário:", ' . json_encode($userData) . ');
                     localStorage.setItem("senat_user", ' . json_encode(json_encode($userData)) . ');
+                    console.log("localStorage definido, redirecionando...");
                     window.location.href = "' . $targetUrl . '";
                 </script>';
                 exit;
