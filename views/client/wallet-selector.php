@@ -31,6 +31,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // Verificar se o usuário é do Senat
         $userSenat = $_SESSION['user_senat'] ?? 'Não';
+
+        // DEBUG: Mostrar informações da sessão
+        echo '<div style="background: #f0f0f0; padding: 10px; margin: 10px; border: 1px solid #ccc;">';
+        echo '<h3>DEBUG - Informações da Sessão:</h3>';
+        echo '<p><strong>user_id:</strong> ' . ($_SESSION['user_id'] ?? 'NÃO DEFINIDO') . '</p>';
+        echo '<p><strong>user_name:</strong> ' . ($_SESSION['user_name'] ?? 'NÃO DEFINIDO') . '</p>';
+        echo '<p><strong>user_email:</strong> ' . ($_SESSION['user_email'] ?? 'NÃO DEFINIDO') . '</p>';
+        echo '<p><strong>user_type:</strong> ' . ($_SESSION['user_type'] ?? 'NÃO DEFINIDO') . '</p>';
+        echo '<p><strong>user_senat:</strong> ' . $userSenat . '</p>';
+        echo '<p><strong>Todas as variáveis da sessão:</strong></p>';
+        echo '<pre>' . print_r($_SESSION, true) . '</pre>';
+        echo '</div>';
+
         if ($userSenat !== 'Sim') {
             $errors[] = 'Acesso negado: Apenas usuários do Senat podem acessar esta carteira.';
         } else {

@@ -58,10 +58,10 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
               URL atual: {window.location.href}
             </div>
           </div>
-          <div className="space-y-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <button
               onClick={() => window.location.href = 'http://localhost:8080/cliente/escolher-carteira'}
-              className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors"
+              className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors text-sm"
             >
               Voltar ao Klube Cash
             </button>
@@ -78,9 +78,35 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
                 localStorage.setItem('senat_user', JSON.stringify(testUser));
                 window.location.reload();
               }}
-              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm"
             >
               Testar com Usuário Fake
+            </button>
+            <button
+              onClick={() => {
+                const realUser = {
+                  id: 9,
+                  nome: "Kaua Matheus da Silva Lope",
+                  email: "kauamatheus920@gmail.com",
+                  tipo: "cliente",
+                  senat: "Sim",
+                  status: "ativo"
+                };
+                localStorage.setItem('senat_user', JSON.stringify(realUser));
+                window.location.reload();
+              }}
+              className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm"
+            >
+              Simular Usuário ID 9
+            </button>
+            <button
+              onClick={() => {
+                localStorage.clear();
+                window.location.reload();
+              }}
+              className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors text-sm"
+            >
+              Limpar localStorage
             </button>
           </div>
         </div>
