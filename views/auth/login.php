@@ -6,19 +6,19 @@ require_once '../../controllers/AuthController.php';
 
 function resolveClientWalletDestination(): string
 {
-    $selectedWallet = $_SESSION['client_selected_wallet'] ?? '';
-    if ($selectedWallet === 'klubecash') {
-        return CLIENT_DASHBOARD_URL;
-    }
+    // Verificar se o usuário é do Senat
+    $userSenat = $_SESSION['user_senat'] ?? 'Não';
 
-    if ($selectedWallet === 'sestsenat') {
+    if ($userSenat === 'Sim') {
+        // Usuário do Senat vai direto para o portal SestSenat
         $sestUrl = trim((string) CLIENT_SESTSENAT_PORTAL_URL);
         if ($sestUrl !== '') {
             return $sestUrl;
         }
     }
 
-    return CLIENT_WALLET_SELECTOR_URL;
+    // Usuários normais vão para o dashboard padrão do Klube Cash
+    return CLIENT_DASHBOARD_URL;
 }
 
 // Verificar se já existe uma sessão ativa

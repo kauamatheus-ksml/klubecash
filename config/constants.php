@@ -208,7 +208,7 @@ define('RECOVER_PASSWORD_URL', SITE_URL . '/recuperar-senha');
 define('LOGOUT_URL', SITE_URL . '/logout'); // ADICIONAR ESTA LINHA
 
 // === URLs DO CLIENTE ===
-define('CLIENT_WALLET_SELECTOR_URL', SITE_URL . '/cliente/escolher-carteira');
+// define('CLIENT_WALLET_SELECTOR_URL', SITE_URL . '/cliente/escolher-carteira'); // Removed: wallet-selector page deleted
 define('CLIENT_DASHBOARD_URL', SITE_URL . '/cliente/dashboard');
 define('CLIENT_STATEMENT_URL', SITE_URL . '/cliente/extrato');
 define('CLIENT_STORES_URL', SITE_URL . '/cliente/lojas-parceiras');

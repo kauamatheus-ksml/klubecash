@@ -290,7 +290,7 @@ RewriteRule ^about/?$ /sobre-klube-cash/ [R=301,L]
 RewriteRule ^contact/?$ /contato/ [R=301,L]
 # Cliente
 RewriteRule ^cliente/dashboard/?$ views/client/dashboard.php [L]
-RewriteRule ^cliente/escolher-carteira/?$ views/client/wallet-selector.php [L]
+# RewriteRule ^cliente/escolher-carteira/?$ - Removed: wallet-selector page deleted
 RewriteRule ^cliente/extrato/?$ views/client/statement.php [L]
 RewriteRule ^cliente/lojas-parceiras/?$ views/client/partner-stores.php [L]
 RewriteRule ^loja/hub/?$ views/client/partner-stores.php [L]

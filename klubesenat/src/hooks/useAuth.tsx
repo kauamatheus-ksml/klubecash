@@ -91,7 +91,7 @@ export const useAuthHook = () => {
     setError(null);
 
     // Redirecionar para o Klube Cash
-    window.location.href = 'https://klubecash.com/cliente/escolher-carteira';
+    window.location.href = 'https://klubecash.com';
   };
 
   const verifySession = async (sessionData: any): Promise<User | null> => {
