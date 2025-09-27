@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 import Profile from "./pages/Profile";
 import Historico from "./pages/Historico";
 import Debug from "./pages/Debug";
+import SestSenatLogin from "./pages/SestSenatLogin";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -22,6 +23,7 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/debug" element={<Debug />} />
+            <Route path="/login" element={<SestSenatLogin />} />
             <Route
               path="/"
               element={

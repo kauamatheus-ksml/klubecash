@@ -689,6 +689,9 @@ if (!empty($urlError)) {
                 <p class="form-subtitle">
                     Não tem conta? <a href="<?php echo REGISTER_URL; ?>">Cadastre-se grátis</a>
                 </p>
+                <p class="form-subtitle" style="margin-top: 0.5rem;">
+                    Usuário do Senat? <a href="<?php echo trim((string) CLIENT_SESTSENAT_PORTAL_URL); ?>/login" style="color: #0066CC;">Acesse o Portal SestSenat</a>
+                </p>
             </div>
 
             <form method="post" action="" class="login-form" id="login-form">
