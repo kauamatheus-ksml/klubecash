@@ -1,24 +1,46 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/hooks/useAuth";
-import { AlertCircle, ArrowLeft, User, Lock } from "lucide-react";
+import { AlertCircle, ArrowLeft, User, Lock, CheckCircle } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const SestSenatLogin = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const { login, isLoading, error } = useAuth();
+  const [localError, setLocalError] = useState('');
+  const { login, isLoading, error, user, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      console.log('SestSenat: Usuário já autenticado, redirecionando para dashboard');
+      navigate('/', { replace: true });
+    }
+  }, [isAuthenticated, user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLocalError('');
+
+    if (!email || !password) {
+      setLocalError('Por favor, preencha todos os campos.');
+      return;
+    }
+
     try {
+      console.log('SestSenatLogin: Iniciando login para:', email);
       await login(email, password);
-      // O redirecionamento será feito automaticamente pelo useAuth
+      console.log('SestSenatLogin: Login bem-sucedido, redirecionando...');
+      navigate('/', { replace: true });
     } catch (error) {
-      // O erro será mostrado automaticamente pelo useAuth
+      console.error('SestSenatLogin: Erro no login:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      setLocalError(errorMessage);
     }
   };
 
@@ -42,11 +64,11 @@ const SestSenatLogin = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {error && (
+            {(error || localError) && (
               <Alert className="mb-4 border-red-200 bg-red-50">
                 <AlertCircle className="h-4 w-4 text-red-600" />
                 <AlertDescription className="text-red-800">
-                  {error}
+                  {localError || error}
                 </AlertDescription>
               </Alert>
             )}

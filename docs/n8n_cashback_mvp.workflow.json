@@ -1,0 +1,341 @@
+﻿{
+  "name": "Cashback MVP WhatsApp Evolution",
+  "nodes": [
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "unit": "minutes",
+              "value": 2
+            }
+          ]
+        }
+      },
+      "id": "1",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        -800,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "query",
+        "query": "SELECT\n    t.id,\n    t.codigo_transacao,\n    t.valor_total,\n    t.valor_cliente,\n    t.data_transacao,\n    u.nome AS cliente_nome,\n    u.telefone AS cliente_telefone,\n    l.nome_fantasia AS loja_nome\nFROM transacoes_cashback t\nJOIN usuarios u ON u.id = t.usuario_id\nJOIN lojas l ON l.id = t.loja_id\nJOIN usuarios loja_u ON loja_u.id = l.usuario_id\nWHERE loja_u.mvp = 'sim'\n  AND t.status = 'aprovado'\n  AND u.telefone IS NOT NULL AND u.telefone <> ''\n  AND NOT EXISTS (\n        SELECT 1\n        FROM cashback_notificacoes cn\n        WHERE cn.transacao_id = t.id\n          AND cn.status = 'enviada'\n    )\nORDER BY t.data_transacao DESC\nLIMIT 50;"
+      },
+      "id": "2",
+      "name": "MySQL - Buscar Transacoes",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2,
+      "position": [
+        -560,
+        0
+      ],
+      "credentials": {
+        "mySql": {
+          "name": "KlubeCash MySQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "const currencyFormatter = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });\nconst dateFormatter = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Sao_Paulo' });\nreturn items.map(item => {\n  const data = item.json;\n  const transactionId = data.id;\n  const rawPhone = (data.cliente_telefone || '').toString();\n  let digits = rawPhone.replace(/\\D/g, '');\n  let validNumber = true;\n\n  if (!digits) {\n    validNumber = false;\n  } else {\n    digits = digits.replace(/^0+/, '');\n    if (!digits.startsWith('55')) {\n      if (digits.length === 11 || digits.length === 10) {\n        digits = '55' + digits;\n      } else {\n        validNumber = false;\n      }\n    }\n    if (digits.startsWith('550') && digits.length === 13) {\n      digits = '55' + digits.slice(3);\n    }\n    if (digits.length < 12 || digits.length > 13) {\n      validNumber = false;\n    }\n  }\n\n  const whatsappNumber = validNumber && digits ? digits : null;\n  const firstName = (data.cliente_nome || 'Cliente').trim().split(/\\s+/)[0];\n  const valorCashback = currencyFormatter.format(Number(data.valor_cliente || 0));\n  const valorTotal = currencyFormatter.format(Number(data.valor_total || 0));\n  const dataTransacao = data.data_transacao ? new Date(data.data_transacao) : new Date();\n  const dataFormatada = dateFormatter.format(dataTransacao);\n  const lojaNome = data.loja_nome || 'Loja parceira';\n  const message = `Ola ${firstName},\\n\\nSeu cashback de ${valorCashback} gerado na ${lojaNome} ja foi liberado!\\n\\nCodigo: ${data.codigo_transacao || 'N/D'}\\nCompra: ${valorTotal}\\nData: ${dataFormatada}\\n\\nUse em klubecash.com`;\n\n  return {\n    json: {\n      ...data,\n      transaction_id: transactionId,\n      raw_phone: rawPhone,\n      whatsapp_number: whatsappNumber,\n      valid_number: Boolean(whatsappNumber),\n      mensagem: message,\n      success_note: `WhatsApp via n8n em ${new Date().toISOString()}`,\n      erro_base: validNumber ? null : 'Telefone ausente ou invalido'\n    }\n  };\n});"
+      },
+      "id": "3",
+      "name": "Function - Preparar Mensagem",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        -320,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.valid_number}}"
+            }
+          ]
+        }
+      },
+      "id": "4",
+      "name": "IF - Numero valido?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://SEU_HOST_EVOLUTION/message/sendText/SESSAO",
+        "jsonParameters": true,
+        "headerParametersJson": "={\"apikey\":\"EVOLUTION_API_KEY\"}",
+        "bodyParametersJson": "={\"number\":\"{{$json[\"whatsapp_number\"]}}\",\"text\":\"{{$json[\"mensagem\"]}}\",\"forceSend\":true}",
+        "options": {
+          "dataPropertyName": "response"
+        }
+      },
+      "id": "5",
+      "name": "HTTP - Evolution API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [
+        160,
+        -60
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "functionCode": "return items.map(item => {\n  const data = item.json;\n  const response = data.response || {};\n  let envioOk = false;\n  let errorMessage = '';\n\n  if (data.error) {\n    errorMessage = typeof data.error === 'string' ? data.error : (data.error.message || JSON.stringify(data.error).slice(0, 240));\n  } else {\n    envioOk = response.success === true || response.status === 'success' || response.result === 'success' || response.ok === true;\n    if (!envioOk) {\n      if (response.error) {\n        errorMessage = typeof response.error === 'string' ? response.error : (response.error.message || JSON.stringify(response.error).slice(0, 240));\n      } else if (response.message) {\n        errorMessage = response.message;\n      } else if (response.detail) {\n        errorMessage = response.detail;\n      }\n    }\n  }\n\n  if (!envioOk && !errorMessage) {\n    errorMessage = 'Resposta inesperada da Evolution API';\n  }\n\n  return {\n    json: {\n      ...data,\n      envio_ok: envioOk,\n      erro_http: errorMessage ? errorMessage.slice(0, 240) : null\n    }\n  };\n});"
+      },
+      "id": "6",
+      "name": "Function - Avaliar Resposta",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        400,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.envio_ok}}"
+            }
+          ]
+        }
+      },
+      "id": "7",
+      "name": "IF - Envio OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        640,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "return items.map(item => {\n  const data = item.json;\n  const note = (data.success_note || 'WhatsApp via n8n') + ' - Evolution OK';\n  return {\n    json: {\n      ...data,\n      transacao_id: data.transaction_id,\n      status: 'enviada',\n      observacao: note.slice(0, 250)\n    }\n  };\n});"
+      },
+      "id": "8",
+      "name": "Function - Marcar Sucesso",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        880,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": "cashback_notificacoes",
+        "columns": "transacao_id,status,observacao"
+      },
+      "id": "9",
+      "name": "MySQL - Registrar Sucesso",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        -160
+      ],
+      "credentials": {
+        "mySql": {
+          "name": "KlubeCash MySQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "return items.map(item => {\n  const data = item.json;\n  const reason = data.erro_http || (data.error && (data.error.message || JSON.stringify(data.error))) || 'Falha desconhecida';\n  return {\n    json: {\n      ...data,\n      transacao_id: data.transaction_id,\n      status: 'erro',\n      observacao: (`Falha envio WhatsApp: ${reason}`).slice(0, 250)\n    }\n  };\n});"
+      },
+      "id": "10",
+      "name": "Function - Tratar Erro HTTP",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        880,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": "cashback_notificacoes",
+        "columns": "transacao_id,status,observacao"
+      },
+      "id": "11",
+      "name": "MySQL - Registrar Erro",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        40
+      ],
+      "credentials": {
+        "mySql": {
+          "name": "KlubeCash MySQL"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "return items.map(item => {\n  const data = item.json;\n  const baseReason = data.erro_base || 'Telefone invalido';\n  return {\n    json: {\n      ...data,\n      transacao_id: data.transaction_id,\n      status: 'erro',\n      observacao: (`Nao foi possivel enviar WhatsApp: ${baseReason}`).slice(0, 250)\n    }\n  };\n});"
+      },
+      "id": "12",
+      "name": "Function - Motivo Telefone",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        160,
+        200
+      ]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "MySQL - Buscar Transacoes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MySQL - Buscar Transacoes": {
+      "main": [
+        [
+          {
+            "node": "Function - Preparar Mensagem",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Function - Preparar Mensagem": {
+      "main": [
+        [
+          {
+            "node": "IF - Numero valido?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Numero valido?": {
+      "main": [
+        [
+          {
+            "node": "HTTP - Evolution API",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Function - Motivo Telefone",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP - Evolution API": {
+      "main": [
+        [
+          {
+            "node": "Function - Avaliar Resposta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Function - Avaliar Resposta": {
+      "main": [
+        [
+          {
+            "node": "IF - Envio OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Envio OK?": {
+      "main": [
+        [
+          {
+            "node": "Function - Marcar Sucesso",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Function - Tratar Erro HTTP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Function - Marcar Sucesso": {
+      "main": [
+        [
+          {
+            "node": "MySQL - Registrar Sucesso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Function - Tratar Erro HTTP": {
+      "main": [
+        [
+          {
+            "node": "MySQL - Registrar Erro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Function - Motivo Telefone": {
+      "main": [
+        [
+          {
+            "node": "MySQL - Registrar Erro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Sao_Paulo"
+  },
+  "pinData": {}
+}

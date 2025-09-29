@@ -65,19 +65,44 @@ export const useAuthHook = () => {
     setError(null);
 
     try {
-      // Para testes, vamos permitir login direto se há dados no localStorage
-      const savedUser = localStorage.getItem('senat_user');
-      if (savedUser) {
-        const userData = JSON.parse(savedUser);
-        if (userData.senat === 'Sim') {
-          setUser(userData);
-          return userData;
-        }
+      console.log('SestSenat: Tentando login com:', { email });
+
+      // Fazer chamada para a API de login
+      const response = await fetch('http://localhost:8080/api/auth/login-senat.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+      console.log('SestSenat: Resposta da API:', data);
+
+      if (!data.success) {
+        throw new Error(data.message || 'Erro no login');
       }
 
-      throw new Error('Acesse através do sistema principal do Klube Cash');
+      const userData: User = {
+        id: data.user.id,
+        nome: data.user.nome,
+        email: data.user.email,
+        tipo: data.user.tipo,
+        senat: data.user.senat,
+        status: data.user.status
+      };
+
+      console.log('SestSenat: Login bem-sucedido, salvando dados:', userData);
+
+      // Salvar no localStorage para futuras visitas
+      localStorage.setItem('senat_user', JSON.stringify(userData));
+      setUser(userData);
+
+      return userData;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+      console.error('SestSenat: Erro no login:', errorMessage);
       setError(errorMessage);
       throw new Error(errorMessage);
     } finally {
