@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 date_default_timezone_set('America/Sao_Paulo');
 // controllers/AuthController.php
 require_once __DIR__ . '/../config/database.php';
@@ -7,15 +7,15 @@ require_once __DIR__ . '/../utils/Email.php';
 require_once __DIR__ . '/../utils/Validator.php';
 
 /**
- * Controlador de AutenticaÃ§Ã£o
- * Gerencia login, registro, recuperaÃ§Ã£o de senha e logout
+ * Controlador de Autenticação
+ * Gerencia login, registro, recuperação de senha e logout
  */
 class AuthController {
 
     public static function requireStoreAccess() {
-        // CORREÃ‡ÃƒO: Bypass para funcionÃ¡rios
+        // CORREÇÃO: Bypass para funcionários
         if (isset($_SESSION['user_type']) && $_SESSION['user_type'] === 'funcionario' && isset($_SESSION['store_id'])) {
-            return; // FuncionÃ¡rio com store_id = OK
+            return; // Funcionário com store_id = OK
         }
         
         if (!self::hasStoreAccess()) {
@@ -26,16 +26,16 @@ class AuthController {
     // Adicionar no AuthController.php
     
     /**
- * MÃ©todo de login COM LOGS FORÃ‡ADOS para debug
+ * Método de login COM LOGS FORÇADOS para debug
  */
 public static function login($email, $senha, $remember = false) {
-    // LOG INICIAL FORÃ‡ADO
+    // LOG INICIAL FORÇADO
     error_log("=== LOGIN INICIADO === Email: {$email}");
     
     try {
         $db = Database::getConnection();
         
-        // Buscar usuÃ¡rio
+        // Buscar usuário
         $stmt = $db->prepare("
             SELECT id, nome, email, senha_hash, tipo, senat, status, loja_vinculada_id, subtipo_funcionario
             FROM usuarios
@@ -44,12 +44,12 @@ public static function login($email, $senha, $remember = false) {
         $stmt->execute([$email]);
         
         if ($stmt->rowCount() === 0) {
-            error_log("LOGIN ERRO: UsuÃ¡rio nÃ£o encontrado - {$email}");
+            error_log("LOGIN ERRO: Usuário não encontrado - {$email}");
             return ['status' => false, 'message' => 'E-mail ou senha incorretos.'];
         }
         
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
-        error_log("LOGIN: UsuÃ¡rio encontrado - ID: {$user['id']}, Tipo: {$user['tipo']}");
+        error_log("LOGIN: Usuário encontrado - ID: {$user['id']}, Tipo: {$user['tipo']}");
         
         // Validar senha
         if (!password_verify($senha, $user['senha_hash'])) {
@@ -60,30 +60,29 @@ public static function login($email, $senha, $remember = false) {
         // Verificar status
         if ($user['status'] !== 'ativo') {
             error_log("LOGIN ERRO: Conta inativa - {$email}");
-            return ['status' => false, 'message' => 'Sua conta estÃ¡ inativa. Entre em contato com o suporte.'];
+            return ['status' => false, 'message' => 'Sua conta está inativa. Entre em contato com o suporte.'];
         }
         
-        error_log("LOGIN: ValidaÃ§Ãµes OK, configurando sessÃ£o...");
+        error_log("LOGIN: Validações OK, configurando sessão...");
         
-        // Configurar sessÃ£o
+        // Configurar sessão
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
 
-        // Definir variÃ¡veis bÃ¡sicas
+        // Definir variáveis básicas
         $_SESSION['user_id'] = intval($user['id']);
         $_SESSION['user_name'] = $user['nome'];
         $_SESSION['user_email'] = $user['email'];
         $_SESSION['user_type'] = $user['tipo'];
-        $_SESSION['user_senat'] = $user['senat'] ?? 'NÃ£o';
+        $_SESSION['user_senat'] = $user['senat'] ?? 'Não';
         $_SESSION['last_activity'] = time();
-
         
-        error_log("LOGIN: SessÃ£o bÃ¡sica definida - User ID: {$user['id']}");
+        error_log("LOGIN: Sessão básica definida - User ID: {$user['id']}");
 
-        // === VERIFICAÃ‡ÃƒO CRÃTICA DE LOJA ===
+        // === VERIFICAÇÃO CRÍTICA DE LOJA ===
         if ($user['tipo'] === 'loja') {
-            error_log("LOGIN: ENTRANDO na configuraÃ§Ã£o de LOJA para User ID: {$user['id']}");
+            error_log("LOGIN: ENTRANDO na configuração de LOJA para User ID: {$user['id']}");
             
             try {
                 // Buscar loja
@@ -94,41 +93,41 @@ public static function login($email, $senha, $remember = false) {
                 if ($loja) {
                     error_log("LOGIN: LOJA ENCONTRADA - ID: {$loja['id']}, Nome: {$loja['nome_fantasia']}");
                     
-                    // FORÃ‡AR DEFINIÃ‡ÃƒO
+                    // FORÇAR DEFINIÇÃO
                     $_SESSION['store_id'] = intval($loja['id']);
                     $_SESSION['store_name'] = $loja['nome_fantasia'];
                     $_SESSION['loja_vinculada_id'] = intval($loja['id']);
                     
-                    error_log("LOGIN: VARIÃVEIS DEFINIDAS - store_id: {$_SESSION['store_id']}, store_name: {$_SESSION['store_name']}");
+                    error_log("LOGIN: VARIÁVEIS DEFINIDAS - store_id: {$_SESSION['store_id']}, store_name: {$_SESSION['store_name']}");
                     
                     // VERIFICAR SE FOI SALVO
                     if (isset($_SESSION['store_id']) && $_SESSION['store_id'] > 0) {
-                        error_log("LOGIN: âœ… SUCESSO! store_id salvo corretamente: {$_SESSION['store_id']}");
+                        error_log("LOGIN: ✅ SUCESSO! store_id salvo corretamente: {$_SESSION['store_id']}");
                     } else {
-                        error_log("LOGIN: âŒ ERRO! store_id NÃƒO foi salvo");
-                        return ['status' => false, 'message' => 'Erro ao salvar dados da loja na sessÃ£o.'];
+                        error_log("LOGIN: ❌ ERRO! store_id NÃO foi salvo");
+                        return ['status' => false, 'message' => 'Erro ao salvar dados da loja na sessão.'];
                     }
                     
                 } else {
-                    error_log("LOGIN: âŒ NENHUMA LOJA ENCONTRADA para User ID: {$user['id']}");
+                    error_log("LOGIN: ❌ NENHUMA LOJA ENCONTRADA para User ID: {$user['id']}");
                     return ['status' => false, 'message' => 'Nenhuma loja aprovada encontrada para sua conta.'];
                 }
                 
             } catch (Exception $e) {
-                error_log("LOGIN: EXCEÃ‡ÃƒO na configuraÃ§Ã£o da loja: " . $e->getMessage());
+                error_log("LOGIN: EXCEÇÃO na configuração da loja: " . $e->getMessage());
                 return ['status' => false, 'message' => 'Erro ao configurar dados da loja: ' . $e->getMessage()];
             }
         } else {
-            error_log("LOGIN: UsuÃ¡rio NÃƒO Ã© lojista, tipo: {$user['tipo']}");
+            error_log("LOGIN: Usuário NÃO é lojista, tipo: {$user['tipo']}");
         }
         
-        // === FUNCIONÃRIOS ===
+        // === FUNCIONÁRIOS ===
         if ($user['tipo'] === 'funcionario') {
-            error_log("LOGIN: CONFIGURANDO FUNCIONÃRIO - User ID: {$user['id']}");
+            error_log("LOGIN: CONFIGURANDO FUNCIONÁRIO - User ID: {$user['id']}");
             
             if (empty($user['loja_vinculada_id'])) {
-                error_log("LOGIN ERRO: FuncionÃ¡rio {$user['id']} sem loja_vinculada_id");
-                return ['status' => false, 'message' => 'FuncionÃ¡rio sem loja vinculada. Entre em contato com o suporte.'];
+                error_log("LOGIN ERRO: Funcionário {$user['id']} sem loja_vinculada_id");
+                return ['status' => false, 'message' => 'Funcionário sem loja vinculada. Entre em contato com o suporte.'];
             }
             
             // Buscar dados COMPLETOS da loja vinculada
@@ -137,43 +136,43 @@ public static function login($email, $senha, $remember = false) {
             $storeData = $storeStmt->fetch(PDO::FETCH_ASSOC);
             
             if (!$storeData) {
-                error_log("LOGIN ERRO: Loja {$user['loja_vinculada_id']} nÃ£o encontrada ou nÃ£o aprovada");
-                return ['status' => false, 'message' => 'A loja vinculada nÃ£o estÃ¡ ativa.'];
+                error_log("LOGIN ERRO: Loja {$user['loja_vinculada_id']} não encontrada ou não aprovada");
+                return ['status' => false, 'message' => 'A loja vinculada não está ativa.'];
             }
             
-            // SISTEMA SIMPLIFICADO: FuncionÃ¡rios tÃªm acesso igual ao lojista
+            // SISTEMA SIMPLIFICADO: Funcionários têm acesso igual ao lojista
             $_SESSION['employee_subtype'] = $user['subtipo_funcionario'] ?? 'funcionario';
-            $_SESSION['store_id'] = intval($storeData['id']); // USAR ID DA LOJA, NÃƒO DO USUÃRIO
+            $_SESSION['store_id'] = intval($storeData['id']); // USAR ID DA LOJA, NÃO DO USUÁRIO
             $_SESSION['store_name'] = $storeData['nome_fantasia'];
             $_SESSION['loja_vinculada_id'] = intval($storeData['id']);
             $_SESSION['subtipo_funcionario'] = $user['subtipo_funcionario'] ?? 'funcionario';
             
-            // VERIFICAÃ‡ÃƒO FORÃ‡ADA
+            // VERIFICAÇÃO FORÇADA
             session_write_close();
             session_start();
             
-            error_log("LOGIN: FUNCIONÃRIO CONFIGURADO - Store ID: {$_SESSION['store_id']}, Nome: {$storeData['nome_fantasia']}");
+            error_log("LOGIN: FUNCIONÁRIO CONFIGURADO - Store ID: {$_SESSION['store_id']}, Nome: {$storeData['nome_fantasia']}");
             
-            // VERIFICAÃ‡ÃƒO FINAL CRÃTICA
+            // VERIFICAÇÃO FINAL CRÍTICA
             if (!isset($_SESSION['store_id']) || empty($_SESSION['store_id']) || $_SESSION['store_id'] != $storeData['id']) {
-                error_log("LOGIN ERRO CRÃTICO: store_id nÃ£o foi salvo corretamente para funcionÃ¡rio {$user['id']}");
+                error_log("LOGIN ERRO CRÍTICO: store_id não foi salvo corretamente para funcionário {$user['id']}");
                 error_log("Esperado: {$storeData['id']}, Atual: " . ($_SESSION['store_id'] ?? 'NULL'));
-                return ['status' => false, 'message' => 'Erro crÃ­tico ao configurar acesso Ã  loja.'];
+                return ['status' => false, 'message' => 'Erro crítico ao configurar acesso à loja.'];
             }
         }
 
-        // Atualizar Ãºltimo login
+        // Atualizar último login
         $updateStmt = $db->prepare("UPDATE usuarios SET ultimo_login = NOW() WHERE id = ?");
         $updateStmt->execute([$user['id']]);
         
-        error_log("LOGIN: Ãšltimo login atualizado");
+        error_log("LOGIN: Último login atualizado");
 
         // LOG FINAL COMPLETO
-        error_log("=== LOGIN CONCLUÃDO ===");
+        error_log("=== LOGIN CONCLUÍDO ===");
         error_log("User ID: {$user['id']}");
         error_log("User Type: {$user['tipo']}");
-        error_log("Store ID na sessÃ£o: " . ($_SESSION['store_id'] ?? 'NÃƒO DEFINIDO'));
-        error_log("SessÃ£o completa: " . json_encode($_SESSION));
+        error_log("Store ID na sessão: " . ($_SESSION['store_id'] ?? 'NÃO DEFINIDO'));
+        error_log("Sessão completa: " . json_encode($_SESSION));
 
         return [
             'status' => true,
@@ -187,7 +186,7 @@ public static function login($email, $senha, $remember = false) {
         ];
 
     } catch (Exception $e) {
-        error_log('LOGIN ERRO CRÃTICO: ' . $e->getMessage());
+        error_log('LOGIN ERRO CRÍTICO: ' . $e->getMessage());
         return ['status' => false, 'message' => 'Erro: ' . $e->getMessage()];
     }
 }
@@ -207,7 +206,7 @@ public static function debugStoreAccess() {
         'method' => $_SERVER['REQUEST_METHOD'] ?? 'unknown'
     ]));
     
-    // Para funcionÃ¡rios, garantir acesso direto
+    // Para funcionários, garantir acesso direto
     if ($userType === 'funcionario' && !empty($storeId)) {
         return true;
     }
@@ -215,7 +214,7 @@ public static function debugStoreAccess() {
     return false;
 }
     /**
-     * Verifica se o usuÃ¡rio logado tem acesso Ã  Ã¡rea da loja
+     * Verifica se o usuário logado tem acesso à área da loja
      */
     public static function hasStoreAccess() {
         if (!self::isAuthenticated()) {
@@ -224,7 +223,7 @@ public static function debugStoreAccess() {
         
         $userType = $_SESSION['user_type'];
         
-        // CORREÃ‡ÃƒO: Incluir 'funcionario' explicitamente
+        // CORREÇÃO: Incluir 'funcionario' explicitamente
         $allowedTypes = ['loja', 'funcionario'];
         if (defined('USER_TYPE_STORE')) $allowedTypes[] = USER_TYPE_STORE;
         if (defined('USER_TYPE_EMPLOYEE')) $allowedTypes[] = USER_TYPE_EMPLOYEE;
@@ -233,7 +232,7 @@ public static function debugStoreAccess() {
             return false;
         }
         
-        // CORREÃ‡ÃƒO: Para funcionÃ¡rios, verificar store_id diretamente
+        // CORREÇÃO: Para funcionários, verificar store_id diretamente
         if ($userType === 'funcionario') {
             return !empty($_SESSION['store_id']);
         }
@@ -244,14 +243,14 @@ public static function debugStoreAccess() {
     }
 
     /**
-     * Verifica se Ã© lojista (nÃ£o funcionÃ¡rio)
+     * Verifica se é lojista (não funcionário)
      */
     public static function isStoreOwner() {
         return isset($_SESSION['user_type']) && $_SESSION['user_type'] === 'loja';
     }
 
     /**
-     * Verifica se Ã© funcionÃ¡rio
+     * Verifica se é funcionário
      */
     public static function isEmployee() {
         return isset($_SESSION['user_type']) && $_SESSION['user_type'] === USER_TYPE_EMPLOYEE;
@@ -259,7 +258,7 @@ public static function debugStoreAccess() {
     
 
     public static function getStoreId() {
-        // Verificar se sessÃ£o estÃ¡ ativa
+        // Verificar se sessão está ativa
         if (!isset($_SESSION['user_type'])) {
             return null;
         }
@@ -271,7 +270,7 @@ public static function debugStoreAccess() {
             return $_SESSION['store_id'] ?? null;
         }
         
-        // Para funcionÃ¡rios, usar loja_vinculada_id OU store_id (ambos devem ter o mesmo valor)
+        // Para funcionários, usar loja_vinculada_id OU store_id (ambos devem ter o mesmo valor)
         if ($userType === USER_TYPE_EMPLOYEE || $userType === 'funcionario') {
             return $_SESSION['store_id'] ?? $_SESSION['loja_vinculada_id'] ?? null;
         }
@@ -292,7 +291,7 @@ public static function debugStoreAccess() {
             $result = $stmt->fetch(PDO::FETCH_ASSOC);
             
             if (!$result) {
-                error_log("ERRO: Loja nÃ£o encontrada - Store ID: {$storeId}");
+                error_log("ERRO: Loja não encontrada - Store ID: {$storeId}");
                 return null;
             }
             
@@ -304,28 +303,28 @@ public static function debugStoreAccess() {
     }
 
     /**
-     * Verifica se o usuÃ¡rio pode gerenciar funcionÃ¡rios (sistema simplificado)
+     * Verifica se o usuário pode gerenciar funcionários (sistema simplificado)
      */
     public static function canManageEmployees() {
-        // Verificar se tem acesso Ã  Ã¡rea da loja
+        // Verificar se tem acesso à área da loja
         if (!self::hasStoreAccess()) {
             return false;
         }
         
-        // Verificar se tem store_id definido (crÃ­tico!)
+        // Verificar se tem store_id definido (crítico!)
         $storeId = self::getStoreId();
         if (!$storeId) {
             return false;
         }
         
-        // Sistema simplificado: lojistas e funcionÃ¡rios tÃªm mesmo acesso
+        // Sistema simplificado: lojistas e funcionários têm mesmo acesso
         $userType = $_SESSION['user_type'];
         return in_array($userType, [USER_TYPE_STORE, USER_TYPE_EMPLOYEE, 'loja', 'funcionario']);
     }
 
 
     /**
-     * ObtÃ©m o nome de exibiÃ§Ã£o do subtipo do funcionÃ¡rio
+     * Obtém o nome de exibição do subtipo do funcionário
      * 
      * @return string|null Nome formatado do subtipo
      */
@@ -335,21 +334,21 @@ public static function debugStoreAccess() {
             return null;
         }
         
-        return EMPLOYEE_SUBTYPES[$subtype] ?? 'NÃ£o definido';
+        return EMPLOYEE_SUBTYPES[$subtype] ?? 'Não definido';
     }
-    // Adicione este cÃ³digo no AuthController.php apÃ³s o login bem-sucedido
+    // Adicione este código no AuthController.php após o login bem-sucedido
     /**
-    * Processa registro via Google OAuth (similar ao login, mas com validaÃ§Ãµes especÃ­ficas)
+    * Processa registro via Google OAuth (similar ao login, mas com validações específicas)
     */
     public static function googleRegister($code, $state) {
         try {
-            // Verificar o state para seguranÃ§a
+            // Verificar o state para segurança
             if (!GoogleAuth::verifyState($state)) {
-                error_log('Google OAuth Register: State invÃ¡lido recebido');
-                return ['status' => false, 'message' => 'Estado de OAuth invÃ¡lido. Tente novamente.'];
+                error_log('Google OAuth Register: State inválido recebido');
+                return ['status' => false, 'message' => 'Estado de OAuth inválido. Tente novamente.'];
             }
             
-            // Trocar cÃ³digo por token de acesso
+            // Trocar código por token de acesso
             $tokenData = GoogleAuth::getAccessToken($code);
             
             if (!$tokenData || !isset($tokenData['access_token'])) {
@@ -357,20 +356,20 @@ public static function debugStoreAccess() {
                 return ['status' => false, 'message' => 'Erro ao obter token do Google.'];
             }
             
-            // Buscar informaÃ§Ãµes do usuÃ¡rio
+            // Buscar informações do usuário
             $userInfo = GoogleAuth::getUserInfo($tokenData['access_token']);
             
             if (!$userInfo || !isset($userInfo['email'])) {
-                error_log('Google OAuth Register: Erro ao obter dados do usuÃ¡rio - ' . json_encode($userInfo));
-                return ['status' => false, 'message' => 'Erro ao obter dados do usuÃ¡rio do Google.'];
+                error_log('Google OAuth Register: Erro ao obter dados do usuário - ' . json_encode($userInfo));
+                return ['status' => false, 'message' => 'Erro ao obter dados do usuário do Google.'];
             }
             
             // Log para debug
-            error_log('Google OAuth Register: Dados do usuÃ¡rio recebidos - ' . json_encode($userInfo));
+            error_log('Google OAuth Register: Dados do usuário recebidos - ' . json_encode($userInfo));
             
             $db = Database::getConnection();
             
-            // Verificar se usuÃ¡rio jÃ¡ existe (REGISTRO nÃ£o deve permitir usuÃ¡rio existente)
+            // Verificar se usuário já existe (REGISTRO não deve permitir usuário existente)
             $stmt = $db->prepare("
                 SELECT * FROM usuarios 
                 WHERE email = :email OR google_id = :google_id
@@ -381,31 +380,31 @@ public static function debugStoreAccess() {
             $existingUser = $stmt->fetch(PDO::FETCH_ASSOC);
             
             if ($existingUser) {
-                // Para registro, usuÃ¡rio nÃ£o deve existir
-                error_log('Google OAuth Register: UsuÃ¡rio jÃ¡ existe - ' . $userInfo['email']);
+                // Para registro, usuário não deve existir
+                error_log('Google OAuth Register: Usuário já existe - ' . $userInfo['email']);
                 return [
                     'status' => false, 
-                    'message' => 'Uma conta com este email jÃ¡ existe. FaÃ§a login em vez de se registrar.',
+                    'message' => 'Uma conta com este email já existe. Faça login em vez de se registrar.',
                     'redirect_to_login' => true
                 ];
             }
             
-            // Validar dados obrigatÃ³rios do Google
+            // Validar dados obrigatórios do Google
             if (empty($userInfo['name'])) {
-                return ['status' => false, 'message' => 'Nome nÃ£o fornecido pelo Google. Tente o registro manual.'];
+                return ['status' => false, 'message' => 'Nome não fornecido pelo Google. Tente o registro manual.'];
             }
             
             if (empty($userInfo['email'])) {
-                return ['status' => false, 'message' => 'Email nÃ£o fornecido pelo Google. Tente o registro manual.'];
+                return ['status' => false, 'message' => 'Email não fornecido pelo Google. Tente o registro manual.'];
             }
             
-            // Verificar se o email do Google estÃ¡ verificado
+            // Verificar se o email do Google está verificado
             if (!isset($userInfo['verified_email']) || !$userInfo['verified_email']) {
-                error_log('Google OAuth Register: Email nÃ£o verificado no Google para ' . $userInfo['email']);
-                // Continuar mesmo assim, mas marcar como nÃ£o verificado
+                error_log('Google OAuth Register: Email não verificado no Google para ' . $userInfo['email']);
+                // Continuar mesmo assim, mas marcar como não verificado
             }
             
-            // Criar novo usuÃ¡rio
+            // Criar novo usuário
             $stmt = $db->prepare("
                 INSERT INTO usuarios (
                     nome, email, google_id, avatar_url, telefone,
@@ -419,7 +418,7 @@ public static function debugStoreAccess() {
             // Preparar dados
             $nome = trim($userInfo['name']);
             $email = strtolower(trim($userInfo['email']));
-            $telefone = ''; // Google nÃ£o fornece telefone por padrÃ£o
+            $telefone = ''; // Google não fornece telefone por padrão
             $emailVerified = isset($userInfo['verified_email']) && $userInfo['verified_email'] ? 1 : 0;
             
             $stmt->bindParam(':nome', $nome);
@@ -432,20 +431,20 @@ public static function debugStoreAccess() {
             if ($stmt->execute()) {
                 $userId = $db->lastInsertId();
                 
-                error_log('Google OAuth Register: Novo usuÃ¡rio registrado - ID: ' . $userId);
+                error_log('Google OAuth Register: Novo usuário registrado - ID: ' . $userId);
                 
-                // Iniciar sessÃ£o automaticamente apÃ³s registro
+                // Iniciar sessão automaticamente após registro
                 if (session_status() === PHP_SESSION_NONE) {
                     session_start();
                 }
                 $_SESSION['user_id'] = $userId;
                 $_SESSION['user_name'] = $nome;
                 $_SESSION['user_type'] = 'cliente';
-
-                // Registrar sessÃ£o
+                
+                // Registrar sessão
                 self::registerSession($userId);
                 
-                // Limpar state da sessÃ£o
+                // Limpar state da sessão
                 unset($_SESSION['google_oauth_state']);
                 unset($_SESSION['google_action']);
                 
@@ -454,7 +453,7 @@ public static function debugStoreAccess() {
                     Email::sendWelcome($email, $nome);
                 } catch (Exception $e) {
                     error_log('Erro ao enviar email de boas-vindas (registro Google): ' . $e->getMessage());
-                    // NÃ£o falhar o registro por causa do email
+                    // Não falhar o registro por causa do email
                 }
                 
                 return [
@@ -469,7 +468,7 @@ public static function debugStoreAccess() {
                 ];
                 
             } else {
-                error_log('Google OAuth Register: Erro ao criar usuÃ¡rio no banco');
+                error_log('Google OAuth Register: Erro ao criar usuário no banco');
                 return ['status' => false, 'message' => 'Erro ao criar conta. Tente novamente.'];
             }
             
@@ -479,7 +478,7 @@ public static function debugStoreAccess() {
         }
     }
     /**
-    * Verifica se o usuÃ¡rio Ã© funcionÃ¡rio e obtÃ©m dados da loja vinculada
+    * Verifica se o usuário é funcionário e obtém dados da loja vinculada
     */
     public static function getEmployeeStoreData($userId) {
         try {
@@ -496,7 +495,7 @@ public static function debugStoreAccess() {
             return $stmt->fetch(PDO::FETCH_ASSOC);
             
         } catch (PDOException $e) {
-            error_log('Erro ao obter dados do funcionÃ¡rio: ' . $e->getMessage());
+            error_log('Erro ao obter dados do funcionário: ' . $e->getMessage());
             return false;
         }
     }
@@ -505,13 +504,13 @@ public static function debugStoreAccess() {
      */
     public static function googleLogin($code, $state) {
         try {
-            // Verificar o state para seguranÃ§a
+            // Verificar o state para segurança
             if (!GoogleAuth::verifyState($state)) {
-                error_log('Google OAuth: State invÃ¡lido recebido');
-                return ['status' => false, 'message' => 'Estado de OAuth invÃ¡lido. Tente novamente.'];
+                error_log('Google OAuth: State inválido recebido');
+                return ['status' => false, 'message' => 'Estado de OAuth inválido. Tente novamente.'];
             }
             
-            // Trocar cÃ³digo por token de acesso
+            // Trocar código por token de acesso
             $tokenData = GoogleAuth::getAccessToken($code);
             
             if (!$tokenData || !isset($tokenData['access_token'])) {
@@ -519,20 +518,20 @@ public static function debugStoreAccess() {
                 return ['status' => false, 'message' => 'Erro ao obter token do Google.'];
             }
             
-            // Buscar informaÃ§Ãµes do usuÃ¡rio
+            // Buscar informações do usuário
             $userInfo = GoogleAuth::getUserInfo($tokenData['access_token']);
             
             if (!$userInfo || !isset($userInfo['email'])) {
-                error_log('Google OAuth: Erro ao obter dados do usuÃ¡rio - ' . json_encode($userInfo));
-                return ['status' => false, 'message' => 'Erro ao obter dados do usuÃ¡rio do Google.'];
+                error_log('Google OAuth: Erro ao obter dados do usuário - ' . json_encode($userInfo));
+                return ['status' => false, 'message' => 'Erro ao obter dados do usuário do Google.'];
             }
             
             // Log para debug
-            error_log('Google OAuth: Dados do usuÃ¡rio recebidos - ' . json_encode($userInfo));
+            error_log('Google OAuth: Dados do usuário recebidos - ' . json_encode($userInfo));
             
             $db = Database::getConnection();
             
-            // Verificar se usuÃ¡rio jÃ¡ existe (por email ou google_id)
+            // Verificar se usuário já existe (por email ou google_id)
             $stmt = $db->prepare("
                 SELECT * FROM usuarios 
                 WHERE email = :email OR google_id = :google_id
@@ -543,7 +542,7 @@ public static function debugStoreAccess() {
             $existingUser = $stmt->fetch(PDO::FETCH_ASSOC);
             
             if ($existingUser) {
-                // UsuÃ¡rio existe - atualizar informaÃ§Ãµes do Google se necessÃ¡rio
+                // Usuário existe - atualizar informações do Google se necessário
                 $updateStmt = $db->prepare("
                     UPDATE usuarios 
                     SET google_id = :google_id, 
@@ -563,15 +562,15 @@ public static function debugStoreAccess() {
                 $userType = $existingUser['tipo'];
                 $userStatus = $existingUser['status'];
                 
-                // Verificar status do usuÃ¡rio
+                // Verificar status do usuário
                 if ($userStatus !== USER_ACTIVE) {
-                    return ['status' => false, 'message' => 'Sua conta estÃ¡ ' . $userStatus . '. Entre em contato com o suporte.'];
+                    return ['status' => false, 'message' => 'Sua conta está ' . $userStatus . '. Entre em contato com o suporte.'];
                 }
                 
-                error_log('Google OAuth: UsuÃ¡rio existente atualizado - ID: ' . $userId);
+                error_log('Google OAuth: Usuário existente atualizado - ID: ' . $userId);
                 
             } else {
-                // Criar novo usuÃ¡rio
+                // Criar novo usuário
                 $stmt = $db->prepare("
                     INSERT INTO usuarios (
                         nome, email, google_id, avatar_url, telefone,
@@ -582,9 +581,9 @@ public static function debugStoreAccess() {
                     )
                 ");
                 
-                // Usar o nome do Google ou extrair do email se nÃ£o disponÃ­vel
+                // Usar o nome do Google ou extrair do email se não disponível
                 $nome = $userInfo['name'] ?? explode('@', $userInfo['email'])[0];
-                $telefone = ''; // Google nÃ£o fornece telefone por padrÃ£o
+                $telefone = ''; // Google não fornece telefone por padrão
                 
                 $stmt->bindParam(':nome', $nome);
                 $stmt->bindParam(':email', $userInfo['email']);
@@ -597,33 +596,33 @@ public static function debugStoreAccess() {
                     $userName = $nome;
                     $userType = 'cliente';
                     
-                    error_log('Google OAuth: Novo usuÃ¡rio criado - ID: ' . $userId);
+                    error_log('Google OAuth: Novo usuário criado - ID: ' . $userId);
                     
                     // Enviar email de boas-vindas
                     try {
                         Email::sendWelcome($userInfo['email'], $nome);
                     } catch (Exception $e) {
                         error_log('Erro ao enviar email de boas-vindas: ' . $e->getMessage());
-                        // NÃ£o falhar o login por causa do email
+                        // Não falhar o login por causa do email
                     }
                 } else {
-                    error_log('Google OAuth: Erro ao criar usuÃ¡rio no banco');
-                    return ['status' => false, 'message' => 'Erro ao criar usuÃ¡rio.'];
+                    error_log('Google OAuth: Erro ao criar usuário no banco');
+                    return ['status' => false, 'message' => 'Erro ao criar usuário.'];
                 }
             }
             
-            // Iniciar sessÃ£o
+            // Iniciar sessão
             if (session_status() === PHP_SESSION_NONE) {
                 session_start();
             }
             $_SESSION['user_id'] = $userId;
             $_SESSION['user_name'] = $userName;
             $_SESSION['user_type'] = $userType;
-
-            // Registrar sessÃ£o
+            
+            // Registrar sessão
             self::registerSession($userId);
             
-            // Limpar state da sessÃ£o
+            // Limpar state da sessão
             unset($_SESSION['google_oauth_state']);
             
             error_log('Google OAuth: Login realizado com sucesso - User ID: ' . $userId);
@@ -644,26 +643,26 @@ public static function debugStoreAccess() {
         }
     }
     /**
-     * Associa um usuÃ¡rio do tipo loja Ã  sua respectiva loja
+     * Associa um usuário do tipo loja à sua respectiva loja
      * 
-     * @param int $userId ID do usuÃ¡rio
-     * @param string $userEmail Email do usuÃ¡rio
+     * @param int $userId ID do usuário
+     * @param string $userEmail Email do usuário
      * @return bool Verdadeiro se associado com sucesso
      */
     private static function associateStoreUser($userId, $userEmail) {
         try {
             $db = Database::getConnection();
             
-            // Verificar se o usuÃ¡rio jÃ¡ estÃ¡ associado a alguma loja
+            // Verificar se o usuário já está associado a alguma loja
             $checkStmt = $db->prepare("SELECT id FROM lojas WHERE usuario_id = :usuario_id");
             $checkStmt->bindParam(':usuario_id', $userId);
             $checkStmt->execute();
             
             if ($checkStmt->rowCount() > 0) {
-                return true; // JÃ¡ estÃ¡ associado
+                return true; // Já está associado
             }
             
-            // Encontrar loja com o mesmo email do usuÃ¡rio
+            // Encontrar loja com o mesmo email do usuário
             $storeStmt = $db->prepare("SELECT id FROM lojas WHERE email = :email AND usuario_id IS NULL");
             $storeStmt->bindParam(':email', $userEmail);
             $storeStmt->execute();
@@ -671,7 +670,7 @@ public static function debugStoreAccess() {
             if ($storeStmt->rowCount() > 0) {
                 $store = $storeStmt->fetch(PDO::FETCH_ASSOC);
                 
-                // Associar usuÃ¡rio Ã  loja
+                // Associar usuário à loja
                 $updateStmt = $db->prepare("UPDATE lojas SET usuario_id = :usuario_id WHERE id = :loja_id");
                 $updateStmt->bindParam(':usuario_id', $userId);
                 $updateStmt->bindParam(':loja_id', $store['id']);
@@ -680,19 +679,19 @@ public static function debugStoreAccess() {
             
             return false;
         } catch (PDOException $e) {
-            error_log('Erro ao associar usuÃ¡rio Ã  loja: ' . $e->getMessage());
+            error_log('Erro ao associar usuário à loja: ' . $e->getMessage());
             return false;
         }
     }
     /**
-    * Registra um novo usuÃ¡rio
+    * Registra um novo usuário
     * 
-    * @param string $nome Nome do usuÃ¡rio
-    * @param string $email Email do usuÃ¡rio
-    * @param string $telefone Telefone do usuÃ¡rio
-    * @param string $senha Senha do usuÃ¡rio
-    * @param string $tipo Tipo do usuÃ¡rio
-    * @return array Resultado da operaÃ§Ã£o com status e mensagem
+    * @param string $nome Nome do usuário
+    * @param string $email Email do usuário
+    * @param string $telefone Telefone do usuário
+    * @param string $senha Senha do usuário
+    * @param string $tipo Tipo do usuário
+    * @return array Resultado da operação com status e mensagem
     */
     public static function register($nome, $email, $telefone, $senha, $tipo = null) {
         try {
@@ -700,7 +699,7 @@ public static function debugStoreAccess() {
             $errors = [];
             
             if (empty($email) || !Validator::validaEmail($email)) {
-                $errors[] = 'Email invÃ¡lido';
+                $errors[] = 'Email inválido';
             }
             
             if (empty($nome) || !Validator::validaNome($nome)) {
@@ -708,11 +707,11 @@ public static function debugStoreAccess() {
             }
             
             if (empty($telefone) || !Validator::validaTelefone($telefone)) {
-                $errors[] = 'Telefone invÃ¡lido';
+                $errors[] = 'Telefone inválido';
             }
             
             if (empty($senha) || !Validator::validaSenha($senha, PASSWORD_MIN_LENGTH)) {
-                $errors[] = 'A senha deve ter no mÃ­nimo ' . PASSWORD_MIN_LENGTH . ' caracteres';
+                $errors[] = 'A senha deve ter no mínimo ' . PASSWORD_MIN_LENGTH . ' caracteres';
             }
             
             if (!empty($errors)) {
@@ -721,16 +720,16 @@ public static function debugStoreAccess() {
             
             $db = Database::getConnection();
             
-            // Verificar se o email jÃ¡ existe
+            // Verificar se o email já existe
             $stmt = $db->prepare("SELECT id FROM usuarios WHERE email = :email");
             $stmt->bindParam(':email', $email);
             $stmt->execute();
             
             if ($stmt->rowCount() > 0) {
-                return ['status' => false, 'message' => 'Este email jÃ¡ estÃ¡ cadastrado. Por favor, use outro ou faÃ§a login.'];
+                return ['status' => false, 'message' => 'Este email já está cadastrado. Por favor, use outro ou faça login.'];
             }
             
-            // Se for usuÃ¡rio do tipo loja, verificar se hÃ¡ uma loja aprovada com este email
+            // Se for usuário do tipo loja, verificar se há uma loja aprovada com este email
             $storeId = null;
             if ($tipo === USER_TYPE_STORE) {
                 $storeStmt = $db->prepare("
@@ -751,13 +750,13 @@ public static function debugStoreAccess() {
             // Hash da senha
             $senha_hash = password_hash($senha, PASSWORD_DEFAULT);
             
-            // Definir tipo de usuÃ¡rio (cliente Ã© o padrÃ£o, mas admin pode alterar)
+            // Definir tipo de usuário (cliente é o padrão, mas admin pode alterar)
             $tipoUsuario = $tipo ?? USER_TYPE_CLIENT;
             
-            // Iniciar transaÃ§Ã£o
+            // Iniciar transação
             $db->beginTransaction();
             
-            // Inserir novo usuÃ¡rio
+            // Inserir novo usuário
             $stmt = $db->prepare("INSERT INTO usuarios (nome, email, senha_hash, tipo, status, data_criacao) 
                                 VALUES (:nome, :email, :senha_hash, :tipo, :status, NOW())");
             $stmt->bindParam(':nome', $nome);
@@ -770,7 +769,7 @@ public static function debugStoreAccess() {
             if ($stmt->execute()) {
                 $user_id = $db->lastInsertId();
                 
-                // Se for usuÃ¡rio do tipo loja e encontrou uma loja correspondente, vincular
+                // Se for usuário do tipo loja e encontrou uma loja correspondente, vincular
                 if ($tipoUsuario === USER_TYPE_STORE && $storeId) {
                     $linkStmt = $db->prepare("UPDATE lojas SET usuario_id = :usuario_id WHERE id = :loja_id");
                     $linkStmt->bindParam(':usuario_id', $user_id);
@@ -778,11 +777,11 @@ public static function debugStoreAccess() {
                     
                     if (!$linkStmt->execute()) {
                         $db->rollBack();
-                        return ['status' => false, 'message' => 'Erro ao vincular usuÃ¡rio Ã  loja.'];
+                        return ['status' => false, 'message' => 'Erro ao vincular usuário à loja.'];
                     }
                 }
                 
-                // Commit da transaÃ§Ã£o
+                // Commit da transação
                 $db->commit();
                 
                 // Enviar email de boas-vindas
@@ -791,7 +790,7 @@ public static function debugStoreAccess() {
                 return [
                     'status' => true, 
                     'message' => 'Cadastro realizado com sucesso!' . 
-                                ($storeId ? ' UsuÃ¡rio vinculado Ã  loja automaticamente.' : ''), 
+                                ($storeId ? ' Usuário vinculado à loja automaticamente.' : ''), 
                     'user_id' => $user_id,
                     'store_linked' => $storeId ? true : false
                 ];
@@ -811,15 +810,15 @@ public static function debugStoreAccess() {
     }
     
     /**
-     * Solicita recuperaÃ§Ã£o de senha
+     * Solicita recuperação de senha
      * 
-     * @param string $email Email do usuÃ¡rio
-     * @return array Resultado da operaÃ§Ã£o com status e mensagem
+     * @param string $email Email do usuário
+     * @return array Resultado da operação com status e mensagem
      */
     public static function recoverPassword($email) {
         try {
             if (empty($email) || !Validator::validaEmail($email)) {
-                return ['status' => false, 'message' => 'Por favor, informe um email vÃ¡lido.'];
+                return ['status' => false, 'message' => 'Por favor, informe um email válido.'];
             }
             
             $db = Database::getConnection();
@@ -831,22 +830,22 @@ public static function debugStoreAccess() {
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
             
             if (!$user) {
-                // NÃ£o informar ao usuÃ¡rio que o email nÃ£o existe (seguranÃ§a)
-                return ['status' => true, 'message' => 'Se o email estiver cadastrado, enviaremos instruÃ§Ãµes para recuperar sua senha.'];
+                // Não informar ao usuário que o email não existe (segurança)
+                return ['status' => true, 'message' => 'Se o email estiver cadastrado, enviaremos instruções para recuperar sua senha.'];
             }
             
             if ($user['status'] !== USER_ACTIVE) {
-                return ['status' => false, 'message' => 'Sua conta estÃ¡ ' . $user['status'] . '. Entre em contato com o suporte.'];
+                return ['status' => false, 'message' => 'Sua conta está ' . $user['status'] . '. Entre em contato com o suporte.'];
             }
             
-            // Gerar token Ãºnico
+            // Gerar token único
             $token = bin2hex(random_bytes(32));
-            $expiry = date('Y-m-d H:i:s', strtotime('+24 hours')); // 24 horas ao invÃ©s de 2
+            $expiry = date('Y-m-d H:i:s', strtotime('+24 hours')); // 24 horas ao invés de 2
             
-            // Verificar se jÃ¡ existe tabela recuperacao_senha, se nÃ£o, criar
+            // Verificar se já existe tabela recuperacao_senha, se não, criar
             self::createRecoveryTableIfNotExists($db);
             
-            // Primeiro excluir tokens antigos deste usuÃ¡rio
+            // Primeiro excluir tokens antigos deste usuário
             $deleteStmt = $db->prepare("DELETE FROM recuperacao_senha WHERE usuario_id = :user_id");
             $deleteStmt->bindParam(':user_id', $user['id']);
             $deleteStmt->execute();
@@ -858,41 +857,41 @@ public static function debugStoreAccess() {
             $insertStmt->bindParam(':expiry', $expiry);
             
             if ($insertStmt->execute()) {
-                // Enviar email de recuperaÃ§Ã£o
+                // Enviar email de recuperação
                 if (Email::sendPasswordRecovery($email, $user['nome'], $token)) {
-                    return ['status' => true, 'message' => 'Enviamos instruÃ§Ãµes para recuperar sua senha para o email informado.'];
+                    return ['status' => true, 'message' => 'Enviamos instruções para recuperar sua senha para o email informado.'];
                 } else {
-                    return ['status' => false, 'message' => 'NÃ£o foi possÃ­vel enviar o email. Por favor, tente novamente mais tarde.'];
+                    return ['status' => false, 'message' => 'Não foi possível enviar o email. Por favor, tente novamente mais tarde.'];
                 }
             } else {
-                return ['status' => false, 'message' => 'Erro ao gerar token de recuperaÃ§Ã£o. Por favor, tente novamente.'];
+                return ['status' => false, 'message' => 'Erro ao gerar token de recuperação. Por favor, tente novamente.'];
             }
         } catch (Exception $e) {
-            error_log('Erro na recuperaÃ§Ã£o de senha: ' . $e->getMessage());
-            return ['status' => false, 'message' => 'Erro ao processar a solicitaÃ§Ã£o. Tente novamente.'];
+            error_log('Erro na recuperação de senha: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro ao processar a solicitação. Tente novamente.'];
         }
     }
     
     /**
-     * Redefine a senha do usuÃ¡rio atravÃ©s de token
+     * Redefine a senha do usuário através de token
      * 
-     * @param string $token Token de recuperaÃ§Ã£o
+     * @param string $token Token de recuperação
      * @param string $newPassword Nova senha
-     * @return array Resultado da operaÃ§Ã£o com status e mensagem
+     * @return array Resultado da operação com status e mensagem
      */
     public static function resetPassword($token, $newPassword) {
         try {
             if (empty($token) || empty($newPassword)) {
-                return ['status' => false, 'message' => 'Dados invÃ¡lidos para redefiniÃ§Ã£o de senha.'];
+                return ['status' => false, 'message' => 'Dados inválidos para redefinição de senha.'];
             }
             
             if (strlen($newPassword) < PASSWORD_MIN_LENGTH) {
-                return ['status' => false, 'message' => 'A senha deve ter no mÃ­nimo ' . PASSWORD_MIN_LENGTH . ' caracteres.'];
+                return ['status' => false, 'message' => 'A senha deve ter no mínimo ' . PASSWORD_MIN_LENGTH . ' caracteres.'];
             }
             
             $db = Database::getConnection();
             
-            // Verificar se o token Ã© vÃ¡lido
+            // Verificar se o token é válido
             $stmt = $db->prepare("
                 SELECT rs.*, u.nome, u.email 
                 FROM recuperacao_senha rs
@@ -906,10 +905,10 @@ public static function debugStoreAccess() {
             $tokenInfo = $stmt->fetch(PDO::FETCH_ASSOC);
             
             if (!$tokenInfo) {
-                return ['status' => false, 'message' => 'Token invÃ¡lido ou expirado. Por favor, solicite uma nova recuperaÃ§Ã£o de senha.'];
+                return ['status' => false, 'message' => 'Token inválido ou expirado. Por favor, solicite uma nova recuperação de senha.'];
             }
             
-            // Atualizar a senha do usuÃ¡rio
+            // Atualizar a senha do usuário
             $passwordHash = password_hash($newPassword, PASSWORD_DEFAULT);
             $updateStmt = $db->prepare("UPDATE usuarios SET senha_hash = :senha_hash WHERE id = :id");
             $updateStmt->bindParam(':senha_hash', $passwordHash);
@@ -921,57 +920,57 @@ public static function debugStoreAccess() {
                 $usedStmt->bindParam(':id', $tokenInfo['id']);
                 $usedStmt->execute();
                 
-                return ['status' => true, 'message' => 'Sua senha foi atualizada com sucesso! VocÃª jÃ¡ pode fazer login.'];
+                return ['status' => true, 'message' => 'Sua senha foi atualizada com sucesso! Você já pode fazer login.'];
             } else {
                 return ['status' => false, 'message' => 'Erro ao atualizar a senha. Por favor, tente novamente.'];
             }
         } catch (PDOException $e) {
-            error_log('Erro na redefiniÃ§Ã£o de senha: ' . $e->getMessage());
-            return ['status' => false, 'message' => 'Erro ao processar a solicitaÃ§Ã£o. Tente novamente.'];
+            error_log('Erro na redefinição de senha: ' . $e->getMessage());
+            return ['status' => false, 'message' => 'Erro ao processar a solicitação. Tente novamente.'];
         }
     }
     
     /**
-     * Realiza o logout do usuÃ¡rio
+     * Realiza o logout do usuário
      * 
-     * @return array Resultado da operaÃ§Ã£o com status e mensagem
+     * @return array Resultado da operação com status e mensagem
      */
     public static function logout() {
-        // Iniciar sessÃ£o se nÃ£o estiver iniciada
+        // Iniciar sessão se não estiver iniciada
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
         
-        // Limpar variÃ¡veis de sessÃ£o
+        // Limpar variáveis de sessão
         $_SESSION = array();
         
-        // Destruir a sessÃ£o
+        // Destruir a sessão
         session_destroy();
         
         return ['status' => true, 'message' => 'Logout efetuado com sucesso.'];
     }
     
     /**
-     * Registra informaÃ§Ãµes da sessÃ£o atual
+     * Registra informações da sessão atual
      * 
-     * @param int $userId ID do usuÃ¡rio
+     * @param int $userId ID do usuário
      * @return void
      */
     private static function registerSession($userId) {
         try {
             $db = Database::getConnection();
             
-            // Gerar ID Ãºnico para a sessÃ£o
+            // Gerar ID único para a sessão
             $sessionId = session_id();
             
-            // Obter informaÃ§Ãµes do cliente
+            // Obter informações do cliente
             $ip = $_SERVER['REMOTE_ADDR'] ?? '';
             $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
             
-            // Data de expiraÃ§Ã£o (24 horas por padrÃ£o)
+            // Data de expiração (24 horas por padrão)
             $expiry = date('Y-m-d H:i:s', time() + SESSION_LIFETIME);
             
-            // Registrar sessÃ£o
+            // Registrar sessão
             $stmt = $db->prepare("INSERT INTO sessoes (id, usuario_id, data_inicio, data_expiracao, ip, user_agent) 
                                   VALUES (:id, :usuario_id, NOW(), :expiracao, :ip, :user_agent)");
             $stmt->bindParam(':id', $sessionId);
@@ -982,14 +981,14 @@ public static function debugStoreAccess() {
             $stmt->execute();
             
         } catch (PDOException $e) {
-            error_log('Erro ao registrar sessÃ£o: ' . $e->getMessage());
+            error_log('Erro ao registrar sessão: ' . $e->getMessage());
         }
     }
     
     /**
-     * Cria a tabela de recuperaÃ§Ã£o de senha se nÃ£o existir
+     * Cria a tabela de recuperação de senha se não existir
      * 
-     * @param PDO $db ConexÃ£o com o banco de dados
+     * @param PDO $db Conexão com o banco de dados
      * @return void
      */
     private static function createRecoveryTableIfNotExists($db) {
@@ -1013,23 +1012,23 @@ public static function debugStoreAccess() {
                 $db->exec($createTable);
             }
         } catch (PDOException $e) {
-            error_log('Erro ao criar tabela de recuperaÃ§Ã£o de senha: ' . $e->getMessage());
+            error_log('Erro ao criar tabela de recuperação de senha: ' . $e->getMessage());
         }
     }
     
     /**
-     * Verifica se o usuÃ¡rio estÃ¡ autenticado
+     * Verifica se o usuário está autenticado
      * 
-     * @return bool Verdadeiro se o usuÃ¡rio estiver autenticado
+     * @return bool Verdadeiro se o usuário estiver autenticado
      */
     public static function isAuthenticated() {
         return isset($_SESSION['user_id']) && isset($_SESSION['user_type']);
     }
     
     /**
-     * Verifica se o usuÃ¡rio tem permissÃ£o de administrador
+     * Verifica se o usuário tem permissão de administrador
      * 
-     * @return bool Verdadeiro se o usuÃ¡rio for administrador
+     * @return bool Verdadeiro se o usuário for administrador
      */
     public static function isAdmin() {
         if (!self::isAuthenticated()) {
@@ -1040,9 +1039,9 @@ public static function debugStoreAccess() {
     }
     
     /**
-     * Verifica se o usuÃ¡rio tem permissÃ£o de loja
+     * Verifica se o usuário tem permissão de loja
      * 
-     * @return bool Verdadeiro se o usuÃ¡rio for loja
+     * @return bool Verdadeiro se o usuário for loja
      */
     public static function isStore() {
         if (!self::isAuthenticated()) {
@@ -1053,9 +1052,9 @@ public static function debugStoreAccess() {
     }
     
     /**
-     * ObtÃ©m o ID do usuÃ¡rio atual
+     * Obtém o ID do usuário atual
      * 
-     * @return int|null ID do usuÃ¡rio ou null se nÃ£o estiver logado
+     * @return int|null ID do usuário ou null se não estiver logado
      */
     public static function getCurrentUserId() {
         if (!self::isAuthenticated()) {
@@ -1066,7 +1065,7 @@ public static function debugStoreAccess() {
     }
 }
 
-// Processar requisiÃ§Ãµes diretas de acesso ao controlador
+// Processar requisições diretas de acesso ao controlador
 if (basename($_SERVER['PHP_SELF']) === 'AuthController.php') {
     $action = $_REQUEST['action'] ?? '';
     
@@ -1079,7 +1078,7 @@ if (basename($_SERVER['PHP_SELF']) === 'AuthController.php') {
                 $result = AuthController::login($email, $password);
                 
                 if ($result['status']) {
-                    // CORREÃ‡ÃƒO: Redirecionar baseado no tipo correto
+                    // CORREÇÃO: Redirecionar baseado no tipo correto
                     $userType = $_SESSION['user_type'] ?? '';
                     
                     if ($userType == 'admin') {
@@ -1087,7 +1086,7 @@ if (basename($_SERVER['PHP_SELF']) === 'AuthController.php') {
                     } else if ($userType == 'loja') {
                         header('Location: ' . STORE_DASHBOARD_URL);
                     } else if ($userType == 'funcionario') {
-                        // FUNCIONÃRIO VAI PARA STORE (SISTEMA SIMPLIFICADO)
+                        // FUNCIONÁRIO VAI PARA STORE (SISTEMA SIMPLIFICADO)
                         header('Location: ' . STORE_DASHBOARD_URL);
                     } else {
                         header('Location: ' . CLIENT_DASHBOARD_URL);
@@ -1106,22 +1105,22 @@ if (basename($_SERVER['PHP_SELF']) === 'AuthController.php') {
                     $email = $_POST['email'] ?? '';
                     $telefone = $_POST['telefone'] ?? '';
                     $senha = $_POST['senha'] ?? '';
-                    $tipo = $_POST['tipo'] ?? 'cliente'; // CORREÃ‡ÃƒO
+                    $tipo = $_POST['tipo'] ?? 'cliente'; // CORREÇÃO
                     
                     $result = AuthController::register($nome, $email, $telefone, $senha, $tipo);
                     
-                    // Verificar se Ã© uma requisiÃ§Ã£o AJAX
+                    // Verificar se é uma requisição AJAX
                     $isAjax = isset($_POST['ajax']) || 
                              (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && 
                               strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest');
                     
                     if ($isAjax) {
-                        // Responder com JSON para requisiÃ§Ãµes AJAX
+                        // Responder com JSON para requisições AJAX
                         header('Content-Type: application/json');
                         echo json_encode($result);
                         exit;
                     } else {
-                        // Redirecionar para pÃ¡ginas normais
+                        // Redirecionar para páginas normais
                         if ($result['status']) {
                             header('Location: ' . LOGIN_URL . '?success=' . urlencode($result['message']));
                         } else {
@@ -1139,7 +1138,7 @@ if (basename($_SERVER['PHP_SELF']) === 'AuthController.php') {
                 $result = AuthController::recoverPassword($email);
                 
                 if ($result['status']) {
-                    // Redirecionar com base no tipo de usuÃ¡rio
+                    // Redirecionar com base no tipo de usuário
                     if ($_SESSION['user_type'] == USER_TYPE_ADMIN) {
                         header('Location: ' . ADMIN_DASHBOARD_URL);
                     } else if ($_SESSION['user_type'] == USER_TYPE_STORE) {
@@ -1174,20 +1173,15 @@ if (basename($_SERVER['PHP_SELF']) === 'AuthController.php') {
         case 'logout':
             $result = AuthController::logout();
             
-            // Redirecionar para a pÃ¡gina de login
+            // Redirecionar para a página de login
             header('Location: ' . LOGIN_URL);
             exit;
             break;
             
         default:
-            // Acesso invÃ¡lido ao controlador
+            // Acesso inválido ao controlador
             header('Location: ' . SITE_URL);
             exit;
     }
 }
 ?>
-
-
-
-
-

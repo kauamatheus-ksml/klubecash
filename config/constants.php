@@ -1,7 +1,7 @@
-﻿<?php
+<?php
 /**
  * Constantes do sistema - Klube Cash v2.1
- * ConfiguraÃ§Ãµes otimizadas para Mercado Pago com qualidade mÃ¡xima
+ * Configurações otimizadas para Mercado Pago com qualidade máxima
  */
 if (!defined('ROOT_PATH')) {
     define('ROOT_PATH', '/home/u383946504/domains/klubecash.com/public_html/'); // SEU CAMINHO ABSOLUTO
@@ -14,24 +14,24 @@ define('CLIENT_TYPE_VISITOR', 'visitante');      // Cliente visitante (sem senha
 
 // === STATUS DE RESPOSTA PARA BUSCA DE CLIENTE ===
 define('CLIENT_SEARCH_FOUND', 'found');          // Cliente encontrado
-define('CLIENT_SEARCH_NOT_FOUND', 'not_found');  // Cliente nÃ£o encontrado
+define('CLIENT_SEARCH_NOT_FOUND', 'not_found');  // Cliente não encontrado
 define('CLIENT_SEARCH_INACTIVE', 'inactive');    // Cliente inativo
 
-// === CONFIGURAÃ‡Ã•ES DE CLIENTE VISITANTE ===
-define('VISITOR_NAME_MAX_LENGTH', 100);          // Tamanho mÃ¡ximo do nome do visitante
-define('VISITOR_PHONE_MIN_LENGTH', 10);          // Tamanho mÃ­nimo do telefone
+// === CONFIGURAÇÕES DE CLIENTE VISITANTE ===
+define('VISITOR_NAME_MAX_LENGTH', 100);          // Tamanho máximo do nome do visitante
+define('VISITOR_PHONE_MIN_LENGTH', 10);          // Tamanho mínimo do telefone
 
 // === MENSAGENS DE CLIENTE VISITANTE ===
 define('MSG_VISITOR_CREATED', 'Cliente visitante criado com sucesso');
-define('MSG_VISITOR_EXISTS', 'JÃ¡ existe um cliente visitante com este telefone nesta loja');
-define('MSG_VISITOR_INVALID_DATA', 'Dados invÃ¡lidos para criar cliente visitante');
+define('MSG_VISITOR_EXISTS', 'Já existe um cliente visitante com este telefone nesta loja');
+define('MSG_VISITOR_INVALID_DATA', 'Dados inválidos para criar cliente visitante');
 
-// === INFORMAÃ‡Ã•ES DO SISTEMA ===
+// === INFORMAÇÕES DO SISTEMA ===
 define('SYSTEM_NAME', 'Klube Cash');
 define('SYSTEM_VERSION', '2.1.0');
 define('SITE_URL', 'https://klubecash.com');
 define('ADMIN_EMAIL', 'contato@klubecash.com');
-// === SMTP CONFIGURAÃ‡Ã•ES ===
+// === SMTP CONFIGURAÇÕES ===
 define('SMTP_HOST_HOSTINGER', 'smtp.hostinger.com');
 define('SMTP_PORT_HOSTINGER', 465);
 define('SMTP_USER_HOSTINGER', 'klubecash@klubecash.com');
@@ -46,14 +46,14 @@ define('WARNING_COLOR', '#F59E0B');
 define('DANGER_COLOR', '#EF4444');
 define('INFO_COLOR', '#3B82F6');
 
-// === DIRETÃ“RIOS ===
+// === DIRETÓRIOS ===
 define('ROOT_DIR', dirname(__DIR__));
 define('VIEWS_DIR', ROOT_DIR . '/views');
 define('UPLOADS_DIR', ROOT_DIR . '/uploads');
 define('LOGS_DIR', ROOT_DIR . '/logs');
 define('ASSETS_DIR', ROOT_DIR . '/assets');
 
-// === CONFIGURAÃ‡Ã•ES DE CASHBACK ===
+// === CONFIGURAÇÕES DE CASHBACK ===
 define('DEFAULT_CASHBACK_TOTAL', 10.00);
 define('DEFAULT_CASHBACK_CLIENT', 5.00);
 define('DEFAULT_CASHBACK_ADMIN', 5.00);
@@ -75,51 +75,51 @@ define('USER_TYPE_STORE', 'loja');
 define('USER_TYPE_EMPLOYEE', 'funcionario');
 
 
-// === AUTENTICAÃ‡ÃƒO (ADIÃ‡ÃƒO) ===
+// === AUTENTICAÇÃO (ADIÇÃO) ===
 define('JWT_SECRET', 'klube_cash_secret_key_2025_secure');
 define('SESSION_LIFETIME', 3600); // 1 hora
-define('TOKEN_EXPIRATION', 7200); // 2 horas para recuperaÃ§Ã£o de senha
+define('TOKEN_EXPIRATION', 7200); // 2 horas para recuperação de senha
 
 
 
 
-// === CONFIGURAÃ‡Ã•ES NOTIFICAÃ‡Ã•ES CASHBACK ===
+// === CONFIGURAÇÕES NOTIFICAÇÕES CASHBACK ===
 define('CASHBACK_NOTIFICATIONS_ENABLED', true);
 define('CASHBACK_NOTIFICATION_API_URL', SITE_URL . '/api/cashback-notificacao.php');
 
-// ConfiguraÃ§Ãµes de retry para notificaÃ§Ãµes falhadas
+// Configurações de retry para notificações falhadas
 define('CASHBACK_NOTIFICATION_MAX_RETRIES', 3);
 define('CASHBACK_NOTIFICATION_RETRY_INTERVAL', 3600); // 1 hora em segundos
 
-// === TIPOS DE MENSAGEM PARA CUSTOMIZAÃ‡ÃƒO ===
+// === TIPOS DE MENSAGEM PARA CUSTOMIZAÇÃO ===
 define('NOTIFICATION_TYPE_FIRST_PURCHASE', 'first_purchase');
 define('NOTIFICATION_TYPE_BIG_PURCHASE', 'big_purchase');
 define('NOTIFICATION_TYPE_VIP_CLIENT', 'vip_client');
 define('NOTIFICATION_TYPE_REGULAR_CLIENT', 'regular_client');
 
-// Valores para determinaÃ§Ã£o de perfil do cliente
+// Valores para determinação de perfil do cliente
 define('VIP_CLIENT_MIN_CASHBACK', 500.00);
 define('VIP_CLIENT_MIN_TRANSACTIONS', 20);
 define('BIG_PURCHASE_THRESHOLD', 200.00);
 
 
-// === CONFIGURAÃ‡Ã•ES WHATSAPP BOT ===
+// === CONFIGURAÇÕES WHATSAPP BOT ===
 define('WHATSAPP_BOT_URL', 'http://localhost:3003');
 define('WHATSAPP_BOT_SECRET', 'klube-cash-2024');
 define('WHATSAPP_ENABLED', true);
 define('WHATSAPP_TIMEOUT', 30);
-define('WHATSAPP_PRODUCTION_MODE', true); // NOVA: Indicador explÃ­cito de modo produÃ§Ã£o
+define('WHATSAPP_PRODUCTION_MODE', true); // NOVA: Indicador explícito de modo produção
 
 define('WHATSAPP_SALDO_KEYWORDS', ['saldo', 'extrato', 'cashback', 'consulta']);
 define('WHATSAPP_SALDO_API_URL', SITE_URL . '/api/whatsapp-saldo.php');
-// === SISTEMA DE USUÃRIOS SIMPLIFICADO ===
-// Todos os funcionÃ¡rios tÃªm acesso igual ao lojista
+// === SISTEMA DE USUÁRIOS SIMPLIFICADO ===
+// Todos os funcionários têm acesso igual ao lojista
 define('STORE_ACCESS_TYPES', [
     USER_TYPE_STORE => 'Lojista',
-    USER_TYPE_EMPLOYEE => 'FuncionÃ¡rio'
+    USER_TYPE_EMPLOYEE => 'Funcionário'
 ]);
 
-// === RASTREAMENTO DE AÃ‡Ã•ES ===
+// === RASTREAMENTO DE AÇÕES ===
 define('TRACK_USER_ACTIONS', true);
 define('LOG_TRANSACTION_CREATOR', true);
 define('LOG_PAYMENT_CREATOR', true);
@@ -131,10 +131,10 @@ define('AUDIT_UPDATED_BY', 'atualizado_por');
 define('AUDIT_CREATED_AT', 'data_criacao');
 define('AUDIT_UPDATED_AT', 'data_atualizacao');
 
-// === FUNCIONÃRIOS SIMPLIFICADO ===
-// Todos funcionÃ¡rios tÃªm acesso igual, diferenciados apenas para exibiÃ§Ã£o
+// === FUNCIONÁRIOS SIMPLIFICADO ===
+// Todos funcionários têm acesso igual, diferenciados apenas para exibição
 define('EMPLOYEE_DISPLAY_TYPES', [
-    'funcionario' => 'FuncionÃ¡rio',
+    'funcionario' => 'Funcionário',
     'gerente' => 'Gerente', 
     'coordenador' => 'Coordenador',
     'assistente' => 'Assistente',
@@ -142,7 +142,7 @@ define('EMPLOYEE_DISPLAY_TYPES', [
     'financeiro' => 'Financeiro'
 ]);
 
-// Campo opcional para organizaÃ§Ã£o interna (nÃ£o afeta permissÃµes)
+// Campo opcional para organização interna (não afeta permissões)
 define('EMPLOYEE_POSITION_FIELD', 'cargo_display');
 
 
@@ -155,28 +155,28 @@ define('STORE_PENDING', 'pendente');
 define('STORE_APPROVED', 'aprovado');
 define('STORE_REJECTED', 'rejeitado');
 
-// === CONFIGURAÃ‡Ã•ES DE SEGURANÃ‡A ===
+// === CONFIGURAÇÕES DE SEGURANÇA ===
 define('PASSWORD_MIN_LENGTH', 8);
 
 
-define('CPF_REQUIRED', true); // Novo: Indica se CPF Ã© obrigatÃ³rio
+define('CPF_REQUIRED', true); // Novo: Indica se CPF é obrigatório
 
-// === MENSAGENS DE VALIDAÃ‡ÃƒO ===
-define('MSG_CPF_REQUIRED', 'CPF Ã© obrigatÃ³rio para completar seu perfil');
-define('MSG_CPF_INVALID', 'CPF informado Ã© invÃ¡lido');
-define('MSG_CPF_EXISTS', 'Este CPF jÃ¡ estÃ¡ cadastrado no sistema');
-// === MERCADO PAGO CONFIGURAÃ‡Ã•ES OTIMIZADAS ===
-define('MP_PUBLIC_KEY', 'APP_USR-60bd9502-2ea5-46c8-80b5-765f10277949'); // Chave pÃºblica de ProduÃ§Ã£o
-define('MP_ACCESS_TOKEN', 'APP_USR-8622491157025652-060223-01208b007f3c9b708958e846841e0a63-2320640278'); // Access token de produÃ§Ã£o
+// === MENSAGENS DE VALIDAÇÃO ===
+define('MSG_CPF_REQUIRED', 'CPF é obrigatório para completar seu perfil');
+define('MSG_CPF_INVALID', 'CPF informado é inválido');
+define('MSG_CPF_EXISTS', 'Este CPF já está cadastrado no sistema');
+// === MERCADO PAGO CONFIGURAÇÕES OTIMIZADAS ===
+define('MP_PUBLIC_KEY', 'APP_USR-60bd9502-2ea5-46c8-80b5-765f10277949'); // Chave pública de Produção
+define('MP_ACCESS_TOKEN', 'APP_USR-8622491157025652-060223-01208b007f3c9b708958e846841e0a63-2320640278'); // Access token de produção
 define('MP_WEBHOOK_URL', SITE_URL . '/api/mercadopago-webhook');
 define('MP_WEBHOOK_SECRET', '21c03ffb0010adca8e57a0b9fcf30855191d44008baa16b757d9104ed5bfce5b'); // Secret do webhook
 
-// === CONFIGURAÃ‡Ã•ES AVANÃ‡ADAS MERCADO PAGO ===
+// === CONFIGURAÇÕES AVANÇADAS MERCADO PAGO ===
 define('MP_ENVIRONMENT', 'production'); // production ou sandbox
 define('MP_PLATFORM_ID', 'mp-ecom'); // Identificador da plataforma
-define('MP_CORPORATION_ID', 'klubecash'); // ID da corporaÃ§Ã£o
-define('MP_INTEGRATION_TYPE', 'direct'); // Tipo de integraÃ§Ã£o
-define('MP_MAX_RETRIES', 3); // MÃ¡ximo de tentativas
+define('MP_CORPORATION_ID', 'klubecash'); // ID da corporação
+define('MP_INTEGRATION_TYPE', 'direct'); // Tipo de integração
+define('MP_MAX_RETRIES', 3); // Máximo de tentativas
 define('MP_TIMEOUT', 30); // Timeout em segundos
 define('MP_USER_AGENT', 'KlubeCash/2.1 (Mercado Pago Integration Optimized)');
 
@@ -185,14 +185,14 @@ define('MP_CREATE_PAYMENT_URL', SITE_URL . '/api/mercadopago?action=create_payme
 define('MP_CHECK_STATUS_URL', SITE_URL . '/api/mercadopago?action=status');
 define('MP_BASE_URL', 'https://api.mercadopago.com');
 
-// === CONFIGURAÃ‡Ã•ES DE QUALIDADE MP ===
+// === CONFIGURAÇÕES DE QUALIDADE MP ===
 define('MP_ENABLE_DEVICE_ID', true); // Habilitar device ID
-define('MP_ENABLE_FRAUD_PREVENTION', true); // Habilitar prevenÃ§Ã£o de fraude
-define('MP_REQUIRE_PAYER_INFO', true); // Exigir informaÃ§Ãµes completas do pagador
-define('MP_ENABLE_ADDRESS_VALIDATION', true); // Habilitar validaÃ§Ã£o de endereÃ§o
-define('MP_ENABLE_PHONE_VALIDATION', true); // Habilitar validaÃ§Ã£o de telefone
+define('MP_ENABLE_FRAUD_PREVENTION', true); // Habilitar prevenção de fraude
+define('MP_REQUIRE_PAYER_INFO', true); // Exigir informações completas do pagador
+define('MP_ENABLE_ADDRESS_VALIDATION', true); // Habilitar validação de endereço
+define('MP_ENABLE_PHONE_VALIDATION', true); // Habilitar validação de telefone
 
-// === PAGINAÃ‡ÃƒO ===
+// === PAGINAÇÃO ===
 define('ITEMS_PER_PAGE', 10);
 
 // === LIMITES ===
@@ -203,26 +203,21 @@ define('MIN_WITHDRAWAL_VALUE', 20.00);
 define('LOGIN_URL', SITE_URL . '/login');
 define('REGISTER_URL', SITE_URL . '/registro');
 define('RECOVER_PASSWORD_URL', SITE_URL . '/recuperar-senha');
-// === URLs DE AUTENTICAÃ‡ÃƒO ===
+// === URLs DE AUTENTICAÇÃO ===
 
 define('LOGOUT_URL', SITE_URL . '/logout'); // ADICIONAR ESTA LINHA
 
 // === URLs DO CLIENTE ===
-// define('CLIENT_WALLET_SELECTOR_URL', SITE_URL . '/cliente/escolher-carteira'); // Removed: wallet-selector page deleted
 define('CLIENT_DASHBOARD_URL', SITE_URL . '/cliente/dashboard');
 define('CLIENT_STATEMENT_URL', SITE_URL . '/cliente/extrato');
 define('CLIENT_STORES_URL', SITE_URL . '/cliente/lojas-parceiras');
 define('CLIENT_PROFILE_URL', SITE_URL . '/cliente/perfil');
 define('CLIENT_BALANCE_URL', SITE_URL . '/cliente/saldo');
 define('CLIENT_ACTIONS_URL', SITE_URL . '/cliente/actions');
-define('CLIENT_SESTSENAT_PORTAL_URL', 'http://localhost:8082');
-define('CLIENT_SESTSENAT_PORTAL_NETWORK_URL', 'http://192.168.100.53:8082');
-define('CLIENT_SESTSENAT_PORTAL_PROD_URL', 'https://sestsenat.klubecash.com');
-define('CLIENT_SESTSENAT_PORTAL_PROD_WWW_URL', 'https://www.sestsenat.klubecash.com');
 
 
-// === CONFIGURAÃ‡Ã•ES DE CPF ===
-define('CPF_TESTE_VALIDO', '00000000191'); // CPF vÃ¡lido para testes quando loja nÃ£o tem CPF
+// === CONFIGURAÇÕES DE CPF ===
+define('CPF_TESTE_VALIDO', '00000000191'); // CPF válido para testes quando loja não tem CPF
 define('CPF_OBRIGATORIO_PIX', true); // Exigir CPF para pagamentos PIX
 
 
@@ -251,11 +246,11 @@ define('STORE_PROFILE_URL', SITE_URL . '/store/perfil');
 define('STORE_PAYMENT_PIX_URL', SITE_URL . '/store/pagamento-pix');
 define('STORE_SALDOS_URL', SITE_URL . '/store/saldos');
 define('STORE_BALANCE_REPASSES_URL', SITE_URL . '/store/repasses-saldo');
-// Adicionar esta linha se nÃ£o existir
+// Adicionar esta linha se não existir
 define('STORE_EMPLOYEES_URL', SITE_URL . '/store/funcionarios');
 
 
-// === CONFIGURAÃ‡Ã•ES DE ASSETS ===
+// === CONFIGURAÇÕES DE ASSETS ===
 define('ASSETS_VERSION', '2.1.0'); // Para cache busting
 define('CDN_URL', SITE_URL); // Para futuros CDNs
 define('CSS_URL', SITE_URL . '/assets/css');
@@ -276,7 +271,7 @@ define('GOOGLE_AUTH_ENDPOINT', SITE_URL . '/auth/google/auth');
 define('GOOGLE_CALLBACK_ENDPOINT', SITE_URL . '/auth/google/callback');
 
 
-// === EMAIL PERSONALIZADO (PÃšBLICO) - RAIZ ===
+// === EMAIL PERSONALIZADO (PÚBLICO) - RAIZ ===
 define('PUBLIC_EMAIL_SEND_URL', SITE_URL . '/enviar-email');
 define('PUBLIC_EMAIL_SEND_ALT_URL', SITE_URL . '/email');
 define('PUBLIC_EMAIL_SEND_ALT2_URL', SITE_URL . '/send-email');
@@ -288,25 +283,25 @@ define('EMAIL_ACCESS_PASSWORD', 'klube2024@!'); // Senha de acesso
 define('ADMIN_EMAIL_SEND_URL', SITE_URL . '/admin/enviar-email');
 define('EMAIL_SEND_BATCH_SIZE', 50);
 define('EMAIL_SEND_DELAY_MS', 200);
-// ConfiguraÃ§Ãµes de envio em lote
+// Configurações de envio em lote
 define('EMAIL_BATCH_SIZE', 50);
 define('EMAIL_SEND_DELAY', 200000); // 0.2 segundo
 define('EMAIL_MAX_RETRIES', 3);
 
-// === CONFIGURAÃ‡Ã•ES DE EMAIL ===
+// === CONFIGURAÇÕES DE EMAIL ===
 if (!defined('SMTP_HOST')) {
     define('SMTP_HOST', 'smtp.hostinger.com');
-    define('SMTP_PORT', 587); // MUDANÃ‡A: 465 â†’ 587
+    define('SMTP_PORT', 587); // MUDANÇA: 465 → 587
     define('SMTP_USERNAME', 'klubecash@klubecash.com');
     define('SMTP_PASSWORD', 'Aaku_2004@');
     define('SMTP_FROM_EMAIL', 'klubecash@klubecash.com');
     define('SMTP_FROM_NAME', 'Klube Cash');
-    define('SMTP_ENCRYPTION', 'tls'); // MUDANÃ‡A: 'ssl' â†’ 'tls'
+    define('SMTP_ENCRYPTION', 'tls'); // MUDANÇA: 'ssl' → 'tls'
 }
-// === OPENPIX CONFIGURAÃ‡Ã•ES (NOVA) ===
+// === OPENPIX CONFIGURAÇÕES (NOVA) ===
 define('OPENPIX_API_URL', 'https://api.openpix.com.br');
 define('OPENPIX_APP_ID', 'Q2xpZW50X0lkXzIzOTVjYmMzLWYyOGItNGJmYi04MWE3LWNkZWIzYzJkYTI4ZTpDbGllbnRfU2VjcmV0X3JYOFRxM016ZWdoNUY5YnVnempJeHl1VlBsRkg2QkNubm0yRFFzUWxQU1E9'); // Substitua pelo seu App ID real
-define('OPENPIX_WEBHOOK_AUTH', 'klube_cash_webhook_2025'); // Chave de autorizaÃ§Ã£o do webhook
+define('OPENPIX_WEBHOOK_AUTH', 'klube_cash_webhook_2025'); // Chave de autorização do webhook
 define('OPENPIX_WEBHOOK_URL', SITE_URL . '/webhook/openpix');
 
 // === AMBIENTE ===
@@ -314,7 +309,7 @@ if (!defined('ENVIRONMENT')) {
     define('ENVIRONMENT', 'production');
     define('LOG_LEVEL', 'INFO');
 }
-// === SINCRONIZAÃ‡ÃƒO PWA ===
+// === SINCRONIZAÇÃO PWA ===
 define('PWA_SYNC_INTERVAL', 300); // 5 minutos
 define('PWA_FULL_SYNC_INTERVAL', 604800); // 7 dias
 define('PWA_MAX_SYNC_RETRIES', 3);
@@ -325,7 +320,7 @@ define('PWA_CACHE_STATIC_MAX_AGE', 86400); // 1 dia
 define('PWA_CACHE_DYNAMIC_MAX_AGE', 3600); // 1 hora
 define('PWA_CACHE_API_MAX_AGE', 300); // 5 minutos
 
-// === NOTIFICAÃ‡Ã•ES PWA ===
+// === NOTIFICAÇÕES PWA ===
 define('PWA_NOTIFICATIONS_ENABLED', true);
 define('PWA_PUSH_PUBLIC_KEY', 'sua_chave_publica_aqui');
 define('PWA_PUSH_PRIVATE_KEY', 'sua_chave_privada_aqui');
@@ -337,15 +332,15 @@ define('PWA_MAX_SYNC_BATCH_SIZE', 100);
 
 
 
-// === EXPORTAÃ‡Ã•ES ===
+// === EXPORTAÇÕES ===
 define('EXPORTS_DIR', ROOT_DIR . '/exports');
 
-// === CONFIGURAÃ‡Ã•ES DE SESSÃƒO SEGURA ===
+// === CONFIGURAÇÕES DE SESSÃO SEGURA ===
 if (session_status() === PHP_SESSION_NONE) {
     ini_set('session.cookie_lifetime', 0);
     ini_set('session.use_only_cookies', 1);
     ini_set('session.cookie_httponly', 1);
-    ini_set('session.cookie_secure', 1); // HTTPS obrigatÃ³rio
+    ini_set('session.cookie_secure', 1); // HTTPS obrigatório
     ini_set('session.cookie_samesite', 'Strict');
     ini_set('session.use_strict_mode', 1);
     session_start();
@@ -365,22 +360,22 @@ define('ALLOWED_IMAGE_TYPES', ['jpg', 'jpeg', 'png', 'webp', 'gif']);
 
 // === SEO E META ===
 define('DEFAULT_META_TITLE', 'Klube Cash - Transforme suas Compras em Dinheiro de Volta');
-define('DEFAULT_META_DESCRIPTION', 'O programa de cashback mais inteligente do Brasil. Receba dinheiro de volta em todas as suas compras. Cadastre-se grÃ¡tis!');
+define('DEFAULT_META_DESCRIPTION', 'O programa de cashback mais inteligente do Brasil. Receba dinheiro de volta em todas as suas compras. Cadastre-se grátis!');
 define('DEFAULT_META_KEYWORDS', 'cashback, dinheiro de volta, economia, programa de fidelidade, compras online, desconto, lojas parceiras');
 
-// === CONFIGURAÃ‡Ã•ES DE LOGS AVANÃ‡ADAS ===
-define('LOG_MP_REQUESTS', true); // Log de todas as requisiÃ§Ãµes MP
+// === CONFIGURAÇÕES DE LOGS AVANÇADAS ===
+define('LOG_MP_REQUESTS', true); // Log de todas as requisições MP
 define('LOG_MP_RESPONSES', true); // Log de todas as respostas MP
 define('LOG_WEBHOOK_EVENTS', true); // Log de eventos de webhook
-define('LOG_QUALITY_METRICS', true); // Log de mÃ©tricas de qualidade
+define('LOG_QUALITY_METRICS', true); // Log de métricas de qualidade
 
-// === CONFIGURAÃ‡Ã•ES PWA ===
+// === CONFIGURAÇÕES PWA ===
 define('PWA_ENABLED', true);
 define('PWA_VERSION', '1.2.0');
 define('PWA_CACHE_VERSION', 'v1.2.0');
 // Adicionar estas constantes no final do arquivo constants.php
 
-// === CONFIGURAÃ‡Ã•ES PWA OFFLINE STORAGE ===
+// === CONFIGURAÇÕES PWA OFFLINE STORAGE ===
 define('PWA_OFFLINE_ENABLED', true);
 define('PWA_INDEXEDDB_NAME', 'KlubeCashDB');
 define('PWA_INDEXEDDB_VERSION', 2);
@@ -392,26 +387,26 @@ define('PWA_STORES_CACHE', 7200); // 2 horas
 define('PWA_CASHBACK_CACHE', 1800); // 30 minutos
 define('PWA_NOTIFICATIONS_CACHE', 600); // 10 minutos
 
-// ConfiguraÃ§Ãµes de sincronizaÃ§Ã£o
+// Configurações de sincronização
 define('PWA_SYNC_BATCH_SIZE', 50);
 define('PWA_SYNC_MAX_RETRIES', 3);
 define('PWA_SYNC_RETRY_DELAY', 5000); // 5 segundos
 define('PWA_SYNC_AUTO_INTERVAL', 30000); // 30 segundos
 
-// Limpeza automÃ¡tica de dados antigos
+// Limpeza automática de dados antigos
 define('PWA_DATA_RETENTION_MONTHS', 6);
 define('PWA_CLEANUP_INTERVAL', 86400); // 24 horas
 
-// Endpoints de sincronizaÃ§Ã£o
+// Endpoints de sincronização
 define('PWA_SYNC_PROFILE_URL', SITE_URL . '/api/sync/profile');
 define('PWA_SYNC_TRANSACTIONS_URL', SITE_URL . '/api/sync/transactions');
 define('PWA_SYNC_STORES_URL', SITE_URL . '/api/sync/stores');
 define('PWA_SYNC_CASHBACK_URL', SITE_URL . '/api/sync/cashback');
 define('PWA_SYNC_NOTIFICATIONS_URL', SITE_URL . '/api/sync/notifications');
 
-// ConfiguraÃ§Ãµes de storage quota
+// Configurações de storage quota
 define('PWA_STORAGE_QUOTA_WARNING', 80); // Aviso em 80% da quota
-define('PWA_STORAGE_QUOTA_CRITICAL', 95); // CrÃ­tico em 95% da quota
+define('PWA_STORAGE_QUOTA_CRITICAL', 95); // Crítico em 95% da quota
 
 // === HELPER FUNCTIONS PWA ===
 function pwa_is_offline_enabled() {
@@ -445,13 +440,13 @@ function pwa_get_cache_durations() {
 
 // Adicionar estas constantes ao arquivo constants.php
 
-// === CONFIGURAÃ‡Ã•ES PUSH NOTIFICATIONS ===
+// === CONFIGURAÇÕES PUSH NOTIFICATIONS ===
 define('PUSH_NOTIFICATIONS_ENABLED', true);
 define('VAPID_SUBJECT', 'mailto:contato@klubecash.com');
 define('VAPID_PUBLIC_KEY', 'BMqSvZe8dGSiQEQYpzJu1h7WGDcfGcHsZVKdayQFjhE9MNbv1tsMfKg2h8YrIFQrPQBJX9jVtLfNPqCt9x4fQ3M');
 define('VAPID_PRIVATE_KEY', ''); // Definir em arquivo seguro
 
-// URLs de notificaÃ§Ã£o
+// URLs de notificação
 define('PUSH_NOTIFICATIONS_CONFIG_URL', SITE_URL . '/api/pwa/config');
 define('PUSH_REGISTER_URL', SITE_URL . '/api/pwa/register-subscription');
 define('PUSH_UNREGISTER_URL', SITE_URL . '/api/pwa/unregister-subscription');
@@ -460,7 +455,7 @@ define('PUSH_PREFERENCES_URL', SITE_URL . '/api/pwa/update-preferences');
 define('PUSH_SYNC_URL', SITE_URL . '/api/pwa/sync-notifications');
 define('PUSH_TEST_URL', SITE_URL . '/api/pwa/test-notification');
 
-// ConfiguraÃ§Ãµes de notificaÃ§Ã£o
+// Configurações de notificação
 define('NOTIFICATION_ICON_DEFAULT', SITE_URL . '/assets/icons/icon-192x192.png');
 define('NOTIFICATION_BADGE_DEFAULT', SITE_URL . '/assets/icons/badge-72x72.png');
 define('NOTIFICATION_TTL_DEFAULT', 86400); // 24 horas em segundos
@@ -468,7 +463,7 @@ define('NOTIFICATION_URGENCY_DEFAULT', 'normal'); // low, normal, high
 define('NOTIFICATION_BATCH_SIZE', 100);
 define('NOTIFICATION_RETRY_ATTEMPTS', 3);
 
-// Tipos de notificaÃ§Ã£o
+// Tipos de notificação
 define('NOTIFICATION_TYPE_CASHBACK', 'cashback_received');
 define('NOTIFICATION_TYPE_AVAILABLE', 'cashback_available');
 define('NOTIFICATION_TYPE_PAYMENT', 'payment_confirmed');
@@ -478,7 +473,7 @@ define('NOTIFICATION_TYPE_SYSTEM', 'system_alert');
 define('NOTIFICATION_TYPE_STORE', 'store_update');
 define('NOTIFICATION_TYPE_ACCOUNT', 'account_update');
 
-// ConfiguraÃ§Ãµes por tipo
+// Configurações por tipo
 define('NOTIFICATION_CONFIGS', [
     NOTIFICATION_TYPE_CASHBACK => [
         'icon' => SITE_URL . '/assets/icons/cashback-icon.png',
@@ -511,7 +506,7 @@ define('NOTIFICATION_ANALYTICS_ENABLED', true);
 define('NOTIFICATION_LOG_LEVEL', 'INFO'); // DEBUG, INFO, WARN, ERROR
 define('NOTIFICATION_LOG_FILE', ROOT_DIR . '/logs/notifications.log');
 
-// Limites e restriÃ§Ãµes
+// Limites e restrições
 define('NOTIFICATION_DAILY_LIMIT_PER_USER', 50);
 define('NOTIFICATION_HOURLY_LIMIT_PER_USER', 10);
 define('NOTIFICATION_SAME_TYPE_COOLDOWN', 300); // 5 minutos
@@ -553,13 +548,13 @@ function validate_notification_data($data) {
     $errors = [];
     
     if (empty($data['title'])) {
-        $errors[] = 'TÃ­tulo Ã© obrigatÃ³rio';
+        $errors[] = 'Título é obrigatório';
     } elseif (strlen($data['title']) > NOTIFICATION_MAX_TITLE_LENGTH) {
-        $errors[] = 'TÃ­tulo muito longo';
+        $errors[] = 'Título muito longo';
     }
     
     if (empty($data['body'])) {
-        $errors[] = 'Corpo da mensagem Ã© obrigatÃ³rio';
+        $errors[] = 'Corpo da mensagem é obrigatório';
     } elseif (strlen($data['body']) > NOTIFICATION_MAX_BODY_LENGTH) {
         $errors[] = 'Mensagem muito longa';
     }
@@ -582,15 +577,15 @@ function log_notification_event($event, $data = []) {
     file_put_contents(NOTIFICATION_LOG_FILE, $logLine, FILE_APPEND | LOCK_EX);
 }
 
-// VerificaÃ§Ã£o de limites de notificaÃ§Ã£o
+// Verificação de limites de notificação
 function check_notification_limits($userId, $type = null) {
-    // Implementar verificaÃ§Ã£o de limites no banco de dados
-    // Retorna true se dentro dos limites, false caso contrÃ¡rio
+    // Implementar verificação de limites no banco de dados
+    // Retorna true se dentro dos limites, false caso contrário
     return true; // Placeholder
 }
 
 function get_notification_stats($userId = null) {
-    // Implementar estatÃ­sticas de notificaÃ§Ã£o
+    // Implementar estatísticas de notificação
     return [
         'sent_today' => 0,
         'sent_this_hour' => 0,
@@ -610,11 +605,11 @@ define('SW_CACHE_DYNAMIC', 'klube-cash-dynamic-' . PWA_CACHE_VERSION);
 define('SW_CACHE_OFFLINE', 'klube-cash-offline-' . PWA_CACHE_VERSION);
 
 // Push Notifications
-define('PUSH_PUBLIC_KEY', 'BEl62iUYgUivyQuW8ndhKJJoJGdnkb...'); // Chave pÃºblica VAPID
+define('PUSH_PUBLIC_KEY', 'BEl62iUYgUivyQuW8ndhKJJoJGdnkb...'); // Chave pública VAPID
 define('PUSH_PRIVATE_KEY', 'mNYWFtF...'); // Chave privada VAPID (manter segura)
 define('PUSH_SUBJECT', 'mailto:contato@klubecash.com');
 
-// ConfiguraÃ§Ãµes de cache offline
+// Configurações de cache offline
 define('OFFLINE_CACHE_DURATION', 24 * 60 * 60); // 24 horas em segundos
 define('STATIC_CACHE_DURATION', 30 * 24 * 60 * 60); // 30 dias em segundos
 
@@ -626,7 +621,7 @@ define('PWA_OFFLINE_PAGES', [
     '/cliente/perfil'
 ]);
 
-// Recursos crÃ­ticos para cache
+// Recursos críticos para cache
 define('PWA_CRITICAL_RESOURCES', [
     '/assets/css/main.css',
     '/assets/css/client.css', 
@@ -637,7 +632,7 @@ define('PWA_CRITICAL_RESOURCES', [
     '/assets/images/logo.png'
 ]);
 
-// ConfiguraÃ§Ãµes de notificaÃ§Ã£o
+// Configurações de notificação
 define('NOTIFICATION_ICON', SITE_URL . '/assets/icons/icon-192x192.png');
 define('NOTIFICATION_BADGE', SITE_URL . '/assets/icons/badge-72x72.png');
 define('NOTIFICATION_DEFAULT_TITLE', 'Klube Cash');
@@ -653,7 +648,7 @@ define('MP_FRONTEND_SDK_ENABLED', true);
 define('MP_BACKEND_SDK_ENABLED', true);
 define('MP_PCI_COMPLIANCE_MODE', true);
 
-// === CERTIFICADOS E SEGURANÃ‡A ===
+// === CERTIFICADOS E SEGURANÇA ===
 define('SSL_ENABLED', true);
 define('TLS_VERSION', '1.2+');
 define('PCI_DSS_COMPLIANT', true);
@@ -664,7 +659,7 @@ define('DEVICE_ID_PREFIX', 'klube_web_');
 define('DEVICE_ID_ALGORITHM', 'enhanced');
 define('DEVICE_ID_STORAGE', 'multi'); // localStorage + sessionStorage + cookie
 
-// FunÃ§Ãµes helper para certificados
+// Funções helper para certificados
 function is_ssl_enabled() {
     return isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
 }
@@ -681,7 +676,7 @@ function validate_pci_compliance() {
 
 
 
-// === FUNÃ‡Ã•ES HELPER OTIMIZADAS ===
+// === FUNÇÕES HELPER OTIMIZADAS ===
 function asset($path, $versioned = true) {
     $url = SITE_URL . '/assets/' . ltrim($path, '/');
     return $versioned ? $url . '?v=' . ASSETS_VERSION : $url;
@@ -710,7 +705,7 @@ function cdn($path) {
     return CDN_URL . '/' . ltrim($path, '/');
 }
 
-// === VALIDAÃ‡Ã•ES ===
+// === VALIDAÇÕES ===
 function is_production() {
     return ENVIRONMENT === 'production';
 }
@@ -724,7 +719,7 @@ function get_asset_url($file) {
     return asset($file) . '?v=' . substr($hash, 0, 8);
 }
 
-// === FUNÃ‡Ã•ES MERCADO PAGO ===
+// === FUNÇÕES MERCADO PAGO ===
 function mp_log($message, $data = null) {
     if (LOG_MP_REQUESTS) {
         $logMessage = "[MP] " . $message;
@@ -742,19 +737,19 @@ function mp_is_enabled() {
 function mp_get_device_id() {
     if (!MP_ENABLE_DEVICE_ID) return null;
     
-    // Gerar device ID baseado em informaÃ§Ãµes do cliente
+    // Gerar device ID baseado em informações do cliente
     $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
     $ip = $_SERVER['REMOTE_ADDR'] ?? '';
     $timestamp = time();
     
     return 'device_' . md5($userAgent . $ip . $timestamp);
 }
-// === CORREÃ‡Ã•ES PARA REGISTRO ===
+// === CORREÇÕES PARA REGISTRO ===
 if (!defined('PASSWORD_DEFAULT')) {
     define('PASSWORD_DEFAULT', PASSWORD_BCRYPT);
 }
 
-// === VALIDAÃ‡ÃƒO DE ESTRUTURA ===
+// === VALIDAÇÃO DE ESTRUTURA ===
 if (!defined('PASSWORD_MIN_LENGTH')) {
     define('PASSWORD_MIN_LENGTH', 8);
 }

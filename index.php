@@ -138,13 +138,7 @@ if ($isLoggedIn) {
             $dashboardURL = ADMIN_DASHBOARD_URL;
             break;
         case 'cliente':
-            // Verificar se o usuário é do Senat
-            $userSenat = $_SESSION['user_senat'] ?? 'Não';
-            if ($userSenat === 'Sim' && trim((string) CLIENT_SESTSENAT_PORTAL_URL) !== '') {
-                $dashboardURL = CLIENT_SESTSENAT_PORTAL_URL;
-            } else {
-                $dashboardURL = CLIENT_DASHBOARD_URL;
-            }
+            $dashboardURL = CLIENT_DASHBOARD_URL;
             break;
         case 'loja':
             $dashboardURL = STORE_DASHBOARD_URL;

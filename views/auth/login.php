@@ -4,23 +4,6 @@ require_once '../../config/constants.php';
 require_once '../../config/database.php';
 require_once '../../controllers/AuthController.php';
 
-function resolveClientWalletDestination(): string
-{
-    // Verificar se o usuário é do Senat
-    $userSenat = $_SESSION['user_senat'] ?? 'Não';
-
-    if ($userSenat === 'Sim') {
-        // Usuário do Senat vai direto para o portal SestSenat
-        $sestUrl = trim((string) CLIENT_SESTSENAT_PORTAL_URL);
-        if ($sestUrl !== '') {
-            return $sestUrl;
-        }
-    }
-
-    // Usuários normais vão para o dashboard padrão do Klube Cash
-    return CLIENT_DASHBOARD_URL;
-}
-
 // Verificar se já existe uma sessão ativa
 session_start();
 if (isset($_SESSION['user_id']) && !isset($_GET['force_login'])) {
@@ -37,7 +20,7 @@ if (isset($_SESSION['user_id']) && !isset($_GET['force_login'])) {
         header('Location: ' . STORE_DASHBOARD_URL);
         exit;
     } else {
-        header('Location: ' . resolveClientWalletDestination());
+        header('Location: ' . CLIENT_DASHBOARD_URL);
         exit;
     }
 }
@@ -66,7 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // CORREÇÃO CRÍTICA: FUNCIONÁRIO VAI PARA STORE
                 header('Location: ' . STORE_DASHBOARD_URL);
             } else {
-                header('Location: ' . resolveClientWalletDestination());
+                header('Location: ' . CLIENT_DASHBOARD_URL);
             }
             exit;
         } else {
@@ -688,9 +671,6 @@ if (!empty($urlError)) {
                 <h2 class="form-title">Entrar</h2>
                 <p class="form-subtitle">
                     Não tem conta? <a href="<?php echo REGISTER_URL; ?>">Cadastre-se grátis</a>
-                </p>
-                <p class="form-subtitle" style="margin-top: 0.5rem;">
-                    Usuário do Senat? <a href="<?php echo trim((string) CLIENT_SESTSENAT_PORTAL_URL); ?>/login" style="color: #0066CC;">Acesse o Portal SestSenat</a>
                 </p>
             </div>
 
