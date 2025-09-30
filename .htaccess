@@ -23,15 +23,7 @@ RewriteBase /
 #RewriteRule ^views/client/dashboard\.php$ /auto-redirect.php [L]
 RewriteRule ^api/store-client-search/?$ api/store-client-search.php [L,QSA]
 RewriteRule ^uploads/whatsapp_images/.*\.(png|jpg|jpeg)$ - [L]
-# API WhatsApp Evolution
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^api/whatsapp/?$ api/whatsapp-enviar-notificacao.php [L,QSA]
 
-# Webhook Evolution API
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^api/webhook/whatsapp/?$ api/webhook-whatsapp.php [L,QSA]
 # BYPASS FUNCIONÁRIO
 RewriteCond %{QUERY_STRING} bypass=funcionario
 RewriteRule ^store/dashboard/?$ views/stores/dashboard.php?bypass=funcionario [L]
