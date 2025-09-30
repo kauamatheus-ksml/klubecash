@@ -20,7 +20,21 @@ define('CLIENT_SEARCH_INACTIVE', 'inactive');    // Cliente inativo
 // === CONFIGURAÇÕES DE CLIENTE VISITANTE ===
 define('VISITOR_NAME_MAX_LENGTH', 100);          // Tamanho máximo do nome do visitante
 define('VISITOR_PHONE_MIN_LENGTH', 10);          // Tamanho mínimo do telefone
+// ==========================================
+// CONFIGURAÇÕES DE WHATSAPP - EVOLUTION API
+// ==========================================
 
+define('WHATSAPP_ENABLED', true);
+define('WHATSAPP_METHOD', 'evolution');
+
+define('EVOLUTION_API_URL', 'https://evolutionapi.klubecash.com');
+define('EVOLUTION_API_KEY', 'XjllCXtwjUXxbecrCvsM6h78ppLMgpNL');
+define('EVOLUTION_INSTANCE_NAME', 'klubecash');
+define('EVOLUTION_TIMEOUT', 30);
+
+define('WHATSAPP_MAX_RETRIES', 3);
+define('WHATSAPP_RETRY_DELAY', 10);
+define('WHATSAPP_BOT_SECRET', 'klube-cash-2024-secret-key');
 // === MENSAGENS DE CLIENTE VISITANTE ===
 define('MSG_VISITOR_CREATED', 'Cliente visitante criado com sucesso');
 define('MSG_VISITOR_EXISTS', 'Já existe um cliente visitante com este telefone nesta loja');

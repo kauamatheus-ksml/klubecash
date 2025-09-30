@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1:3306
--- Tempo de geração: 26/09/2025 às 18:03
+-- Tempo de geração: 29/09/2025 às 22:09
 -- Versão do servidor: 11.8.3-MariaDB-log
 -- Versão do PHP: 7.2.34
 
@@ -288,6 +288,14 @@ CREATE TABLE `cashback_movimentacoes` (
   `pagamento_id` int(11) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+--
+-- Despejando dados para a tabela `cashback_movimentacoes`
+--
+
+INSERT INTO `cashback_movimentacoes` (`id`, `usuario_id`, `loja_id`, `criado_por`, `tipo_operacao`, `valor`, `saldo_anterior`, `saldo_atual`, `descricao`, `transacao_origem_id`, `transacao_uso_id`, `data_operacao`, `pagamento_id`) VALUES
+(337, 9, 59, NULL, 'credito', 120.00, 0.00, 120.00, 'Cashback MVP instantâneo - Código: KC25092615583190179', 686, NULL, '2025-09-26 18:58:35', NULL),
+(338, 9, 59, NULL, 'credito', 30.00, 120.00, 150.00, 'Cashback MVP instantâneo - Código: KC25092919062385127', 687, NULL, '2025-09-29 22:06:25', NULL);
+
 -- --------------------------------------------------------
 
 --
@@ -344,7 +352,8 @@ INSERT INTO `cashback_saldos` (`id`, `usuario_id`, `loja_id`, `saldo_disponivel`
 (163, 180, 59, 200.00, 200.00, 0.00, '2025-09-15 01:44:47', '2025-09-25 22:53:56'),
 (304, 9, 38, 1000.00, 1000.00, 0.00, '2025-09-25 22:56:07', '2025-09-26 14:47:28'),
 (305, 140, 59, 1000.00, 1000.00, 0.00, '2025-09-25 22:57:31', '2025-09-25 22:57:31'),
-(306, 9, 34, 2.50, 2.50, 0.00, '2025-09-26 10:15:54', '2025-09-26 10:15:54');
+(306, 9, 34, 2.50, 2.50, 0.00, '2025-09-26 10:15:54', '2025-09-26 10:15:54'),
+(307, 9, 59, 150.00, 150.00, 0.00, '2025-09-26 18:58:35', '2025-09-29 22:06:25');
 
 -- --------------------------------------------------------
 
@@ -861,7 +870,9 @@ CREATE TABLE `transacoes_cashback` (
 
 INSERT INTO `transacoes_cashback` (`id`, `usuario_id`, `loja_id`, `criado_por`, `valor_total`, `valor_cashback`, `valor_cliente`, `valor_admin`, `valor_loja`, `codigo_transacao`, `descricao`, `data_transacao`, `data_criacao_usuario`, `status`) VALUES
 (367, 180, 59, NULL, 800.00, 200.00, 200.00, 0.00, 0.00, 'KC25091422441319527-SH', 'Desenvolvimento do Site e sistemas Web, Clea Casamentos', '2025-09-14 22:42:00', '2025-09-15 01:44:47', 'aprovado'),
-(680, 180, 62, NULL, 50.00, 5.00, 2.50, 2.50, 0.00, 'KC25092420385019033', 'alugo um acessório calça social.', '2025-09-24 20:35:00', '2025-09-24 23:39:46', 'pendente');
+(680, 180, 62, NULL, 50.00, 5.00, 2.50, 2.50, 0.00, 'KC25092420385019033', 'alugo um acessório calça social.', '2025-09-24 20:35:00', '2025-09-24 23:39:46', 'pendente'),
+(686, 9, 59, NULL, 1200.00, 120.00, 120.00, 0.00, 0.00, 'KC25092615583190179', '', '2025-09-26 15:58:00', '2025-09-26 18:58:35', 'aprovado'),
+(687, 9, 59, NULL, 300.00, 30.00, 30.00, 0.00, 0.00, 'KC25092919062385127', '', '2025-09-29 19:06:00', '2025-09-29 22:06:25', 'aprovado');
 
 -- --------------------------------------------------------
 
@@ -952,15 +963,15 @@ CREATE TABLE `usuarios` (
 --
 
 INSERT INTO `usuarios` (`id`, `nome`, `email`, `telefone`, `cpf`, `senha_hash`, `data_criacao`, `ultimo_login`, `status`, `tipo`, `senat`, `tipo_cliente`, `loja_criadora_id`, `google_id`, `avatar_url`, `provider`, `email_verified`, `two_factor_enabled`, `two_factor_code`, `two_factor_expires`, `two_factor_verified`, `tentativas_2fa`, `bloqueado_2fa_ate`, `ultimo_2fa_enviado`, `loja_vinculada_id`, `subtipo_funcionario`, `mvp`) VALUES
-(9, 'Kaua Matheus da Silva Lope', 'kauamatheus920@gmail.com', '38991045205', '15692134616', '$2y$10$ZBHPPEjv69ihoxjJatuJZefND4d0UNGpzK.UG1fji3BeETLymm7eu', '2025-05-05 19:45:04', '2025-09-26 10:19:07', 'ativo', 'cliente', 'Não', 'completo', NULL, NULL, NULL, 'local', 0, 0, NULL, NULL, 0, 0, NULL, NULL, NULL, NULL, 'nao'),
+(9, 'Kaua Matheus da Silva Lope', 'kauamatheus920@gmail.com', '38991045205', '15692134616', '$2y$10$ZBHPPEjv69ihoxjJatuJZefND4d0UNGpzK.UG1fji3BeETLymm7eu', '2025-05-05 19:45:04', '2025-09-27 12:06:20', 'ativo', 'cliente', 'Sim', 'completo', NULL, NULL, NULL, 'local', 0, 0, NULL, NULL, 0, 0, NULL, NULL, NULL, NULL, 'nao'),
 (10, 'Frederico', 'repertoriofredericofagundes@gmail.com', NULL, NULL, '$2y$10$yGjHS8rJq49AuLeuVrZHkOUPSkzNLs79A6H52HwwY8DpzLA2A95Ay', '2025-05-05 21:45:46', '2025-09-15 18:30:09', 'ativo', 'cliente', 'Não', 'completo', NULL, NULL, NULL, 'local', 0, 0, NULL, NULL, 0, 0, NULL, NULL, NULL, NULL, 'nao'),
-(11, 'Kaua Lopés', 'kaua@klubecash.com', NULL, NULL, '$2y$10$3cp74UJto1IK9R4f8wx.su3HR.SdXKPLotS4OLck7BxMLOhuJMtHq', '2025-05-07 12:19:05', '2025-09-26 14:42:27', 'ativo', 'admin', 'Não', 'completo', NULL, NULL, NULL, 'local', 0, 0, NULL, NULL, 0, 0, NULL, NULL, NULL, NULL, 'nao'),
+(11, 'Kaua Lopés', 'kaua@klubecash.com', NULL, NULL, '$2y$10$3cp74UJto1IK9R4f8wx.su3HR.SdXKPLotS4OLck7BxMLOhuJMtHq', '2025-05-07 12:19:05', '2025-09-29 20:31:08', 'ativo', 'admin', 'Não', 'completo', NULL, NULL, NULL, 'local', 0, 0, NULL, NULL, 0, 0, NULL, NULL, NULL, NULL, 'nao'),
 (55, 'Matheus', 'kauamathes123487654@gmail.com', '34991191534', NULL, '$2y$10$VwSfpE6zvr72HI19RLFLF.Dw4VKMjbGajc5l6mN3jQiaoHK1GUR0u', '2025-05-25 19:17:34', '2025-09-26 10:14:16', 'ativo', 'loja', 'Sim', 'completo', NULL, NULL, NULL, 'local', 0, 0, NULL, NULL, 0, 0, NULL, NULL, NULL, NULL, 'sim'),
-(61, 'Frederico Fagundes', 'fredericofagundes0@gmail.com', NULL, NULL, '$2y$10$Lcszebxu3vPCg4dNkDhP7eAvk07mvjEvFLNz4pFYdMveo0skeNFWi', '2025-06-05 17:48:45', '2025-09-25 19:38:01', 'ativo', 'admin', 'Não', 'completo', NULL, NULL, NULL, 'local', 0, 0, NULL, NULL, 0, 0, NULL, NULL, NULL, NULL, 'nao'),
+(61, 'Frederico Fagundes', 'fredericofagundes0@gmail.com', NULL, NULL, '$2y$10$Lcszebxu3vPCg4dNkDhP7eAvk07mvjEvFLNz4pFYdMveo0skeNFWi', '2025-06-05 17:48:45', '2025-09-27 22:33:11', 'ativo', 'admin', 'Não', 'completo', NULL, NULL, NULL, 'local', 0, 0, NULL, NULL, 0, 0, NULL, NULL, NULL, NULL, 'nao'),
 (63, 'KLUBE DIGITAL', 'acessoriafredericofagundes@gmail.com', '(34) 99335-7697', NULL, '$2y$10$VuDfT8bieSTLToSbmd3EzOVkmwNLYeC9itIfm2kxl3f54OpnZpd5O', '2025-06-07 16:11:42', '2025-09-25 19:36:19', 'ativo', 'loja', 'Sim', 'completo', NULL, NULL, NULL, 'local', 0, 0, NULL, NULL, 0, 0, NULL, NULL, NULL, NULL, 'sim'),
 (71, 'Roberto Magalhães Corrêa ', 'ropatosmg@gmail.com', '5534993171602', NULL, '$2y$10$77e0qthXH0AJkZFGJR0APu9fifxY/M8BvkNOGrHMBMBmAv7W3SohO', '2025-06-10 00:08:12', '2025-06-10 00:08:51', 'ativo', 'cliente', 'Não', 'completo', NULL, NULL, NULL, 'local', 0, 0, NULL, NULL, 0, 0, NULL, NULL, NULL, NULL, 'nao'),
 (72, 'Sabrina', 'sabrina290623@gmail.com', '(34) 99842-3591', NULL, '$2y$10$1FNgzRYI0AbiCYymdAgBlOWe2uIJn.PwU24.AUe3UP7pf5bA1ImJO', '2025-06-10 00:11:51', '2025-06-10 00:12:00', 'ativo', 'cliente', 'Não', 'completo', NULL, NULL, NULL, 'local', 0, 0, NULL, NULL, 0, 0, NULL, NULL, NULL, NULL, 'nao'),
-(73, 'Frederico Fagundes', 'klubecash@gmail.com', '(34) 99335-7697', NULL, '$2y$10$cM0f9co4abNHzxiOD0ZgjuZchVNk9o3v6mOadv2aByV.s339xdTPu', '2025-06-10 00:14:24', '2025-09-25 19:36:08', 'ativo', 'cliente', 'Não', 'completo', NULL, NULL, NULL, 'local', 0, 0, NULL, NULL, 0, 0, NULL, NULL, NULL, NULL, 'nao'),
+(73, 'Frederico Fagundes', 'klubecash@gmail.com', '(34) 99335-7697', NULL, '$2y$10$cM0f9co4abNHzxiOD0ZgjuZchVNk9o3v6mOadv2aByV.s339xdTPu', '2025-06-10 00:14:24', '2025-09-27 22:35:11', 'ativo', 'cliente', 'Não', 'completo', NULL, NULL, NULL, 'local', 0, 0, NULL, NULL, 0, 0, NULL, NULL, NULL, NULL, 'nao'),
 (74, 'Amanda rosa ', 'aricken31@gmail.com', '(34) 99975-8423', NULL, '$2y$10$aV.0Wj3E2dMRHSX7KqHa9u0.LsHiHDdBEpD/yOzCB.QC4uFcu72/K', '2025-06-10 00:15:41', NULL, 'ativo', 'cliente', 'Não', 'completo', NULL, NULL, NULL, 'local', 0, 0, NULL, NULL, 0, 0, NULL, NULL, NULL, NULL, 'nao'),
 (75, 'Felipe Vieira ribeiro', 'ribeirofilepe34@gmail.com', '(34) 99712-8998', NULL, '$2y$10$MpCAnHh7GN8ToE7b3FGzcurkrl8TA4Ffm69NECs0ePdMJcuvW0iNC', '2025-06-10 00:40:43', '2025-08-30 20:41:38', 'ativo', 'cliente', 'Não', 'completo', NULL, NULL, NULL, 'local', 0, 0, NULL, NULL, 0, 0, NULL, NULL, NULL, NULL, 'nao'),
 (76, 'Gabriela Steffany da Silva ', 'gabisteffany@icloud.com', '(34) 98700-3621', NULL, '$2y$10$eFewesljEaKuqWpeFRnuy.Xh/FJ4sXLz8thior8hzQUytyrDisYay', '2025-06-10 00:41:33', '2025-06-10 00:45:29', 'ativo', 'cliente', 'Não', 'completo', NULL, NULL, NULL, 'local', 0, 0, NULL, NULL, 0, 0, NULL, NULL, NULL, NULL, 'nao'),
@@ -999,7 +1010,7 @@ INSERT INTO `usuarios` (`id`, `nome`, `email`, `telefone`, `cpf`, `senha_hash`, 
 (156, 'Vitória Filipa', 'visitante_55349972501_loja_38@klubecash.local', '55349972501', NULL, NULL, '2025-08-14 20:13:31', NULL, 'ativo', 'cliente', 'Não', 'visitante', 38, NULL, NULL, 'local', 0, 0, NULL, NULL, 0, 0, NULL, NULL, NULL, 'funcionario', 'nao'),
 (157, 'Pyetro swanson', 'visitante_34991251830_loja_38@klubecash.local', '34991251830', NULL, NULL, '2025-08-14 20:15:45', NULL, 'ativo', 'cliente', 'Não', 'visitante', 38, NULL, NULL, 'local', 0, 0, NULL, NULL, 0, 0, NULL, NULL, NULL, 'funcionario', 'nao'),
 (158, 'Carla Gonçalves', 'visitante_34998966741_loja_38@klubecash.local', '34998966741', NULL, NULL, '2025-08-15 01:02:50', NULL, 'ativo', 'cliente', 'Não', 'visitante', 38, NULL, NULL, 'local', 0, 0, NULL, NULL, 0, 0, NULL, NULL, NULL, 'funcionario', 'nao'),
-(159, 'Sync Holding', 'kaua@syncholding.com.br', '(34) 99800-2600', '04355521630', '$2y$10$W4Mw0j5/DhS.p0/I.D0he.aekBeq.O9.5xVoS8wntjF4L3U3P6OPW', '2025-08-15 13:52:55', '2025-09-25 22:55:54', 'ativo', 'loja', 'Não', 'completo', NULL, NULL, NULL, 'local', 0, 0, NULL, NULL, 0, 0, NULL, NULL, NULL, 'funcionario', 'sim'),
+(159, 'Sync Holding', 'kaua@syncholding.com.br', '(34) 99800-2600', '04355521630', '$2y$10$W4Mw0j5/DhS.p0/I.D0he.aekBeq.O9.5xVoS8wntjF4L3U3P6OPW', '2025-08-15 13:52:55', '2025-09-29 22:03:21', 'ativo', 'loja', 'Não', 'completo', NULL, NULL, NULL, 'local', 0, 0, NULL, NULL, 0, 0, NULL, NULL, NULL, 'funcionario', 'sim'),
 (160, 'Cecilia', 'visitante_34991191534_loja_59@klubecash.local', '34991191534', NULL, NULL, '2025-08-15 14:47:55', NULL, 'ativo', 'cliente', 'Não', 'visitante', 59, NULL, NULL, 'local', 0, 0, NULL, NULL, 0, 0, NULL, NULL, NULL, 'funcionario', 'nao'),
 (161, 'Evaldo Gabriel', 'visitante_34991247963_loja_38@klubecash.local', '34991247963', NULL, NULL, '2025-08-15 17:02:42', NULL, 'ativo', 'cliente', 'Não', 'visitante', 38, NULL, NULL, 'local', 0, 0, NULL, NULL, 0, 0, NULL, NULL, NULL, 'funcionario', 'nao'),
 (162, 'Cecilia 3', 'visitante_34998002600_loja_59@klubecash.local', '34998002600', NULL, NULL, '2025-08-15 19:30:55', NULL, 'ativo', 'cliente', 'Não', 'visitante', 59, NULL, NULL, 'local', 0, 0, NULL, NULL, 0, 0, NULL, NULL, NULL, 'funcionario', 'nao'),
@@ -1031,7 +1042,8 @@ INSERT INTO `usuarios` (`id`, `nome`, `email`, `telefone`, `cpf`, `senha_hash`, 
 (193, 'Класс! Вам достался потрясающий приз ждёт вас! Изучите подробности по ссылке https://tinyurl.com/phA', 'veldgrube.00@mail.ru', '86756898182', NULL, '$2y$10$FAFdUdSMlo.Buv5rUx4JU.go17HPyYkNHHWLTibaHgPS8AiNlzoIG', '2025-09-23 11:24:18', '2025-09-23 11:24:19', 'inativo', 'cliente', 'Não', 'completo', NULL, NULL, NULL, 'local', 0, 0, NULL, NULL, 0, 0, NULL, NULL, NULL, 'funcionario', 'nao'),
 (194, 'Супер! Вы получили эксклюзивный сюрприз готов для вас! Изучите все подробности по ссылке https://tin', 'kateebartonmmp26936t@52sk2.org', '89714695939', NULL, '$2y$10$CVF8v3ondOv9BY0nWYQryeJdVUnUHLeUlfFcT9fg1gevw7u4on8sG', '2025-09-23 11:24:18', '2025-09-23 11:24:20', 'inativo', 'cliente', 'Não', 'completo', NULL, NULL, NULL, 'local', 0, 0, NULL, NULL, 0, 0, NULL, NULL, NULL, 'funcionario', 'nao'),
 (195, 'Kaua teste', 'visitante_3891045205_loja_59@klubecash.local', NULL, NULL, NULL, '2025-09-24 06:52:01', NULL, 'ativo', 'cliente', 'Não', 'visitante', 59, NULL, NULL, 'local', 0, 0, NULL, NULL, 0, 0, NULL, NULL, NULL, 'funcionario', 'nao'),
-(196, 'Вам перевод 170998 руб. забрать тут  https://tinyurl.com/bvDqJbKs NFDAW47442NFDAW', '6c2ini1uwox@lchaoge.com', '86315518115', NULL, '$2y$10$h3k/dd7XuwhV6MXl5o7KMOlDZepHMqL45w3THS7T1OGMZhNwiWT4S', '2025-09-25 22:01:38', '2025-09-25 22:01:40', 'inativo', 'cliente', 'Não', 'completo', NULL, NULL, NULL, 'local', 0, 0, NULL, NULL, 0, 0, NULL, NULL, NULL, 'funcionario', 'nao');
+(196, 'Вам перевод 170998 руб. забрать тут  https://tinyurl.com/bvDqJbKs NFDAW47442NFDAW', '6c2ini1uwox@lchaoge.com', '86315518115', NULL, '$2y$10$h3k/dd7XuwhV6MXl5o7KMOlDZepHMqL45w3THS7T1OGMZhNwiWT4S', '2025-09-25 22:01:38', '2025-09-25 22:01:40', 'inativo', 'cliente', 'Não', 'completo', NULL, NULL, NULL, 'local', 0, 0, NULL, NULL, 0, 0, NULL, NULL, NULL, 'funcionario', 'nao'),
+(197, 'Вау! Ваш эксклюзивный подарок готов для вас! Проверьте детали по ссылке https://tinyurl.com/gwpSjJb4', 'mantsurov1990@bk.ru', '87234617859', NULL, '$2y$10$Jgc.I73BzKatOGLrqg4W9ODGU4CEnpRWB3ZFtRuk5u9a6U/WBVpBy', '2025-09-28 21:04:35', '2025-09-28 21:04:36', 'inativo', 'cliente', 'Não', 'completo', NULL, NULL, NULL, 'local', 0, 0, NULL, NULL, 0, 0, NULL, NULL, NULL, 'funcionario', 'nao');
 
 -- --------------------------------------------------------
 
@@ -1623,7 +1635,7 @@ ALTER TABLE `bot_consultas`
 -- AUTO_INCREMENT de tabela `cashback_movimentacoes`
 --
 ALTER TABLE `cashback_movimentacoes`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=337;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=339;
 
 --
 -- AUTO_INCREMENT de tabela `cashback_notificacoes`
@@ -1641,7 +1653,7 @@ ALTER TABLE `cashback_notification_retries`
 -- AUTO_INCREMENT de tabela `cashback_saldos`
 --
 ALTER TABLE `cashback_saldos`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=307;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=309;
 
 --
 -- AUTO_INCREMENT de tabela `comissoes_status_historico`
@@ -1791,7 +1803,7 @@ ALTER TABLE `store_balance_payments`
 -- AUTO_INCREMENT de tabela `transacoes_cashback`
 --
 ALTER TABLE `transacoes_cashback`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=686;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=688;
 
 --
 -- AUTO_INCREMENT de tabela `transacoes_comissao`
@@ -1815,7 +1827,7 @@ ALTER TABLE `transacoes_status_historico`
 -- AUTO_INCREMENT de tabela `usuarios`
 --
 ALTER TABLE `usuarios`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=197;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=198;
 
 --
 -- AUTO_INCREMENT de tabela `usuarios_contato`
