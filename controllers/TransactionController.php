@@ -1179,7 +1179,95 @@ class TransactionController {
                 
                 $stmt->execute();
                 $transactionId = $db->lastInsertId();
+                try {
+                    error_log("[EVOLUTION] Iniciando envio automático WhatsApp para transação {$transactionId}");
+                    
+                    // Verificar se Evolution está habilitada
+                    if (defined('EVOLUTION_ENABLED') && EVOLUTION_ENABLED) {
+                        $evolutionPath = __DIR__ . '/../classes/WhatsAppEvolutionAutomation.php';
+                        
+                        if (file_exists($evolutionPath)) {
+                            require_once $evolutionPath;
+                            
+                            if (class_exists('WhatsAppEvolutionAutomation')) {
+                                $whatsappAutomation = new WhatsAppEvolutionAutomation();
+                                
+                                // Enviar notificação automaticamente
+                                $whatsappResult = $whatsappAutomation->notificarCashback($transactionId);
+                                
+                                if ($whatsappResult['success']) {
+                                    error_log("[EVOLUTION] ✅ Notificação WhatsApp enviada com sucesso para transação {$transactionId}");
+                                } else {
+                                    error_log("[EVOLUTION] ⚠️ Falha ao enviar WhatsApp: " . ($whatsappResult['error'] ?? 'Erro desconhecido'));
+                                }
+                            } else {
+                                error_log("[EVOLUTION] Classe WhatsAppEvolutionAutomation não encontrada");
+                            }
+                        } else {
+                            error_log("[EVOLUTION] Arquivo não encontrado: {$evolutionPath}");
+                        }
+                    } else {
+                        error_log("[EVOLUTION] WhatsApp Evolution desabilitada nas configurações");
+                    }
+                    
+                } catch (Exception $e) {
+                    // Não deixar erro de WhatsApp afetar o registro da transação
+                    error_log("[EVOLUTION] Exceção na automação WhatsApp: " . $e->getMessage());
+                }
                 
+                // ========================================================================
+                // 🔚 FIM DA NOVA AUTOMAÇÃO WHATSAPP EVOLUTION 🔚
+                // ========================================================================
+
+                // Commit
+                $db->commit();
+                
+                // ... [RESTO DO CÓDIGO EXISTENTE A PARTIR DA LINHA 206] ...
+                
+                // Mensagem de sucesso
+                $successMessage = $isStoreMvp ? 
+                    '🎉 Transação MVP aprovada instantaneamente! Cashback creditado automaticamente.' :
+                    'Transação registrada com sucesso!';
+                    
+                // Se MVP, creditar cashback
+                $cashbackCreditado = false;
+                if ($isStoreMvp && $valorCashbackCliente > 0) {
+                    require_once __DIR__ . '/../models/CashbackBalance.php';
+                    $balanceModel = new CashbackBalance();
+                    $descricaoCashback = "Cashback MVP instantâneo - Código: " . $data['codigo_transacao'];
+                    
+                    $creditResult = $balanceModel->addBalance(
+                        $data['usuario_id'],
+                        $data['loja_id'],
+                        $valorCashbackCliente,
+                        $descricaoCashback,
+                        $transactionId
+                    );
+                    
+                    $cashbackCreditado = $creditResult;
+                }
+                
+                return [
+                    'status' => true,
+                    'message' => $successMessage,
+                    'data' => [
+                        'transaction_id' => $transactionId,
+                        'valor_original' => $data['valor_total'],
+                        'valor_cashback' => $valorCashbackCliente,
+                        'is_mvp' => $isStoreMvp,
+                        'status_transacao' => $transactionStatus,
+                        'cashback_creditado' => $cashbackCreditado
+                    ]
+                ];
+                
+            } catch (Exception $e) {
+                if (isset($db) && $db->inTransaction()) {
+                    $db->rollBack();
+                }
+                
+                error_log('Erro em registerTransactionFixed: ' . $e->getMessage());
+                return ['status' => false, 'message' => 'Erro ao registrar transação. Tente novamente.'];
+            }
                 // === MARCADOR DE TRACE: TransactionController - Nova transação criada ===
                 if (file_exists('trace-integration.php')) {
                     error_log("[TRACE] TransactionController::registerTransaction() - Transação criada com ID: {$transactionId}", 3, 'integration_trace.log');
