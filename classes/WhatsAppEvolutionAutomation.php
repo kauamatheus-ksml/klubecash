@@ -13,9 +13,9 @@ class WhatsAppEvolutionAutomation {
     public function __construct() {
         // Configurações da Evolution API
         $this->evolutionConfig = [
-            'base_url' => 'https://evolutionapi.klubecash.com', // Ajuste para sua URL
+            'base_url' => 'https://evolution.klubecash.com', // URL da sua Evolution API
             'instance_name' => 'klubecash',
-            'api_key' => 'XjllCXtwjUXxbecrCvsM6h78ppLMgpNL' // Sua chave da Evolution
+            'api_key' => 'B6D711FCDE4D4FD5936544120E713976'
         ];
         
         // Conectar ao banco
@@ -26,6 +26,67 @@ class WhatsAppEvolutionAutomation {
         $this->logFile = __DIR__ . '/../logs/whatsapp_automation.log';
         if (!is_dir(dirname($this->logFile))) {
             mkdir(dirname($this->logFile), 0755, true);
+        }
+    }
+    
+    /**
+     * Verificar status da instância Evolution
+     */
+    public function verificarStatusInstancia() {
+        try {
+            $url = "{$this->evolutionConfig['base_url']}/instance/connectionState/{$this->evolutionConfig['instance_name']}";
+            
+            // Debug da URL
+            error_log("Evolution API - Verificando status em: {$url}");
+            
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $url);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                'apikey: ' . $this->evolutionConfig['api_key'],
+                'Content-Type: application/json'
+            ]);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true); // CORREÇÃO AQUI!
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+            
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = curl_error($ch);
+            $curlInfo = curl_getinfo($ch);
+            curl_close($ch);
+            
+            if ($error) {
+                return [
+                    'connected' => false, 
+                    'error' => $error,
+                    'curl_info' => $curlInfo
+                ];
+            }
+            
+            // Log da resposta
+            error_log("Evolution API - HTTP Code: {$httpCode}");
+            error_log("Evolution API - Response: " . substr($response, 0, 500));
+            
+            if ($httpCode === 200) {
+                $data = json_decode($response, true);
+                return [
+                    'connected' => isset($data['state']) && ($data['state'] === 'open'),
+                    'status' => $data,
+                    'http_code' => $httpCode
+                ];
+            }
+            
+            return [
+                'connected' => false, 
+                'http_code' => $httpCode,
+                'response' => $response,
+                'url_tested' => $url
+            ];
+            
+        } catch (Exception $e) {
+            return ['connected' => false, 'error' => $e->getMessage()];
         }
     }
     
@@ -72,14 +133,14 @@ class WhatsAppEvolutionAutomation {
             $this->log("Loja: {$transaction['loja_nome']}");
             $this->log("Valor: R$ " . number_format($transaction['valor_total'], 2, ',', '.'));
             
-            // Formatar telefone (garantir formato brasileiro com 55)
+            // Formatar telefone
             $phone = $this->formatarTelefone($transaction['cliente_telefone']);
             
             if (!$phone) {
                 throw new Exception("Telefone inválido: {$transaction['cliente_telefone']}");
             }
             
-            // Criar mensagem personalizada
+            // Criar mensagem
             $mensagem = $this->criarMensagemCashback($transaction);
             
             // Enviar via Evolution API
@@ -98,7 +159,7 @@ class WhatsAppEvolutionAutomation {
             if ($resultado['success']) {
                 $this->log("✅ SUCESSO: Mensagem enviada para {$phone}");
                 
-                // Atualizar status de notificação na transação
+                // Atualizar status de notificação
                 $updateQuery = "
                     UPDATE transacoes_cashback 
                     SET notificacao_enviada = 1,
@@ -121,6 +182,31 @@ class WhatsAppEvolutionAutomation {
                 'error' => $e->getMessage()
             ];
         }
+    }
+    
+    /**
+     * Formatar telefone para padrão internacional
+     */
+    private function formatarTelefone($telefone) {
+        // Remover caracteres não numéricos
+        $telefone = preg_replace('/[^0-9]/', '', $telefone);
+        
+        // Se tem 11 dígitos (formato brasileiro), adicionar código do país
+        if (strlen($telefone) == 11) {
+            $telefone = '55' . $telefone;
+        }
+        // Se tem 10 dígitos (sem o 9), adicionar código do país e o 9
+        else if (strlen($telefone) == 10) {
+            $telefone = '55' . substr($telefone, 0, 2) . '9' . substr($telefone, 2);
+        }
+        // Se já tem 13 dígitos (com código do país)
+        else if (strlen($telefone) == 13 && substr($telefone, 0, 2) == '55') {
+            // Já está no formato correto
+        } else {
+            return false; // Formato inválido
+        }
+        
+        return $telefone;
     }
     
     /**
@@ -158,36 +244,14 @@ class WhatsAppEvolutionAutomation {
     }
     
     /**
-     * Formatar telefone para padrão internacional
-     */
-    private function formatarTelefone($telefone) {
-        // Remover caracteres não numéricos
-        $telefone = preg_replace('/[^0-9]/', '', $telefone);
-        
-        // Se tem 11 dígitos (formato brasileiro), adicionar código do país
-        if (strlen($telefone) == 11) {
-            $telefone = '55' . $telefone;
-        }
-        // Se tem 10 dígitos (sem o 9), adicionar código do país e o 9
-        else if (strlen($telefone) == 10) {
-            $telefone = '55' . substr($telefone, 0, 2) . '9' . substr($telefone, 2);
-        }
-        // Se já tem 13 dígitos (com código do país)
-        else if (strlen($telefone) == 13 && substr($telefone, 0, 2) == '55') {
-            // Já está no formato correto
-        } else {
-            return false; // Formato inválido
-        }
-        
-        return $telefone;
-    }
-    
-    /**
      * Enviar mensagem via Evolution API
      */
     private function enviarViaEvolution($phone, $message) {
         try {
             $url = "{$this->evolutionConfig['base_url']}/message/sendText/{$this->evolutionConfig['instance_name']}";
+            
+            $this->log("Enviando para URL: {$url}");
+            $this->log("Telefone: {$phone}");
             
             $data = [
                 'number' => $phone,
@@ -212,11 +276,14 @@ class WhatsAppEvolutionAutomation {
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
             curl_setopt($ch, CURLOPT_TIMEOUT, 10);
             curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
             
             $response = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             $error = curl_error($ch);
             curl_close($ch);
+            
+            $this->log("HTTP Code: {$httpCode}");
             
             if ($error) {
                 throw new Exception("Erro CURL: " . $error);
@@ -250,6 +317,23 @@ class WhatsAppEvolutionAutomation {
      */
     private function registrarEnvio($transactionId, $phone, $message, $success, $response, $error) {
         try {
+            // Verificar se a tabela existe, senão criar
+            $this->db->exec("
+                CREATE TABLE IF NOT EXISTS whatsapp_evolution_logs (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    phone VARCHAR(20),
+                    message TEXT,
+                    success TINYINT(1),
+                    response TEXT,
+                    transaction_id INT,
+                    event_type VARCHAR(50),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_phone (phone),
+                    INDEX idx_transaction (transaction_id),
+                    INDEX idx_created_at (created_at)
+                )
+            ");
+            
             $stmt = $this->db->prepare("
                 INSERT INTO whatsapp_evolution_logs (
                     transaction_id,
@@ -274,7 +358,8 @@ class WhatsAppEvolutionAutomation {
             $stmt->bindParam(':phone', $phone);
             $stmt->bindParam(':message', $message);
             $stmt->bindParam(':success', $success, PDO::PARAM_INT);
-            $stmt->bindParam(':response', json_encode($response ?? ['error' => $error]));
+            $responseJson = json_encode($response ?? ['error' => $error]);
+            $stmt->bindParam(':response', $responseJson);
             $stmt->execute();
             
             // Também registrar na tabela whatsapp_logs principal
@@ -322,41 +407,56 @@ class WhatsAppEvolutionAutomation {
         $timestamp = date('Y-m-d H:i:s');
         $logMessage = "[{$timestamp}] {$message}\n";
         file_put_contents($this->logFile, $logMessage, FILE_APPEND);
-        error_log("WhatsApp Automation: {$message}");
+        error_log("WhatsApp Evolution: {$message}");
     }
     
     /**
-     * Verificar status da instância Evolution
+     * Testar conexão básica com a API
      */
-    public function verificarStatusInstancia() {
+    public function testarConexaoAPI() {
         try {
-            $url = "{$this->evolutionConfig['base_url']}/instance/connectionState/{$this->evolutionConfig['instance_name']}";
+            $urls = [
+                "{$this->evolutionConfig['base_url']}/instance/fetchInstances",
+                "https://evolution-api.klubecash.com/instance/fetchInstances",
+                "http://localhost:8080/instance/fetchInstances",
+                "https://api.evolution.klubecash.com/instance/fetchInstances"
+            ];
             
-            $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, $url);
-            curl_setopt($ch, CURLOPT_HTTPHEADER, [
-                'apikey: ' . $this->evolutionConfig['api_key']
-            ]);
-            curl_setopt($ch, CURLOPT_RETURNTRANSABLE, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 5);
-            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-            
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            curl_close($ch);
-            
-            if ($httpCode === 200) {
-                $data = json_decode($response, true);
-                return [
-                    'connected' => ($data['state'] === 'open'),
-                    'status' => $data
-                ];
+            foreach ($urls as $url) {
+                $ch = curl_init();
+                curl_setopt($ch, CURLOPT_URL, $url);
+                curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                    'apikey: ' . $this->evolutionConfig['api_key']
+                ]);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+                curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+                
+                $response = curl_exec($ch);
+                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $error = curl_error($ch);
+                curl_close($ch);
+                
+                if ($httpCode === 200 && !$error) {
+                    return [
+                        'success' => true,
+                        'url' => $url,
+                        'response' => json_decode($response, true)
+                    ];
+                }
             }
             
-            return ['connected' => false, 'status' => null];
+            return [
+                'success' => false,
+                'error' => 'Não foi possível conectar à Evolution API em nenhuma URL testada'
+            ];
             
         } catch (Exception $e) {
-            return ['connected' => false, 'error' => $e->getMessage()];
+            return [
+                'success' => false,
+                'error' => $e->getMessage()
+            ];
         }
     }
 }
