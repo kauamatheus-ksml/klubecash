@@ -52,6 +52,7 @@ define('VIEWS_DIR', ROOT_DIR . '/views');
 define('UPLOADS_DIR', ROOT_DIR . '/uploads');
 define('LOGS_DIR', ROOT_DIR . '/logs');
 define('ASSETS_DIR', ROOT_DIR . '/assets');
+define('DISPLAY_DEBUG_LOGS', false);
 
 // === CONFIGURAÇÕES DE CASHBACK ===
 define('DEFAULT_CASHBACK_TOTAL', 10.00);
@@ -745,3 +746,4 @@ if (!defined('PASSWORD_MIN_LENGTH')) {
     define('PASSWORD_MIN_LENGTH', 8);
 }
 ?>
+
