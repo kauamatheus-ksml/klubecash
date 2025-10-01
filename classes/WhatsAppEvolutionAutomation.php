@@ -15,7 +15,7 @@ class WhatsAppEvolutionAutomation {
         $this->evolutionConfig = [
             'base_url' => 'https://evolution.klubecash.com', // URL da sua Evolution API
             'instance_name' => 'klubecash',
-            'api_key' => 'B6D711FCDE4D4FD5936544120E713976'
+            'api_key' => 'XjllCXtwjUXxbecrCvsM6h78ppLMgpNL'
         ];
         
         // Conectar ao banco
