@@ -6,11 +6,7 @@
 if (!defined('ROOT_PATH')) {
     define('ROOT_PATH', '/home/u383946504/domains/klubecash.com/public_html/'); // SEU CAMINHO ABSOLUTO
 }
-// === CONFIGURAÇÕES WHATSAPP EVOLUTION API ===
-define('EVOLUTION_API_URL', 'https://evolutionapi.klubecash.com'); // Ajuste para sua URL
-define('EVOLUTION_INSTANCE', 'klubecash');
-define('EVOLUTION_API_KEY', 'XjllCXtwjUXxbecrCvsM6h78ppLMgpNL'); // Sua chave
-define('EVOLUTION_ENABLED', true); // Ativar/desativar automação
+
 
 // === TIPOS DE CLIENTE ===
 define('CLIENT_TYPE_COMPLETE', 'completo');      // Cliente com cadastro completo

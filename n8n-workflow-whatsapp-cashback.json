@@ -1,0 +1,245 @@
+{
+  "name": "KlubeCash - Notificação WhatsApp Cashback",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "A cada 1 minuto",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n    t.id as transacao_id,\n    t.valor_cliente,\n    t.valor_total,\n    u.nome,\n    CONCAT('55', REGEXP_REPLACE(u.telefone, '[^0-9]', '')) as telefone,\n    l.nome_fantasia as loja_nome\nFROM transacoes_cashback t\nJOIN usuarios u ON t.usuario_id = u.id\nJOIN lojas l ON t.loja_id = l.id\nLEFT JOIN cashback_notificacoes n ON n.transacao_id = t.id AND n.status = 'enviada'\nWHERE t.status = 'aprovado' \n  AND n.id IS NULL\n  AND t.data_transacao >= DATE_SUB(NOW(), INTERVAL 10 MINUTE)\nLIMIT 10"
+      },
+      "id": "mysql-buscar",
+      "name": "Buscar Transações Não Notificadas",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        460,
+        300
+      ],
+      "credentials": {
+        "mySql": {
+          "id": "SUAS_CREDENCIAIS_MYSQL",
+          "name": "MySQL - KlubeCash"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "condition-1",
+              "leftValue": "={{ $json.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-tem-dados",
+      "name": "Tem transações?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "loop-items",
+      "name": "Loop Cada Transação",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        900,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://evolutionapi.klubecash.com/message/sendText/KluebCash",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "HONejkqQLlxZoeYiaQxmUczVRTdqscw2"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "number",
+              "value": "={{ $json.telefone }}"
+            },
+            {
+              "name": "text",
+              "value": "🎉 *Parabéns {{ $json.nome }}!*\n\nSeu cashback foi liberado! 💰\n\n📋 *Detalhes:*\n• Compra: R$ {{ $json.valor_total }}\n• Cashback: R$ {{ $json.valor_cliente }}\n• Loja: {{ $json.loja_nome }}\n\n✅ Saldo disponível para uso!\n\nAcesse: https://klubecash.com/cliente/dashboard"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "http-whatsapp",
+      "name": "Enviar WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1120,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "=INSERT INTO cashback_notificacoes (transacao_id, status, observacao, data_tentativa)\nVALUES ({{ $json.transacao_id }}, 'enviada', 'Notificação automática via N8N', NOW())"
+      },
+      "id": "mysql-registrar",
+      "name": "Registrar Notificação Enviada",
+      "type": "n8n-nodes-base.mySql",
+      "typeVersion": 2.4,
+      "position": [
+        1340,
+        200
+      ],
+      "credentials": {
+        "mySql": {
+          "id": "SUAS_CREDENCIAIS_MYSQL",
+          "name": "MySQL - KlubeCash"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "no-data",
+      "name": "Sem Dados",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        900,
+        400
+      ]
+    }
+  ],
+  "connections": {
+    "A cada 1 minuto": {
+      "main": [
+        [
+          {
+            "node": "Buscar Transações Não Notificadas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Transações Não Notificadas": {
+      "main": [
+        [
+          {
+            "node": "Tem transações?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tem transações?": {
+      "main": [
+        [
+          {
+            "node": "Loop Cada Transação",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Sem Dados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Cada Transação": {
+      "main": [
+        [
+          {
+            "node": "Enviar WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Registrar Notificação Enviada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registrar Notificação Enviada": {
+      "main": [
+        [
+          {
+            "node": "Loop Cada Transação",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2025-09-29T00:00:00.000Z",
+  "versionId": "1"
+}

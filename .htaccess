@@ -23,8 +23,7 @@ RewriteBase /
 #RewriteRule ^views/client/dashboard\.php$ /auto-redirect.php [L]
 RewriteRule ^api/store-client-search/?$ api/store-client-search.php [L,QSA]
 RewriteRule ^uploads/whatsapp_images/.*\.(png|jpg|jpeg)$ - [L]
-# Teste WhatsApp Automation
-RewriteRule ^test-whatsapp/?$ test-whatsapp-automation.php [L,QSA]
+
 # BYPASS FUNCIONÁRIO
 RewriteCond %{QUERY_STRING} bypass=funcionario
 RewriteRule ^store/dashboard/?$ views/stores/dashboard.php?bypass=funcionario [L]
