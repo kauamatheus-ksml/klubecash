@@ -103,15 +103,6 @@ define('VIP_CLIENT_MIN_TRANSACTIONS', 20);
 define('BIG_PURCHASE_THRESHOLD', 200.00);
 
 
-// === CONFIGURAÇÕES WHATSAPP BOT ===
-define('WHATSAPP_BOT_URL', 'http://localhost:3003');
-define('WHATSAPP_BOT_SECRET', 'klube-cash-2024');
-define('WHATSAPP_ENABLED', true);
-define('WHATSAPP_TIMEOUT', 30);
-define('WHATSAPP_PRODUCTION_MODE', true); // NOVA: Indicador explícito de modo produção
-
-define('WHATSAPP_SALDO_KEYWORDS', ['saldo', 'extrato', 'cashback', 'consulta']);
-define('WHATSAPP_SALDO_API_URL', SITE_URL . '/api/whatsapp-saldo.php');
 // === SISTEMA DE USUÁRIOS SIMPLIFICADO ===
 // Todos os funcionários têm acesso igual ao lojista
 define('STORE_ACCESS_TYPES', [

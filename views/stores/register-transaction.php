@@ -183,15 +183,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 
                 if ($result['status']) {
-                    // === INTEGRAÇÃO WHATSAPP DIRETA ===
-                    try {
-                        require_once '../../utils/NotificationTrigger.php';
-                        $notificationResult = NotificationTrigger::send($result['data']['transaction_id']);
-                        error_log("[TRACE] register-transaction.php - Notificação enviada: " . json_encode($notificationResult), 3, '../../integration_trace.log');
-                    } catch (Exception $e) {
-                        error_log("[TRACE] register-transaction.php - ERRO na notificação: " . $e->getMessage(), 3, '../../integration_trace.log');
-                    }
-
                     // ✅ AUDITORIA: Registrar quem criou a transação
                     StoreHelper::logUserAction($_SESSION['user_id'], 'criou_transacao', [
                         'loja_id' => $storeId,
